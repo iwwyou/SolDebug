@@ -1,0 +1,4547 @@
+# SolidityGuardian/Analyzers/ContractAnalyzer.py
+from Utils.Interval import *
+from Utils.cfg import *
+from Utils.util import *
+from solcx import compile_source, install_solc
+from collections import deque
+import solcx
+import re
+import copy
+
+
+class ContractAnalyzer:
+    def __init__(self):
+        self.addressManager = AddressSymbolicManager()
+
+        self.full_code = None
+        self.full_code_lines = {} # 라인별 코드를 저장하는 딕셔너리
+        self.brace_count = {} # 각 라인에서 `{`와 `}`의 개수를 저장하는 딕셔너리
+
+        self.current_start_line = None
+        self.current_end_line = None
+
+        self.current_context_type = None
+        self.current_target_contract = None
+        self.current_target_function = None
+        self.current_target_function_cfg = None
+        self.current_target_struct = None
+
+        # for Multiple Contract
+        self.contract_cfgs = {} # name -> CFG
+
+        self.analysis_results = None
+
+    """
+    Prev analysis part
+    """
+
+    def update_code(self, start_line, end_line, new_code):
+        """
+        1) 기존 로직 그대로 유지: 라인들을 self.full_code_lines에 삽입/갱신
+        2) 만약 new_code가 "@during-execution" 주석이라면, 기존 라인을 수정 (append) 하여 코드가 '밀리지' 않도록 처리
+        """
+
+        self.current_start_line = start_line
+        self.current_end_line = end_line
+
+        lines = new_code.split('\n')
+
+        # STEP A) 먼저, 'lines'가 딱 한 줄이고, 해당 줄이 '@during-execution' 주석인지 검사
+        #        (여러 줄 주석이 들어오면 아래 별도 처리 필요)
+        is_single_line = (len(lines) == 1)
+        stripped_line = lines[0].strip() if is_single_line else None
+
+        # 체크: 이 라인이 '@during-execution'인지
+        # (혹은 startswith("// @during-execution")로 더 정확히 해도 됨)
+        is_during_execution_comment = False
+        if is_single_line and stripped_line.startswith('// @during-execution'):
+            is_during_execution_comment = True
+
+        if is_during_execution_comment:
+            # --- STEP B) 인라인 주석을 기존 line 끝에 추가 ---
+
+            # 1) 기존 라인 가져오기
+            #    만약 기존에 해당 line이 없으면? (ex: new code appended at end) -> fallback?
+            if start_line in self.full_code_lines:
+                original = self.full_code_lines[start_line]
+
+                # 2) 혹시 이미 세미콜론 등 공백이 있는지 확인 후
+                #    (원하는 대로 spacing/줄바꿈을 조정)
+                updated_line = original.rstrip() + " " + new_code.lstrip()
+                # -> 이렇게 하면 "int256 _magCorrection = toInt256(...);" 뒤에
+                #    "// @during-execution ..."을 이어붙임
+
+                self.full_code_lines[start_line] = updated_line
+                # brace_count 갱신
+                self.update_brace_count(start_line, updated_line)
+
+            # 3) full_code 다시 합치기
+            self.full_code = '\n'.join(
+                [self.full_code_lines[line_no] for line_no in sorted(self.full_code_lines.keys())]
+            )
+
+        # --- STEP C) 그 외의 경우(기존 로직) ---
+        # 새 라인들 삽입/밀기 등
+        if not self.full_code_lines:  # initialize
+            for i, line_no in enumerate(range(start_line, end_line + 1)):
+                self.full_code_lines[line_no] = lines[i]
+                self.update_brace_count(line_no, lines[i])
+        else:
+            offset = end_line - start_line + 1
+
+            # 1. 기존 라인 뒤로 밀기
+            keys_to_shift = sorted(
+                [line_no for line_no in self.full_code_lines.keys() if line_no >= start_line],
+                reverse=True
+            )
+            for old_line_no in keys_to_shift:
+                self.full_code_lines[old_line_no + offset] = self.full_code_lines.pop(old_line_no)
+                self.update_brace_count(old_line_no + offset, self.full_code_lines[old_line_no + offset])
+
+            # 2. 새로운 코드 라인 삽입
+            for i, line_no in enumerate(range(start_line, end_line + 1)):
+                self.full_code_lines[line_no] = lines[i]
+                self.update_brace_count(line_no, lines[i])
+
+        # 3. full_code 재구성
+        self.full_code = '\n'.join(
+            [self.full_code_lines[line_no] for line_no in sorted(self.full_code_lines.keys())]
+        )
+
+        # 4. analyze_context
+        if new_code != "\n":
+            self.analyze_context(start_line, new_code)
+
+        self.compile_check()
+
+    def compile_check(self):
+        try:
+            install_solc('0.8.0')  # 필요한 Solidity 컴파일러 버전을 설치합니다.
+            compile_source(self.full_code)
+        except solcx.exceptions.SolcError as e:
+            print("Solidity 컴파일 오류: ", e)
+        except Exception as e:
+            print("예상치 못한 오류: ", e)
+
+    def update_brace_count(self, line_number, code):
+        open_braces = code.count('{')
+        close_braces = code.count('}')
+
+        # brace_count 업데이트
+        self.brace_count[line_number] = {
+            'open': open_braces,
+            'close': close_braces,
+            'cfg_node': None
+        }
+
+    def analyze_context(self, start_line, new_code):
+        stripped_code = new_code.strip()
+
+        # (1) 만약 이 라인이 "@pre-execution-global", "@pre-execution-state", 등 Intent가 들어간 주석인지 확인
+        if stripped_code.startswith('// @'):
+            self.current_context_type = "intentUnit"
+            self.current_target_contract = self.find_contract_context(start_line)
+            if 'pre-execution-global' in stripped_code :
+                return
+            self.current_target_function = self.find_function_context(start_line)
+            return  # 이 함수 종료
+
+        # 매 분석마다 초기화
+        self.current_context_type = None
+        self.current_target_contract = None
+        self.current_target_function = None
+        self.current_target_struct = None
+
+        # 새로 추가된 코드 블록의 컨텍스트를 분석
+        if stripped_code.endswith(';'):
+            if 'while' in stripped_code :
+                self.current_context_type = "doWhileWhile"
+                pass
+
+            parent_context = self.find_parent_context(start_line)
+            if parent_context == "contract" : # 시작 규칙 : interactiveSourceUnit
+                self.current_context_type = "stateVariableDeclaration"
+                self.current_target_contract = self.find_contract_context(start_line)
+            elif parent_context == "struct" : # 시작 규칙 : interactiveStructUnit
+                self.current_context_type = "structMember"
+                self.current_target_contract = self.find_contract_context(start_line)
+                self.current_target_struct = self.find_struct_context(start_line)
+            else : # constructor, function, --- # 시작 규칙 : interactiveBlockUnit
+                self.current_context_type = "simpleStatement"
+                self.current_target_contract = self.find_contract_context(start_line)
+                self.current_target_function = self.find_function_context(start_line)
+
+        elif ',' in stripped_code:
+            # 함수 정의인지 확인 (괄호 열고 닫힌 경우는 함수 파라미터로 가정)
+            if '(' in stripped_code and ')' in stripped_code:
+                self.current_context_type = "functionDefinition"
+                self.current_target_contract = self.find_contract_context(start_line)
+                self.current_target_function = self.find_function_context(start_line)
+
+            # enum인지 확인
+            else:
+                parent_context = self.find_parent_context(start_line)
+                if parent_context == "enum":
+                    self.current_context_type = "enumMember"
+                    self.current_target_contract = self.find_contract_context(start_line)
+
+        elif '{' in stripped_code: # definition 및 block 관련
+            self.current_context_type = self.determine_top_level_context(new_code)
+
+            if self.current_context_type == "contract" :
+                return
+
+            # 수정 필요할수도 있음
+            self.current_target_contract = self.find_contract_context(start_line)
+            self.current_target_function = self.find_function_context(start_line)
+
+        # 최종적으로 context가 제대로 파악되지 않은 경우 기본값 처리
+        if not self.current_target_contract:
+            raise ValueError(f"Contract context not found for line {start_line}")
+        if self.current_context_type == "simpleStatement" and not self.current_target_function:
+            raise ValueError(f"Function context not found for simple statement at line {start_line}")
+
+    def find_parent_context(self, line_number):
+        close_brace_count = 0
+
+        # 위로 거슬러 올라가면서 `{`와 `}`의 짝을 찾기
+        for line in range(line_number - 1, 0, -1):
+            brace_info = self.brace_count.get(line, {'open': 0, 'close': 0, 'cfg_node': None})
+            open_braces = brace_info['open']
+            close_braces = brace_info['close']
+
+            if close_brace_count > 0:
+                close_brace_count -= open_braces
+                if close_brace_count <= 0:
+                    close_brace_count = 0
+            else:
+                if open_braces > 0:
+                    return self.determine_top_level_context(self.full_code_lines[line])
+                close_brace_count += close_braces
+
+        return "unknown"
+
+    def find_contract_context(self, line_number):
+        # 위로 거슬러 올라가면서 해당 라인이 속한 컨트랙트를 찾습니다.
+        for line in range(line_number, 0, -1):
+            brace_info = self.brace_count.get(line, {'open': 0, 'close': 0, 'cfg_node': None})
+            if brace_info['open'] > 0 and brace_info['cfg_node']:
+                context_type = self.determine_top_level_context(self.full_code_lines[line])
+                if context_type == "contract":
+                    return self.full_code_lines[line].split()[1]  # contract 이름 반환
+        return None
+
+    def find_function_context(self, line_number):
+        # 위로 거슬러 올라가면서 해당 라인이 속한 함수를 찾습니다.
+        for line in range(line_number, 0, -1):
+            brace_info = self.brace_count.get(line, {'open': 0, 'close': 0, 'cfg_node': None})
+            if brace_info['open'] > 0 and brace_info['cfg_node']:
+                context_type = self.determine_top_level_context(self.full_code_lines[line])
+                if context_type == "function":
+                    # 함수 이름 뒤에 붙은 '('를 기준으로 함수 이름만 추출
+                    function_declaration = self.full_code_lines[line]
+                    function_name = function_declaration.split()[1]  # 첫 번째는 함수 선언, 두 번째는 함수 이름 포함
+                    function_name = function_name.split('(')[0]  # 함수 이름만 추출
+                    return function_name
+        return None
+
+    def find_struct_context(self, line_number):
+        # 위로 거슬러 올라가면서 해당 라인이 속한 함수를 찾습니다.
+        for line in range(line_number, 0, -1):
+            brace_info = self.brace_count.get(line, {'open': 0, 'close': 0, 'cfg_node': None})
+            if brace_info['open'] > 0 and brace_info['cfg_node']:
+                context_type = self.determine_top_level_context(self.full_code_lines[line])
+                if context_type == "struct":
+                    return self.full_code_lines[line].split()[1]
+
+    def determine_top_level_context(self, code_line):
+        try:
+            # 코드 라인의 내용에 따라 최상위 컨텍스트를 결정
+            stripped_code = code_line.strip()
+
+            if stripped_code.startswith("contract"):
+                return "contract"
+            elif stripped_code.startswith("interface"):
+                return "interface"
+            elif stripped_code.startswith("library"):
+                return "library"
+            elif stripped_code.startswith("function"):
+                return "function"
+            elif stripped_code.startswith("constructor"):
+                return "constructor"
+            elif stripped_code.startswith("fallback"):
+                return "fallback"
+            elif stripped_code.startswith("receive"):
+                return "receive"
+            elif stripped_code.startswith("modifier"):
+                return "modifier"
+            elif stripped_code.startswith("struct"):
+                return "struct"
+            elif stripped_code.startswith("enum"):
+                return "enum"
+            elif stripped_code.startswith("event"):
+                return "event"
+            elif stripped_code.startswith("if"):
+                return "if"
+            elif stripped_code.startswith("else if"):
+                return "else_if"
+            elif stripped_code.startswith("else"):
+                return "else"
+            elif stripped_code.startswith("for"):
+                return "for"
+            elif stripped_code.startswith("while"):
+                return "while"
+            elif stripped_code.startswith("do"):
+                return "do_while"
+            elif stripped_code.startswith("try"):
+                return "try"
+            elif stripped_code.startswith("catch"):
+                return "catch"
+            elif stripped_code.startswith("assembly"):
+                return "assembly"
+            else:
+                raise ValueError(f"Unknown context type for line: {code_line}")
+
+        except ValueError as e:
+            print(f"Error: {e}")
+            return "unknown"
+
+    def get_full_code(self):
+        return self.full_code
+
+    def get_current_context_type(self):
+        return self.current_context_type
+
+    """
+    cfg part    
+    """
+
+    def make_contract_cfg(self, contract_name):
+        if contract_name not in self.contract_cfgs:
+            # 새로운 ContractCFG 생성
+            self.contract_cfgs[contract_name] = ContractCFG(contract_name)
+            # CFG 노드를 brace_count에 저장 (cfg_node만 업데이트)
+            self.brace_count[self.current_start_line]['cfg_node'] = self.contract_cfgs[contract_name]
+
+    def get_contract_cfg(self, contract_name):
+        return self.contract_cfgs.get(contract_name)
+
+    # for interactiveEnumDefinition in Solidity.g4
+    def process_enum_definition(self, enum_name):
+        contract_cfg = self.contract_cfgs.get(self.current_target_contract)
+
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # 새로운 EnumDefinition 객체 생성
+        enum_def = EnumDefinition(enum_name)
+        contract_cfg.define_enum(enum_name, enum_def)
+
+        # brace_count 업데이트
+        self.brace_count[self.current_start_line]['cfg_node'] = enum_def
+
+    def process_enum_item(self, items):
+        # 현재 타겟 컨트랙트의 CFG 가져오기
+        contract_cfg = self.contract_cfgs.get(self.current_target_contract)
+
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # brace_count에서 가장 최근의 enum 정의를 찾습니다.
+        enum_def = None
+        for line in reversed(range(self.current_start_line + 1)):
+            context = self.brace_count.get(line)
+            if context and 'cfg_node' in context and isinstance(context['cfg_node'], EnumDefinition):
+                enum_def = context['cfg_node']
+                break
+
+        if enum_def is not None:
+            # EnumDefinition에 아이템 추가
+            for item in items:
+                enum_def.add_member(item)
+        else:
+            raise ValueError(f"Unable to find EnumDefinition context for line {self.current_start_line}")
+
+    # for interactiveStructDefinition in Solidity.g4
+    def process_struct_definition(self, struct_name):
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        struct_def = StructDefinition(struct_name=struct_name)
+
+        contract_cfg.define_struct(struct_def)
+
+        # 10. contract_cfg를 contract_cfgs에 반영
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        # brace_count 업데이트
+        self.brace_count[self.current_start_line]['structs'] = contract_cfg.structs
+
+    def process_struct_member(self, var_name, type_obj):
+        # 1. 현재 타겟 컨트랙트의 CFG를 가져옴
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # 2. 현재 타겟 구조체를 확인하고 멤버 추가
+        if not self.current_target_struct:
+            raise ValueError("No target struct to add members to.")
+
+        contract_cfg.add_struct_member(self.current_target_struct, var_name, type_obj)
+
+        # 10. contract_cfg를 contract_cfgs에 반영
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+    def process_state_variable(self, variable_obj, init_expr=None):
+        # 1. 현재 타겟 컨트랙트의 CFG 가져오기
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # 우변 표현식을 저장하기 위해 init_expr를 확인
+        if init_expr is None: # 초기화가 없으면
+            if isinstance(variable_obj, ArrayVariable) :
+                if variable_obj.typeInfo.arrayBaseType.startswith("int") :
+                    variable_obj.initialize_elements(IntegerInterval.bottom())
+                elif variable_obj.typeInfo.arrayBaseType.startswith("uint") :
+                    variable_obj.initialize_elements(UnsignedIntegerInterval.bottom())
+                elif variable_obj.typeInfo.arrayBaseType.startswith("bool") :
+                    variable_obj.initialize_elements(BoolInterval.bottom())
+                elif variable_obj.typeInfo.arrayBaseType in ["address", "address payable", "string", "bytes", "Byte", "Fixed", "Ufixed"] :
+                    variable_obj.initialize_elements_of_not_abstracted_type(variable_obj.identifier)
+            elif isinstance(variable_obj, StructVariable) :
+                if variable_obj.typeInfo.structTypeName in contract_cfg.structDefs.keys():
+                    struct_def = contract_cfg.structDefs[variable_obj.typeInfo.structTypeName]
+                    variable_obj.initialize_struct(struct_def)
+                else :
+                    ValueError(f"This struct def {variable_obj.typeInfo.structTypeName} is undefined")
+            elif isinstance(variable_obj, MappingVariable) :
+                pass
+            elif isinstance(variable_obj,EnumVariable) :
+                pass
+            elif variable_obj.typeCategory == "elementary" :
+                if variable_obj.elementaryTypeName.startswith("int", "uint", "bool") :
+                    variable_obj.value = self.calculate_default_interval(variable_obj.elementaryTypeName)
+                elif variable_obj.elementaryTypeName in ["address", "address payable", "string", "bytes", "Byte", "Fixed", "Ufixed"] :
+                    variable_obj.value = str('symbol' + variable_obj.identifier)
+        else : # 초기화 식이 있으면
+            if isinstance(variable_obj, ArrayVariable) :
+                inlineArrayValues = self.evaluate_expression(init_expr, contract_cfg.state_variable_node.variables, None, None)
+
+                for value in inlineArrayValues :
+                    variable_obj.elements.append(value)
+            elif isinstance(variable_obj, StructVariable) : # 관련된 경우 없을듯
+                pass
+            elif isinstance(variable_obj, MappingVariable) : # 관련된 경우 없을 듯
+                pass
+            elif variable_obj.typeCategory == "elementary" :
+                variable_obj.value = self.evaluate_expression(init_expr, contract_cfg.state_variable_node.variables, None, None)
+
+        # 4. 상태 변수를 ContractCFG에 추가
+        contract_cfg.add_state_variable(variable_obj, expr=init_expr)
+
+        # 5. ContractCFG에 있는 모든 FunctionCFG에 상태 변수 추가
+        for function_cfg in contract_cfg.functions.values():
+            function_cfg.add_related_variable(variable_obj.identifier, variable_obj)
+
+        # 6. contract_cfg를 contract_cfgs에 반영
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        # 7. brace_count 업데이트
+        self.brace_count[self.current_start_line]['cfg_node'] = contract_cfg.state_variable_node
+
+    def process_constant_variable(self, variable_obj, init_expr):
+        # 1. 현재 타겟 컨트랙트의 CFG 가져오기
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # 2. abstract interpretation 수행 (상수이므로 반드시 초기화 식이 있어야 함)
+        if init_expr:
+            interval_result = self.evaluate_expression(init_expr)
+            if interval_result is not None:
+                variable_obj.value = interval_result
+            else:
+                raise ValueError(f"Unable to evaluate constant expression for {variable_obj.identifier}")
+        else:
+            raise ValueError(f"Constant variable {variable_obj.identifier} must have an initializer.")
+
+        # 4. 상수임을 표시
+        variable_obj.isConstant = True
+
+        # 3. 상태 변수를 ContractCFG에 추가
+        contract_cfg.add_state_variable(variable_obj.identifier, variable_obj)
+
+        # 5. brace_count 업데이트
+        self.brace_count[self.current_start_line]['cfg_node'] = contract_cfg.state_variable_node
+
+    def process_modifier_definition(self, modifier_name, parameters):
+        # 현재 컨텍스트에서 타겟 컨트랙트를 가져옴
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # Modifier에 대한 FunctionCFG 생성
+        modifier_cfg = FunctionCFG(function_type='modifier', function_name=modifier_name)
+
+        # 파라미터가 있을 경우, 이를 FunctionCFG에 추가
+        for var_name, var_type_info in parameters.items():
+            modifier_cfg.add_related_variable(var_name, var_type_info)
+
+        # 현재 state_variable_node에서 상태 변수를 가져와 related_variables에 추가
+        if contract_cfg.state_variable_node:
+            for var_name, var_info in contract_cfg.state_variable_node.variables.items():
+                modifier_cfg.add_related_variable(var_name, var_info)
+
+        # Modifier CFG를 ContractCFG에 추가
+        contract_cfg.add_function_cfg(modifier_cfg)
+
+        # 10. contract_cfg를 contract_cfgs에 반영
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        # brace_count 업데이트 (필요시)
+        self.brace_count[self.current_start_line]['cfg_node'] = modifier_cfg.get_entry_node()
+
+    def process_modifier_invocation(self, function_cfg, modifier_name):
+        # 현재 타겟 컨트랙트의 CFG를 가져옴
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # ContractCFG에서 modifier CFG를 가져옴
+        modifier_cfg = contract_cfg.get_modifier_cfg(modifier_name)
+
+        if not modifier_cfg:
+            raise ValueError(f"Modifier {modifier_name} not found in contract {self.current_target_contract}")
+
+        # Modifier를 function CFG에 통합 (entry와 exit 노드 연결)
+        function_cfg.integrate_modifier(modifier_cfg)
+
+        # function_cfg에 modifier 이름 추가
+        function_cfg.modifiers[modifier_name] = modifier_cfg
+
+        # 9. function_cfg 결과를 contract_cfg에 반영
+        contract_cfg.functions[self.current_target_function] = function_cfg
+
+        # 10. contract_cfg를 contract_cfgs에 반영
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+    def process_constructor_definition(self, constructor_name, parameters, modifiers):
+        # 현재 컨텍스트에서 타겟 컨트랙트를 가져옴
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # Constructor에 대한 FunctionCFG 생성
+        constructor_cfg = FunctionCFG(function_type='constructor', function_name=constructor_name)
+
+        # 파라미터가 있을 경우, 이를 FunctionCFG에 추가
+        for variable in parameters:
+            constructor_cfg.add_related_variable(variable)
+
+        # Modifier가 있을 경우 이를 FunctionCFG에 추가
+        for modifier_name in modifiers:
+            self.process_modifier_invocation(constructor_cfg, modifier_name)
+
+        # Constructor CFG를 ContractCFG에 추가
+        contract_cfg.add_constructor_to_cfg(constructor_cfg)
+
+        # 10. contract_cfg를 contract_cfgs에 반영
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        # 현재 state_variable_node에서 상태 변수를 가져와 related_variables에 추가
+        if contract_cfg.state_variable_node:
+            for var_name, var_info in contract_cfg.state_variable_node.variables.items():
+                constructor_cfg.add_related_variable(var_name, var_info)
+
+        self.brace_count[self.current_start_line]['cfg_node'] = constructor_cfg.get_entry_node()
+
+    def process_function_definition(self, function_name, parameters, modifiers, returns):
+        # 1. 현재 타겟 컨트랙트의 CFG를 가져옴
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # 2. 함수에 대한 FunctionCFG 생성
+        function_cfg = FunctionCFG(function_type='function', function_name=function_name)
+
+        # 3. 파라미터 처리
+        for type_obj, var_name in parameters:
+            variable_obj = None
+
+            # 타입에 따라 적절한 변수 클래스를 생성
+            if type_obj.typeCategory == 'array':
+                # 배열 타입인 경우 ArrayVariable 생성
+                variable_obj = ArrayVariable(
+                    identifier=var_name,
+                    base_type=type_obj.arrayBaseType,
+                    array_length=type_obj.arrayLength,
+                    scope="local"
+                )
+
+                baseType = type_obj.arrayBaseType
+
+                # 배열 요소 초기화
+                if baseType.startswith('int') :
+                    length = int(baseType[3:]) if baseType != "int" else 256
+                    variable_obj.initialize_elements(IntegerInterval.bottom(length))  # 기본 interval 설정
+                elif baseType.startswith('uint') :
+                    length = int(baseType[4:]) if baseType != "int" else 256
+                    variable_obj.initialize_elements(UnsignedIntegerInterval.bottom(length))  # 기본 interval 설정
+                elif baseType == 'bool' :
+                    variable_obj.initialize_elements(BoolInterval.bottom())
+                elif baseType in ["address", "address payable", "string", "bytes", "Byte", "Fixed", "Ufixed"] :
+                    variable_obj.initialize_elements_of_not_abstracted_type(var_name)
+
+            elif type_obj.typeCategory == 'struct':
+                if type_obj.structTypeName in contract_cfg.structDefs :
+                    struct_def = contract_cfg.structDefs[type_obj.structTypeName]
+
+                    variable_obj = StructVariable(
+                        identifier = var_name,
+                        struct_type = type_obj.structTypeName,
+                        socpe="local" # 이거 나중에 storage인지 memory인지 보고 고쳐야됨
+                    )
+
+                    variable_obj.initialize_struct(struct_def)
+
+                else :
+                    raise ValueError (f"This struct definition {type_obj.structTypeName} is not defined")
+            elif type_obj.typeCategory == "elementary":
+                # 기본 타입인 경우 Variables 객체 생성
+                variable_obj = Variables(identifier=var_name, scope="local")
+                variable_obj.typeInfo = type_obj  # SolType 객체를 typeInfo로 설정
+
+                if type_obj.elementaryTypeName.startswith('int', 'uint', 'bool') :
+                    variable_obj.value = self.calculate_default_interval(type_obj.elementaryTypeName)
+                elif type_obj.elementaryTypeName in ["address", "address payable", "string", "bytes", "Byte", "Fixed", "Ufixed"] :
+                    variable_obj.value = str("symbol" + var_name)
+
+        # 4. Modifier 처리 및 CFG 통합
+        for modifier_name in modifiers:
+            self.process_modifier_invocation(function_cfg, modifier_name)
+
+        # 5. 반환 타입 처리 (있다면)
+        if returns:
+            for variable in returns:
+                function_cfg.add_related_variable(variable)
+
+        # 현재 state_variable_node에서 상태 변수를 가져와 related_variables에 추가
+        if contract_cfg.state_variable_node:
+            for var_name, variable in contract_cfg.state_variable_node.variables.items():
+                function_cfg.add_related_variable(variable)
+
+        # 9. function_cfg 결과를 contract_cfg에 반영
+        contract_cfg.functions[function_name] = function_cfg
+
+        # 10. contract_cfg를 contract_cfgs에 반영
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        # 7. brace_count에 CFG 노드 정보 업데이트 (함수의 시작 라인 정보 사용)
+        self.brace_count[self.current_start_line]['cfg_node'] = function_cfg.get_entry_node()
+
+    def process_variable_declaration(self, type_obj, var_name, init_expr=None):
+        # 1. 현재 타겟 컨트랙트의 CFG 가져오기
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # 2. 현재 타겟 함수의 CFG 가져오기
+        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not self.current_target_function_cfg:
+            raise ValueError("No active function to add variables to.")
+
+        # 좌변 변수 객체 생성
+        variable_obj = None
+        if type_obj.typeCategory == 'array':
+            # 배열 타입인 경우 ArrayVariable 생성
+            base_type = type_obj.arrayBaseType
+            array_length = type_obj.arrayLength
+            variable_obj = ArrayVariable(identifier=var_name, base_type=base_type,
+                                         array_length=array_length, scope='local')
+
+        elif type_obj.typeCategory == 'struct':
+            # 구조체 타입인 경우 StructVariable 생성
+            struct_type = type_obj.structTypeName
+            variable_obj = StructVariable(identifier=var_name, struct_type=struct_type, scope='local')
+
+        elif type_obj.typeCategry == 'Enum' :
+            struct_type = type_obj.enumTypeName
+            variable_obj = EnumVariable(identifier=var_name, enum_type=struct_type, scope='local')
+
+        else:
+            # 기본 타입인 경우 Variables 객체 생성
+            variable_obj = Variables(identifier=var_name, scope="local")
+            variable_obj.typeInfo = type_obj  # SolType 객체를 typeInfo로 설정
+
+        # 3. 현재 블록의 CFG 노드 가져오기
+        current_block = self.get_current_block()
+
+        # 우변 표현식을 저장하기 위해 init_expr를 확인
+        if init_expr is None:  # 초기화가 없으면
+            if isinstance(variable_obj, ArrayVariable):
+                if variable_obj.typeInfo.arrayBaseType.startswith("int"):
+                    variable_obj.initialize_elements(IntegerInterval.bottom())
+                elif variable_obj.typeInfo.arrayBaseType.startswith("uint"):
+                    variable_obj.initialize_elements(UnsignedIntegerInterval.bottom())
+                elif variable_obj.typeInfo.arrayBaseType.startswith("bool"):
+                    variable_obj.initialize_elements(BoolInterval.bottom())
+                elif variable_obj.typeInfo.arrayBaseType in ["address", "address payable", "string", "bytes", "Byte",
+                                                             "Fixed", "Ufixed"]:
+                    variable_obj.initialize_elements_of_not_abstracted_type(variable_obj.identifier)
+            elif isinstance(variable_obj, StructVariable):
+                if variable_obj.typeInfo.structTypeName in contract_cfg.structDefs:
+                    struct_def = contract_cfg.structDefs[variable_obj.typeInfo.structTypeName]
+                    variable_obj.initialize_struct(struct_def)
+                else:
+                    ValueError(f"This struct def {variable_obj.struct_type} is undefined")
+            elif isinstance(variable_obj, MappingVariable): # 동적으로 할당되서 선언이 딱히 없음
+                pass
+            elif isinstance(variable_obj, EnumVariable):
+                if variable_obj.typeInfo.enumTypeName in contract_cfg.enumDefs :
+                    enum_def = contract_cfg.enumDefs[variable_obj.typeInfo.enumTypeName]
+                    variable_obj.value = enum_def.members[0]
+                    variable_obj.valueIndex = 0
+
+            elif variable_obj.typeCategory == "elementary":
+                if variable_obj.elementaryTypeName.startswith("int", "uint", "bool"):
+                    variable_obj.value = self.calculate_default_interval(variable_obj.elementaryTypeName)
+                elif variable_obj.elementaryTypeName in ["address", "address payable", "string", "bytes", "Byte",
+                                                         "Fixed", "Ufixed"]:
+                    variable_obj.value = str('symbol' + variable_obj.identifier)
+
+        else : # 초기화 식이 있으면
+            if isinstance(variable_obj, ArrayVariable) :
+                inlineArrayValues = self.evaluate_expression(init_expr, current_block.variables, None)
+                for value in inlineArrayValues :
+                    variable_obj.elements.append(value)
+            elif isinstance(variable_obj, StructVariable) : # 관련된 경우 있을 것 같긴 함
+                pass
+            elif isinstance(variable_obj, MappingVariable) : # 관련된 경우 없을 듯
+                pass
+            elif isinstance(variable_obj, EnumVariable) : # 관련된 경우 있을 것 같긴 함
+                enum_val = self.evaluate_expression(init_expr, current_block.variables, None)
+
+                if isinstance(enum_val, IntegerInterval):
+                    # int값으로 들어온 경우 -> 만약 min==max라면 유효 범위인지 검사
+                    if enum_val.min_value == enum_val.max_value:
+                        index_val = enum_val.min_value
+                        # enum_def = contract_cfg.enumDefs[variable_obj.typeInfo.enumTypeName]
+                        # 여기서 index_val이 enum_def.members 범위 내인지?
+                        # (논문 스코프에선 간단히 pass 해도 됨)
+                        variable_obj.valueIndex = index_val
+                        variable_obj.value = f"EnumIndex({index_val})"
+                    else:
+                        # 범위가 넓으면 symbolic
+                        variable_obj.value = f"SymbolicEnumInterval({enum_val})"
+
+                elif isinstance(enum_val, str):
+                    # 만약 "RED" 처럼 들어왔을 때
+                    # enum_def = contract_cfg.enumDefs[variable_obj.typeInfo.enumTypeName]
+                    # if enum_val in enum_def.members => variable_obj.valueIndex = ...
+                    variable_obj.value = enum_val
+                else:
+                    # 나머지는 symbolic
+                    variable_obj.value = f"symbolicEnum({enum_val})"
+
+            elif variable_obj.typeCategory == "elementary" :
+                variable_obj.value = self.evaluate_expression(init_expr, current_block.variables, None)
+
+        # cfg node에 문장 추가
+        current_block.variables[variable_obj.identifier] = variable_obj
+        current_block.add_variable_declaration_statement(type_obj, var_name, init_expr)
+
+        # function_cfg에 지역변수 추가
+        self.current_target_function_cfg.add_related_variable(variable_obj)
+
+        # variableDeclarationStatement가 loop 안에 있으면 fixpoint 알고리즘 수행
+        if current_block.is_loop_body :
+            vars = self.fixpoint(current_block)
+            self.update_loop_body(vars, current_block)
+
+        # 11. current_block을 function CFG에 반영
+        self.current_target_function_cfg.update_block(current_block)  # 변경된 블록을 반영
+
+        # 12. function_cfg 결과를 contract_cfg에 반영
+        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+
+        # 13. contract_cfg를 contract_cfgs에 반영
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        # 14. brace_count에 CFG 노드 정보 업데이트 (함수의 시작 라인 정보 사용)
+        self.brace_count[self.current_start_line]['cfg_node'] = current_block
+
+        self.current_target_function_cfg = None
+
+    def process_assignment_expression(self, expr):
+        # 1. 현재 타겟 컨트랙트의 CFG 가져오기
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # 2. 현재 타겟 함수의 CFG 가져오기
+        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not self.current_target_function_cfg:
+            raise ValueError("No active function to add variables to.")
+
+        # 3. 현재 블록의 CFG 노드 가져오기
+        current_block = self.get_current_block()
+
+        # assignment에 대한 abstract interpretation 수행
+        rExpVal = self.evaluate_expression(expr.right, current_block.variables, None, None)
+        self.update_left_var(expr.left, rExpVal, expr.operator, current_block.variables, None, None)
+
+        current_block.add_assign_statement(expr.left, expr.operator, expr.right)
+
+        if current_block.is_loop_body:
+            vars = self.fixpoint(current_block)
+            self.update_loop_body(vars, current_block)
+
+        # 9. current_block을 function CFG에 반영
+        self.current_target_function_cfg.update_block(current_block)  # 변경된 블록을 반영
+
+        # 10. function_cfg 결과를 contract_cfg에 반영
+        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+
+        # 11. contract_cfg를 contract_cfgs에 반영
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        # 12. brace_count에 CFG 노드 정보 업데이트 (함수의 시작 라인 정보 사용)
+        self.brace_count[self.current_start_line]['cfg_node'] = current_block
+
+    def process_unary_prefix_operation(self, expr):
+        # 1. 현재 타겟 컨트랙트의 CFG 가져오기
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # 2. 현재 타겟 함수의 CFG 가져오기
+        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not self.current_target_function_cfg:
+            raise ValueError("No active function to add variables to.")
+
+        # 3. 현재 블록의 CFG 노드 가져오기
+        current_block = self.get_current_block()
+
+        literalExp = Expression(literal=1, context='LiteralExpContext')
+
+        if expr.operator == "++" :
+            self.update_left_var(expr.expression, 1, '+=', current_block.variables, None, None)
+            current_block.add_assign_statement(expr.expression, '+=', literalExp)
+        elif expr.operator == "--" :
+            self.update_left_var(expr.expression, 1, '-=', current_block.variables, None, None)
+            current_block.add_assign_statement(expr.expression, '-=', literalExp)
+
+        if current_block.is_loop_body:
+            vars = self.fixpoint(current_block)
+            self.update_loop_body(vars, current_block)
+
+        # 10. current_block을 function CFG에 반영
+        self.current_target_function_cfg.update_block(current_block)  # 변경된 블록을 반영
+
+        # 11. function_cfg 결과를 contract_cfg에 반영
+        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+
+        # 12. contract_cfg를 contract_cfgs에 반영
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        # 12. brace_count에 CFG 노드 정보 업데이트 (함수의 시작 라인 정보 사용)
+        self.brace_count[self.current_start_line]['cfg_node'] = current_block
+
+        self.current_target_function_cfg = None
+
+    def process_unary_suffix_operation(self, expr):
+        # 1. 현재 타겟 컨트랙트의 CFG 가져오기
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # 2. 현재 타겟 함수의 CFG 가져오기
+        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not self.current_target_function_cfg:
+            raise ValueError("No active function to add variables to.")
+
+        # 3. 현재 블록의 CFG 노드 가져오기
+        current_block = self.get_current_block()
+
+        literalExp = Expression(literal=1, context='LiteralExpContext')
+
+        if expr.operator == "++":
+            self.update_left_var(expr.expression, 1, '+=', current_block.variables, None, None)
+            current_block.add_assign_statement(expr.expression, '+=', literalExp)
+        elif expr.operator == "--":
+            self.update_left_var(expr.expression, 1, '-=', current_block.variables, None, None)
+            current_block.add_assign_statement(expr.expression, '-=', literalExp)
+
+        if current_block.is_loop_body:
+            vars = self.fixpoint(current_block)
+            self.update_loop_body(vars, current_block)
+
+        # 10. current_block을 function CFG에 반영
+        self.current_target_function_cfg.update_block(current_block)  # 변경된 블록을 반영
+
+        # 11. function_cfg 결과를 contract_cfg에 반영
+        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+
+        # 12. contract_cfg를 contract_cfgs에 반영
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        # 12. brace_count에 CFG 노드 정보 업데이트 (함수의 시작 라인 정보 사용)
+        self.brace_count[self.current_start_line]['cfg_node'] = current_block
+
+        self.current_target_function_cfg = None
+    def process_function_call(self, expr):
+        """
+        함수 호출을 처리하는 메소드입니다.
+        :param expr: Expression 객체 (FunctionCall)
+        :return: 함수 호출 결과 (Interval 또는 None)
+        """
+
+        # 1. 현재 타겟 컨트랙트의 CFG 가져오기
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # 2. 현재 타겟 함수의 CFG 가져오기
+        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not self.current_target_function_cfg:
+            raise ValueError("No active function to add variables to.")
+
+        current_block = self.get_current_block()
+
+        # 3. 함수 표현식 가져오기
+        function_expr = expr.function
+
+        _ = self.evaluate_function_call_context(function_expr, current_block.variables, None, None)
+
+        if current_block.is_loop_body:
+            vars = self.fixpoint(current_block)
+            self.update_loop_body(vars, current_block)
+
+        current_block.add_function_call_statement(function_expr)
+
+        # 10. current_block을 function CFG에 반영
+        self.current_target_function_cfg.update_block(current_block)  # 변경된 블록을 반영
+
+        # 11. function_cfg 결과를 contract_cfg에 반영
+        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+
+        # 12. contract_cfg를 contract_cfgs에 반영
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        # 12. brace_count에 CFG 노드 정보 업데이트 (함수의 시작 라인 정보 사용)
+        self.brace_count[self.current_start_line]['cfg_node'] = current_block
+
+        self.current_target_function_cfg = None
+
+    def process_payable_function_call(self, expr):
+        # Handle payable function calls
+        pass
+
+    def process_function_call_options(self, expr):
+        # Handle function calls with options
+        pass
+
+    def process_if_statement(self, condition_expr):
+        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not self.current_target_function_cfg:
+            raise ValueError("No active function to process the if statement.")
+
+        # 2. 현재 블록 가져오기
+        current_block = self.get_current_block()
+
+        # 3. 조건식 블록 생성 및 평가
+        condition_block = CFGNode(name=f"if_condition_{self.current_start_line}",
+                                  condition_node=True,
+                                  condition_node_type="if")
+        condition_block.condition_expr = condition_expr
+        # 7. True 분기에서 변수 상태 복사 및 업데이트
+        condition_block.variables = self.copy_variables(current_block.variables)
+        if current_block.is_loop_body == False :
+            condition_block.is_loop_body = True
+
+        # 4. brace_count 업데이트 - 존재하지 않으면 초기화
+        if self.current_start_line not in self.brace_count:
+            self.brace_count[self.current_start_line] = {}
+        self.brace_count[self.current_start_line]['cfg_node'] = condition_block
+
+        # 5. True 분기 블록 생성
+        true_block = CFGNode(name=f"if_true_{self.current_start_line}")
+
+        # 7. True 분기에서 변수 상태 복사 및 업데이트
+        true_block.variables = self.copy_variables(condition_block.variables)
+        if current_block.is_loop_body == False :
+            condition_block.is_loop_body = True
+        self.update_variables_with_condition(true_block.variables, condition_expr, is_true_branch=True)
+
+        false_block = CFGNode(name=f"if_false_{self.current_start_line}")
+        false_block.variables = self.copy_variables(condition_block.variables)
+        self.update_variables_with_condition(false_block.variables, condition_expr, is_true_branch=False)
+
+        # 8. 현재 블록의 후속 노드 처리 (기존 current_block의 successors를 가져옴)
+        successors = list(self.current_target_function_cfg.graph.successors(current_block))
+
+        # 기존 current_block과 successor들의 edge를 제거
+        for successor in successors:
+            self.current_target_function_cfg.graph.remove_edge(current_block, successor)
+
+        # 9. CFG 노드 추가
+        self.current_target_function_cfg.graph.add_node(condition_block)
+        self.current_target_function_cfg.graph.add_node(true_block)
+        self.current_target_function_cfg.graph.add_node(false_block)
+
+        # 10. 조건 블록과 True/False 분기 연결
+        self.current_target_function_cfg.graph.add_edge(current_block, condition_block)
+        self.current_target_function_cfg.graph.add_edge(condition_block, true_block, condition=True)
+        self.current_target_function_cfg.graph.add_edge(condition_block, false_block, condition=False)
+
+        # 11. True 분기 후속 노드 연결
+        for successor in successors:
+            self.current_target_function_cfg.graph.add_edge(true_block, successor)
+
+        # 11. function_cfg 결과를 contract_cfg에 반영
+        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+
+        # 12. contract_cfg를 contract_cfgs에 반영
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        # 12. brace_count에 CFG 노드 정보 업데이트 (함수의 시작 라인 정보 사용)
+        self.brace_count[self.current_start_line]['cfg_node'] = condition_block
+
+        self.current_target_function_cfg = None
+
+    def process_else_if_statement(self, condition_expr):
+        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not self.current_target_function_cfg:
+            raise ValueError("No active function to process the else-if statement.")
+
+        # 2. 이전 조건 노드를 가져와서 부정된 조건을 처리
+        previous_condition_node = self.find_corresponding_condition_node()
+        if not previous_condition_node:
+            raise ValueError("No previous if or else if node found for else-if statement.")
+
+        # 3. 이전 조건 노드의 False 분기 제거
+        false_successors = list(self.current_target_function_cfg.graph.successors(previous_condition_node))
+        for successor in false_successors:
+            edge_data = self.current_target_function_cfg.graph.get_edge_data(previous_condition_node, successor)
+            if edge_data.get('condition') is False:
+                self.current_target_function_cfg.graph.remove_edge(previous_condition_node, successor)
+
+        # 3. 이전 조건 노드에서 False 분기 처리 (가상의 블록)
+        temp_variables = self.copy_variables(previous_condition_node.variables)
+        self.update_variables_with_condition(temp_variables, previous_condition_node.condition_expr,
+                                             is_true_branch=False)
+
+        # 4. else if 조건식 블록 생성
+        condition_block = CFGNode(name=f"else_if_condition_{self.current_start_line}",
+                                  condition_node=True,
+                                  condition_node_type="else if")
+        condition_block.condition_expr = condition_expr
+
+        # 5. brace_count 업데이트 - 존재하지 않으면 초기화
+        if self.current_start_line not in self.brace_count:
+            self.brace_count[self.current_start_line] = {}
+        self.brace_count[self.current_start_line]['cfg_node'] = condition_block
+
+        # 6. True 분기 블록 생성
+        true_block = CFGNode(name=f"else_if_true_{self.current_start_line + 1}")
+
+        # 7. True 분기에서 변수 상태 복사 및 업데이트
+        true_block.variables = self.copy_variables(temp_variables)
+        self.update_variables_with_condition(true_block.variables, condition_expr, is_true_branch=True)
+
+        # 5. False 분기 블록 생성
+        false_block = CFGNode(name=f"else_if_false_{self.current_start_line}")
+        false_block.variables = self.copy_variables(previous_condition_node.variables)
+        self.update_variables_with_condition(false_block.variables, previous_condition_node.condition_expr,
+                                             is_true_branch=False)
+
+        # 8. 이전 조건 블록과 새로운 else_if_condition 블록 연결
+        self.current_target_function_cfg.graph.add_edge(previous_condition_node, condition_block, condition=False)
+
+        # 9. 새로운 조건 블록과 True 블록 연결
+        self.current_target_function_cfg.graph.add_node(condition_block)
+        self.current_target_function_cfg.graph.add_node(true_block)
+        self.current_target_function_cfg.graph.add_node(false_block)
+
+        self.current_target_function_cfg.graph.add_edge(condition_block, true_block, condition=True)
+        self.current_target_function_cfg.graph.add_edge(condition_block, false_block, condition=False)
+
+        # 11. function_cfg 결과를 contract_cfg에 반영
+        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+
+        # 12. contract_cfg를 contract_cfgs에 반영
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        # 12. brace_count에 CFG 노드 정보 업데이트 (함수의 시작 라인 정보 사용)
+        self.brace_count[self.current_start_line]['cfg_node'] = condition_block
+
+        self.current_target_function_cfg = None
+
+    def process_else_statement(self):
+        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not self.current_target_function_cfg:
+            raise ValueError("No active function to process the else statement.")
+
+        # 2. 대응되는 if 또는 else if의 조건 노드 찾기
+        condition_node = self.find_corresponding_condition_node()
+        if not condition_node:
+            raise ValueError("No corresponding if or else if condition node found for else statement.")
+
+        # 3. 이전 조건 노드의 False 분기 제거
+        false_successors = list(self.current_target_function_cfg.graph.successors(condition_node))
+        for successor in false_successors:
+            edge_data = self.current_target_function_cfg.graph.get_edge_data(condition_node, successor)
+            if edge_data.get('condition') is False:
+                self.current_target_function_cfg.graph.remove_edge(condition_node, successor)
+
+        # 3. False 분기 블록 생성
+        else_block = CFGNode(name=f"else_block_{self.current_start_line}")
+
+        # 5. 변수 상태 관리
+        # else 블록의 변수 상태 초기화 (이전 조건 노드의 변수 상태 복사)
+        else_block.variables = self.copy_variables(condition_node.variables)
+
+        # 6. 조건식 부정된 상태로 변수 값 업데이트
+        self.update_variables_with_condition(else_block.variables, condition_node.condition_expr, is_true_branch=False)
+
+        # 4. CFG 연결 - 조건 노드의 False 브랜치에 else 블록 연결
+        self.current_target_function_cfg.graph.add_node(else_block)
+        self.current_target_function_cfg.graph.add_edge(condition_node, else_block, condition=False)
+
+        # 5. brace_count 업데이트 - 존재하지 않으면 초기화
+        if self.current_start_line not in self.brace_count:
+            self.brace_count[self.current_start_line] = {}
+        self.brace_count[self.current_start_line]['cfg_node'] = else_block
+
+        # 7. CFG 업데이트
+        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        self.current_target_function_cfg = None
+
+    def process_while_statement(self, condition_expr):
+        # 1. Get the current contract and function CFG
+        contract_cfg = self.contract_cfgs.get(self.current_target_contract)
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not self.current_target_function_cfg:
+            raise ValueError("No active function to process the while statement.")
+
+        # 2. Get the current block
+        current_block = self.get_current_block()
+
+        # 3. Create the join point node (entry point for the loop)
+        join_node = CFGNode(name=f"while_join_{self.current_start_line}",
+                            fixpoint_evaluation_node=True)
+
+        # Copy variables from current_block to join_node
+        join_node.variables = self.copy_variables(current_block.variables) # while문 이전에서 들어온 변수의 상태
+        join_node.fixpoint_evaluation_node_vars = self.copy_variables(current_block.variables)
+
+        successors = list(self.current_target_function_cfg.graph.successors(current_block))
+
+        # 기존 current_block과 successor들의 edge를 제거
+        for successor in successors:
+            self.current_target_function_cfg.graph.remove_edge(current_block, successor)
+
+        # 4. Create the condition node
+        condition_node = CFGNode(name=f"while_condition_{self.current_start_line}",
+                                 condition_node=True,
+                                 condition_node_type="while")
+        condition_node.condition_expr = condition_expr  # Store the condition expression for later use
+        condition_node.variables = self.copy_variables(join_node.variables)
+
+        # 5. Connect the current block to the join node (if not already connected)
+        self.current_target_function_cfg.graph.add_node(join_node)
+        self.current_target_function_cfg.graph.add_edge(current_block, join_node)
+
+        # 6. Connect the join node to the condition node
+        self.current_target_function_cfg.graph.add_node(condition_node)
+        self.current_target_function_cfg.graph.add_edge(join_node, condition_node)
+
+        # 7. Create the true node (loop body)
+        true_node = CFGNode(name=f"while_body_{self.current_start_line}")
+        true_node.is_loop_body = True
+        true_node.variables = self.copy_variables(condition_node.variables)
+        self.update_variables_with_condition(true_node.variables, condition_expr, is_true_branch=True)
+
+        # 8. Create the false node (exit block)
+        false_node = CFGNode(name=f"while_exit_{self.current_start_line}",
+                             loop_exit_node=True)
+
+        # 9. Connect the condition node's true branch to the true node
+        self.current_target_function_cfg.graph.add_node(true_node)
+        self.current_target_function_cfg.graph.add_edge(condition_node, true_node, condition=True)
+
+        # 10. Connect the condition node's false branch to the false node
+        self.current_target_function_cfg.graph.add_node(false_node)
+        self.current_target_function_cfg.graph.add_edge(condition_node, false_node, condition=False)
+
+        # 기존 current_block과 successor들을 false block의 successor로
+        for successor in successors:
+            self.current_target_function_cfg.graph.add_edge(successor, false_node)
+
+        # 11. Connect the true node back to the join node (loop back)
+        self.current_target_function_cfg.graph.add_edge(true_node, join_node)
+
+        # 8. Return 노드에 대한 brace_count 업데이트
+        if self.current_start_line not in self.brace_count:
+            self.brace_count[self.current_start_line] = {}
+        self.brace_count[self.current_start_line]['cfg_node'] = condition_node
+
+        # 8. CFG 업데이트
+        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        self.current_target_function_cfg = None
+
+    def process_for_statement(self, initial_statement=None, condition_expr=None, increment_expr=None):
+
+        # 1) 현재 컨트랙트 / 함수 CFG 가져오기
+        contract_cfg = self.contract_cfgs.get(self.current_target_contract)
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+        function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not function_cfg:
+            raise ValueError("No active function to process the for statement.")
+
+        current_block = self.get_current_block()  # for문 직전에 위치한 block
+
+        # 2) 먼저 initial_statement 처리
+        #    - 이 부분은 'for' 루프에 진입하기 전에 한 번만 실행
+        #    - while문 로직에서는 없었던 부분이므로, 여기서만 추가
+        init_node = CFGNode(f"for_init_{self.current_start_line}")
+        init_node.variables = self.copy_variables(current_block.variables)
+
+        # 6) exit node
+        exit_node = CFGNode(name=f"for_exit_{self.current_start_line}", loop_exit_node=True)
+        exit_node.variables = self.copy_variables(current_block.variables)
+
+        # 8) 기존 current_block 의 successor(들)를 exit_node로 연결
+        successors = list(function_cfg.graph.successors(current_block))
+
+        # 기존 current_block과 successor들의 edge를 제거
+        for successor in successors:
+            self.current_target_function_cfg.graph.remove_edge(current_block, successor)
+            self.current_target_function_cfg.graph.add_edge(exit_node, successor)
+
+        if initial_statement is not None:
+            if initial_statement.get('context') == 'VariableDeclaration':
+                # initVarType, initVarName, initValExpr
+                initVarType = initial_statement['initVarType']
+                initVarName = initial_statement['initVarName']
+                initValExpr = initial_statement['initValExpr']
+
+                # 예시 (단순) 처리:
+                var_obj = Variables(identifier=initVarName, typeInfo=initVarType, scope="local")
+                init_node.variables[initVarName] = var_obj
+                if initValExpr is not None:
+                    val = self.evaluate_expression(initValExpr, init_node.variables)
+                    var_obj.value = val
+
+            elif initial_statement['context'] == 'Expression' :
+                tempExpr = initial_statement['initExpr']
+                rExpVal = self.evaluate_expression(tempExpr.right, init_node.variables, None, None)
+                self.update_left_var(tempExpr.left, rExpVal,'=', init_node.variables, None)
+
+
+        # 3) join node 생성 (while_join과 유사)
+        join_node = CFGNode(name=f"for_join_{self.current_start_line}", fixpoint_evaluation_node=True)
+        join_node.variables = self.copy_variables(init_node.variables)
+        join_node.fixpoint_evaluation_node_vars = self.copy_variables(init_node.variables)
+
+        function_cfg.graph.add_node(init_node)
+        function_cfg.graph.add_edge(current_block, init_node)
+        function_cfg.graph.add_node(join_node)
+        function_cfg.graph.add_edge(init_node, join_node)
+
+        # 4) condition node
+        cond_node = CFGNode(name=f"for_condition_{self.current_start_line}",
+                            condition_node=True,
+                            condition_node_type="for")
+        cond_node.condition_expr = condition_expr
+        cond_node.variables = self.copy_variables(join_node.variables)
+
+        function_cfg.graph.add_node(cond_node)
+        function_cfg.graph.add_edge(join_node, cond_node)
+
+        # 5) loop body node
+        body_node = CFGNode(name=f"for_body_{self.current_start_line}")
+        body_node.is_loop_body = True
+        body_node.variables = self.copy_variables(cond_node.variables)
+        if condition_expr is not None:
+            self.update_variables_with_condition(body_node.variables, condition_expr, is_true_branch=True)
+
+        function_cfg.graph.add_node(body_node)
+        # true branch (cond==True) → body_node
+        function_cfg.graph.add_edge(cond_node, body_node, condition=True)
+
+        function_cfg.graph.add_node(exit_node)
+        function_cfg.graph.add_edge(cond_node, exit_node, condition=False)
+        # false branch refine
+        if condition_expr is not None:
+            self.update_variables_with_condition(exit_node.variables, condition_expr, is_true_branch=False)
+
+        # 7) 증분문(increment) 노드
+        #   - 보통 C/solidity 스타일 for문은 "본문 실행 후 → 증분문 실행 → 다시 condition" 식
+        increment_node = CFGNode(name=f"for_increment_{self.current_start_line}")
+        increment_node.variables = self.copy_variables(body_node.variables)
+
+        # 여기서 increment_expr_ctx → Expression 객체로 만들어 interpret / store
+        if increment_expr is not None:
+            literalExp = Expression(literal=1, context='LiteralExpContext')
+
+            if increment_expr.operator == "++" :
+                self.update_left_var(increment_expr.expression, 1, '+=', increment_node.variables, None, None)
+                increment_node.add_assign_statement(increment_expr.expression, "+=", literalExp)
+            elif increment_expr.operator == "--" :
+                self.update_left_var(increment_expr.expression, 1, '-=', increment_node.variables, None, None)
+                increment_node.add_assign_statement(increment_expr.expression, "-=", literalExp)
+            elif increment_expr.operator == "+=" :
+                self.update_left_var(increment_expr.left, increment_expr.right, '+=', increment_node.variables, None, None)
+                increment_node.add_assign_statement(increment_expr.left, "+=", increment_expr.right)
+            elif increment_expr.operator == "-=" :
+                self.update_left_var(increment_expr.left, increment_expr.right, '-=', increment_node.variables, None, None)
+                increment_node.add_assign_statement(increment_expr.left, "-=", increment_expr.right)
+            else :
+                raise ValueError(f"This operator '{increment_expr.operator}' is not expected.")
+
+        function_cfg.graph.add_node(increment_node)
+        # body_node → increment_node
+        function_cfg.graph.add_edge(body_node, increment_node)
+
+        # increment_node → join_node (루프 백)
+        function_cfg.graph.add_edge(increment_node, join_node)
+
+        # 9) 마지막으로 CFG 업데이트
+        contract_cfg.functions[self.current_target_function] = function_cfg
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        # brace_count 업데이트 (선택)
+        if self.current_start_line not in self.brace_count:
+            self.brace_count[self.current_start_line] = {}
+        self.brace_count[self.current_start_line]['cfg_node'] = cond_node
+
+        self.current_target_function_cfg = None
+
+    def process_continue_statement(self):
+        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
+        contract_cfg = self.contract_cfgs.get(self.current_target_contract)
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not self.current_target_function_cfg:
+            raise ValueError("No active function to process the continue statement.")
+
+        # 2. 현재 블록 가져오기 (continue가 발생한 블록)
+        current_block = self.get_current_block()
+
+        # 3. 현재 블록에 continue statement 추가 (Statement 객체로 추가)
+        current_block.add_continue_statement()
+
+        # 4. 재귀적으로 fixpoint_evaluation_node 찾기
+        fixpoint_evaluation_node = self.find_fixpoint_evaluation_node(current_block, self.current_target_function_cfg)
+        if not fixpoint_evaluation_node:
+            raise ValueError("No corresponding loop join node found for continue statement.")
+
+        # 5. 현재 블록의 모든 successor와의 edge 제거
+        successors = list(self.current_target_function_cfg.graph.successors(current_block))
+        for successor in successors:
+            self.current_target_function_cfg.graph.remove_edge(current_block, successor)
+
+        # 6. 현재 블록을 fixpoint_evaluation_node로 연결 (loop로 다시 돌아감)
+        self.current_target_function_cfg.graph.add_edge(current_block, fixpoint_evaluation_node)
+
+        if current_block.is_loop_body:
+            vars = self.fixpoint(current_block)
+            self.update_loop_body(vars, current_block)
+
+        # 8. Return 노드에 대한 brace_count 업데이트
+        if self.current_start_line not in self.brace_count:
+            self.brace_count[self.current_start_line] = {}
+        self.brace_count[self.current_start_line]['cfg_node'] = current_block
+
+        # 7. CFG 업데이트
+        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        self.current_target_function_cfg = None
+
+    def process_break_statement(self):
+        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
+        contract_cfg = self.contract_cfgs.get(self.current_target_contract)
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not self.current_target_function_cfg:
+            raise ValueError("No active function to process the break statement.")
+
+        # 2. 현재 블록 가져오기 (break가 발생한 블록)
+        current_block = self.get_current_block()
+
+        # 3. 현재 블록에 break statement 추가 (Statement 객체로 추가)
+        current_block.add_break_statement()
+
+        # 4. 재귀적으로 위로 타고 올라가서 while문 조건 노드를 찾기
+        condition_node = self.find_loop_condition_node(current_block, self.current_target_function_cfg)
+        if not condition_node:
+            raise ValueError("No corresponding while condition node found for break statement.")
+
+        # 5. 해당 조건 노드의 false branch를 통해 loop_exit_node 찾기
+        loop_exit_node = self.current_target_function_cfg.get_false_block(condition_node)  # 수정된 부분
+        if not loop_exit_node or not loop_exit_node.loop_exit_node:
+            raise ValueError("No valid loop exit node found for break statement.")
+
+        # 6. 현재 블록의 모든 successor와의 edge 제거
+        successors = list(self.current_target_function_cfg.graph.successors(current_block))
+        for successor in successors:
+            self.current_target_function_cfg.graph.remove_edge(current_block, successor)
+
+        # 7. 현재 블록을 loop_exit_node로 연결 (루프에서 빠져나감)
+        self.current_target_function_cfg.graph.add_edge(current_block, loop_exit_node)
+
+        if current_block.is_loop_body:
+            vars = self.fixpoint(current_block)
+            self.update_loop_body(vars, current_block)
+
+        # 8. Return 노드에 대한 brace_count 업데이트
+        if self.current_start_line not in self.brace_count:
+            self.brace_count[self.current_start_line] = {}
+        self.brace_count[self.current_start_line]['cfg_node'] = current_block
+
+        # 8. CFG 업데이트
+        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        self.current_target_function_cfg = None
+
+    def find_fixpoint_evaluation_node(self, current_node):
+        """
+        재귀적으로 predecessor를 탐색하여 fixpoint_evaluation_node를 찾는 함수
+        """
+        # 현재 노드가 fixpoint_evaluation_node라면 반환
+        if current_node.fixpoint_evaluation_node:
+            return current_node
+
+        # 직접적인 predecessor를 탐색
+        predecessors = list(self.current_target_function_cfg.graph.predecessors(current_node))
+        for pred in predecessors:
+            # 재귀적으로 predecessor를 탐색하여 fixpoint_evaluation_node를 찾음
+            fixpoint_evaluation_node = self.find_fixpoint_evaluation_node(pred)
+            if fixpoint_evaluation_node:
+                return fixpoint_evaluation_node
+
+        # fixpoint_evaluation_node를 찾지 못하면 None 반환
+        return None
+
+    def find_loop_condition_node(self, current_node):
+        """
+                재귀적으로 predecessor를 탐색하여 fixpoint_evaluation_node를 찾는 함수
+                """
+        # 현재 노드가 fixpoint_evaluation_node라면 반환
+        if current_node.condition_node and current_node.condition_node_type in["while", "for"] :
+            return current_node
+
+        # 직접적인 predecessor를 탐색
+        predecessors = list(self.current_target_function_cfg.graph.predecessors(current_node))
+        for pred in predecessors:
+            # 재귀적으로 predecessor를 탐색하여 fixpoint_evaluation_node를 찾음
+            loop_condition_node = self.find_loop_condition_node(pred)
+            if loop_condition_node:
+                return loop_condition_node
+
+        # fixpoint_evaluation_node를 찾지 못하면 None 반환
+        return None
+
+    def process_return_statement(self, return_expr=None):
+        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
+        contract_cfg = self.contract_cfgs.get(self.current_target_contract)
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not self.current_target_function_cfg:
+            raise ValueError("No active function to process the return statement.")
+
+        # 2. 현재 블록 가져오기
+        current_block = self.get_current_block()
+
+        # 3. 반환값이 있는 경우 expression 평가
+        if return_expr:
+            return_value = self.evaluate_expression(return_expr, current_block.variables, None, None)
+        else:
+            return_value = None
+
+        # 4. Return 구문을 current_block에 추가
+        current_block.add_return_statement(return_expr=return_expr)
+
+        # 5. function_exit_node에 return 값을 저장
+        exit_node = self.current_target_function_cfg.get_exit_node()
+        exit_node.return_vals[self.current_start_line] = return_value  # 반환 값을 exit_node의 return_val에 기록
+
+        # 7. current_block에서 exit_node로 직접 연결
+        self.current_target_function_cfg.graph.add_edge(current_block, exit_node)
+
+        if current_block.is_loop_body:
+            vars = self.fixpoint(current_block)
+            self.update_loop_body(vars, current_block)
+
+        # 8. CFG 업데이트
+        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        # 9. current_target_function_cfg를 None으로 설정하여 함수 종료
+        self.current_target_function_cfg = None
+
+    def process_revert_statement(self, revert_identifier=None, string_literal=None, call_argument_list=None):
+        # 1. 현재 타겟 컨트랙트의 CFG 가져오기
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # 2. 현재 타겟 함수의 CFG 가져오기
+        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not self.current_target_function_cfg:
+            raise ValueError("No active function to process the revert statement.")
+
+        # 3. 현재 블록 가져오기
+        current_block = self.get_current_block()
+
+        current_block.add_revert_statement(revert_identifier, string_literal, call_argument_list)
+
+        # 5. 함수의 exit 노드와 현재 노드 간 연결이 이미 존재하는지 확인
+        exit_node = self.current_target_function_cfg.get_exit_node()
+        if not self.current_target_function_cfg.graph.has_edge(current_block, exit_node):
+            # 기존 엣지가 없으면 연결
+            self.current_target_function_cfg.graph.add_edge(current_block, exit_node)
+
+        # 7. Revert 노드의 brace_count 업데이트
+        if self.current_start_line not in self.brace_count:
+            self.brace_count[self.current_start_line] = {}
+        self.brace_count[self.current_start_line]['cfg_node'] = current_block
+
+        # 6. CFG 업데이트
+        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        self.current_target_function_cfg = None
+
+    def process_require_statement(self, condition_expr, string_literal):
+        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not self.current_target_function_cfg:
+            raise ValueError("No active function to process the require statement.")
+
+        # 2. 현재 블록 가져오기
+        current_block = self.get_current_block()
+
+        # 3. 기존 current_block의 successor 가져오기
+        successors = list(self.current_target_function_cfg.graph.successors(current_block))
+
+        # 4. 조건식 블록 생성 및 평가
+        require_condition_node = CFGNode(name=f"require_condition_{self.current_start_line}",
+                                         condition_node=True,
+                                         condition_node_type="require")
+        require_condition_node.condition_expr = condition_expr
+
+        # 5. True 분기 블록 생성
+        true_block = CFGNode(name=f"require_true_{self.current_start_line + 1}")
+
+        # 6. True 블록에서 변수 상태 복사 및 업데이트
+        true_block.variables = self.copy_variables(current_block.variables)
+        self.update_variables_with_condition(true_block.variables, condition_expr, is_true_branch=True)
+
+        # 7. 기존 current_block의 successors를 require_condition_node로 설정
+        for successor in successors:
+            self.current_target_function_cfg.graph.add_edge(require_condition_node, successor)
+            self.current_target_function_cfg.graph.remove_edge(current_block, successor)
+
+        # 8. 기존 current_block과 require_condition_node 연결
+        self.current_target_function_cfg.graph.add_node(require_condition_node)
+        self.current_target_function_cfg.graph.add_edge(current_block, require_condition_node)
+
+        # 9. False 분기 처리 (조건이 실패할 경우, exit 노드로 연결)
+        exit_node = self.current_target_function_cfg.get_exit_node()
+        self.current_target_function_cfg.graph.add_edge(require_condition_node, exit_node, condition=False)
+
+        # 10. True 블록 연결
+        self.current_target_function_cfg.graph.add_node(true_block)
+        self.current_target_function_cfg.graph.add_edge(require_condition_node, true_block, condition=True)
+
+        # 11. brace_count 업데이트
+        if self.current_start_line not in self.brace_count:
+            self.brace_count[self.current_start_line] = {}
+        self.brace_count[self.current_start_line]['cfg_node'] = require_condition_node
+
+        # 12. CFG 업데이트
+        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        self.current_target_function_cfg = None
+
+    def process_assert_statement(self, condition_expr, string_literal):
+        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not self.current_target_function_cfg:
+            raise ValueError("No active function to process the require statement.")
+
+        # 2. 현재 블록 가져오기
+        current_block = self.get_current_block()
+
+        # 3. 기존 current_block의 successor 가져오기
+        successors = list(self.current_target_function_cfg.graph.successors(current_block))
+
+        # 4. 조건식 블록 생성 및 평가
+        assert_condition_node = CFGNode(name=f"assert_condition_{self.current_start_line}",
+                                        condition_node=True,
+                                        condition_node_type="assert")
+        assert_condition_node.condition_expr = condition_expr
+
+        # 5. True 분기 블록 생성
+        true_block = CFGNode(name=f"require_true_{self.current_start_line + 1}")
+
+        # 6. True 블록에서 변수 상태 복사 및 업데이트
+        true_block.variables = self.copy_variables(current_block.variables)
+        self.update_variables_with_condition(true_block.variables, condition_expr, is_true_branch=True)
+
+        # 7. 기존 current_block의 successors를 require_condition_node로 설정
+        for successor in successors:
+            self.current_target_function_cfg.graph.add_edge(assert_condition_node, successor)
+            self.current_target_function_cfg.graph.remove_edge(current_block, successor)
+
+        # 8. 기존 current_block과 require_condition_node 연결
+        self.current_target_function_cfg.graph.add_node(assert_condition_node)
+        self.current_target_function_cfg.graph.add_edge(current_block, assert_condition_node)
+
+        # 9. False 분기 처리 (조건이 실패할 경우, exit 노드로 연결)
+        exit_node = self.current_target_function_cfg.get_exit_node()
+        self.current_target_function_cfg.graph.add_edge(assert_condition_node, exit_node, condition=False)
+
+        # 10. True 블록 연결
+        self.current_target_function_cfg.graph.add_node(true_block)
+        self.current_target_function_cfg.graph.add_edge(assert_condition_node, true_block, condition=True)
+
+        # 11. brace_count 업데이트
+        if self.current_start_line not in self.brace_count:
+            self.brace_count[self.current_start_line] = {}
+        self.brace_count[self.current_start_line]['cfg_node'] = assert_condition_node
+
+        # 12. CFG 업데이트
+        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        self.current_target_function_cfg = None
+
+    def process_pre_execution_global(self, global_var_obj: GlobalVariable):
+        """
+        Global pre-execution intent를 처리하여, 예를 들어
+          'block.timestamp' = IntegerInterval(1000, 2000, 256)
+          'msg.sender' = "address 1"
+        와 같이 현재 타겟 컨트랙트의 CFG에 저장합니다.
+        """
+        # 1) 현재 타겟 컨트랙트의 CFG 가져오기
+        contract_cfg = self.contract_cfgs.get(self.current_target_contract)
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # 2) pre_exec_globals에 저장 (키는 완전한 글로벌 변수 이름, 예: "block.timestamp")
+        contract_cfg.pre_exec_globals[global_var_obj.identifier] = global_var_obj
+
+    def process_pre_execution_state(self, lhs_expr, value):
+        """
+        Process a pre-execution-state comment.
+          e.g. // @pre-execution-state myMapping[0x123] = 100
+               // @pre-execution-state myVar = true
+
+        :param lhs_expr: Expression object (from testingExpression)
+                         possible forms:
+                           - identifier only    -> myVar
+                           - index access       -> myArray[3] or myMapping[0x123]
+                           - member access      -> myStruct.member
+                           - nested form        -> myStruct.nestedArray[7]
+        :param value:    int or bool from numberBoolLiteral
+        """
+        # 1) Get the current contract CFG
+        contract_cfg = self.contract_cfgs.get(self.current_target_contract)
+        if contract_cfg is None:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # 2) Get the function CFG (since it's 'pre-execution-state', we assume we are inside a function)
+        function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if function_cfg is None:
+            raise ValueError(f"Unable to find function CFG for {self.current_target_function}")
+
+        # 3) Save it in function_cfg.pre_exec_state
+        #    - build a string key from lhs_expr if needed
+        lhs_key = lhs_expr.to_string() if hasattr(lhs_expr, "to_string") else self._expression_to_str(lhs_expr)
+
+        if not hasattr(function_cfg, "pre_exec_state"):
+            function_cfg.pre_exec_state = {}
+        function_cfg.pre_exec_state[lhs_key] = value
+
+        # 4) Actually update the corresponding variable object in function_cfg.related_variables
+        #    The main logic: we follow the Expression to find the final variable.
+
+        # --- Start from the root Expression (lhs_expr) and recursively descend. ---
+        # e.g. myVar, myArray[3], myStruct.member, myNestedMapping[key].member ...
+        updated_var = self._resolve_and_update_expr(lhs_expr, function_cfg, value)
+
+        # 5) (Optional) re-run abstract interpretation to reflect the changes
+        # self.re_run_abstract_interpretation(function_cfg)
+
+    def process_pre_execution_local(self, lhs_expr, value):
+        """
+               Process a pre-execution-state comment.
+                 e.g. // @pre-execution-state myMapping[0x123] = 100
+                      // @pre-execution-state myVar = true
+
+               :param lhs_expr: Expression object (from testingExpression)
+                                possible forms:
+                                  - identifier only    -> myVar
+                                  - index access       -> myArray[3] or myMapping[0x123]
+                                  - member access      -> myStruct.member
+                                  - nested form        -> myStruct.nestedArray[7]
+               :param value:    int or bool from numberBoolLiteral
+               """
+        # 1) Get the current contract CFG
+        contract_cfg = self.contract_cfgs.get(self.current_target_contract)
+        if contract_cfg is None:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # 2) Get the function CFG (since it's 'pre-execution-state', we assume we are inside a function)
+        function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if function_cfg is None:
+            raise ValueError(f"Unable to find function CFG for {self.current_target_function}")
+
+        # 3) Save it in function_cfg.pre_exec_state
+        #    - build a string key from lhs_expr if needed
+        lhs_key = lhs_expr.to_string() if hasattr(lhs_expr, "to_string") else self._expression_to_str(lhs_expr)
+
+        if not hasattr(function_cfg, "pre_exec_state"):
+            function_cfg.pre_exec_local = {}
+        function_cfg.pre_exec_local[lhs_key] = value
+
+        # 4) Actually update the corresponding variable object in function_cfg.related_variables
+        #    The main logic: we follow the Expression to find the final variable.
+
+        # --- Start from the root Expression (lhs_expr) and recursively descend. ---
+        # e.g. myVar, myArray[3], myStruct.member, myNestedMapping[key].member ...
+        updated_var = self._resolve_and_update_expr(lhs_expr, function_cfg, value)
+
+        # 5) (Optional) re-run abstract interpretation to reflect the changes
+        # self.re_run_abstract_interpretation(function_cfg)
+
+    def _expression_to_str(self, expr):
+        """
+        Helper to convert a (testing) Expression into a string representation.
+        e.g.
+          Expression(identifier='myVar') -> "myVar"
+          Expression(base=..., member='memberName') -> "base.memberName"
+          Expression(base=..., index=someExpr) -> "base[someExpr]"
+        This is just for storing in a dict key if we want.
+        """
+        # If expr is just identifier:
+        if expr.member is None and expr.index is None and expr.base is None:
+            return expr.identifier  # e.g. "myVar"
+        # If it's member access
+        if expr.member is not None:
+            # build base string, then ".member"
+            base_str = self._expression_to_str(expr.base)
+            return f"{base_str}.{expr.member}"
+        # If it's index access
+        if expr.index is not None:
+            base_str = self._expression_to_str(expr.base)
+            # index part: if index is literal or identifier
+            if expr.index.literal is not None:
+                idx_str = str(expr.index.literal)
+            elif expr.index.identifier is not None:
+                idx_str = expr.index.identifier
+            else:
+                # fallback
+                idx_str = self._expression_to_str(expr.index)
+            return f"{base_str}[{idx_str}]"
+
+        # fallback: if none of the above logic
+        return "EXPR?"
+
+    def _resolve_and_update_expr(self, expr, function_cfg, new_value):
+        """
+        Recursively resolve expr to find the actual Variables (or MappingVariable, etc.) and update its 'value'.
+        Return the updated Variables object if found.
+
+        expr: Expression object
+        function_cfg: current function CFG
+        new_value: int or bool
+        """
+        # if expr has no base, we are at root identifier
+        if expr.base is None:
+            # e.g. "myVar"
+            var_name = expr.identifier
+            var_obj = function_cfg.get_related_variable(var_name)
+            if var_obj is not None:
+                self._apply_new_value_to_variable(var_obj, new_value)
+                return var_obj
+            else:
+                print(f"[Warning] var '{var_name}' not found in function '{function_cfg.function_name}'.")
+                return None
+        else:
+            # there's a base expression
+            base_obj = self._resolve_and_update_expr(expr.base, function_cfg, None)
+            # we don't update the base with new_value, but we do want to navigate
+            if base_obj is None:
+                # cannot proceed
+                return None
+
+            # If it's member access
+            if expr.member is not None:
+                # base_obj should be e.g. a StructVariable or similar
+                if isinstance(base_obj, StructVariable):
+                    member_name = expr.member
+                    if member_name in base_obj.members:
+                        member_var = base_obj.members[member_name]
+                        if expr.index is None:
+                            # we want to update member_var with new_value (if new_value != None)
+                            if new_value is not None:
+                                self._apply_new_value_to_variable(member_var, new_value)
+                            return member_var
+                        else:
+                            # theoretically structVar.member[...]?
+                            print("[Warning] structVar.member[...] not typical, skipping.")
+                            return None
+                    else:
+                        print(f"[Warning] struct '{base_obj.identifier}' has no member '{member_name}'")
+                        return None
+                else:
+                    print(f"[Warning] Attempting member access on non-struct var '{base_obj.identifier}'")
+                    return None
+
+            # If it's index access
+            if expr.index is not None:
+                # base_obj should be e.g. ArrayVariable or MappingVariable
+                if isinstance(base_obj, ArrayVariable):
+                    # index might be literal or maybe an expression
+                    idx_val = self._extract_index_val(expr.index)
+                    idx_int = int(idx_val)  # enforce int
+                    if 0 <= idx_int < len(base_obj.elements):
+                        element_var = base_obj.elements[idx_int]
+                        if new_value is not None:
+                            self._apply_new_value_to_variable(element_var, new_value)
+                        return element_var
+                    else:
+                        print(f"[Warning] array index out of range: {idx_int}")
+                        return None
+
+                elif isinstance(base_obj, MappingVariable):
+                    idx_val = self._extract_index_val(expr.index)  # string or int
+                    # we store it as string, typically
+                    key_str = str(idx_val)
+                    # get or create mapping entry
+                    mapped_var = base_obj.mapping.get(key_str)
+                    if mapped_var is None:
+                        # create new
+                        mapped_var = self._create_new_mapping_value(base_obj, key_str)
+                        base_obj.mapping[key_str] = mapped_var
+                    # update mapped_var if new_value is not None
+                    if new_value is not None:
+                        self._apply_new_value_to_variable(mapped_var, new_value)
+                    return mapped_var
+                else:
+                    print(
+                        f"[Warning] Attempting index access on var '{base_obj.identifier}' which is not array/mapping.")
+                    return None
+
+            # fallback
+            return None
+
+    def _apply_new_value_to_variable(self, var_obj, new_value):
+        """
+        Given var_obj (Variables, ArrayVariable, etc.) and new_value (int or bool),
+        interpret typeInfo and update var_obj.value accordingly.
+        """
+        if not hasattr(var_obj, "typeInfo") or var_obj.typeInfo is None:
+            # no type info => just store as integer?
+            var_obj.value = new_value
+            return
+
+        # e.g. elementary type?
+        etype = var_obj.typeInfo.elementaryTypeName
+        if etype is None:
+            # might be array/mapping/struct but let's see typeCategory
+            if var_obj.typeInfo.typeCategory == 'array':
+                print(f"[Info] _apply_new_value_to_variable: array type update not supported directly.")
+                return
+            elif var_obj.typeInfo.typeCategory == 'mapping':
+                print(f"[Info] _apply_new_value_to_variable: mapping type update not supported directly.")
+                return
+            elif var_obj.typeInfo.typeCategory == 'struct':
+                print(f"[Info] _apply_new_value_to_variable: struct type update not supported directly.")
+                return
+            else:
+                print("[Warning] unknown typeCategory in var_obj.typeInfo")
+                return
+
+        # if we do have something like "int", "uint", "bool"
+        if etype.startswith("int"):
+            bit_len = var_obj.typeInfo.intTypeLength if var_obj.typeInfo.intTypeLength else 256
+            if isinstance(new_value, bool):
+                # treat as int(0 or 1)
+                int_val = 1 if new_value else 0
+                var_obj.value = IntegerInterval(int_val, int_val, bit_len)
+            else:
+                var_obj.value = IntegerInterval(new_value, new_value, bit_len)
+        elif etype.startswith("uint"):
+            bit_len = var_obj.typeInfo.intTypeLength if var_obj.typeInfo.intTypeLength else 256
+            if isinstance(new_value, bool):
+                int_val = 1 if new_value else 0
+                var_obj.value = UnsignedIntegerInterval(int_val, int_val, bit_len)
+            else:
+                var_obj.value = UnsignedIntegerInterval(new_value, new_value, bit_len)
+        elif etype == "bool":
+            if isinstance(new_value, bool):
+                var_obj.value = BoolInterval(new_value, new_value)
+            else:
+                # interpret non-zero => True
+                bool_val = (new_value != 0)
+                var_obj.value = BoolInterval(bool_val, bool_val)
+        else:
+            print(f"[Warning] _apply_new_value_to_variable: unrecognized elementary type '{etype}'")
+
+    def _extract_index_val(self, index_expr):
+        """
+        Attempt to get a concrete index from index_expr (Expression).
+        If it's literal: return int(index_expr.literal)
+        If it's identifier: we might not have a direct integer => handle carefully
+        etc.
+        """
+        if index_expr.literal is not None:
+            return int(index_expr.literal, 0)  # parse w/ base=0 => auto 0x => hex
+        elif index_expr.identifier is not None:
+            # we could look up if that identifier is known => partial for now
+            return index_expr.identifier
+        else:
+            # fallback => to_string or something
+            return "???"
+
+    def _create_new_mapping_value(self, map_var, key_str):
+        """
+        Create a new default Variables object for the given mapping key if not existing.
+        We can look up map_var.typeInfo.mappingValueType and build a suitable variable.
+        """
+        # e.g. an elementary
+        val_type = map_var.typeInfo.mappingValueType
+        if val_type.typeCategory == 'elementary':
+            etype = val_type.elementaryTypeName
+            if etype.startswith('int'):
+                bit_len = val_type.intTypeLength if val_type.intTypeLength else 256
+                default_val = IntegerInterval(0, 0, bit_len)
+                new_obj = Variables(identifier=f"{map_var.identifier}[{key_str}]",
+                                    value=default_val,
+                                    scope=map_var.scope,
+                                    typeInfo=val_type)
+                return new_obj
+            elif etype.startswith('uint'):
+                bit_len = val_type.intTypeLength if val_type.intTypeLength else 256
+                default_val = UnsignedIntegerInterval(0, 0, bit_len)
+                new_obj = Variables(identifier=f"{map_var.identifier}[{key_str}]",
+                                    value=default_val,
+                                    scope=map_var.scope,
+                                    typeInfo=val_type)
+                return new_obj
+            elif etype == 'bool':
+                default_val = BoolInterval(False, False)
+                new_obj = Variables(identifier=f"{map_var.identifier}[{key_str}]",
+                                    value=default_val,
+                                    scope=map_var.scope,
+                                    typeInfo=val_type)
+                return new_obj
+            else:
+                # fallback
+                new_obj = Variables(identifier=f"{map_var.identifier}[{key_str}]",
+                                    value=None,
+                                    scope=map_var.scope,
+                                    typeInfo=val_type)
+                return new_obj
+        else:
+            # array / struct / mapping => we'd have to create ArrayVariable, StructVariable, etc.
+            print("[Info] _create_new_mapping_value: non-elementary value type => returning simple placeholder.")
+            new_obj = Variables(identifier=f"{map_var.identifier}[{key_str}]",
+                                value=None,
+                                scope=map_var.scope,
+                                typeInfo=val_type)
+            return new_obj
+
+    import copy
+
+    def copy_variables(self, variables):
+        """
+        주어진 변수 딕셔너리(variables)를 깊은 복사하여 반환합니다.
+        variables: var_name -> Variables 객체
+        """
+        copied_variables = {}
+        for var_name, var_obj in variables.items():
+            if isinstance(var_obj, ArrayVariable):
+                copied_array = ArrayVariable(
+                    identifier=var_obj.identifier,
+                    base_type=var_obj.typeInfo.arrayBaseType,
+                    array_length=var_obj.typeInfo.arrayLength,
+                    is_dynamic=var_obj.typeInfo.isDynamicArray,
+                    value=copy.deepcopy(var_obj.value),
+                    isConstant=var_obj.isConstant,
+                    scope=var_obj.scope
+                )
+                # 배열의 각 요소를 깊은 복사
+                copied_array.elements = [self.copy_variables({elem.identifier: elem})[elem.identifier] for elem in
+                                         var_obj.elements]
+                copied_variables[var_name] = copied_array
+
+            elif isinstance(var_obj, StructVariable):
+                copied_struct = StructVariable(
+                    identifier=var_obj.identifier,
+                    struct_type=var_obj.typeInfo.structTypeName,
+                    value=copy.deepcopy(var_obj.value),
+                    isConstant=var_obj.isConstant,
+                    scope=var_obj.scope
+                )
+                # 구조체 멤버를 깊은 복사
+                copied_struct.members = {member_name: self.copy_variables({member_name: member_obj})[member_name] for
+                                         member_name, member_obj in var_obj.members.items()}
+                copied_variables[var_name] = copied_struct
+
+            elif isinstance(var_obj, MappingVariable):
+                copied_mapping = MappingVariable(
+                    identifier=var_obj.identifier,
+                    key_type=var_obj.typeInfo.mappingKeyType,
+                    value_type=var_obj.typeInfo.mappingValueType,
+                    value=copy.deepcopy(var_obj.value),
+                    isConstant=var_obj.isConstant,
+                    scope=var_obj.scope
+                )
+                # 매핑의 키-값 쌍을 깊은 복사
+                copied_mapping.mapping = {}
+                for key, value in var_obj.mapping.items():
+                    # 값이 Variables 객체인지 확인
+                    if isinstance(value, Variables):
+                        # Variables 객체인 경우 재귀적으로 복사
+                        copied_value = self.copy_variables({key: value})[key]
+                    else:
+                        # Variables 객체가 아닌 경우 (Interval 등), 값을 그대로 복사
+                        copied_value = copy.deepcopy(value)
+                    copied_mapping.mapping[key] = copied_value
+                copied_variables[var_name] = copied_mapping
+
+            else:
+                # 기본 Variables 타입 처리
+                copied_variables[var_name] = Variables(
+                    identifier=var_obj.identifier,
+                    value=copy.deepcopy(var_obj.value),
+                    isConstant=var_obj.isConstant,
+                    scope=var_obj.scope,
+                    typeInfo=var_obj.typeInfo  # SolType 객체 복사
+                )
+
+        return copied_variables
+
+    def fixpoint(self, current_block):
+        """
+        고정점(Interval) 해석을 수행하여 루프 내 변수 상태를 수렴시킵니다.
+
+        1) 먼저 loop_condition_node와 fixpoint_evaluation_node(while_join, for_join 등)를 찾음
+        2) 루프 내 모든 노드를 수집 (traverse_loop_nodes)
+        3) in_vars[node], out_vars[node]를 반복적으로 조인(join)하여 수렴
+        4) 수렴된 뒤, 각 루프 노드의 variables를 out_vars[node]로 덮어씌움
+        5) fixpoint_evaluation_node의 out_vars를 반환 (루프 초입 시점에 대한 결과)
+
+        :param current_block: 현재 블록(CFGNode). break나 continue가 있을 경우, 이 블록은 루프 내부일 수 있음
+        :return: fixpoint_evaluation_node의 out_vars (dict: var_name -> Variables)
+        """
+        # 1) fixpoint_evaluation_node(while_join, for_join 등) 찾기
+        fixpoint_evaluation_node = self.find_fixpoint_evaluation_node(current_block)
+        if not fixpoint_evaluation_node:
+            raise ValueError("Join point node (fixpoint_evaluation_node) not found for the current block.")
+
+        # 2) loop_condition_node (while_condition, for_condition 등) 찾기
+        loop_condition_node = self.find_loop_condition_node(current_block)
+        if not loop_condition_node:
+            raise ValueError("Loop condition node not found for the current block.")
+
+        # 3) 루프 내 모든 노드 수집
+        loop_nodes = self.traverse_loop_nodes(loop_condition_node)
+
+        # in_vars, out_vars 초기화
+        in_vars = {}
+        out_vars = {}
+        for node in loop_nodes:
+            in_vars[node] = {}
+            out_vars[node] = {}
+
+        # loop_condition_node의 in_vars는
+        # 보통 fixpoint_evaluation_node.fixpoint_evaluation_node_vars에서 시작
+        # (while_join, for_join에서 복사해온 상태)
+        in_vars[loop_condition_node] = self.copy_variables(fixpoint_evaluation_node.fixpoint_evaluation_node_vars)
+
+        # 4) 워크리스트 알고리즘
+        worklist = deque([loop_condition_node])
+        max_iterations = 50
+        iteration = 0
+
+        while worklist and iteration < max_iterations:
+            iteration += 1
+            node = worklist.popleft()
+
+            # 4.1) predecessors의 out_vars를 조인하여 in_vars[node] 계산
+            new_in_vars = None
+            preds = list(self.current_target_function_cfg.graph.predecessors(node))
+
+            for pred in preds:
+                # pred가 루프 내부 노드인지 체크
+                if pred in loop_nodes:
+                    # pred의 out_vars가 이미 계산되어 있으면 조인
+                    if pred in out_vars and out_vars[pred]:
+                        if new_in_vars is None:
+                            new_in_vars = self.copy_variables(out_vars[pred])
+                        else:
+                            new_in_vars = self.join_variables(new_in_vars, out_vars[pred])
+                    else:
+                        # 혹시 pred의 out_vars가 아직 없거나, pred == node인 경우(자기참조) → 보수적으로 pass
+                        pass
+                else:
+                    # pred가 루프 밖에 있으면 => fixpoint_evaluation_node.variables와 조인
+                    # (혹은 pred의 variables를 사용할 수도 있지만, 여기서는 join_node를 대체)
+                    if new_in_vars is None:
+                        new_in_vars = self.copy_variables(fixpoint_evaluation_node.variables)
+                    else:
+                        new_in_vars = self.join_variables(new_in_vars, fixpoint_evaluation_node.variables)
+
+            # 4.2) in_vars[node] 갱신 여부
+            if new_in_vars:
+                if not self.variables_equal(in_vars[node], new_in_vars):
+                    in_vars[node] = new_in_vars
+
+            # 4.3) node의 transfer function
+            old_out_vars = out_vars[node]
+            out_vars[node] = self.transfer_function(node, in_vars[node])
+
+            # 4.4) out_vars[node]가 변화했으면 successor들을 worklist에 넣음
+            if not self.variables_equal(old_out_vars, out_vars[node]):
+                successors = list(self.current_target_function_cfg.graph.successors(node))
+                for succ in successors:
+                    if succ in loop_nodes:
+                        worklist.append(succ)
+
+            if iteration == max_iterations:
+                print("Fixpoint analysis did not converge within max_iterations.")
+                break
+
+        # 5) 최종적으로 수렴된 값으로 노드들의 variables를 갱신
+        for node in loop_nodes:
+            node.variables = out_vars[node]
+
+        # 보통 fixpoint_evaluation_node의 out_vars가 "루프 진입 시점"의 최종 상태를 의미
+        return out_vars[fixpoint_evaluation_node]
+
+    def traverse_loop_nodes(self, loop_node):
+        """
+        루프 내의 모든 노드를 수집합니다.
+        :param loop_node: 루프의 시작 노드 (fixpoint_evaluation_node)
+        :return: 루프 내의 노드 집합 (set)
+        """
+        visited = set()
+        stack = [loop_node]
+        while stack:
+            current_node = stack.pop()
+            if current_node in visited:
+                continue
+            visited.add(current_node)
+            successors = list(self.current_target_function_cfg.graph.successors(current_node))
+            for succ in successors:
+                # 루프 종료 노드로의 에지는 제외
+                if current_node.condition_node and \
+                        current_node.condition_node_type in ['while', 'for', 'do'] :
+                    if succ.loop_exit_node:
+                        continue
+                stack.append(succ)
+        return visited
+
+    def join_variables(self, vars1, vars2):
+        """
+        두 변수 상태(vars1, vars2)를 조인하여(합집합) 반환.
+        - array: 요소별 join
+        - struct: 멤버별 join
+        - mapping: 매핑 key별 join
+        - 기본타입: Interval join
+        """
+        result = self.copy_variables(vars1)
+
+        for var_name, var_obj2 in vars2.items():
+            if var_name in result:
+                var_obj1 = result[var_name]
+
+                # 타입 동일성
+                if var_obj1.typeInfo.typeCategory != var_obj2.typeInfo.typeCategory:
+                    raise TypeError(f"Cannot join different typeCategories: {var_obj1.typeInfo.typeCategory} "
+                                    f"vs {var_obj2.typeInfo.typeCategory}")
+
+                cat = var_obj1.typeInfo.typeCategory
+                if cat == 'array':
+                    # 길이 같음 전제(동적 배열 등은 별도 정책)
+                    if len(var_obj1.elements) != len(var_obj2.elements):
+                        raise ValueError("Cannot join arrays of different lengths (static array).")
+                    for i, (e1, e2) in enumerate(zip(var_obj1.elements, var_obj2.elements)):
+                        joined_elem = self.join_variables({e1.identifier: e1}, {e2.identifier: e2})
+                        var_obj1.elements[i] = joined_elem[e1.identifier]
+
+                elif cat == 'struct':
+                    # 멤버별 join
+                    var_obj1.members = self.join_variables(var_obj1.members, var_obj2.members)
+
+                elif cat == 'mapping':
+                    # 매핑된 키-값 each join
+                    for key, mvar2 in var_obj2.mapping.items():
+                        if key not in var_obj1.mapping:
+                            # 없는 키 => 새로 복사
+                            var_obj1.mapping[key] = self.copy_variables({key: mvar2})[key]
+                        else:
+                            # 기존 키 => join
+                            mvar1 = var_obj1.mapping[key]
+                            joined_map = self.join_variables({key: mvar1}, {key: mvar2})
+                            var_obj1.mapping[key] = joined_map[key]
+
+                else:
+                    # elementary => interval join
+                    var_obj1.value = self.join_variable_values(var_obj1.value, var_obj2.value)
+            else:
+                # 새 변수
+                result[var_name] = self.copy_variables({var_name: var_obj2})[var_name]
+        return result
+
+    def variables_equal(self, vars1, vars2):
+        """
+        두 변수 딕셔너리가 동일한지 비교
+        - array: length/각 요소
+        - struct: 멤버별
+        - mapping: 동일 key, 동일 값
+        - elementary: interval 동등성 체크
+        """
+        if vars1.keys() != vars2.keys():
+            return False
+
+        for var_name in vars1:
+            if var_name not in vars2:
+                return False
+
+            obj1 = vars1[var_name]
+            obj2 = vars2[var_name]
+
+            cat = obj1.typeInfo.typeCategory
+            if cat != obj2.typeInfo.typeCategory:
+                return False
+
+            if cat == 'array':
+                if len(obj1.elements) != len(obj2.elements):
+                    return False
+                for e1, e2 in zip(obj1.elements, obj2.elements):
+                    # 재귀
+                    if not self.variables_equal({e1.identifier: e1}, {e2.identifier: e2}):
+                        return False
+
+            elif cat == 'struct':
+                if not self.variables_equal(obj1.members, obj2.members):
+                    return False
+
+            elif cat == 'mapping':
+                # 키 동일성
+                if obj1.mapping.keys() != obj2.mapping.keys():
+                    return False
+                for key in obj1.mapping:
+                    if not self.variables_equal({key: obj1.mapping[key]}, {key: obj2.mapping[key]}):
+                        return False
+            else:
+                # elementary => interval equals
+                if not obj1.value.equals(obj2.value):
+                    return False
+
+        return True
+
+    def transfer_function(self, node, in_vars):
+        """
+        노드의 transfer function을 적용하여 out_vars를 계산합니다.
+        :param node: 현재 노드
+        :param in_vars: 노드의 입력 변수 상태 (var_name -> Variables 객체)
+        :return: 노드의 출력 변수 상태 (var_name -> Variables 객체)
+        """
+        out_vars = self.copy_variables(in_vars)
+        if node.condition_node:
+            # 조건 노드 처리
+            self.update_variables_with_condition(out_vars, node.condition_expr, is_true_branch=True)
+        elif node.fixpoint_evaluation_node:
+            return out_vars
+        else:
+            # 일반 노드 처리: 노드의 모든 statement 평가
+            for statement in node.statements:
+                self.update_statement_with_variables(statement, out_vars)
+        return out_vars
+
+    def update_loop_body(self, variables, current_block):
+        """
+        고정점 분석 결과를 바탕으로 while body 내의 문장들의 Interval을 업데이트합니다.
+        :param variables: 수렴된 변수 상태 딕셔너리 (var_name -> Variables 객체)
+        :param current_block: 현재 블록 (CFGNode)
+        """
+        # 1. fixpoint_evaluation_node 찾기
+        fixpoint_evaluation_node = self.find_fixpoint_evaluation_node(current_block)
+        if not fixpoint_evaluation_node:
+            raise ValueError("Join point node not found for the current block.")
+
+        # 2. 루프 내의 모든 노드 수집
+        loop_nodes = self.traverse_loop_nodes(fixpoint_evaluation_node)
+
+        # 3. 각 노드의 문장들에 대해 Interval 업데이트
+        for node in loop_nodes:
+            node_vars = node.variables
+            for statement in node.statements:
+                self.update_statement_with_variables(statement, node_vars)
+
+    def update_statement_with_variables(self, stmt, current_variables):
+        if stmt.statement_type == 'variableDeclaration':
+            return self.interpret_variable_declaration_statement(stmt, current_variables)
+        elif stmt.statement_type == 'assignment':
+            return self.interpret_assignment_statement(stmt, current_variables)
+        elif stmt.statement_type == 'function_call':
+            return self.interpret_function_call_statement(stmt, current_variables)
+        elif stmt.statement_type == 'return':
+            return self.interpret_return_statement(stmt, current_variables)
+        elif stmt.statement_type == 'revert':
+            return self.interpret_revert_statement(stmt, current_variables)
+        else:
+            raise ValueError(f"Statement '{stmt.statement_type}' is not implemented.")
+
+
+    def get_current_block(self):
+        """
+        현재 코드 위치에서 들어갈 CFG 블록을 결정하는 함수입니다.
+        블록 아웃을 감지하여 필요한 처리를 수행합니다.
+        """
+        closeBraceQueue = []
+
+        # 현재 라인부터 위로 올라가면서 brace_count 검사
+        for line in range(self.current_start_line - 1, 0, -1):
+            brace_info = self.brace_count.get(line, {'open': 0, 'close': 0, 'cfg_node': None})
+
+            if not closeBraceQueue:
+                # closeBraceQueue가 비어있는 경우
+                if brace_info['cfg_node'] is None and brace_info['open'] == 0 and brace_info['close'] == 0:
+                    # 공백 라인 또는 처리할 것이 없는 라인
+                    continue
+                elif brace_info['cfg_node'] is not None and brace_info['open'] == 0 and brace_info['close'] == 0:
+                    # 분기가 없는 일반적인 문장인 경우
+                    return brace_info['cfg_node']
+                elif brace_info['cfg_node'] is not None and brace_info['open'] == 1 and brace_info['close'] == 0:
+                    # 여는 중괄호 '{'를 만난 경우 (entry point 또는 조건 노드)
+                    cfg_node = brace_info['cfg_node']
+                    if cfg_node.name == "ENTRY":
+                        # ENTRY 노드인 경우 새로운 블록 생성 및 반환
+                        if self.current_target_function_cfg:
+                            entry_node = self.current_target_function_cfg.get_entry_node()
+                            new_block = CFGNode(f"Block_{self.current_start_line}")
+                            # related_variables 딕셔너리를 복사하고 새로운 블록에 할당
+                            new_block.variables = self.copy_variables(
+                                self.current_target_function_cfg.related_variables)
+                            self.current_target_function_cfg.graph.add_node(new_block)
+                            self.current_target_function_cfg.graph.add_edge(entry_node, new_block)
+                            return new_block
+                        else:
+                            raise ValueError("No active function CFG found.")
+                    elif cfg_node.condition_node:
+                        # 조건 노드인 경우 해당 블록 반환
+                        if cfg_node.condition_node_type == 'if':  # if 블록이면 true_block 반환
+                            return self.get_true_block(cfg_node)
+                        elif cfg_node.condition_node_type == 'else if':  # else_if 블록이면 true_block 반환
+                            return self.get_true_block(cfg_node)
+                        elif cfg_node.condition_node_type == 'else':  # else 블록이면 false_block 반환
+                            return self.get_false_block(cfg_node)
+                        elif cfg_node.condition_node_type == 'while' :
+                            return self.get_true_block(cfg_node)
+                        else:
+                            continue  # 다른 조건 노드는 건너뛰기
+                    else:
+                        # 기타 경우 해당 노드 반환
+                        return cfg_node
+                elif brace_info['cfg_node'] is None and brace_info['open'] == 0 and brace_info['close'] == 1:
+                    # 닫는 중괄호 '}'를 만난 경우 (블록 아웃 감지)
+                    closeBraceQueue.append(line)
+            else:
+                # closeBraceQueue가 비어있지 않은 경우 (추가적인 블록 아웃 감지)
+                if brace_info['cfg_node'] is None and brace_info['open'] == 0 and brace_info['close'] == 1:
+                    # 또 다른 블록 아웃을 감지
+                    closeBraceQueue.append(line)
+                elif brace_info['cfg_node'] is None and brace_info['open'] == 0 and brace_info['close'] == 0:
+                    # 공백 라인 또는 처리할 것이 없는 라인
+                    continue
+                else:
+                    # 블록 아웃 탐색 완료
+                    break
+
+        # 블록 아웃 처리
+        if closeBraceQueue:
+            return self.process_flow_join(closeBraceQueue)
+        else:
+            raise ValueError("No active function CFG found.")
+
+    def process_flow_join(self, closeBraceQueue):
+        """
+        블록 아웃을 처리하는 함수입니다.
+        :param closeBraceQueue: 블록 아웃이 감지된 라인 번호의 리스트
+        :return: 블록 아웃 처리 후의 CFG 노드
+        """
+        outSideIfNode = None
+        newBlock = None
+        hasNode = False
+
+        # closeBraceQueue에서 각 닫는 중괄호에 대해 처리
+        for line in closeBraceQueue:
+            openBrace = self.find_corresponding_open_brace(line)
+            if not openBrace:
+                raise ValueError("No open brace are found.")
+
+            cfg_node = openBrace['cfg_node']
+
+            if cfg_node.condition_node_type == "while":
+                # while 루프의 경우 고정점 분석 수행
+                newBlock = self.apply_fixpoint_to_exit_node(cfg_node)
+                break  # while 루프의 블록 아웃 처리는 여기서 종료
+            elif not hasNode and cfg_node.condition_node_type == "if":
+                outSideIfNode = cfg_node
+                hasNode = True
+
+        if hasNode and outSideIfNode:
+            newBlock = self.join_leaf_nodes(outSideIfNode)
+
+            # **새로운 블록을 그래프에 추가 및 연결**
+            # 조건 노드의 successor들을 새로운 블록의 successor로 설정
+            successors = list(self.current_target_function_cfg.graph.successors(outSideIfNode))
+            for succ in successors:
+                # 조건 노드와 successor 간의 에지를 제거하고, 새로운 블록과 successor를 연결
+                self.current_target_function_cfg.graph.remove_edge(outSideIfNode, succ)
+                self.current_target_function_cfg.graph.add_edge(newBlock, succ)
+
+            # 조건 노드에서 새로운 블록으로 에지를 추가
+            self.current_target_function_cfg.graph.add_edge(outSideIfNode, newBlock)
+
+            return newBlock
+        else:
+            # 블록 아웃 처리가 완료되지 않았거나 처리할 노드가 없는 경우
+            return None
+
+    def apply_fixpoint_to_exit_node(self, while_node):
+        """
+        함수 호출 시 while 루프의 exit 노드에 고정점 계산된 변수 상태를 적용하고 exit 노드를 반환합니다.
+        :param while_node: while 루프의 조건 노드 (CFGNode)
+        :return: while 루프의 exit 노드 (CFGNode)
+        """
+        # 1. 루프의 exit 노드 찾기
+        exit_nodes = self.find_loop_exit_nodes(while_node)
+        if not exit_nodes:
+            raise ValueError("While loop does not have an exit node.")
+        exit_node = exit_nodes[0]  # 일반적으로 exit 노드는 하나일 것입니다.
+
+        # 2. 루프 내의 모든 노드 수집
+        loop_nodes = self.traverse_loop_nodes(while_node)
+
+        # 3. 변수 상태 초기화
+        in_vars = {}
+        out_vars = {}
+        for node in loop_nodes:
+            in_vars[node] = {}
+            out_vars[node] = {}
+            if node == while_node:
+                # while 루프의 진입 시점 변수 상태 초기화
+                in_vars[node] = self.copy_variables(while_node.variables)
+
+        # 4. 워크리스트 알고리즘 초기화
+        worklist = deque([while_node])
+        max_iterations = 30  # 최대 반복 횟수 설정
+        iteration = 0
+
+        while worklist and iteration < max_iterations:
+            iteration += 1
+            node = worklist.popleft()
+
+            # 5. 선행 노드들의 out_vars를 조인하여 in_vars 계산
+            predecessors = list(self.current_target_function_cfg.graph.predecessors(node))
+            new_in_vars = None  # None으로 초기화하여 첫 번째 조인 시 설정되도록 함
+            for pred in predecessors:
+                if pred in loop_nodes:
+                    # pred가 루프 내의 노드인 경우
+                    if pred in out_vars and out_vars[pred]:
+                        if new_in_vars is None:
+                            new_in_vars = self.copy_variables(out_vars[pred])
+                        else:
+                            new_in_vars = self.join_variables(new_in_vars, out_vars[pred])
+                else:
+                    # pred가 루프 밖의 노드인 경우
+                    if new_in_vars is None:
+                        new_in_vars = self.copy_variables(pred.variables)
+                    else:
+                        new_in_vars = self.join_variables(new_in_vars, pred.variables)
+
+            # 6. in_vars 변화 확인
+            if new_in_vars:
+                if not self.variables_equal(in_vars[node], new_in_vars):
+                    in_vars[node] = new_in_vars
+
+            # 7. 노드의 transfer function 적용하여 out_vars 계산
+            old_out_vars = out_vars[node]
+            out_vars[node] = self.transfer_function(node, in_vars[node])
+
+            # 8. out_vars 변화 확인 및 워크리스트 업데이트
+            if not self.variables_equal(old_out_vars, out_vars[node]):
+                successors = list(self.current_target_function_cfg.graph.successors(node))
+                for succ in successors:
+                    if succ in loop_nodes:
+                        worklist.append(succ)
+
+            if iteration == max_iterations:
+                print("Fixpoint analysis did not converge within max iterations.")
+                break
+
+        # 9. 수렴된 변수 상태를 exit 노드에 반영
+        exit_node.variables = out_vars[exit_node]
+
+        # 10. exit 노드 반환
+        return exit_node
+
+    def find_loop_exit_nodes(self, while_node):
+        """
+        주어진 while 노드의 루프 exit 노드를 찾습니다.
+        :param while_node: while 루프의 조건 노드
+        :return: 루프 exit 노드들의 리스트
+        """
+        exit_nodes = []
+        visited = set()
+        stack = [while_node]
+
+        while stack:
+            current_node = stack.pop()
+            if current_node in visited:
+                continue
+            visited.add(current_node)
+
+            successors = list(self.current_target_function_cfg.graph.successors(current_node))
+            for succ in successors:
+                if succ == while_node:
+                    # 루프 백 엣지이므로 무시
+                    continue
+                if not self.is_node_in_loop(succ, while_node):
+                    # 루프 밖의 노드이면 exit 노드로 추가
+                    exit_nodes.append(succ)
+                else:
+                    stack.append(succ)
+
+        return exit_nodes
+
+    def is_node_in_loop(self, node, while_node):
+        """
+        주어진 노드가 while 루프 내에 속해 있는지 확인합니다.
+        :param node: 확인할 노드
+        :param while_node: while 루프의 조건 노드
+        :return: True 또는 False
+        """
+        # while_node에서 시작하여 루프 내의 모든 노드를 수집하고, 그 안에 node가 있는지 확인
+        loop_nodes = self.traverse_loop_nodes(while_node)
+        return node in loop_nodes
+
+    def find_corresponding_open_brace(self, close_line):
+        """
+        닫는 중괄호에 대응되는 여는 중괄호를 찾는 함수입니다.
+        :param close_line: 닫는 중괄호 라인 번호
+        :return: 여는 중괄호의 brace_info 딕셔너리
+        """
+        contextDiff = 0
+        for line in range(close_line, 0, -1):
+            brace_info = self.brace_count.get(line, {'open': 0, 'close': 0, 'cfg_node': None})
+            contextDiff += brace_info['open'] - brace_info['close']
+
+            if contextDiff == 0 and brace_info['open'] > 0:
+                cfg_node = brace_info['cfg_node']
+                if cfg_node and cfg_node.condition_node_type in ["while", "if"]:
+                    return brace_info
+                elif cfg_node and cfg_node.condition_node_type in ["else if", "else"] :
+                    continue
+        return None
+
+    def join_leaf_nodes(self, condition_node):
+        """
+        주어진 조건 노드의 하위 그래프를 탐색하여 리프 노드들을 수집하고 변수 정보를 조인합니다.
+        :param condition_node: 최상위 조건 노드 (if 노드)
+        :return: 조인된 변수 정보를 가진 새로운 블록
+        """
+        # 리프 노드 수집
+        leaf_nodes = self.collect_leaf_nodes(condition_node)
+
+        # 리프 노드들의 변수 정보를 조인
+        joined_variables = {}
+        for node in leaf_nodes:
+            if node.function_exit_node:
+                continue
+            for var_name, var_value in node.variables.items():
+                if var_name in joined_variables:
+                    # 기존 변수와 조인
+                    joined_variables[var_name] = self.join_variable_values(joined_variables[var_name], var_value)
+                else:
+                    # 새로운 변수 추가
+                    joined_variables[var_name] = var_value
+
+        # 새로운 블록 생성 및 변수 정보 저장
+        new_block = CFGNode(name=f"JoinBlock_{self.current_start_line}")
+        new_block.variables = joined_variables
+
+        # **CFG 그래프에 새로운 블록 추가**
+        self.current_target_function_cfg.graph.add_node(new_block)
+
+        # **리프 노드들과 새로운 블록을 에지로 연결**
+        for node in leaf_nodes:
+            # 기존의 successor가 없으므로, 리프 노드에서 new_block으로 에지를 연결
+            self.current_target_function_cfg.graph.add_edge(node, new_block)
+
+        # **조건 노드의 successor를 새로운 블록으로 연결**
+        successors = list(self.current_target_function_cfg.graph.successors(condition_node))
+        for succ in successors:
+            # 조건 노드와 successor 간의 에지를 제거하고, 새로운 블록과 successor를 연결
+            self.current_target_function_cfg.graph.remove_edge(condition_node, succ)
+            self.current_target_function_cfg.graph.add_edge(new_block, succ)
+
+        return new_block
+
+    def collect_leaf_nodes(self, node):
+        """
+        주어진 노드의 하위 그래프를 탐색하여 리프 노드들을 수집합니다.
+        :param node: 시작 노드
+        :return: 리프 노드들의 리스트
+        """
+        leaf_nodes = []
+        visited = set()
+        stack = [node]
+
+        while stack:
+            current_node = stack.pop()
+            if current_node in visited:
+                continue
+            visited.add(current_node)
+
+            successors = list(self.current_target_function_cfg.graph.successors(current_node))
+            if not successors:
+                # 자식이 없는 노드 (리프 노드)
+                leaf_nodes.append(current_node)
+            else:
+                # 자식 노드가 있는 경우 스택에 추가
+                for successor in successors:
+                    stack.append(successor)
+
+        return leaf_nodes
+
+    def join_variable_values(self, val1, val2):
+        """
+        elementary Interval 간의 join
+        - 둘 다 Interval이면 val1.join(val2)
+        - boolInterval이면 val1.join(val2)
+        - 그 외 => symbolic or val1?
+        """
+        if hasattr(val1, 'join') and hasattr(val2, 'join') and type(val1) == type(val2):
+            return val1.join(val2)
+        else:
+            # 타입 다르거나 join 불가 => symbolic
+            return f"symbolicJoin({val1},{val2})"
+
+    def traverse_loop_nodes(self, loop_node):
+        """
+        루프 노드부터 시작하여 루프 내의 노드들을 순회합니다.
+        :param loop_node: 루프의 조건 노드
+        :return: 루프 내의 노드들
+        """
+        visited = set()
+        stack = [loop_node]
+        loop_nodes = []
+
+        while stack:
+            current_node = stack.pop()
+            if current_node in visited:
+                continue
+            visited.add(current_node)
+            loop_nodes.append(current_node)
+
+            successors = list(self.current_target_function_cfg.graph.successors(current_node))
+            for successor in successors:
+                # 간선의 조건을 확인하여 false_branch를 건너뜀
+                edge_data = self.current_target_function_cfg.graph.get_edge_data(current_node, successor)
+                if edge_data and edge_data.get('condition') == False:  # False branch는 제외
+                    continue
+
+                # False branch가 아니면 순회 계속
+                stack.append(successor)
+                #if successor != loop_node.false_branch:
+                #    stack.append(successor)
+
+        return loop_nodes
+
+    def get_true_block(self, condition_node):
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not function_cfg:
+            raise ValueError("No active function to process the require statement.")
+
+        # 해당 조건 노드에서 true일 때 실행될 블록을 찾아 리턴
+        successors = list(function_cfg.graph.successors(condition_node))
+        for successor in successors:
+            if function_cfg.graph.edges[condition_node, successor].get('condition', False):
+                return successor
+        return None  # True 블록을 찾지 못하면 None 반환
+
+    def get_false_block(self, condition_node):
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not function_cfg:
+            raise ValueError("No active function to process the require statement.")
+
+        # 해당 조건 노드에서 false일 때 실행될 블록을 찾아 리턴
+        successors = list(self.function_cfg.graph.successors(condition_node))
+        for successor in successors:
+            if not function_cfg.graph.edges[condition_node, successor].get('condition', False):
+                return successor
+        return None  # False 블록을 찾지 못하면 None 반환
+
+    def find_corresponding_condition_node(self): # else if, else에 대한 처리
+        # 현재 라인부터 위로 탐색하면서 대응되는 조건 노드를 찾음
+        target_brace = 0
+        for line in range(self.current_start_line - 1, 0, -1):
+            brace_info = self.brace_count[line]
+            if brace_info:
+                # '{'와 '}'의 개수 확인
+                if brace_info['open'] == 1:
+                    target_brace -= 1
+                elif brace_info['close'] == 1:
+                    target_brace += 1
+
+                # target_brace가 0이 되면 대응되는 블록을 찾은 것
+                if target_brace == 0:
+                    if brace_info['cfg_node'] != None and \
+                            brace_info['cfg_node'].condition_node_type in ['if', 'else if']:
+                        return brace_info['cfg_node']
+        return None
+
+
+    """
+    Abstract Interpretation part
+    """
+
+    @staticmethod
+    def calculate_default_interval(var_type):
+        # 1. int 타입 처리
+        if var_type.startswith("int"):
+            length = int(var_type[3:]) if var_type != "int" else 256  # int 타입의 길이 (기본값은 256)
+            return IntegerInterval.bottom(length)  # int의 기본 범위 반환
+
+        # 2. uint 타입 처리
+        elif var_type.startswith("uint"):
+            length = int(var_type[4:]) if var_type != "uint" else 256  # uint 타입의 길이 (기본값은 256)
+            return UnsignedIntegerInterval.bottom(length)  # uint의 기본 범위 반환
+
+        # 3. bool 타입 처리
+        elif var_type == "bool":
+            return BoolInterval()  # bool은 항상 0 또는 1
+
+        # 4. 기타 처리 (필요시 확장 가능)
+        else:
+            raise ValueError(f"Unsupported type for default interval: {var_type}")
+
+    def update_left_var(self, expr, rVal, operator, variables,
+                        callerObject=None, callerContext=None):
+        if expr.context == "IndexAccessContext" :
+            return self.update_left_var_of_index_access_context(expr, rVal, operator, variables,
+                                                                callerObject, callerContext)
+        elif expr.context == "MemberAccessContext" :
+            return self.update_left_var_of_member_access_context(expr, rVal, operator, variables,
+                                                                callerObject, callerContext)
+
+        elif expr.context == "IdentifierExpContext" :
+            return self.update_left_var_of_identifier_context(expr, rVal, operator, variables,
+                                                              callerObject, callerContext)
+        elif expr.context == "LiteralExpContext" :
+            return self.update_left_var_of_literal_context(expr, rVal, operator, variables,
+                                                                callerObject)
+
+    def compound_assignment(self, left_interval, right_interval, operator):
+        if operator == '=' :
+            return right_interval
+        elif operator == '+=':
+            return left_interval.add(right_interval)
+        elif operator == '-=':
+            return left_interval.subtract(right_interval)
+        elif operator == '*=':
+            return left_interval.multiply(right_interval)
+        elif operator == '/=':
+            return left_interval.divide(right_interval)
+        elif operator == '%=':
+            return left_interval.modulo(right_interval)
+        elif operator == '|=':
+            return left_interval.bitwise_or(right_interval)
+        elif operator == '^=':
+            return left_interval.bitwise_xor(right_interval)
+        elif operator == '&=':
+            return left_interval.bitwise_and(right_interval)
+        elif operator in ['<<=', '>>=', '>>>=']:
+            # '<<=', '>>=' 등에서 '=' 제거 후 처리
+            return left_interval.shift(right_interval, operator[:-1])
+        else:
+            raise ValueError(f"Unsupported operator '{operator}' in compound assignment")
+
+    def update_left_var_of_index_access_context(self, expr, rVal, operator, variables,
+                                                callerObject=None, callerContext=None):
+        # base expression에 대한 재귀
+        base_obj = self.update_left_var(expr.base, rVal, operator, variables, None, "IndexAccessContext")
+
+        # index expression에 대한 재귀
+        self.update_left_var(expr.index, rVal, operator, variables, base_obj, "IndexAccessContext")
+
+    def update_left_var_of_member_access_context(self, expr, rVal, operator, variables,
+                                                 callerObject=None, callerContext=None) :
+        base_obj = self.update_left_var(expr.base, rVal, operator, variables, None, "MemberAccessContext")
+        member = expr.member
+
+        if isinstance(base_obj, StructVariable) :
+            if member in base_obj.members :
+                nestedMember = base_obj.members[member]
+                if isinstance(nestedMember, Variables) or isinstance(nestedMember, EnumVariable):
+                    nestedMember.value = self.compound_assignment(nestedMember.value, rVal, operator)
+                elif isinstance(nestedMember, StructVariable) or isinstance(nestedMember, ArrayVariable) :
+                    return nestedMember  # 구조체 안에 member가 ArrayVariable, StructVariable 등인경우
+                else :
+                    raise ValueError(f"This object '{nestedMember}' is not expected in this context")
+            else :
+                raise ValueError(f"This member '{member}' is not included in struct '{base_obj.identifier}'")
+
+    def update_left_var_of_literal_context(self, expr, rVal, operator, variables,
+                                           callerObject=None):
+        literal_str = expr.literal  # 예: "123", "0x1A", "true", "false", "Hello", ...
+        expr_type = expr.expr_type  # 예: 'uint', 'int', 'bool', 'string'
+
+        # assignment의 좌변 변수에 대해서는 literal은 callerObject 없이 있을 수 없는듯
+        if callerObject is not None:
+            # assignment의 좌변 변수에 대해서, literal이 오는 경우는 Array랑 Mapping 밖에 없는듯?
+            if isinstance(callerObject, ArrayVariable):
+                if literal_str.isdigit():
+                    # 인덱스로 해석 (음수인지도 체크 가능)
+                    idx = int(literal_str)
+                    if idx < 0 or idx >= len(callerObject.elements):
+                        raise IndexError(f"Index {idx} out of range in array '{callerObject.identifier}'")
+
+                    element = callerObject.elements[idx]
+                    if isinstance(element, Variables) or isinstance(element, EnumVariable) :
+                        if not self._is_interval(rVal) :
+                            if rVal.startswith('-') or rVal.isdigit() or rVal in ["true", "false"] :
+                                newRVal = self.convert_literal_to_interval(rVal, element)
+                        element.value = self.compound_assignment(element.value, newRVal, operator)
+                        return
+                    elif isinstance(element, ArrayVariable) or isinstance(element, StructVariable) :
+                        return element
+            elif isinstance(callerObject, MappingVariable):
+                if literal_str in callerObject.mapping :
+                    mapVar = callerObject.mapping[literal_str]
+                    if isinstance(mapVar, Variables) or isinstance(mapVar, EnumVariable) :
+                        if not self._is_interval(rVal) :
+                            if rVal.startswith('-') or rVal.isdigit() or rVal in ["true", "false"]:
+                                newRVal = self.convert_literal_to_interval(rVal, mapVar)
+                        mapVar.value = self.compound_assignment(mapVar.value, rVal, operator)
+                    elif isinstance(mapVar, ArrayVariable) or isinstance(mapVar, StructVariable)\
+                            or isinstance(mapVar, MappingVariable):
+                        return mapVar
+        else :
+            raise ValueError(f"This literal context '{literal_str}' is wrong context")
+
+    def update_left_var_of_identifier_context(self, expr, rVal, operator, variables:dict,
+                                              callerObject=None, callerContext=None):
+        ident_str = expr.identifier
+
+        if callerObject is not None :
+            if isinstance(callerObject, Variables) or isinstance(callerObject, EnumVariable) :
+                callerObject.value = self.compound_assignment(callerObject.value, rVal, operator)
+            elif isinstance(callerObject, ArrayVariable) : # index
+                if ident_str not in variables:
+                    raise ValueError(f"Index identifier '{ident_str}' not found in variables.")
+                index_var_obj = variables[ident_str]
+                if isinstance(index_var_obj, Variables):
+                    if index_var_obj.value.min_value == index_var_obj.value.max_value:
+                        idx = index_var_obj.value.min_value
+                else:
+                    raise ValueError(f"This excuse should be analyzed : '{ident_str}'")
+
+                # 경계검사
+                if idx < 0 or idx >= len(callerObject.elements):
+                    raise IndexError(f"Index {idx} out of range in array '{callerObject.identifier}'")
+
+                element = callerObject.elements[idx]
+                if isinstance(element, Variables) or isinstance(element, EnumVariable) :
+                    element.value = self.compound_assignment(element.value, rVal, operator)
+                elif isinstance(element, ArrayVariable) or isinstance(element, StructVariable) :
+                    return element
+                elif isinstance(element, MappingVariable) :
+                    raise ValueError(f"Is Mapping Variable is available of Array Variable's elements?")
+            elif isinstance(callerObject, StructVariable) :
+                if ident_str not in callerObject.members:
+                    raise ValueError(f"member identifier '{ident_str}' not found in struct variables.")
+
+                member = callerObject.members[ident_str]
+
+                if isinstance(member, Variables) or isinstance(member, EnumVariable) :
+                    member.value = self.compound_assignment(member.value, rVal, operator)
+                elif isinstance(member, ArrayVariable) or isinstance(member, StructVariable) \
+                        or isinstance(member, MappingVariable) :
+                    return member
+            elif isinstance(callerObject, MappingVariable) :
+                if ident_str not in callerObject.mapping:
+                    raise ValueError(f"mapping identifier '{ident_str}' not found in mapping variables.")
+
+                mapVar = callerObject.mapping[ident_str]
+
+                if isinstance(mapVar, Variables) or isinstance(mapVar, EnumVariable) :
+                    mapVar.value = self.compound_assignment(mapVar.value, rVal, operator)
+                elif isinstance(mapVar, ArrayVariable) or isinstance(mapVar, StructVariable) \
+                        or isinstance(mapVar, MappingVariable) :
+                    return mapVar
+
+        if callerContext is not None :
+            if callerContext == "IndexAccessContext" or "MemberAccessContext" :
+                if ident_str in variables : # base에 대한 탐색
+                    return variables[ident_str]
+
+        if ident_str in variables :
+            if isinstance(variables[ident_str], Variables) :
+                variables[ident_str].value = self.compound_assignment(variables[ident_str].value, rVal, operator)
+
+    def convert_literal_to_interval(self, literalValue:str, variableObj:Variables):
+        if literalValue.startswith('-') or literalValue.isdigit() :
+            varType = variableObj.typeInfo.elementaryTypeName
+            varLen = variableObj.typeInfo.intTypeLength
+            if varType.startswith("int") :
+                return IntegerInterval(int(literalValue), int(literalValue), varLen)
+            elif varType.startswith("uint") :
+                return UnsignedIntegerInterval(int(literalValue), int(literalValue), varLen)
+        elif literalValue in ["true", "false"] :
+            lower_str = literalValue.lower()
+            if lower_str == "true":
+                return BoolInterval(1, 1)
+            elif lower_str == "false":
+                return BoolInterval(0, 0)
+            else:
+                raise ValueError(f"Invalid boolean literal '{literalValue}'")
+
+    def evaluate_expression(self, expr: Expression, variables: Variables, callerObject=None, callerContext=None):
+        if expr.context == "LiteralExpContext":
+            return self.evaluate_literal_context(expr, variables, callerObject, callerContext)
+        elif expr.context == "IdentifierExpContext" :
+            return self.evaluate_identifier_context(expr, variables, callerObject, callerContext)
+        elif expr.context == 'MemberAccessContext' :
+            return self.evaluate_member_access_context(expr, variables, callerObject, callerContext)
+        elif expr.context == "IndexAccessContext" :
+            return self.evaluate_index_access_context(expr, variables, callerObject, callerContext)
+        elif expr.context == "TypeConversionContext" :
+            return self.evaluate_type_conversion_context(expr, variables, callerObject, callerContext)
+        elif expr.context == "ConditionalExpContext" :
+            return self.evaluate_conditional_expression_context(expr, variables, callerObject, callerContext)
+        elif expr.context == "InlineArrayExpression" :
+            return self.evaluate_inline_array_expression_context(expr, variables, callerObject, callerContext)
+        elif expr.context == "FunctionCallContext" :
+            return self.evaluate_function_call_context(expr, variables, callerObject, callerContext)
+
+        # 단항 연산자
+        if expr.operator in ['-', '!', '~'] and expr.expression :
+            return self.evaluate_unary_operator(expr, variables, callerObject, callerContext)
+
+        # 이항 연산자
+        if expr.left is not None and expr.right is not None :
+            return self.evaluate_binary_operator(expr, variables, callerObject, callerContext)
+
+    def evaluate_literal_context(self, expr: Expression, variables, callerObject=None, callerContext=None):
+        literal_str = expr.literal  # 예: "123", "0x1A", "true", "false", "Hello", ...
+        expr_type = expr.expr_type  # 예: 'uint', 'int', 'bool', 'string'
+
+        # 1) if we have a callerObject that is an ArrayVariable, and the literal is a digit
+        if callerObject is not None :
+            if isinstance(callerObject, ArrayVariable) :
+                if literal_str.isdigit() :
+                    # 인덱스로 해석 (음수인지도 체크 가능)
+                    idx = int(literal_str)
+                    if idx < 0 or idx >= len(callerObject.elements):
+                        raise IndexError(f"Index {idx} out of range in array '{callerObject.identifier}'")
+                    return callerObject.elements[idx]  # element: Variables, ArrayVariable, etc.
+                else:
+                    raise ValueError(
+                        f"Array '{callerObject.identifier}' index must be integer literal, got '{literal_str}'")
+
+            # 1-2) MappingVariable
+            elif isinstance(callerObject, MappingVariable):
+                # 맵핑 키로 사용. Solidity에선 key가 uint/address/bytes 등 가능하나,
+                # 여기선 예시로 'string' key 로 처리
+                if literal_str in callerObject.mapping:
+                    return callerObject.mapping[literal_str]
+                else:
+                    # 새로 엔트리 생성
+                    new_var_obj = self.create_default_mapping_value(callerObject, literal_str)
+
+                    # callerObject.mapping[literal_str] = new_var_obj
+                    # state_variable_node / function_cfg 둘 다 업데이트
+                    self.update_mapping_in_cfg(callerObject.identifier, literal_str, new_var_obj)
+
+                    return new_var_obj.value
+
+        if callerContext is not None : # callerObject는 없고 callerContext가 있는 경우
+            if callerContext == "IndexAccessContext" : # literal_str이 이면서 IndexAccess면 mapping key 호출 밖에 없을듯?
+                return literal_str
+
+        # callerObject, callerContext 둘다 없으면 그냥 값 리턴
+        if expr_type == "uint":
+            # int() with base=0로 파싱해 다양한 16진/10진 포맷 허용
+            val = int(literal_str, 0)
+            if val < 0:
+                raise ValueError(f"Literal '{literal_str}' is negative, not valid for uint.")
+            # 기본 비트 길이 설정
+            length = expr.type_length if expr.type_length else 256
+            return UnsignedIntegerInterval(val, val, length)
+
+        elif expr_type == "int":
+            val = int(literal_str, 0)
+            length = expr.type_length if expr.type_length else 256
+            return IntegerInterval(val, val, length)
+
+        elif expr_type == "bool":
+            lower_str = literal_str.lower()
+            if lower_str == "true":
+                return BoolInterval(1, 1)
+            elif lower_str == "false":
+                return BoolInterval(0, 0)
+            else:
+                raise ValueError(f"Invalid boolean literal '{literal_str}'")
+
+        elif expr_type == "string":
+            # 여기서 그대로 문자열 반환.
+            # 필요하면 앞뒤 따옴표 제거 로직도 추가할 수 있음.
+            return literal_str
+
+        else:
+            raise ValueError(f"Unsupported literal expr_type '{expr_type}'")
+
+    def evaluate_identifier_context(self, expr:Expression, variables, callerObject=None, callerContext=None):
+        ident_str = expr.identifier
+
+        # callerObject가 있는 경우
+        if callerObject is not None:
+            if isinstance(callerObject, ArrayVariable) : # ident_Str이 index면 index별 join 필요 (index의 interval 크기, array의 길이 참조)
+                if ident_str not in variables:
+                    raise ValueError(f"Index identifier '{ident_str}' not found in variables.")
+                index_var_obj = variables[ident_str]
+                if isinstance(index_var_obj, Variables) :
+                    if index_var_obj.value.min_value == index_var_obj.value.max_value:
+                        idx = index_var_obj.value.min_value
+                else :
+                    raise ValueError(f"This excuse should be analyzed : '{ident_str}'")
+
+                # 경계검사
+                if idx < 0 or idx >= len(callerObject.elements):
+                    raise IndexError(f"Index {idx} out of range in array '{callerObject.identifier}'")
+                return callerObject.elements[idx]
+
+            elif isinstance(callerObject, StructVariable) :
+                if ident_str not in callerObject.members:
+                    raise ValueError(f"member identifier '{ident_str}' not found in struct variables.")
+
+                var = callerObject.members[ident_str]
+
+                if isinstance(var, Variables) : # int, uint, bool이면 interval address, string이면 symbol을 리턴
+                    return var.value
+                else : # ArrayVariable, StructVariable
+                    return var # var 자체를 리턴 (배열, 다른 구조체일 수 있음)
+
+            elif isinstance(callerObject, EnumDefinition) :
+                for enumMemberIndex in range(len(callerObject.members)) :
+                    if ident_str == callerObject.members[enumMemberIndex] :
+                        return enumMemberIndex
+
+                raise ValueError(f"This '{ident_str}' may not be included in enum def '{callerObject.enum_name}'")
+
+        # callerObject가 없고 callerContext는 있는 경우
+        if callerContext is not None :
+            if callerContext == "MemberAccessContext" : # base에 대한 접근
+                if ident_str in variables :
+                    return variables[ident_str] # MappingVariable, StructVariable 자체를 리턴
+                elif ident_str in ["block", "tx", "msg", "address", "code"] :
+                    return ident_str # block, tx, msg를 리턴
+                elif ident_str in self.contract_cfgs[self.current_target_contract].enumDefs : # EnumDef 리턴
+                    return self.contract_cfgs[self.current_target_contract].enumDefs[ident_str]
+                else :
+                    raise ValueError(f"This '{ident_str}' is may be array or struct but may not be declared")
+            elif callerContext == "IndexAccessContext" : # base에 대한 접근
+                if ident_str in variables :
+                    return variables[ident_str] # ArrayVariable 자체를 리턴
+
+        # callerContext, callerObject 둘다 없는 경우
+        if ident_str in variables: # variables에 있으면
+            return variables[ident_str].value # 해당 value 리턴
+        else:
+            raise ValueError(f"This '{ident_str}' is may be elementary variable but may not be declared")
+
+    def evaluate_member_access_context(self, expr: Expression, variables, callerObject=None, callerContext=None):
+
+        # 1. base expression 재귀적으로 평가
+        base_val = self.evaluate_expression(expr.base, variables, None, "MemberAccessContext")
+        member = expr.member
+
+        # 2. 글로벌 변수 접근 (예: block, msg, tx)
+        if isinstance(base_val, str) :
+            if base_val in ["block", "msg", "tx"]:
+                full_name = f"{base_val}.{member}"
+                # 예시 글로벌 변수 매핑 (실제 구현 시 더 구체적인 값/Interval 필요)
+                contract_cfg = self.contract_cfgs.get(self.current_target_contract)
+
+                if full_name in contract_cfg.pre_exec_globals:
+                    return contract_cfg.pre_exec_globals[full_name].value
+                else:
+                    global_map = {
+                        "block.basefee": UnsignedIntegerInterval(1000, 1000, 256),
+                        "block.blobbasefee": UnsignedIntegerInterval(1000, 1000, 256),
+                        "block.chainid": UnsignedIntegerInterval(1000, 1000, 256),
+                        "block.coinbase": "address 0",
+                        "block.difficulty": UnsignedIntegerInterval(1000, 1000, 256),
+                        "block.gaslimit": UnsignedIntegerInterval(1000, 1000, 256),
+                        "block.number": UnsignedIntegerInterval(1000, 1000, 256),
+                        "block.prevrandao": UnsignedIntegerInterval(1000, 1000, 256),
+                        "block.timestamp": UnsignedIntegerInterval(1000, 1000, 256),
+                        "msg.sender": "address 100",
+                        "msg.value": UnsignedIntegerInterval(1000, 1000, 256),
+                        "tx.gasprice": UnsignedIntegerInterval(1000, 1000, 256),
+                        "tx.origin": "address 10"
+                    }
+                    return global_map[full_name]
+
+            elif member == "code" : # base_Val이 str 이면서 member가 code면 address.code 형태
+                return member
+
+            elif base_val == "code" :
+                if member == "length" :
+                    return UnsignedIntegerInterval(1000, 1000, 256)
+            else :
+                ValueError(f"member '{member}' is not global variable member'.")
+
+        elif isinstance(base_val, ArrayVariable) :
+            if callerContext == "functionCallContext" :
+                if not base_val.typeInfo.isDynamicArray :
+                    raise ValueError ("This variable's type is array and callerContext is functionCall "
+                                      "but not dynamic array")
+                base_type = base_val.typeInfo.arrayBaseType
+                if member == "push" :
+                    elementVar = Variables(identifier=base_val.identifier)
+                    if base_type.startswith("int", "uint", "bool") :
+                        elementVar.value = self.calculate_default_interval(base_type)
+
+                    elif base_type in ["address", "address payable", "string", "bytes", "Byte",
+                                                         "Fixed", "Ufixed"] :
+                        elementVar.value = str('symbol' + base_val.identifier + "index" + len(base_val.elements))
+                    base_val.elements.append(elementVar)
+                    base_val.typeInfo.arrayLength += 1
+                elif member == "pop" :
+                    base_val.elements.pop()
+
+            if member == "length" : # myArray.length
+                length_val = len(base_val.elements)
+                return UnsignedIntegerInterval(length_val, length_val, 256)
+
+        elif isinstance(base_val, StructVariable) :
+            if member in base_val.members :
+                nestedMember = base_val.members[member]
+                if isinstance(nestedMember, Variables) or isinstance(nestedMember, EnumVariable) :
+                    return nestedMember.value # Variable 객체 이므로 Interval 값 등의 value를 리턴
+                elif isinstance(nestedMember, StructVariable) or isinstance(nestedMember, ArrayVariable) :
+                    return nestedMember # 구조체 안에 member가 ArrayVariable, StructVariable 등인경우
+            else :
+                raise ValueError(f"This member '{member}' is not included in struct '{base_val}'")
+
+        elif isinstance(base_val, EnumDefinition) : # 이거 좀 수정해야됨
+            for enumMemberIndex in range(len(base_val.members)) :
+                if member == base_val.members[enumMemberIndex] :
+                    return enumMemberIndex
+
+        #elif isinstance(base_val, MappingVariable) : #base_Val이 Mapping이면서 value type이 enum, struct 인경우
+
+        # 5. 타입 정보 접근 (예: type(uint256).max, type(uint256).min)
+        if isinstance(base_val, dict) and base_val.get("isType", False):
+            T = base_val["typeName"]
+            if member == "max":
+                if T.startswith("uint"):
+                    length = int(T[4:]) if len(T) > 4 else 256
+                    return UnsignedIntegerInterval(2 ** length - 1, 2 ** length - 1, length)
+                elif T.startswith("int"):
+                    length = int(T[3:]) if len(T) > 3 else 256
+                    return IntegerInterval(2 ** (length - 1) - 1, 2 ** (length - 1) - 1, length)
+                else:
+                    raise ValueError(f"Unsupported type for max: {T}")
+            elif member == "min":
+                if T.startswith("uint"):
+                    return UnsignedIntegerInterval(0, 0, 256)
+                elif T.startswith("int"):
+                    length = int(T[3:]) if len(T) > 3 else 256
+                    return IntegerInterval(-2 ** (length - 1), -2 ** (length - 1), length)
+                else:
+                    raise ValueError(f"Unsupported type for min: {T}")
+            else:
+                raise ValueError(f"Unsupported type member '{member}' for type '{T}'")
+
+        # 6. Enum 멤버 접근 (base가 enum type을 나타내는 dict)
+        if isinstance(base_val, dict) and "enumType" in base_val:
+            enum_type = base_val["enumType"]
+            # 심볼릭하게 "EnumType.Member"를 리턴 (실제 구현은 contract_cfg에서 값 조회 필요)
+            return f"{enum_type}.{member}"
+
+        # 7. 컨트랙트 인스턴스 접근 (base가 contract instance를 나타내는 dict)
+        if isinstance(base_val, dict) and "contractInstance" in base_val:
+            if member == "address":
+                return base_val["address"]
+            return f"{base_val['contractInstance']}.{member}"
+
+        # 8. 라이브러리 확장 메소드 (callerContext가 "library")
+        if callerObject == "library":
+            return f"library_function({base_val}).{member}"
+
+        # 9. 만약 위 케이스에 해당하지 않으면 심볼릭하게 표현
+        return f"symbolic({base_val}.{member})"
+
+    def evaluate_index_access_context(self, expr, variables, callerObject=None, callerContext=None):
+        """
+        해석 로직:
+          1) base_val = evaluate_expression(expr.base, variables, ..., callerContext="IndexAccessContext")
+          2) index_val = evaluate_expression(expr.index, variables, callerObject=base_val, callerContext="IndexAccessContext")
+          3) base_val이 ArrayVariable이면 -> arrayVar.elements[index]
+             base_val이 MappingVariable이면 -> mappingVar.mapping[indexKey]
+             그 외 -> symbolic/error
+        """
+
+        # 1) base 해석
+        base_val = self.evaluate_expression(expr.base, variables, None, "IndexAccessContext")
+
+        if expr.index is not None:
+            return self.evaluate_expression(expr.index, variables, base_val, "IndexAccessContext")
+        else:
+            raise ValueError(f"There is no index expression")
+
+    def evaluate_type_conversion_context(self, expr, variables, callerObject=None, callerContext=None):
+        """
+        expr: Expression(operator='type_conversion', type_name=..., expression=subExpr, context='TypeConversionContext')
+        예:  'uint256(x)', 'int8(y)', 'bool(z)', 'address w' 등
+
+        1) sub_val = evaluate_expression(expr.expression, variables, None, "TypeConversion")
+        2) if type_name.startswith('uint'):  -> UnsignedIntegerInterval로 클램핑
+           if type_name.startswith('int'):   -> IntegerInterval로 클램핑
+           if type_name == 'bool':           -> 0이면 False, 나머지면 True (또는 Interval [0,1])
+           if type_name == 'address':        -> int/Interval -> symbolic address, string '0x...' 등등
+        3) 반환
+        """
+
+        type_name = expr.type_name  # 예: "uint256", "int8", "bool", "address"
+        sub_val = self.evaluate_expression(expr.expression, variables, None, "TypeConversion")
+
+        # 1) 우선 sub_val이 Interval(혹은 BoolInterval), str, etc. 중 어느 것인가 확인
+        #    편의상, 아래에서 Interval이면 클램핑, BoolInterval이면 bool 변환 등 처리
+
+        # a. bool, int, uint, address 등으로 나누어 처리
+        if type_name.startswith("uint"):
+            # 예: "uint256", "uint8" 등
+            # 1) bits 추출
+            bits_str = "".join(ch for ch in type_name[4:] if ch.isdigit())  # "256" or "8" 등
+            bits = int(bits_str) if bits_str else 256
+
+            # 2) sub_val이 IntegerInterval/UnsignedIntegerInterval 이라면:
+            #    - 음수 부분은 0으로 clamp
+            #    - 상한은 2^bits - 1로 clamp
+            #    - 만약 sub_val이 BoolInterval, string, etc. => 대략 변환 로직 / symbolic
+            return self.convert_to_uint(sub_val, bits)
+
+        elif type_name.startswith("int"):
+            # 예: "int8", "int256"
+            bits_str = "".join(ch for ch in type_name[3:] if ch.isdigit())
+            bits = int(bits_str) if bits_str else 256
+            return self.convert_to_int(sub_val, bits)
+
+        elif type_name == "bool":
+            # sub_val이 Interval이면:
+            #   == 0 => bool false
+            #   != 0 => bool true
+            # 범위 넓으면 [0,1]
+            return self.convert_to_bool(sub_val)
+
+        elif type_name == "address":
+            # sub_val이 Interval이면 "address( interval )" → symbolic?
+            # sub_val이 string "0x..." -> parse or symbolic
+            return self.convert_to_address(sub_val)
+
+        else:
+            # 그 외( bytesNN, string, etc. ) => 필요 시 구현
+            return f"symbolicTypeConversion({type_name}, {sub_val})"
+
+    def evaluate_conditional_expression_context(self, expr, variables, callerObject=None, callerContext=None):
+        """
+        삼항 연산자 (condition ? true_expr : false_expr)
+        expr: Expression(
+          condition=...,  # condition expression
+          true_expr=...,  # true-branch expression
+          false_expr=..., # false-branch expression
+          operator='?:',
+          context='ConditionalExpContext'
+        )
+        """
+
+        # 1) 조건식 해석
+        cond_val = self.evaluate_expression(expr.condition, variables, None, "ConditionalCondition")
+        # cond_val이 BoolInterval일 가능성이 높음
+        # 다른 경우(Interval 등) => symbolic or 0≠0 ?
+
+        if isinstance(cond_val, BoolInterval):
+            # (a) cond_val이 [1,1] => 항상 true
+            if cond_val.min_value == 1 and cond_val.max_value == 1:
+                return self.evaluate_expression(expr.true_expr, variables, callerObject, "ConditionalExp")
+
+            # (b) cond_val이 [0,0] => 항상 false
+            if cond_val.min_value == 0 and cond_val.max_value == 0:
+                return self.evaluate_expression(expr.false_expr, variables, callerObject, "ConditionalExp")
+
+            # (c) cond_val이 [0,1] => 부분적 => 두 branch 모두 해석 후 join
+            true_val = self.evaluate_expression(expr.true_expr, variables, callerObject, "ConditionalExp")
+            false_val = self.evaluate_expression(expr.false_expr, variables, callerObject, "ConditionalExp")
+
+            # 두 결과가 모두 Interval이면 => join
+            # (IntegerInterval, UnsignedIntegerInterval, BoolInterval 등)
+            if (hasattr(true_val, 'join') and hasattr(false_val, 'join')
+                    and type(true_val) == type(false_val)):
+                return true_val.join(false_val)
+            else:
+                # 타입이 다르거나, join 메서드 없는 경우 => symbolic
+                return f"symbolicConditional({true_val}, {false_val})"
+
+        # 2) cond_val이 BoolInterval가 아님 => symbolic
+        # 예: cond_val이 IntegerInterval => 0이 아닌 값은 true?
+        # 여기서는 간단히 [0,∞]? => partial => symbolic
+        return f"symbolicConditionalCondition({cond_val})"
+
+    def evaluate_inline_array_expression_context(self, expr, variables, callerObject=None, callerContext=None):
+        """
+        expr: Expression(
+           elements = [ expr1, expr2, ... ],
+           expr_type = 'array',
+           context   = 'InlineArrayExpressionContext'
+        )
+
+        이 배열 표현식은 예: [1,2,3], [0x123, 0x456], [true, false], ...
+        각 요소를 재귀적으로 evaluate_expression으로 해석하고, 그 결과들을 리스트로 만든다.
+        """
+
+        results = []
+        for elem_expr in expr.elements:
+            # 각 요소를 재귀 해석
+            # callerObject, callerContext는 "inline array element"로 명시
+            val = self.evaluate_expression(elem_expr, variables, None, "InlineArrayElement")
+            results.append(val)
+
+        # -- 2) 여기서 optional로, 모든 요소가 Interval인지, BoolInterval인지, etc.를 확인해
+        #       "동일한 타입"인지 검사하거나, 적절히 symbolic 처리할 수도 있음.
+        # 여기서는 단순히 그대로 반환
+
+        return results
+
+    def evaluate_unary_operator(self, expr, variables, callerObject=None, callerContext=None):
+        operand_interval = self.evaluate_expression(expr.expression, variables, None, "Unary")
+        if operand_interval is not None:
+            if expr.operator == '-':
+                return operand_interval.negate()
+            elif expr.operator == '!':
+                return operand_interval.logical_not()
+            elif expr.operator == '~':
+                return operand_interval.bitwise_not()
+        else:
+            raise ValueError(f"Unable to evaluate operand in unary expression: {expr}")
+
+    def evaluate_binary_operator(self, expr, variables, callerObject=None, callerContext=None):
+        leftInterval = self.evaluate_expression(expr.left, variables, None, "Binary")
+        rightInterval = self.evaluate_expression(expr.right, variables, None, "Binary")
+        operator = expr.operator
+
+        result = None
+
+        if operator == '+':
+            result = leftInterval.add(rightInterval)
+        elif operator == '-':
+            result = leftInterval.subtract(rightInterval)
+        elif operator == '*':
+            result = leftInterval.multiply(rightInterval)
+        elif operator == '/':
+            result = leftInterval.divide(rightInterval)
+        elif operator == '%':
+            result = leftInterval.modulo(rightInterval)
+        elif operator == '**':
+            result = leftInterval.exponentiate(rightInterval)
+        # 시프트 연산자 처리
+        elif operator in ['<<', '>>', '>>>']:
+            if 'int' in expr.expr_type:
+                result = IntegerInterval.shift(leftInterval, rightInterval, operator)
+            elif 'uint' in expr.expr_type:
+                result = UnsignedIntegerInterval.shift(leftInterval, rightInterval, operator)
+            else:
+                raise ValueError(f"Unsupported type '{expr.expr_type}' for shift operation")
+        # 비교 연산자 처리
+        elif operator in ['==', '!=', '<', '>', '<=', '>=']:
+            result = self.compare_intervals(leftInterval, rightInterval, operator)
+        # 논리 연산자 처리
+        elif operator in ['&&', '||']:
+            result = leftInterval.logical_op(rightInterval, operator)
+        else:
+            raise ValueError(f"Unsupported operator '{operator}' in expression: {expr}")
+
+        if isinstance(callerObject, ArrayVariable) or isinstance(callerObject, MappingVariable) :
+            return self.evaluate_binary_operator_of_index(result, callerObject)
+        else :
+            return result
+
+    def evaluate_array_expression(self, variable_obj=None, init_expr=None, variables=None):
+        return
+
+    def evaluate_enum_expression(self, expr, variables=None):
+        return
+
+    def evaluate_struct_expression(self, variable_obj, init_expr):
+        return
+
+    def convert_to_uint(self, sub_val, bits):
+        """
+        sub_val을 uintN 범위[0..(2^bits-1)]로 클램핑
+        """
+        type_max = 2 ** bits - 1
+
+        # Interval(UnsignedIntegerInterval or IntegerInterval)인 경우
+        if isinstance(sub_val, UnsignedIntegerInterval) or isinstance(sub_val, IntegerInterval):
+            # min_value < 0 => clamp to 0
+            new_min = max(0, sub_val.min_value)
+            new_max = min(type_max, sub_val.max_value)
+            if new_min > new_max:
+                # 불가능 => bottom
+                return UnsignedIntegerInterval(None, None, bits)
+
+            return UnsignedIntegerInterval(new_min, new_max, bits)
+
+        elif isinstance(sub_val, BoolInterval):
+            # false => [0,0], true => [1,1], top => [0,1]
+            # clamp to [0..1] (여전히 uintN 범위는 가능하니 문제 없음)
+            if sub_val.min_value == 1 and sub_val.max_value == 1:
+                return UnsignedIntegerInterval(1, 1, bits)
+            elif sub_val.min_value == 0 and sub_val.max_value == 0:
+                return UnsignedIntegerInterval(0, 0, bits)
+            else:
+                # [0,1]
+                return UnsignedIntegerInterval(0, 1, bits)
+
+        elif isinstance(sub_val, str):
+            # string -> parse as decimal? hex?
+            # 간단히 symbolic
+            return f"symbolicUint{bits}({sub_val})"
+
+        else:
+            # fallback
+            return f"symbolicUint{bits}({sub_val})"
+
+    def convert_to_int(self, sub_val, bits):
+        """
+        sub_val을 intN 범위[-2^(bits-1) .. 2^(bits-1)-1]로 클램핑
+        """
+        type_min = -(2 ** (bits - 1))
+        type_max = (2 ** (bits - 1)) - 1
+
+        # Interval
+        if isinstance(sub_val, IntegerInterval) or isinstance(sub_val, UnsignedIntegerInterval):
+            new_min = max(type_min, sub_val.min_value)
+            new_max = min(type_max, sub_val.max_value)
+            if new_min > new_max:
+                # bottom
+                return IntegerInterval(None, None, bits)
+            return IntegerInterval(new_min, new_max, bits)
+
+        elif isinstance(sub_val, BoolInterval):
+            # false => [0,0], true => [1,1], top => [0,1]
+            # clamp to [-2^(bits-1), 2^(bits-1)-1]
+            if sub_val.min_value == 1 and sub_val.max_value == 1:
+                val = 1
+                if val < type_min or val > type_max:
+                    # bottom
+                    return IntegerInterval(None, None, bits)
+                return IntegerInterval(val, val, bits)
+            elif sub_val.min_value == 0 and sub_val.max_value == 0:
+                val = 0
+                if val < type_min or val > type_max:
+                    return IntegerInterval(None, None, bits)
+                return IntegerInterval(val, val, bits)
+            else:
+                # [0,1]
+                # => [0,1] intersect with [type_min..type_max]
+                new_min = max(type_min, 0)
+                new_max = min(type_max, 1)
+                if new_min > new_max:
+                    return IntegerInterval(None, None, bits)
+                return IntegerInterval(new_min, new_max, bits)
+
+        elif isinstance(sub_val, str):
+            # parse or symbolic
+            return f"symbolicInt{bits}({sub_val})"
+
+        else:
+            return f"symbolicInt{bits}({sub_val})"
+
+    def convert_to_bool(self, sub_val):
+        """
+        int/uint interval -> 0 => false, !=0 => true => [0,1] 형태
+        """
+        if isinstance(sub_val, IntegerInterval) or isinstance(sub_val, UnsignedIntegerInterval):
+            if sub_val.is_bottom():
+                return BoolInterval(None, None)
+            # if entire range is strictly 0..0 => false
+            if sub_val.min_value == 0 and sub_val.max_value == 0:
+                return BoolInterval(0, 0)
+            # if entire range is non-zero => true => [1,1]
+            if sub_val.min_value > 0:
+                return BoolInterval(1, 1)
+            # if partial includes 0 and nonzero => [0,1]
+            return BoolInterval(0, 1)
+
+        elif isinstance(sub_val, BoolInterval):
+            # 이미 bool => 그대로 반환 가능
+            return sub_val
+
+        elif isinstance(sub_val, str):
+            # string => symbolic bool
+            return BoolInterval(0, 1)
+
+        # fallback
+        return BoolInterval(0, 1)
+
+    def convert_to_address(self, sub_val):
+        """
+        address(...) 변환 예시:
+        - int interval => symbolic address, 단일값 => 'address(0x..)'?
+        - string => if startswith("0x") => parse? else symbolic
+        """
+        # 실무에선 address는 160bit => [0..2^160-1]
+        # 여기선 간단히 symbolic
+        if isinstance(sub_val, IntegerInterval) or isinstance(sub_val, UnsignedIntegerInterval):
+            if sub_val.min_value == sub_val.max_value:
+                # 단일 값 => e.g. 'address(12345)'
+                return f"address({sub_val.min_value})"
+            else:
+                # symbolic
+                return f"symbolicAddressInterval([{sub_val.min_value}, {sub_val.max_value}])"
+
+        elif isinstance(sub_val, str):
+            # 간단히 '0x'로 시작하면 주소로 간주?
+            if sub_val.startswith("0x"):
+                return sub_val  # already address string
+            else:
+                return f"symbolicAddress({sub_val})"
+
+        elif isinstance(sub_val, BoolInterval):
+            # bool -> address => symbolic
+            return f"symbolicAddressFromBool({sub_val})"
+
+        else:
+            return f"symbolicAddress({sub_val})"
+
+    def evaluate_binary_operator_of_index(self, result, callerObject):
+        # 2) callerObject가 ArrayVariable이면 => 인덱스 접근 결과로 해석
+        if isinstance(callerObject, ArrayVariable):
+            # result가 Interval인지 검사
+            if not hasattr(result, 'min_value') or not hasattr(result, 'max_value'):
+                # result가 BoolInterval or symbolic 등 => array 인덱스로 사용 불가 → symbolic
+                return f"symbolicIndex({callerObject.identifier}[{result}])"
+
+            # (a) bottom이면 symbolic or direct bottom
+            if result.is_bottom():
+                return f"symbolicIndex({callerObject.identifier}[BOTTOM])"
+
+            min_idx = result.min_value
+            max_idx = result.max_value
+            if min_idx is None or max_idx is None:
+                # None이면 bottom => symbolic
+                return f"symbolicIndex({callerObject.identifier}[{result}])"
+
+            # (b) 단일값?
+            if min_idx == max_idx:
+                idx = min_idx
+                # 범위체크
+                if idx < 0 or idx >= len(callerObject.elements):
+                    raise IndexError(f"Index {idx} out of range for array '{callerObject.identifier}'")
+                element_var = callerObject.elements[idx]
+                # element_var가 Variables면 element_var.value가 실제 Interval/주소/등일 수 있음
+                if hasattr(element_var, 'value'):
+                    return element_var.value
+                else:
+                    return element_var  # ArrayVariable/StructVariable 등
+
+            # (c) 범위: [min_idx..max_idx]
+            # 각 요소를 순회하며 join
+            joined = None
+            for idx in range(min_idx, max_idx + 1):
+                if idx < 0 or idx >= len(callerObject.elements):
+                    # 범위 벗어나면 symbolic 처리
+                    return f"symbolicIndexRange({callerObject.identifier}[{result}])"
+
+                elem_var = callerObject.elements[idx]
+                # elem_var가 Variables => elem_var.value가 Interval일 수도 있고,
+                # 다른 타입(주소, bool 등)일 수도 있음
+                # 여기선 "전부 Interval이면 join, 아니면 symbolic" 예시
+                val = elem_var.value if hasattr(elem_var, 'value') else elem_var
+
+                # 주소 or string or struct => symbolic
+                if (isinstance(val, IntegerInterval) or isinstance(val, UnsignedIntegerInterval)
+                        or isinstance(val, BoolInterval)):
+                    if joined is None:
+                        joined = val
+                    else:
+                        joined = joined.join(val)
+                else:
+                    return f"symbolicMixedType({callerObject.identifier}[{result}])"
+
+            # 모든 요소를 Interval.join했으면 joined에 최종 Interval
+            return joined
+
+        # 3) callerObject가 MappingVariable인 경우 (비슷한 로직 확장 가능)
+        if isinstance(callerObject, MappingVariable):
+            # result => 단일 키 or 범위 => map lookup
+            if not hasattr(result, 'min_value') or not hasattr(result, 'max_value'):
+                # symbolic
+                return f"symbolicMappingIndex({callerObject.identifier}[{result}])"
+
+            if result.is_bottom():
+                return f"symbolicMappingIndex({callerObject.identifier}[BOTTOM])"
+
+            min_idx = result.min_value
+            max_idx = result.max_value
+            if min_idx == max_idx:
+                key_str = str(min_idx)
+                if key_str in callerObject.mapping:
+                    return callerObject.mapping[key_str].value
+                else:
+                    # 새로 추가 or symbolic
+                    new_var_obj = self.create_default_mapping_value(callerObject, key_str)
+                    self.update_mapping_in_cfg(callerObject.identifier, key_str, new_var_obj)
+                    return new_var_obj.value
+            else:
+                # 범위 [min_idx..max_idx], 여러 entry join
+                # (실제로 주소형이나 uint형 등 다양한 키 처리 시 로직 필요)
+                joined = None
+                for k in range(min_idx, max_idx + 1):
+                    k_str = str(k)
+                    if k_str not in callerObject.mapping:
+                        # default
+                        new_obj = self.create_default_mapping_value(callerObject, k_str)
+                        self.update_mapping_in_cfg(callerObject.identifier, k_str, new_obj)
+                        val = new_obj.value
+                    else:
+                        val = callerObject.mapping[k_str].value
+
+                    # join
+                    if isinstance(val, Interval):
+                        if joined is None:
+                            joined = val
+                        else:
+                            joined = joined.join(val)
+                    else:
+                        return f"symbolicMixedType({callerObject.identifier}[{result}])"
+
+                return joined
+
+    def create_default_mapping_value(self, mappingVar: MappingVariable, key_str: str):
+        """
+        mappingVar: MappingVariable
+        key_str: 키 문자열
+        이 매핑에 새로 들어갈 기본값(Variables 객체)을 생성해 반환
+        예: int/uint -> 0, bool -> False, ...
+        """
+        value_type_info = mappingVar.typeInfo.mappingValueType
+        # 일단 elementary 가정
+        if value_type_info.elementaryTypeName.startswith("int"):
+            length = value_type_info.intTypeLength or 256
+            zero_interval = IntegerInterval(0, 0, length)
+            new_obj = Variables(identifier=f"{mappingVar.identifier}[{key_str}]",
+                                value=zero_interval,
+                                typeInfo=value_type_info)
+            mappingVar.mapping[key_str] = new_obj
+            return new_obj
+        elif value_type_info.elementaryTypeName.startswith("uint"):
+            length = value_type_info.intTypeLength or 256
+            zero_interval = UnsignedIntegerInterval(0, 0, length)
+            new_obj = Variables(identifier=f"{mappingVar.identifier}[{key_str}]",
+                                value=zero_interval,
+                                typeInfo=value_type_info)
+            mappingVar.mapping[key_str] = new_obj
+            return new_obj
+        elif value_type_info.elementaryTypeName == "bool":
+            bool_obj = Variables(identifier=f"{mappingVar.identifier}[{key_str}]",
+                                 value=BoolInterval(0, 0),
+                                 typeInfo=value_type_info)
+            mappingVar.mapping[key_str] = bool_obj
+            return bool_obj
+        else:
+            # fallback for other types - struct, array, ...
+            # possibly create a symbolic placeholder
+            sym_obj = Variables(identifier=f"{mappingVar.identifier}[{key_str}]",
+                                value=f"symbolicDefault({value_type_info.elementaryTypeName})",
+                                typeInfo=value_type_info)
+            mappingVar.mapping[key_str] = sym_obj
+            return sym_obj
+
+    def update_mapping_in_cfg(self, mapVarName: str, key_str: str, new_var_obj: Variables):
+        """
+        mapVarName: "myMapping"
+        key_str: "someKey"
+        new_var_obj: 새로 만든 Variables(...) for the mapping value
+        여기에 state_variable_node, function_cfg 등을 업데이트
+        """
+        contract_cfg = self.contract_cfgs.get(self.current_target_contract)
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # state_variable_node 갱신
+        if contract_cfg.state_variable_node and mapVarName in contract_cfg.state_variable_node.variables:
+            mapVar = contract_cfg.state_variable_node.variables[mapVarName]
+            if isinstance(mapVar, MappingVariable):
+                mapVar.mapping[key_str] = new_var_obj
+
+        # 함수 CFG 갱신
+        function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if function_cfg:
+            if mapVarName in function_cfg.related_variables:
+                mapVar2 = function_cfg.related_variables[mapVarName]
+                if isinstance(mapVar2, MappingVariable):
+                    mapVar2.mapping[key_str] = new_var_obj
+
+    def update_variables_with_condition(self, variables, condition_expr, is_true_branch):
+        """
+            condition_expr: Expression
+              - 연산자(operator)가 비교연산(==,!=,<,>,<=,>=)일 수도 있고,
+              - 논리연산(&&, ||, !)일 수도 있고,
+              - 단일 변수(IdentifierExpContext)나 bool literal, etc. 일 수도 있음
+            is_true_branch:
+              - True => 조건이 만족되는 브랜치 (if, while 등의 true 분기)
+              - False => 조건이 불만족인 브랜치 (else, while not, etc)
+            variables: { var_name: Variables }  (CFGNode 상의 변수 상태)
+            """
+
+        # 1) condition_expr.operator 파악
+        op = condition_expr.operator
+
+        # 2) 만약 operator가 None인데, context가 IdentifierExpContext(단일 변수) 등 “단순 bool 변환”이라면
+        if op is None:
+            # 예: if (myBoolVar) => true branch라면 myBoolVar = [1,1], false branch라면 myBoolVar=[0,0]
+            return self._update_single_condition(variables, condition_expr, is_true_branch)
+
+        # 3) 논리 연산 처리
+        elif op in ['&&', '||', '!']:
+            return self._update_logical_condition(variables, condition_expr, is_true_branch)
+
+        # 4) 비교 연산 처리 (==, !=, <, >, <=, >=)
+        elif op in ['==', '!=', '<', '>', '<=', '>=']:
+            return self._update_comparison_condition(variables, condition_expr, is_true_branch)
+
+        else :
+            raise ValueError(f"This operator '{op}' is not expected operator")
+
+    def _update_single_condition(self, variables: dict, condition_expr: Expression, is_true_branch: bool):
+        """
+        예) if (myBoolVar) / while (myBoolVar) / ...
+            - true branch => myBoolVar ∈ [1,1]
+            - false branch => myBoolVar ∈ [0,0]
+        """
+        # condition_expr가 IdentifierExpContext or literalExpContext( true / false ) 등인 경우
+        # 1) evaluate_expression으로 값을 가져옴
+        cond_val = self.evaluate_expression(condition_expr, variables, None, None)
+        if isinstance(cond_val, BoolInterval):
+            # is_true_branch면 cond_val = [1,1], false면 [0,0]로 좁힘
+            new_val = None
+            if is_true_branch:
+                # meet with [1,1]
+                new_val = cond_val.meet(BoolInterval(1, 1))
+            else:
+                # meet with [0,0]
+                new_val = cond_val.meet(BoolInterval(0, 0))
+            # cond_val이 변수의 interval일 수도, 아니면 literal일 수도 있으므로
+            # 만약 “단일 변수” 식이라면, 그 변수를 찾아서 interval 교체
+            var_name = None
+            if condition_expr.context == "IdentifierExpContext":
+                var_name = condition_expr.identifier
+            if var_name and var_name in variables:
+                # 교집합 결과로 갱신
+                if isinstance(variables[var_name].value, BoolInterval):
+                    updated_val = variables[var_name].value.meet(new_val)
+                    variables[var_name].value = updated_val
+                # struct 일수도 있을듯 추후 수정
+        else:
+            # cond_val이 BoolInterval이 아닐 수도 있으므로, 간단히 symbolic 처리 or pass
+            pass
+
+    def _update_logical_condition(self, variables: dict, cond_expr: Expression, is_true_branch: bool):
+        op = cond_expr.operator  # '&&', '||', '!'
+        if op == '!':
+            # ! X => true branch => X = false, false branch => X=true
+            # => is_true_branch = true => X=[0,0], else => X=[1,1]
+            # cond_expr.expression 이 실제 operand
+            operand_expr = cond_expr.expression
+            # 재귀적으로 single_condition 등 호출
+            return self._update_single_condition(variables, operand_expr, not is_true_branch)
+
+        elif op == '&&':
+            # (condA && condB)
+            # true branch => condA=true and condB=true
+            # false branch => condA=false OR condB=false (정보손실: 둘 중 하나만 false면 되니까)
+            condA = cond_expr.left
+            condB = cond_expr.right
+
+            if is_true_branch:
+                # A=true, B=true
+                self.update_variables_with_condition(variables, condA, True)
+                self.update_variables_with_condition(variables, condB, True)
+            else:
+                # A=false or B=false
+                # 단일 Interval domain에선 “둘 중 하나 false”를 따로 분기해서 저장하기 어렵다.
+                # 보수적으로 A= [0,1], B=[0,1] 정도로 그냥 pass 하거나, symbolic
+                pass
+
+        elif op == '||':
+            # (condA || condB)
+            # true branch => condA=true or condB=true (Info-loss)
+            # false branch => condA=false AND condB=false
+            condA = cond_expr.left
+            condB = cond_expr.right
+
+            if is_true_branch:
+                # A=true or B=true → Interval domain에서는 크게 좁히기 어렵다.
+                pass
+            else:
+                # both false
+                self.update_variables_with_condition(variables, condA, False)
+                self.update_variables_with_condition(variables, condB, False)
+
+    def _update_comparison_condition(self, variables: dict, cond_expr: Expression, is_true_branch: bool):
+        """
+        cond_expr.operator in ['<','>','<=','>=','==','!=']
+        cond_expr.left, cond_expr.right => Expression
+        is_true_branch => True면 cond_expr.operator 그대로 쓰고,
+                          False면 negate_operator를 적용
+        """
+        op = cond_expr.operator
+        # negate operator (if is_true_branch==False) => eq <-> !=, < -> >=, ...
+        actual_op = op if is_true_branch else self.negate_operator(op)
+
+        left_expr = cond_expr.left
+        right_expr = cond_expr.right
+
+        # 1) evaluate_expression으로 좌우 값을 먼저 가져옴
+        left_val = self.evaluate_expression(left_expr, variables, None, None)
+        right_val = self.evaluate_expression(right_expr, variables, None, None)
+
+        # ========================= CASE 1: 양쪽이 Interval =========================
+        if self._is_interval(left_val) and self._is_interval(right_val):
+            # 예) a < b → clamp a, b
+            updated_left, updated_right = self.refine_intervals_for_comparison(
+                left_val, right_val, actual_op
+            )
+
+            self.update_left_var(left_expr, updated_left, '=', variables)
+            self.update_left_var(right_expr, updated_right, '=', variables)
+
+        # ========================= CASE 2: 한쪽 Interval, 한쪽 literal =========================
+        # 예) a < 10, 혹은 0 < b
+        elif self._is_interval(left_val) and isinstance(right_val, (int, float, str)):
+            # ex) a < 10
+            # 1) 우변 literal -> Interval로 변환 시도 (예: int => [10, 10])
+            right_intv = self._coerce_literal_to_interval(right_val, left_val.type_length)
+            updated_left, _ = self.refine_intervals_for_comparison(
+                left_val, right_intv, actual_op
+            )
+            self.update_left_var(left_expr, updated_left, '=', variables)
+
+        elif self._is_interval(right_val) and isinstance(left_val, (int, float, str)):
+            # ex) 0 < b
+            left_intv = self._coerce_literal_to_interval(left_val, right_val.type_length)
+            # 실제 op가 (left op right)이므로, left=literal, right=interval
+            # refine_intervals_for_comparison은 (a_interval, b_interval, op) 순
+            updated_left, updated_right = self.refine_intervals_for_comparison(
+                left_intv, right_val, actual_op
+            )
+            self.update_left_var(right_expr, updated_right, '=', variables)
+
+        # ========================= CASE 3: BoolInterval 비교 =========================
+        # 예) a == true, boolA != boolB, etc.
+        elif isinstance(left_val, BoolInterval) or isinstance(right_val, BoolInterval):
+            # 실제론 bool끼리의 <, >는 이상하긴 하지만,
+            # == / != 는 가능
+            self._update_bool_comparison(variables, left_expr, right_expr, left_val, right_val, actual_op)
+
+        else:
+            # 그 외 => symbolic or pass
+            pass
+
+    def refine_intervals_for_comparison(self, a_interval, b_interval, op):
+        """
+        a_interval, b_interval: Interval (IntegerInterval or UnsignedIntegerInterval)
+        op: '<', '>', '<=', '>=', '==', '!='
+        return: (new_a, new_b)
+        """
+        # 복사본 생성
+        new_a = a_interval.copy()
+        new_b = b_interval.copy()
+
+        # ---------- 1) a < b ----------
+        if op == '<':
+            # a.max < b.min
+            # clamp: a.max <= b.min - 1
+            if new_b.min_value != float('-inf'):
+                candidate_max = new_b.min_value - 1
+                if candidate_max < new_a.min_value:
+                    new_a = new_a.bottom(new_a.type_length)
+                else:
+                    new_a.max_value = min(new_a.max_value, candidate_max)
+
+            # b.min >= a.max+1
+            if not new_a.is_bottom() and new_a.max_value != float('inf'):
+                candidate_min = new_a.max_value + 1
+                if candidate_min > new_b.max_value:
+                    new_b = new_b.bottom(new_b.type_length)
+                else:
+                    new_b.min_value = max(new_b.min_value, candidate_min)
+
+            return (new_a, new_b)
+
+        # ---------- 2) a <= b ----------
+        if op == '<=':
+            # a.max <= b.max
+            # a <= b => a.max <= b.min?  (아닌가? Actually: a <= b => a.max <= b.max, b.min >= a.min..)
+            # 보수적으로 a.max <= b.max, b.min >= a.min
+            # 좀더 정확히: a <= b => a.max <= b.min if we treat strict domain
+            # (실제로는 a <= b => a.max <= b.min ? => that’s effectively <)
+            # => a <= b is basically (a < b) or (a==b)
+            # 여기서는 a <= b => a.max <= b.max (너무 약함)
+            # 혹은 (a < b) U (a==b) => clamp both
+            # 간단 구현: treat as a < b, then a==b join
+            # => pass
+            # 아래선 a <= b를 "a < b or a==b"로 처리
+            # => a< b clamp + a==b clamp => union => in Interval Domain, union 연산은 join
+            lt_a, lt_b = self.refine_intervals_for_comparison(a_interval, b_interval, '<')
+            eq_a, eq_b = self.refine_intervals_for_comparison(a_interval, b_interval, '==')
+            # join
+            join_a = lt_a.join(eq_a)
+            join_b = lt_b.join(eq_b)
+            return (join_a, join_b)
+
+        # ---------- 3) a > b ----------
+        if op == '>':
+            # a.min > b.max
+            # clamp a.min >= b.max+1
+            if new_b.max_value != float('inf'):
+                candidate_min = new_b.max_value + 1
+                if candidate_min > new_a.max_value:
+                    new_a = new_a.bottom(new_a.type_length)
+                else:
+                    new_a.min_value = max(new_a.min_value, candidate_min)
+            # b.max <= a.min-1
+            if not new_a.is_bottom() and new_a.min_value != float('-inf'):
+                candidate_max = new_a.min_value - 1
+                if candidate_max < new_b.min_value:
+                    new_b = new_b.bottom(new_b.type_length)
+                else:
+                    new_b.max_value = min(new_b.max_value, candidate_max)
+            return (new_a, new_b)
+
+        # ---------- 4) a >= b ----------
+        if op == '>=':
+            # a >= b => same trick => union of (a> b) and (a==b)
+            gt_a, gt_b = self.refine_intervals_for_comparison(a_interval, b_interval, '>')
+            eq_a, eq_b = self.refine_intervals_for_comparison(a_interval, b_interval, '==')
+            join_a = gt_a.join(eq_a)
+            join_b = gt_b.join(eq_b)
+            return (join_a, join_b)
+
+        # ---------- 5) a == b ----------
+        if op == '==':
+            # a == b => meet(a,b)
+            meet_ab = new_a.meet(new_b)
+            return (meet_ab, meet_ab)
+
+        # ---------- 6) a != b ----------
+        if op == '!=':
+            # a != b => (a,b) NOT in (a==b)
+            # Interval Domain에서 정확히 "not equal"을 표현하기 어려움
+            # 단일 정수라면 exclude => a,b 교집합 빼기
+            # 간단히 "no refinement" or symbolic
+            return (new_a, new_b)
+
+        # fallback
+        return (new_a, new_b)
+
+    def _coerce_literal_to_interval(self, literal_value, default_bits=256):
+        """
+        literal_value가 int, float, str('123' 같은)이면
+        IntegerInterval/UnsignedIntegerInterval 로 대충 변환
+        - 여기선 부호 추정이 어려우므로 int인지 uint인지는
+          대략 정하거나, int라고 가정
+        - 실제론 parse해서 음수/양수 구분, base등 처리 가능
+        """
+        if isinstance(literal_value, (int, float)):
+            # int 범위 - 여기선 int라고 가정
+            # 실제론 unsigned 구분 필요
+            int_val = int(literal_value)
+            return IntegerInterval(int_val, int_val, default_bits)
+        if isinstance(literal_value, str):
+            # 만약 '123'이면 int 변환
+            # 만약 'hello'이면 symbolic?
+            try:
+                int_val = int(literal_value, 0)
+                return IntegerInterval(int_val, int_val, default_bits)
+            except ValueError:
+                # symbolic
+                return IntegerInterval(None, None, default_bits).make_bottom()
+        # fallback
+        return IntegerInterval(None, None, default_bits).make_bottom()
+
+    def _update_bool_comparison(self, variables: dict,
+                                left_expr: Expression, right_expr: Expression,
+                                left_val, right_val, op: str):
+        """
+        예) (boolA == boolB), (boolA != true), ...
+        op in ['==','!=','<','>','<=','>='] 중 bool끼리 말이 되는건 ==, != 정도
+        ( <, > 등은 사실상 말이 안 되지만 예시로 처리)
+        """
+        # 우선 bool이 아닌쪽을 boolInterval로 변환 시도?
+        # 아니면 단순 symbolic
+        if not isinstance(left_val, BoolInterval):
+            if isinstance(right_val, BoolInterval):
+                # swap
+                left_expr, right_expr = right_expr, left_expr
+                left_val, right_val = right_val, left_val
+            else:
+                # 둘다 bool이 아님
+                return
+
+        # 이제 left_val은 BoolInterval 확정
+        # right_val이 BoolInterval이거나, bool literal => BoolInterval(0 or 1),
+        # 또는 int(0 or 1)
+
+        if not isinstance(right_val, BoolInterval):
+            # 만약 int(0,0) or (1,1) => 변환
+            if self._is_interval(right_val):
+                # int interval => [0,0] => false, [1,1] => true, [0,1] => unknown
+                bool_equiv = self._convert_int_to_bool_interval(right_val)
+                right_val = bool_equiv
+            else:
+                # symbolic
+                return
+
+        # 이제 left_val, right_val 둘 다 BoolInterval
+        # op == '==' => left==right => 교집합
+        # op == '!=' => left!=right => 부분 부정
+        # 그외 <, >, <=, >= => 논리적으로 별 의미 없음 => symbolic or skip
+        if op == '==':
+            meet_lr = left_val.meet(right_val)
+            # left_expr/right_expr가 identifier면 갱신
+            left_name = self._extract_identifier_if_possible(left_expr)
+            right_name = self._extract_identifier_if_possible(right_expr)
+            if left_name in variables:
+                variables[left_name].value = meet_lr
+            if right_name in variables:
+                variables[right_name].value = meet_lr
+
+        elif op == '!=':
+            # left != right
+            # 만약 left=[0,0], right=[0,0] => meet => bottom
+            # if left=[0,1], right=[0,1], => no refinement
+            # ...
+            # 여기서는 간단히 partial symbolic
+            pass
+
+        else:
+            # <, >, <=, >= => 보통 bool끼리 잘 안 씀 => symbolic
+            pass
+
+    def _convert_int_to_bool_interval(self, int_interval):
+        """
+        간단히 [0,0] => BoolInterval(0,0),
+             [1,1] => BoolInterval(1,1)
+             그외 => BoolInterval(0,1)
+        """
+        if int_interval.is_bottom():
+            return BoolInterval(None, None)
+        if int_interval.min_value == 0 and int_interval.max_value == 0:
+            return BoolInterval(0, 0)  # always false
+        elif int_interval.min_value == 1 and int_interval.max_value == 1:
+            return BoolInterval(1, 1)  # always true
+        else:
+            return BoolInterval(0, 1)  # unknown
+
+    def _is_interval(self, val):
+        return isinstance(val, (IntegerInterval, UnsignedIntegerInterval, BoolInterval))
+
+    def _extract_variable_of_expression(self, expr):
+        """
+        expr가 IdentifierExpContext인지 검사하여, 맞으면 expr.identifier 리턴
+        아니면 None
+        """
+        if expr.context == "IdentifierExpContext":
+            return expr.identifier
+        return None
+
+    def negate_operator(self, op: str) -> str:
+        neg_map = {
+            '==': '!=',
+            '!=': '==',
+            '<': '>=',
+            '>': '<=',
+            '<=': '>',
+            '>=': '<'
+        }
+        return neg_map.get(op, op)
+
+    def evaluate_function_call_context(self, expr, variables, callerObject=None, callerContext=None):
+        if expr.context == "MemberAccessContext" : # dynamic array에 대한 push, pop
+            return self.evaluate_expression((expr, variables, None, "functionCallContext"))
+
+        if expr.function.identifier:
+            function_name = expr.function.identifier
+        else:
+            raise ValueError (f"There is no function name in function call context")
+
+        # 2) 현재 컨트랙트 CFG 가져오기
+        contract_cfg = self.contract_cfgs.get(self.current_target_contract)
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        # 3) 함수 CFG 가져오기
+        function_cfg = contract_cfg.get_function_cfg(function_name)
+        if not function_cfg:
+            return f"symbolicFunctionCall({function_name})"  # 또는 에러
+
+        # 4) 함수 파라미터와 인자 매핑
+        #    expr.arguments -> 위치 기반 인자
+        #    expr.named_arguments -> 키워드 인자
+        arguments = expr.arguments if expr.arguments else []
+        named_arguments = expr.named_arguments if expr.named_arguments else {}
+
+        # 파라미터 목록 (이 예시에서는 function_cfg.parameters를 [paramName1, paramName2, ...]로 가정)
+        param_names = getattr(function_cfg, 'parameters', [])
+        # 또는 function_cfg가 paramName->type인 dict라면 list(paramName->type) 식으로 바꿔야 함
+
+        total_params = len(param_names)
+        total_args = len(arguments) + len(named_arguments)
+        if total_params != total_args:
+            raise ValueError(f"Argument count mismatch in function call to '{function_name}': "
+                             f"expected {total_params}, got {total_args}.")
+
+        # 현재 함수 컨텍스트 저장
+        saved_function = self.current_target_function
+        self.current_target_function = function_name
+
+        # 5) 인자 해석
+        #    순서 기반 인자
+        for i, arg_expr in enumerate(arguments):
+            param_name = param_names[i]
+            arg_val = self.evaluate_expression(arg_expr, variables, None, None)
+
+            # function_cfg 내부의 related_variables에 param_name이 있어야
+            if param_name in function_cfg.related_variables:
+                function_cfg.related_variables[param_name].value = arg_val
+            else:
+                raise ValueError(f"Parameter '{param_name}' not found in function '{function_name}' variables.")
+
+        #    named 인자
+        #    (예: foo(a=1,b=2)) => paramName->index 매핑이 필요할 수 있음
+        #    여기서는 paramName가 function_cfg.parameters[i]와 동일한지 가정
+        param_offset = len(arguments)
+        for i, (key, expr_val) in enumerate(named_arguments.items()):
+            if key not in param_names:
+                raise ValueError(f"Unknown named parameter '{key}' in function '{function_name}'.")
+            arg_val = self.evaluate_expression(expr_val, variables, None, f"CallNamedArg({function_name})")
+
+            if key in function_cfg.related_variables:
+                function_cfg.related_variables[key].value = arg_val
+            else:
+                raise ValueError(f"Parameter '{key}' not found in function '{function_name}' variables.")
+
+        # 6) 실제 함수 CFG 해석
+        return_value = self.interpret_function_cfg(function_cfg)
+
+        # 7) 함수 컨텍스트 복원
+        self.current_target_function = saved_function
+
+        return return_value
+
+    def interpret_function_cfg(self, function_cfg):
+        """
+        수정된 interpret_function_cfg 로직 예시
+        """
+        entry_block = function_cfg.get_entry_node()
+        successors = list(function_cfg.graph.successors(entry_block))
+        if len(successors) != 1:
+            raise ValueError("Entry block must have exactly one successor.")
+        start_block = successors[0]
+
+        # block_queue에는 now just nodes, no variables
+        block_queue = deque()
+        block_queue.append(start_block)
+
+        # 함수 내 변수 환경은 CFG 노드에 저장됨.
+        # entry_block의 successor 시작 시, entry_block.variables를 start_block에 전달
+        # entry_block.variables는 아마 constructor나 state_variable_node 해석 후 초기값이 세팅되어 있을 것이라 가정
+        # start_block은 predecessor가 entry_block 하나이므로 그냥 그 값 복사
+        start_block.variables = self.copy_variables(entry_block.variables)
+
+        # return_values를 모아둘 자료구조 (나중에 exit node에서 join)
+        return_values = []
+
+        visited = set()
+
+        while block_queue:
+            analyzingNode = block_queue.popleft()
+            if analyzingNode in visited:
+                continue
+            visited.add(analyzingNode)
+
+            # 이전 block 분석 결과 반영
+            # join_point_node인 경우 predecessor들의 결과를 join한뒤 analyzingNode에 반영
+            # 아니면 predecessor 하나가 있을 것이므로 그 predecessor의 variables를 복사
+            predecessors = list(function_cfg.graph.predecessors(analyzingNode))
+
+            # join node 처리
+            # predecessor들의 variables를 join
+            joined_vars = None
+            for pred in predecessors:
+                if joined_vars is None:
+                    joined_vars = self.copy_variables(pred.variables)
+                else:
+                    joined_vars = self.join_variables(joined_vars, pred.variables)
+            analyzingNode.variables = joined_vars
+
+            current_block = analyzingNode
+            current_variables = current_block.variables
+
+            # condition node 처리
+            if current_block.condition_node:
+                condition_expr = current_block.condition_expr
+
+                if current_block.condition_node_type in ["if", "else if"]:
+                    # true/false branch 각각 하나의 successor 가정
+                    true_successors = [s for s in function_cfg.graph.successors(current_block) if
+                                       function_cfg.graph.edges[current_block, s].get('condition') == True]
+                    false_successors = [s for s in function_cfg.graph.successors(current_block) if
+                                        function_cfg.graph.edges[current_block, s].get('condition') == False]
+
+                    # 각각 한 개라 가정
+                    if len(true_successors) != 1 or len(false_successors) != 1:
+                        raise ValueError(
+                            "if/else if node must have exactly one true successor and one false successor.")
+
+                    true_variables = self.copy_variables(current_variables)
+                    false_variables = self.copy_variables(current_variables)
+
+                    self.update_variables_with_condition(true_variables, condition_expr, is_true_branch=True)
+                    self.update_variables_with_condition(false_variables, condition_expr, is_true_branch=False)
+
+                    # true branch로 이어지는 successor enqueue
+                    true_succ = true_successors[0]
+                    true_succ.variables = true_variables
+                    block_queue.append(true_succ)
+
+                    # false branch로 이어지는 successor enqueue
+                    false_succ = false_successors[0]
+                    false_succ.variables = false_variables
+                    block_queue.append(false_succ)
+                    continue
+
+                elif current_block.condition_node_type in ["require", "assert"]:
+                    # true branch만 존재한다고 가정
+                    true_successors = [s for s in function_cfg.graph.successors(current_block) if
+                                       function_cfg.graph.edges[current_block, s].get('condition') == True]
+
+                    if len(true_successors) != 1:
+                        raise ValueError("require/assert node must have exactly one true successor.")
+
+                    true_variables = self.copy_variables(current_variables)
+                    self.update_variables_with_condition(true_variables, condition_expr, is_true_branch=True)
+
+                    true_succ = true_successors[0]
+                    true_succ.variables = true_variables
+                    block_queue.append(true_succ)
+                    continue
+
+                elif current_block.condition_node_type in ["while", "for", "do_while"]:
+                    # while 루프 처리
+                    # fixpoint 계산 후 exit_node 반환
+                    exit_node = self.apply_fixpoint_to_exit_node(current_block)
+                    # exit_node의 successor는 하나라고 가정
+                    successors = list(function_cfg.graph.successors(exit_node))
+                    if len(successors) == 1:
+                        next_node = successors[0]
+                        next_node.variables = self.copy_variables(exit_node.variables)
+                        block_queue.append(next_node)
+                    elif len(successors) == 0:
+                        # while 종료 후 아무 successor도 없으면 끝
+                        pass
+                    else:
+                        raise ValueError("While exit node must have exactly one successor.")
+                    continue
+
+                elif current_block.fixpoint_evaluation_node:
+                    # 그냥 continue
+                    continue
+                else:
+                    raise ValueError(f"Unknown condition node type: {current_block.condition_node_type}")
+
+            else:
+                # condition node가 아닌 일반 블록
+                # 블록 내 문장 해석
+                for stmt in current_block.statements:
+                    current_variables = self.update_statement_with_variables(stmt, current_variables)
+
+                # return이나 revert를 만나지 않았다면 successors 방문
+                successors = list(function_cfg.graph.successors(current_block))
+                if len(successors) == 1:
+                    next_node = successors[0]
+                    # next_node에 현재 변수 상태를 반영
+                    next_node.variables = self.copy_variables(current_variables)
+                    block_queue.append(next_node)
+                elif len(successors) > 1:
+                    raise ValueError("Non-condition, non-join node should not have multiple successors.")
+                # successors가 없으면 리프노드이므로 그냥 끝.
+
+        # exit node에 도달했다면 return_values join
+        # 모든 return을 모아 exit node에서 join 처리할 수 있으나, 여기서는 단순히 top-level에서 return_values를 join
+        if len(return_values) == 0:
+            return None
+        elif len(return_values) == 1:
+            return return_values[0]
+        else:
+            # 여러 return 값 join 로직 필요 (정수 interval join 등)
+            joined_ret = return_values[0]
+            for rv in return_values[1:]:
+                joined_ret = joined_ret.join(rv)
+            return joined_ret
+
+    def interpret_variable_declaration_statement(self, stmt, variables):
+        varType = stmt.type_obj
+        varName = stmt.var_name
+        initExpr = stmt.init_expr
+
+        # 이미 process_variable_declaration에서 변수 객체 만들어져 있을 것이기 때문에
+        # 초기화 식 없으면 그냥 리턴하면 됨
+        if initExpr is None :
+            return variables
+
+        variableObj = None
+        if varName in variables :
+            variableObj = variables[varName]
+        else :
+            raise ValueError (f"There is no variable '{varName}' in variables dictionary")
+
+        # 초기화 식이 있는데, array면 inline array expression 밖에 없을듯
+        if isinstance(variableObj, ArrayVariable) :
+            return variables
+        elif isinstance(variableObj, StructVariable) : # 관련된거 있을 것 같긴 한데 일단 pass
+            pass
+        elif isinstance(variableObj, MappingVariable) : # mapping은 있을수가 없음
+            raise ValueError (f"Mapping variable is not expected in variable declaration context")
+        elif isinstance(variableObj, Variables) :
+            if varType.typeCategory == "elementary" :
+                variableObj.value = self.evaluate_expression(initExpr, variables, None, None)
+                return variables
+        else :
+            raise ValueError (f"Unexpected type of variable object")
+
+    def interpret_assignment_statement(self, stmt, variables):
+        leftExpr = stmt.left
+        operator = stmt.operator
+        rightExpr = stmt.right
+
+        rExpVal = self.evaluate_expression(rightExpr, variables, None, None)
+        self.update_left_var(leftExpr, rExpVal, operator, variables, None, None)
+
+        return variables
+
+    def interpret_function_call_statement(self, stmt, variables):
+        function_expr = stmt.function_call_expr
+        return_value = self.evaluate_function_call_context(function_expr, variables, None, None)
+
+        return variables
+
+    def interpret_return_statement(self, stmt, variables):
+        returnExpr = stmt.return_expr
+        returnValue = self.evaluate_expression(returnExpr, variables, None, None)
+
+        # 5. function_exit_node에 return 값을 저장
+        exit_node = self.current_target_function_cfg.get_exit_node()
+        exit_node.return_vals[self.current_start_line] = returnValue  # 반환 값을 exit_node의 return_val에 기록
+
+        return variables
+
+    def interpret_revert_statement(self, stmt, variables):
+        return variables
+
+    def compare_intervals(self, left_interval, right_interval, operator):
+        """
+        두 Interval 간의 비교를 수행하여 BooleanInterval을 반환합니다.
+        """
+        if left_interval.min_value is None or left_interval.max_value is None \
+                or right_interval.min_value is None or right_interval.max_value is None:
+            # Interval 중 하나라도 값이 없으면 결과를 확정할 수 없음
+            return BoolInterval(False, True)
+
+        # 비교 결과를 나타내는 변수
+        is_true = False
+        is_false = False
+
+        if operator == '==':
+            if left_interval.max_value < right_interval.min_value or left_interval.min_value > right_interval.max_value:
+                is_false = True
+            elif left_interval.min_value == left_interval.max_value == right_interval.min_value == right_interval.max_value:
+                is_true = True
+            else:
+                is_true = is_false = True  # 불확실함
+        elif operator == '!=':
+            if left_interval.max_value < right_interval.min_value or left_interval.min_value > right_interval.max_value:
+                is_true = True
+            elif left_interval.min_value == left_interval.max_value == right_interval.min_value == right_interval.max_value:
+                is_false = True
+            else:
+                is_true = is_false = True  # 불확실함
+        elif operator == '<':
+            if left_interval.max_value < right_interval.min_value:
+                is_true = True
+            elif left_interval.min_value >= right_interval.max_value:
+                is_false = True
+            else:
+                is_true = is_false = True
+        elif operator == '>':
+            if left_interval.min_value > right_interval.max_value:
+                is_true = True
+            elif left_interval.max_value <= right_interval.min_value:
+                is_false = True
+            else:
+                is_true = is_false = True
+        elif operator == '<=':
+            if left_interval.max_value <= right_interval.min_value:
+                is_true = True
+            elif left_interval.min_value > right_interval.max_value:
+                is_false = True
+            else:
+                is_true = is_false = True
+        elif operator == '>=':
+            if left_interval.min_value >= right_interval.max_value:
+                is_true = True
+            elif left_interval.max_value < right_interval.min_value:
+                is_false = True
+            else:
+                is_true = is_false = True
+        else:
+            raise ValueError(f"Unsupported comparison operator: {operator}")
+
+        return BoolInterval(is_true, is_false)
+
+
+    """
+    intent analysis part
+    """
+
+    def parse_intent(self, line_comment):
+        """
+        개발자의 의도를 파싱하여 변수별로 interval을 반환하는 함수.
+        @intent <variable> <comparison> <value>
+        예: // @intent x >= 5 && x <= 10
+        """
+        # 패턴: @intent 뒤에 나오는 비교 표현식을 파싱
+        intent_pattern = r'@intent\s+([\w\[\]\.]+)\s*(>=|<=|>|<|==|!=)\s*(\d+)'  # 변수명, 연산자, 값 추출
+        matches = re.findall(intent_pattern, line_comment)
+
+        # 의도된 interval 결과 저장
+        intent_intervals = {}
+
+        for match in matches:
+            var_name, operator, value = match
+            value = int(value)
+
+            # 변수를 기준으로 비교 연산자에 따른 interval 설정
+            if var_name not in intent_intervals:
+                intent_intervals[var_name] = [None, None]  # min, max 초기화
+
+            # 비교 연산자 처리
+            if operator == '>=':
+                intent_intervals[var_name][0] = value
+            elif operator == '>':
+                intent_intervals[var_name][0] = value + 1
+            elif operator == '<=':
+                intent_intervals[var_name][1] = value
+            elif operator == '<':
+                intent_intervals[var_name][1] = value - 1
+            elif operator == '==':
+                intent_intervals[var_name] = [value, value]
+            elif operator == '!=':
+                # != 연산은 범위 처리에 부적합하므로 제외 처리하거나 경고 가능
+                pass
+
+        # 각 변수에 대한 Interval 객체 생성
+        parsed_intervals = {}
+        for var_name, (min_val, max_val) in intent_intervals.items():
+            # min, max 값이 없을 경우 Interval(None, None) 반환
+            parsed_intervals[var_name] = Interval(min_val, max_val)
+
+        return parsed_intervals
+
+    def get_analysis_result(self):
+        # 가장 최근의 분석 결과를 반환
+        return self.analysis_results if self.analysis_results else {}
