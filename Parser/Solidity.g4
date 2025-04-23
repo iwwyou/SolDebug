@@ -250,22 +250,15 @@ interactiveCatchClauseUnit
     interactiveCatchClause
   )* EOF;
 
-
-intentUnit
+debugUnit
   : (
-    preExecution
-    | duringExecution
-    | postExecution
+    debugGlobalVar
+    debugStateVar
+    debugLocalVar
   ) * EOF;
 
-preExecution
-  : preExecutionGlobal
-  | preExecutionState
-  | preExecutionLocal
-  ;
-
-preExecutionGlobal
-  : '//' '@pre-execution-global' identifier'.'identifier '=' globalValue
+debugGlobalVar
+  : '//' '@GlobalVar' identifier ('.' identifier)? '=' globalValue
   ;
 
 globalValue
@@ -273,12 +266,12 @@ globalValue
   | 'address' numberLiteral # GlobalAddressValue
   ;
 
-preExecutionState
-  : '//' '@pre-execution-state' testingExpression '=' stateLocalValue
+debugStateVar
+  : '//' '@StateVar' testingExpression '=' stateLocalValue
   ;
 
-preExecutionLocal
-  : '//' '@pre-execution-local' testingExpression '=' stateLocalValue
+debugLocalVar
+  : '//' '@LocalVar' testingExpression '=' stateLocalValue
   ;
 
 testingExpression
@@ -293,93 +286,12 @@ subAccess
 stateLocalValue
   : '[' '-'? numberLiteral ',' '-'? numberLiteral ']' #StateLocalIntValue
   | 'address' numberLiteral # StateLocalAddressValue
-  | '[' booleanLiteral ',' booleanLiteral ']' # StateLocalBooleanValue
+  | ('true' | 'false' | 'any') # StateLocalBoolValue
   ;
 
 numberBoolLiteral
   : '-'? numberLiteral
   | booleanLiteral ;
-
-postExecution
-  : postExecutionState
-  | postExecutionReturn
-  ;
-
-postExecutionState
-  : '//' '@post-execution-state' testingExpression entryExit
-  | '//' '@post-execution-state' testingExpression comparisonOperator numberBoolLiteral
-  ;
-
-entryExit
-  : '(' 'Entry' comparisonOperator 'Exit' ')' ;
-
-postExecutionReturn
-  : '//' '@post-execution' 'returnValues' comparisonOperator numberBoolLiteral ;
-
-duringExecution
-  : '//' duringExecutionComment (',' duringExecutionComment)* ;
-
-duringExecutionComment
-  : duringExecutionBeforeAfter
-  | duringExecutionAssignCurrent
-  | duringExecutionReturn
-  | duringExecutionGeneral;
-
-duringExecutionBeforeAfter
-  : '@during-execution' testingExpression beforeAfter ;
-
-beforeAfter
-  : '(' 'Before' comparisonOperator 'After' ')';
-
-duringExecutionAssignCurrent
-  : '@during-execution' testingExpression assignCurrent ;
-
-assignCurrent
-  : '(' 'Assign' comparisonOperator 'Current' ')';
-
-duringExecutionReturn
-  : '@during-execution' returnType ;
-
-returnType
-  : 'returnExpresion' comparisonOperator numberBoolLiteral # ExpressionReturn
-  | returnVar (',' returnVar)* # VarReturn
-  ;
-
-returnVar
-  : testingExpression comparisonOperator numberBoolLiteral ;
-
-duringExecutionGeneral
-  : '@during-execution' comparisonExpression (logicalOperator comparisonExpression)* ;
-
-comparisonExpression
-  : arithmeticExpression comparisonOperator arithmeticExpression ;
-
-logicalOperator
-  : '&&' | '||' ;
-
-comparisonOperator
-  : '<' | '>' | '<=' | '>=' | '==' | '!=' ;
-
-arithmeticExpression
-  : multiplicativeExpression (additiveOperator multiplicativeExpression)* ;
-
-multiplicativeExpression
-  : primaryExpression (multiplicativeOperator primaryExpression)* ;
-
-primaryExpression
-  : literal
-  | identifier
-  | accessExpression
-  | '(' arithmeticExpression ')' ;
-
-accessExpression
-  : identifier ('[' (literal|identifier)+ ']' | '.' identifier)* ;
-
-additiveOperator
-  : '+' | '-' ;
-
-multiplicativeOperator
-  : '*' | '/' ;
 
 interactiveSimpleStatement
   : ( interactiveVariableDeclarationStatement | interactiveExpressionStatement ) ;
