@@ -139,9 +139,9 @@ class ContractAnalyzer:
 
         # (1) 만약 이 라인이 "@pre-execution-global", "@pre-execution-state", 등 Intent가 들어간 주석인지 확인
         if stripped_code.startswith('// @'):
-            self.current_context_type = "intentUnit"
+            self.current_context_type = "debug"
             self.current_target_contract = self.find_contract_context(start_line)
-            if 'pre-execution-global' in stripped_code :
+            if 'GlobalVar' in stripped_code :
                 return
             self.current_target_function = self.find_function_context(start_line)
             return  # 이 함수 종료
@@ -2291,9 +2291,14 @@ class ContractAnalyzer:
                     if not self.variables_equal({key: obj1.mapping[key]}, {key: obj2.mapping[key]}):
                         return False
             else:
-                # elementary => interval equals
-                if not obj1.value.equals(obj2.value):
-                    return False
+                # elementary (int/uint/bool/enum 등) 비교
+                if hasattr(obj1.value, "equals") and hasattr(obj2.value, "equals"):
+                    if not obj1.value.equals(obj2.value):
+                        return False
+                else:
+                    # Interval 이 아닌 단순 값(예: enum 리터럴 index, symbolic address 등)
+                    if obj1.value != obj2.value:
+                        return False
 
         return True
 
@@ -2687,37 +2692,6 @@ class ContractAnalyzer:
             # 타입 다르거나 join 불가 => symbolic
             return f"symbolicJoin({val1},{val2})"
 
-    def traverse_loop_nodes(self, loop_node):
-        """
-        루프 노드부터 시작하여 루프 내의 노드들을 순회합니다.
-        :param loop_node: 루프의 조건 노드
-        :return: 루프 내의 노드들
-        """
-        visited = set()
-        stack = [loop_node]
-        loop_nodes = []
-
-        while stack:
-            current_node = stack.pop()
-            if current_node in visited:
-                continue
-            visited.add(current_node)
-            loop_nodes.append(current_node)
-
-            successors = list(self.current_target_function_cfg.graph.successors(current_node))
-            for successor in successors:
-                # 간선의 조건을 확인하여 false_branch를 건너뜀
-                edge_data = self.current_target_function_cfg.graph.get_edge_data(current_node, successor)
-                if edge_data and edge_data.get('condition') == False:  # False branch는 제외
-                    continue
-
-                # False branch가 아니면 순회 계속
-                stack.append(successor)
-                #if successor != loop_node.false_branch:
-                #    stack.append(successor)
-
-        return loop_nodes
-
     def get_true_block(self, condition_node):
         contract_cfg = self.contract_cfgs[self.current_target_contract]
         if not contract_cfg:
@@ -2744,7 +2718,7 @@ class ContractAnalyzer:
             raise ValueError("No active function to process the require statement.")
 
         # 해당 조건 노드에서 false일 때 실행될 블록을 찾아 리턴
-        successors = list(self.function_cfg.graph.successors(condition_node))
+        successors = list(function_cfg.graph.successors(condition_node))  # --- 수정 ---
         for successor in successors:
             if not function_cfg.graph.edges[condition_node, successor].get('condition', False):
                 return successor
@@ -2794,8 +2768,7 @@ class ContractAnalyzer:
         else:
             raise ValueError(f"Unsupported type for default interval: {var_type}")
 
-    def update_left_var(self, expr, rVal, operator, variables,
-                        callerObject=None, callerContext=None):
+    def update_left_var(self, expr, rVal, operator, variables, callerObject=None, callerContext=None):
         if expr.context == "IndexAccessContext" :
             return self.update_left_var_of_index_access_context(expr, rVal, operator, variables,
                                                                 callerObject, callerContext)
@@ -2809,6 +2782,7 @@ class ContractAnalyzer:
         elif expr.context == "LiteralExpContext" :
             return self.update_left_var_of_literal_context(expr, rVal, operator, variables,
                                                                 callerObject)
+        return None
 
     def compound_assignment(self, left_interval, right_interval, operator):
         if operator == '=' :
@@ -2879,22 +2853,28 @@ class ContractAnalyzer:
                     if isinstance(element, Variables) or isinstance(element, EnumVariable) :
                         if not self._is_interval(rVal) :
                             if rVal.startswith('-') or rVal.isdigit() or rVal in ["true", "false"] :
-                                newRVal = self.convert_literal_to_interval(rVal, element)
-                        element.value = self.compound_assignment(element.value, newRVal, operator)
-                        return
+                                rVal = self.convert_literal_to_interval(rVal, element)
+                        element.value = self.compound_assignment(element.value, rVal, operator)
+                        return None
                     elif isinstance(element, ArrayVariable) or isinstance(element, StructVariable) :
                         return element
+                    return None
+                return None
             elif isinstance(callerObject, MappingVariable):
                 if literal_str in callerObject.mapping :
                     mapVar = callerObject.mapping[literal_str]
                     if isinstance(mapVar, Variables) or isinstance(mapVar, EnumVariable) :
                         if not self._is_interval(rVal) :
                             if rVal.startswith('-') or rVal.isdigit() or rVal in ["true", "false"]:
-                                newRVal = self.convert_literal_to_interval(rVal, mapVar)
+                                rVal = self.convert_literal_to_interval(rVal, mapVar)
                         mapVar.value = self.compound_assignment(mapVar.value, rVal, operator)
+                        return None
                     elif isinstance(mapVar, ArrayVariable) or isinstance(mapVar, StructVariable)\
                             or isinstance(mapVar, MappingVariable):
                         return mapVar
+                    return None
+                return None
+            return None
         else :
             raise ValueError(f"This literal context '{literal_str}' is wrong context")
 
@@ -4492,56 +4472,3 @@ class ContractAnalyzer:
             raise ValueError(f"Unsupported comparison operator: {operator}")
 
         return BoolInterval(is_true, is_false)
-
-
-    """
-    intent analysis part
-    """
-
-    def parse_intent(self, line_comment):
-        """
-        개발자의 의도를 파싱하여 변수별로 interval을 반환하는 함수.
-        @intent <variable> <comparison> <value>
-        예: // @intent x >= 5 && x <= 10
-        """
-        # 패턴: @intent 뒤에 나오는 비교 표현식을 파싱
-        intent_pattern = r'@intent\s+([\w\[\]\.]+)\s*(>=|<=|>|<|==|!=)\s*(\d+)'  # 변수명, 연산자, 값 추출
-        matches = re.findall(intent_pattern, line_comment)
-
-        # 의도된 interval 결과 저장
-        intent_intervals = {}
-
-        for match in matches:
-            var_name, operator, value = match
-            value = int(value)
-
-            # 변수를 기준으로 비교 연산자에 따른 interval 설정
-            if var_name not in intent_intervals:
-                intent_intervals[var_name] = [None, None]  # min, max 초기화
-
-            # 비교 연산자 처리
-            if operator == '>=':
-                intent_intervals[var_name][0] = value
-            elif operator == '>':
-                intent_intervals[var_name][0] = value + 1
-            elif operator == '<=':
-                intent_intervals[var_name][1] = value
-            elif operator == '<':
-                intent_intervals[var_name][1] = value - 1
-            elif operator == '==':
-                intent_intervals[var_name] = [value, value]
-            elif operator == '!=':
-                # != 연산은 범위 처리에 부적합하므로 제외 처리하거나 경고 가능
-                pass
-
-        # 각 변수에 대한 Interval 객체 생성
-        parsed_intervals = {}
-        for var_name, (min_val, max_val) in intent_intervals.items():
-            # min, max 값이 없을 경우 Interval(None, None) 반환
-            parsed_intervals[var_name] = Interval(min_val, max_val)
-
-        return parsed_intervals
-
-    def get_analysis_result(self):
-        # 가장 최근의 분석 결과를 반환
-        return self.analysis_results if self.analysis_results else {}

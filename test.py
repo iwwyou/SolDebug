@@ -67,8 +67,8 @@ def generate_parse_tree(input_stream, context_type):
         tree = parser.interactiveIfElseUnit()
     elif context_rule == 'interactiveCatchClauseUnit':
         tree = parser.interactiveCatchClauseUnit()
-    elif context_rule == 'intentUnit' :
-        tree = parser.intentUnit()
+    elif context_rule == 'debugUnit' :
+        tree = parser.debugUnit()
     else:
         tree = parser.interactiveSourceUnit()
 

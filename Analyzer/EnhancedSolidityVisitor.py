@@ -530,32 +530,28 @@ class EnhancedSolidityVisitor(SolidityVisitor):
     def visitInteractiveCatchClauseUnit(self, ctx:SolidityParser.InteractiveCatchClauseUnitContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by SolidityParser#intentUnit.
-    def visitIntentUnit(self, ctx: SolidityParser.IntentUnitContext):
+    # Visit a parse tree produced by SolidityParser#debugUnit.
+    def visitDebugUnit(self, ctx:SolidityParser.DebugUnitContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by SolidityParser#preExecution.
-    def visitPreExecution(self, ctx: SolidityParser.PreExecutionContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#preExecutionGlobal.
-    def visitPreExecutionGlobal(self, ctx: SolidityParser.PreExecutionGlobalContext):
+    # Visit a parse tree produced by SolidityParser#debugGlobalVar.
+    def visitDebugGlobalVar(self, ctx:SolidityParser.DebugGlobalVarContext):
         """
-        Handles global pre-execution intent comments.
+                Handles global pre-execution intent comments.
 
-        Grammar rule:
-          preExecutionGlobal
-            : '//' '@pre-execution-global' identifier '.' identifier '=' globalValue
-            ;
+                Grammar rule:
+                  preExecutionGlobal
+                    : '//' '@pre-execution-global' identifier '.' identifier '=' globalValue
+                    ;
 
-          globalValue:
-            : '[' numberLiteral ',' numberLiteral ']'   # GlobalIntValue
-            | 'symbolicAddress' numberLiteral                     # GlobalAddressValue
+                  globalValue:
+                    : '[' numberLiteral ',' numberLiteral ']'   # GlobalIntValue
+                    | 'symbolicAddress' numberLiteral                     # GlobalAddressValue
 
-        Examples:
-          // @pre-execution-global block.timestamp = [1000, 2000]
-          // @pre-execution-global msg.sender = address 1
-        """
+                Examples:
+                  // @pre-execution-global block.timestamp = [1000, 2000]
+                  // @pre-execution-global msg.sender = address 1
+                """
         # 1) 추출: 두 개의 identifier (예: "block", "timestamp")
         left_id = ctx.identifier(0).getText()  # 예: "block"
         right_id = ctx.identifier(1).getText()  # 예: "timestamp"
@@ -573,7 +569,7 @@ class EnhancedSolidityVisitor(SolidityVisitor):
                 "block.number",
                 "block.prevrandao",
                 "block.timestamp",
-                "msg.sender", #
+                "msg.sender",  #
                 "msg.value",
                 "tx.gasprice",
                 "tx.origin"
@@ -628,37 +624,14 @@ class EnhancedSolidityVisitor(SolidityVisitor):
     def visitGlobalAddressValue(self, ctx: SolidityParser.GlobalAddressValueContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by SolidityParser#preExecutionState.
-    def visitPreExecutionState(self, ctx: SolidityParser.PreExecutionStateContext):
-        """
-                Handles comments like:
-                  // @pre-execution-state someMapping[0x123] = 100
-                  // @pre-execution-state myVar = true
-                """
-        # (1) LHS: parse testingExpression into an Expression object.
-        lhs_expr = self.visitTestingExpression(ctx.testingExpression())
-        # (2) RHS: parse the literal (number or boolean)
-        rhs_text = ctx.numberBoolLiteral().getText()  # 예: "100", "true", "-20", etc.
-        value = self.parse_number_bool_literal(rhs_text)
-        # (3) Call process function in the analyzer
-        self.contract_analyzer.process_pre_execution_state(lhs_expr, value)
-        return None
+    # Visit a parse tree produced by SolidityParser#debugStateVar.
+    def visitDebugStateVar(self, ctx:SolidityParser.DebugStateVarContext):
+        return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by SolidityParser#preExecutionLocal.
-    def visitPreExecutionLocal(self, ctx: SolidityParser.PreExecutionLocalContext):
-        """
-                        Handles comments like:
-                          // @pre-execution-state someMapping[0x123] = 100
-                          // @pre-execution-state myVar = true
-                        """
-        # (1) LHS: parse testingExpression into an Expression object.
-        lhs_expr = self.visitTestingExpression(ctx.testingExpression())
-        # (2) RHS: parse the literal (number or boolean)
-        rhs_text = ctx.numberBoolLiteral().getText()  # 예: "100", "true", "-20", etc.
-        value = self.parse_number_bool_literal(rhs_text)
-        # (3) Call process function in the analyzer
-        self.contract_analyzer.process_pre_execution_state(lhs_expr, value)
-        return None
+
+    # Visit a parse tree produced by SolidityParser#debugLocalVar.
+    def visitDebugLocalVar(self, ctx:SolidityParser.DebugLocalVarContext):
+        return self.visitChildren(ctx)
 
     # Visit a parse tree produced by SolidityParser#testingExpression.
     def visitTestingExpression(self, ctx: SolidityParser.TestingExpressionContext):
@@ -732,107 +705,11 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by SolidityParser#StateLocalBooleanValue.
-    def visitStateLocalBooleanValue(self, ctx: SolidityParser.StateLocalBooleanValueContext):
+    def visitStateLocalBoolValue(self, ctx: SolidityParser.StateLocalBoolValueContext):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by SolidityParser#numberBoolLiteral.
     def visitNumberBoolLiteral(self, ctx: SolidityParser.NumberBoolLiteralContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#postExecution.
-    def visitPostExecution(self, ctx: SolidityParser.PostExecutionContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#postExecutionState.
-    def visitPostExecutionState(self, ctx: SolidityParser.PostExecutionStateContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#entryExit.
-    def visitEntryExit(self, ctx:SolidityParser.EntryExitContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#postExecutionReturn.
-    def visitPostExecutionReturn(self, ctx: SolidityParser.PostExecutionReturnContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#duringExecution.
-    def visitDuringExecution(self, ctx: SolidityParser.DuringExecutionContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#duringExecutionComment.
-    def visitDuringExecutionComment(self, ctx: SolidityParser.DuringExecutionCommentContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#duringExecutionBeforeAfter.
-    def visitDuringExecutionBeforeAfter(self, ctx: SolidityParser.DuringExecutionBeforeAfterContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#beforeAfter.
-    def visitBeforeAfter(self, ctx: SolidityParser.BeforeAfterContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#duringExecutionAssignCurrent.
-    def visitDuringExecutionAssignCurrent(self, ctx: SolidityParser.DuringExecutionAssignCurrentContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#assignCurrent.
-    def visitAssignCurrent(self, ctx: SolidityParser.AssignCurrentContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#duringExecutionReturn.
-    def visitDuringExecutionReturn(self, ctx: SolidityParser.DuringExecutionReturnContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#ExpressionReturn.
-    def visitExpressionReturn(self, ctx: SolidityParser.ExpressionReturnContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#VarReturn.
-    def visitVarReturn(self, ctx: SolidityParser.VarReturnContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#returnVar.
-    def visitReturnVar(self, ctx: SolidityParser.ReturnVarContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#duringExecutionGeneral.
-    def visitDuringExecutionGeneral(self, ctx: SolidityParser.DuringExecutionGeneralContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#comparisonExpression.
-    def visitComparisonExpression(self, ctx: SolidityParser.ComparisonExpressionContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#logicalOperator.
-    def visitLogicalOperator(self, ctx: SolidityParser.LogicalOperatorContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#comparisonOperator.
-    def visitComparisonOperator(self, ctx: SolidityParser.ComparisonOperatorContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#arithmeticExpression.
-    def visitArithmeticExpression(self, ctx: SolidityParser.ArithmeticExpressionContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#multiplicativeExpression.
-    def visitMultiplicativeExpression(self, ctx: SolidityParser.MultiplicativeExpressionContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#primaryExpression.
-    def visitPrimaryExpression(self, ctx: SolidityParser.PrimaryExpressionContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#accessExpression.
-    def visitAccessExpression(self, ctx: SolidityParser.AccessExpressionContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#additiveOperator.
-    def visitAdditiveOperator(self, ctx: SolidityParser.AdditiveOperatorContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#multiplicativeOperator.
-    def visitMultiplicativeOperator(self, ctx: SolidityParser.MultiplicativeOperatorContext):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by SolidityParser#interactiveSimpleStatement.
