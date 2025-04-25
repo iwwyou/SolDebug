@@ -708,10 +708,6 @@ class EnhancedSolidityVisitor(SolidityVisitor):
     def visitStateLocalBoolValue(self, ctx: SolidityParser.StateLocalBoolValueContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by SolidityParser#numberBoolLiteral.
-    def visitNumberBoolLiteral(self, ctx: SolidityParser.NumberBoolLiteralContext):
-        return self.visitChildren(ctx)
-
     # Visit a parse tree produced by SolidityParser#interactiveSimpleStatement.
     def visitInteractiveSimpleStatement(self, ctx:SolidityParser.InteractiveSimpleStatementContext):
         return self.visitChildren(ctx)

@@ -289,10 +289,6 @@ stateLocalValue
   | ('true' | 'false' | 'any') # StateLocalBoolValue
   ;
 
-numberBoolLiteral
-  : '-'? numberLiteral
-  | booleanLiteral ;
-
 interactiveSimpleStatement
   : ( interactiveVariableDeclarationStatement | interactiveExpressionStatement ) ;
 

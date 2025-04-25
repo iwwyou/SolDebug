@@ -602,15 +602,6 @@ class SolidityListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by SolidityParser#numberBoolLiteral.
-    def enterNumberBoolLiteral(self, ctx:SolidityParser.NumberBoolLiteralContext):
-        pass
-
-    # Exit a parse tree produced by SolidityParser#numberBoolLiteral.
-    def exitNumberBoolLiteral(self, ctx:SolidityParser.NumberBoolLiteralContext):
-        pass
-
-
     # Enter a parse tree produced by SolidityParser#interactiveSimpleStatement.
     def enterInteractiveSimpleStatement(self, ctx:SolidityParser.InteractiveSimpleStatementContext):
         pass
