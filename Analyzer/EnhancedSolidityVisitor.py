@@ -594,13 +594,76 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by SolidityParser#debugStateVar.
-    def visitDebugStateVar(self, ctx:SolidityParser.DebugStateVarContext):
-        return self.visitChildren(ctx)
+    # Analyzer/EnhancedSolidityVisitor.py
+    def visitDebugStateVar(self, ctx: SolidityParser.DebugStateVarContext):
+        # ── 1) LHS  (testingExpression → Expression AST) ──
+        lhs_expr = self.visitTestingExpression(ctx.testingExpression())
 
+        # ── 2) RHS  (stateLocalValue → 구체 값) ──
+        sv_ctx = ctx.stateLocalValue()
+        first = sv_ctx.getChild(0).getText()
+
+        if first == '[':  # [min,max]
+            lo = int(sv_ctx.numberLiteral(0).getText(), 0)
+            hi = int(sv_ctx.numberLiteral(1).getText(), 0)
+            rhs_val = (IntegerInterval if lo < 0 else UnsignedIntegerInterval)(lo, hi, 256)
+
+        elif first == 'symbolicAddress':
+            rhs_val = f"symbolicAddress {sv_ctx.numberLiteral().getText()}"
+
+        elif first == 'symbolicArrayIndex':
+            lo = int(sv_ctx.numberLiteral(0).getText(), 0)
+            hi = int(sv_ctx.numberLiteral(1).getText(), 0)
+            rhs_val = f"symbolicArrayIndex[{lo},{hi}]"
+
+        elif first == 'symbolicBytes':
+            rhs_val = f"symbolicBytes {sv_ctx.numberLiteral().getText()}"
+
+        else:  # true | false | any
+            rhs_val = {
+                'true': BoolInterval(1, 1),
+                'false': BoolInterval(0, 0),
+                'any': BoolInterval(0, 1)
+            }[first]
+
+        # ── 3) ContractAnalyzer로 전달 ──
+        self.contract_analyzer.process_state_var_for_debug(lhs_expr, rhs_val)
+        return None
 
     # Visit a parse tree produced by SolidityParser#debugLocalVar.
     def visitDebugLocalVar(self, ctx:SolidityParser.DebugLocalVarContext):
-        return self.visitChildren(ctx)
+        # ── 1) LHS  (testingExpression → Expression AST) ──
+        lhs_expr = self.visitTestingExpression(ctx.testingExpression())
+
+        # ── 2) RHS  (stateLocalValue → 구체 값) ──
+        sv_ctx = ctx.stateLocalValue()
+        first = sv_ctx.getChild(0).getText()
+        if first == '[':  # [min,max]
+            lo = int(sv_ctx.numberLiteral(0).getText(), 0)
+            hi = int(sv_ctx.numberLiteral(1).getText(), 0)
+            rhs_val = (IntegerInterval if lo < 0 else UnsignedIntegerInterval)(lo, hi, 256)
+
+        elif first == 'symbolicAddress':
+            rhs_val = f"symbolicAddress {sv_ctx.numberLiteral().getText()}"
+
+        elif first == 'symbolicArrayIndex':
+            lo = int(sv_ctx.numberLiteral(0).getText(), 0)
+            hi = int(sv_ctx.numberLiteral(1).getText(), 0)
+            rhs_val = f"symbolicArrayIndex[{lo},{hi}]"
+
+        elif first == 'symbolicBytes':
+            rhs_val = f"symbolicBytes {sv_ctx.numberLiteral().getText()}"
+
+        else:  # true | false | any
+            rhs_val = {
+                'true': BoolInterval(1, 1),
+                'false': BoolInterval(0, 0),
+                'any': BoolInterval(0, 1)
+            }[first]
+
+        # ── 3) ContractAnalyzer로 전달 ──
+        self.contract_analyzer.process_local_var_for_debug(lhs_expr, rhs_val)
+        return None
 
     # Visit a parse tree produced by SolidityParser#testingExpression.
     def visitTestingExpression(self, ctx: SolidityParser.TestingExpressionContext):
