@@ -2355,7 +2355,6 @@ class ContractAnalyzer:
         else:
             raise ValueError(f"Statement '{stmt.statement_type}' is not implemented.")
 
-
     def get_current_block(self):
         """
         현재 코드 위치에서 들어갈 CFG 블록을 결정하는 함수입니다.
@@ -2399,7 +2398,7 @@ class ContractAnalyzer:
                             return self.get_true_block(cfg_node)
                         elif cfg_node.condition_node_type == 'else':  # else 블록이면 false_block 반환
                             return self.get_false_block(cfg_node)
-                        elif cfg_node.condition_node_type == 'while' :
+                        elif cfg_node.condition_node_type in ['while', "for", "doWhile"] :
                             return self.get_true_block(cfg_node)
                         else:
                             continue  # 다른 조건 노드는 건너뛰기
@@ -2445,8 +2444,8 @@ class ContractAnalyzer:
 
             cfg_node = openBrace['cfg_node']
 
-            if cfg_node.condition_node_type == "while":
-                # while 루프의 경우 고정점 분석 수행
+            if cfg_node.condition_node_type in ["while", "for", "doWhile"]:
+                # 루프의 경우 고정점 분석 수행
                 newBlock = self.apply_fixpoint_to_exit_node(cfg_node)
                 break  # while 루프의 블록 아웃 처리는 여기서 종료
             elif not hasNode and cfg_node.condition_node_type == "if":

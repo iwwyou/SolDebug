@@ -334,6 +334,16 @@ class SolidityVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by SolidityParser#StateLocalArrayIndex.
+    def visitStateLocalArrayIndex(self, ctx:SolidityParser.StateLocalArrayIndexContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by SolidityParser#StateLocalByteValue.
+    def visitStateLocalByteValue(self, ctx:SolidityParser.StateLocalByteValueContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by SolidityParser#StateLocalBoolValue.
     def visitStateLocalBoolValue(self, ctx:SolidityParser.StateLocalBoolValueContext):
         return self.visitChildren(ctx)

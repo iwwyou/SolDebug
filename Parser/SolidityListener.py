@@ -593,6 +593,24 @@ class SolidityListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by SolidityParser#StateLocalArrayIndex.
+    def enterStateLocalArrayIndex(self, ctx:SolidityParser.StateLocalArrayIndexContext):
+        pass
+
+    # Exit a parse tree produced by SolidityParser#StateLocalArrayIndex.
+    def exitStateLocalArrayIndex(self, ctx:SolidityParser.StateLocalArrayIndexContext):
+        pass
+
+
+    # Enter a parse tree produced by SolidityParser#StateLocalByteValue.
+    def enterStateLocalByteValue(self, ctx:SolidityParser.StateLocalByteValueContext):
+        pass
+
+    # Exit a parse tree produced by SolidityParser#StateLocalByteValue.
+    def exitStateLocalByteValue(self, ctx:SolidityParser.StateLocalByteValueContext):
+        pass
+
+
     # Enter a parse tree produced by SolidityParser#StateLocalBoolValue.
     def enterStateLocalBoolValue(self, ctx:SolidityParser.StateLocalBoolValueContext):
         pass

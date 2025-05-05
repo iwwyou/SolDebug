@@ -285,7 +285,9 @@ subAccess
 
 stateLocalValue
   : '[' '-'? numberLiteral ',' '-'? numberLiteral ']' #StateLocalIntValue
-  | 'address' numberLiteral # StateLocalAddressValue
+  | 'symbolicAddress' numberLiteral # StateLocalAddressValue
+  | 'symbolicArrayIndex'  '[' numberLiteral ',' numberLiteral ']' # StateLocalArrayIndex
+  | 'symbolicBytes' numberLiteral # StateLocalByteValue
   | ('true' | 'false' | 'any') # StateLocalBoolValue
   ;
 
