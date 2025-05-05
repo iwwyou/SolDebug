@@ -38,7 +38,7 @@ def map_context_type(context_type):
         'catch': 'interactiveCatchClauseUnit',
         'else_if': 'interactiveIfElseUnit',
         'else': 'interactiveIfElseUnit',
-        'intentUnit' : 'intentUnit'
+        'debugUnit' : 'debugUnit'
     }
 
     try:
