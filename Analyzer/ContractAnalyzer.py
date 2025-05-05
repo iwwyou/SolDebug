@@ -790,6 +790,7 @@ class ContractAnalyzer:
 
         self.current_target_function_cfg = None
 
+
     def process_assignment_expression(self, expr):
         # 1. 현재 타겟 컨트랙트의 CFG 가져오기
         contract_cfg = self.contract_cfgs[self.current_target_contract]
@@ -803,6 +804,7 @@ class ContractAnalyzer:
 
         # 3. 현재 블록의 CFG 노드 가져오기
         current_block = self.get_current_block()
+
 
         # assignment에 대한 abstract interpretation 수행
         rExpVal = self.evaluate_expression(expr.right, current_block.variables, None, None)
@@ -840,6 +842,7 @@ class ContractAnalyzer:
         # 3. 현재 블록의 CFG 노드 가져오기
         current_block = self.get_current_block()
 
+
         literalExp = Expression(literal=1, context='LiteralExpContext')
 
         if expr.operator == "++" :
@@ -867,6 +870,7 @@ class ContractAnalyzer:
 
         self.current_target_function_cfg = None
 
+
     def process_unary_suffix_operation(self, expr):
         # 1. 현재 타겟 컨트랙트의 CFG 가져오기
         contract_cfg = self.contract_cfgs[self.current_target_contract]
@@ -880,6 +884,7 @@ class ContractAnalyzer:
 
         # 3. 현재 블록의 CFG 노드 가져오기
         current_block = self.get_current_block()
+
 
         literalExp = Expression(literal=1, context='LiteralExpContext')
 
@@ -907,6 +912,8 @@ class ContractAnalyzer:
         self.brace_count[self.current_start_line]['cfg_node'] = current_block
 
         self.current_target_function_cfg = None
+
+
     def process_function_call(self, expr):
         """
         함수 호출을 처리하는 메소드입니다.
@@ -925,6 +932,7 @@ class ContractAnalyzer:
             raise ValueError("No active function to add variables to.")
 
         current_block = self.get_current_block()
+
 
         # 3. 함수 표현식 가져오기
         function_expr = expr.function
@@ -950,6 +958,7 @@ class ContractAnalyzer:
         self.brace_count[self.current_start_line]['cfg_node'] = current_block
 
         self.current_target_function_cfg = None
+
 
     def process_payable_function_call(self, expr):
         # Handle payable function calls
@@ -1032,6 +1041,7 @@ class ContractAnalyzer:
 
         self.current_target_function_cfg = None
 
+
     def process_else_if_statement(self, condition_expr):
         # 1. 현재 컨트랙트와 함수의 CFG 가져오기
         contract_cfg = self.contract_cfgs[self.current_target_contract]
@@ -1070,6 +1080,8 @@ class ContractAnalyzer:
             self.brace_count[self.current_start_line] = {}
         self.brace_count[self.current_start_line]['cfg_node'] = condition_block
 
+
+
         # 6. True 분기 블록 생성
         true_block = CFGNode(name=f"else_if_true_{self.current_start_line + 1}")
 
@@ -1104,6 +1116,7 @@ class ContractAnalyzer:
         self.brace_count[self.current_start_line]['cfg_node'] = condition_block
 
         self.current_target_function_cfg = None
+
 
     def process_else_statement(self):
         # 1. 현재 컨트랙트와 함수의 CFG 가져오기
@@ -1186,6 +1199,7 @@ class ContractAnalyzer:
         condition_node.condition_expr = condition_expr  # Store the condition expression for later use
         condition_node.variables = self.copy_variables(join_node.variables)
 
+
         # 5. Connect the current block to the join node (if not already connected)
         self.current_target_function_cfg.graph.add_node(join_node)
         self.current_target_function_cfg.graph.add_edge(current_block, join_node)
@@ -1229,6 +1243,7 @@ class ContractAnalyzer:
         self.contract_cfgs[self.current_target_contract] = contract_cfg
 
         self.current_target_function_cfg = None
+
 
     def process_for_statement(self, initial_statement=None, condition_expr=None, increment_expr=None):
 
@@ -1297,6 +1312,7 @@ class ContractAnalyzer:
         cond_node.condition_expr = condition_expr
         cond_node.variables = self.copy_variables(join_node.variables)
 
+
         function_cfg.graph.add_node(cond_node)
         function_cfg.graph.add_edge(join_node, cond_node)
 
@@ -1358,6 +1374,7 @@ class ContractAnalyzer:
         self.brace_count[self.current_start_line]['cfg_node'] = cond_node
 
         self.current_target_function_cfg = None
+
 
     def process_continue_statement(self):
         # 1. 현재 컨트랙트와 함수의 CFG 가져오기
@@ -1503,6 +1520,7 @@ class ContractAnalyzer:
         # 2. 현재 블록 가져오기
         current_block = self.get_current_block()
 
+
         # 3. 반환값이 있는 경우 expression 평가
         if return_expr:
             return_value = self.evaluate_expression(return_expr, current_block.variables, None, None)
@@ -1543,6 +1561,7 @@ class ContractAnalyzer:
 
         # 3. 현재 블록 가져오기
         current_block = self.get_current_block()
+
 
         current_block.add_revert_statement(revert_identifier, string_literal, call_argument_list)
 
@@ -1620,6 +1639,7 @@ class ContractAnalyzer:
 
         self.current_target_function_cfg = None
 
+
     def process_assert_statement(self, condition_expr, string_literal):
         # 1. 현재 컨트랙트와 함수의 CFG 가져오기
         contract_cfg = self.contract_cfgs[self.current_target_contract]
@@ -1641,6 +1661,7 @@ class ContractAnalyzer:
                                         condition_node=True,
                                         condition_node_type="assert")
         assert_condition_node.condition_expr = condition_expr
+
 
         # 5. True 분기 블록 생성
         true_block = CFGNode(name=f"require_true_{self.current_start_line + 1}")
@@ -1677,6 +1698,7 @@ class ContractAnalyzer:
 
         self.current_target_function_cfg = None
 
+
     def process_global_var_for_debug(self, gv_obj: GlobalVariable):
         cfg = self.contract_cfgs[self.current_target_contract]
 
@@ -1695,8 +1717,10 @@ class ContractAnalyzer:
             if gv_obj.identifier in fc.related_variables:
                 fc.related_variables[gv_obj.identifier].value = gv_obj.value
 
-        # 4) “수정된 시점 이후만 재-해석” 을 원한다면
-        #    g.last_touch_node = self.brace_count[self.current_start_line]['cfg_node']
+        # ② 영향을 받는 함수만 재해석
+        for func_name in gv_obj.usage_sites:
+            if func_name in cfg.functions:
+                self.interpret_function_cfg(cfg.functions[func_name])
 
     def process_pre_execution_state(self, lhs_expr, value):
 
@@ -3120,13 +3144,15 @@ class ContractAnalyzer:
 
         # 2. 글로벌 변수 접근 (예: block, msg, tx)
         if isinstance(base_val, str) :
-            if base_val in ["block", "msg", "tx"]:
+            if base_val in {"block", "msg", "tx"}:
                 full_name = f"{base_val}.{member}"
-                # 예시 글로벌 변수 매핑 (실제 구현 시 더 구체적인 값/Interval 필요)
-                contract_cfg = self.contract_cfgs.get(self.current_target_contract)
+                contract_cfg = self.contract_cfgs[self.current_target_contract]
 
-                return contract_cfg.globals[full_name].value
+                gv_obj = contract_cfg.globals[full_name]
+                func_name = self.current_target_function
+                gv_obj.usage_sites.add(func_name)  # ✔ 함수명만 저장
 
+                return gv_obj.current
 
             elif member == "code" : # base_Val이 str 이면서 member가 code면 address.code 형태
                 return member

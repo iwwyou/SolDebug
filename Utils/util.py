@@ -85,7 +85,7 @@ class GlobalVariable(Variables):
 
         self.default_value: Interval | str | None = None  # 런타임 기본값
         self.debug_override: Interval | str | None = None  # 마지막 @GlobalVar 값
-        self.usage_sites: set[tuple[str, str, int]] = set()  # (func_name, node_name, line)
+        self.usage_sites: set[str] = set()   # func_name 만!
 
     # helper ― override 가 있으면 그것, 없으면 value
     @property
