@@ -263,7 +263,7 @@ debugGlobalVar
 
 globalValue
   : '[' numberLiteral ',' numberLiteral ']' # GlobalIntValue
-  | 'address' numberLiteral # GlobalAddressValue
+  | 'symbolicAddress' numberLiteral # GlobalAddressValue
   ;
 
 debugStateVar

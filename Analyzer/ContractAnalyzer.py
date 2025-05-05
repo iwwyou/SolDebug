@@ -46,41 +46,6 @@ class ContractAnalyzer:
 
         lines = new_code.split('\n')
 
-        # STEP A) 먼저, 'lines'가 딱 한 줄이고, 해당 줄이 '@during-execution' 주석인지 검사
-        #        (여러 줄 주석이 들어오면 아래 별도 처리 필요)
-        is_single_line = (len(lines) == 1)
-        stripped_line = lines[0].strip() if is_single_line else None
-
-        # 체크: 이 라인이 '@during-execution'인지
-        # (혹은 startswith("// @during-execution")로 더 정확히 해도 됨)
-        is_during_execution_comment = False
-        if is_single_line and stripped_line.startswith('// @during-execution'):
-            is_during_execution_comment = True
-
-        if is_during_execution_comment:
-            # --- STEP B) 인라인 주석을 기존 line 끝에 추가 ---
-
-            # 1) 기존 라인 가져오기
-            #    만약 기존에 해당 line이 없으면? (ex: new code appended at end) -> fallback?
-            if start_line in self.full_code_lines:
-                original = self.full_code_lines[start_line]
-
-                # 2) 혹시 이미 세미콜론 등 공백이 있는지 확인 후
-                #    (원하는 대로 spacing/줄바꿈을 조정)
-                updated_line = original.rstrip() + " " + new_code.lstrip()
-                # -> 이렇게 하면 "int256 _magCorrection = toInt256(...);" 뒤에
-                #    "// @during-execution ..."을 이어붙임
-
-                self.full_code_lines[start_line] = updated_line
-                # brace_count 갱신
-                self.update_brace_count(start_line, updated_line)
-
-            # 3) full_code 다시 합치기
-            self.full_code = '\n'.join(
-                [self.full_code_lines[line_no] for line_no in sorted(self.full_code_lines.keys())]
-            )
-
-        # --- STEP C) 그 외의 경우(기존 로직) ---
         # 새 라인들 삽입/밀기 등
         if not self.full_code_lines:  # initialize
             for i, line_no in enumerate(range(start_line, end_line + 1)):
@@ -138,7 +103,7 @@ class ContractAnalyzer:
         stripped_code = new_code.strip()
 
         if stripped_code.startswith('// @'):
-            self.current_context_type = "debug"
+            self.current_context_type = "debugUnit"
             self.current_target_contract = self.find_contract_context(start_line)
             if 'GlobalVar' in stripped_code :
                 return
@@ -1666,7 +1631,7 @@ class ContractAnalyzer:
 
         self.current_target_function_cfg = None
 
-    def process_pre_execution_global(self, global_var_obj: GlobalVariable):
+    def process_global_var_for_debug(self, global_var_obj: GlobalVariable):
         """
         Global pre-execution intent를 처리하여, 예를 들어
           'block.timestamp' = IntegerInterval(1000, 2000, 256)

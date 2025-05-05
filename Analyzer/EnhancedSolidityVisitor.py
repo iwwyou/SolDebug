@@ -536,22 +536,7 @@ class EnhancedSolidityVisitor(SolidityVisitor):
 
     # Visit a parse tree produced by SolidityParser#debugGlobalVar.
     def visitDebugGlobalVar(self, ctx:SolidityParser.DebugGlobalVarContext):
-        """
-                Handles global pre-execution intent comments.
 
-                Grammar rule:
-                  preExecutionGlobal
-                    : '//' '@pre-execution-global' identifier '.' identifier '=' globalValue
-                    ;
-
-                  globalValue:
-                    : '[' numberLiteral ',' numberLiteral ']'   # GlobalIntValue
-                    | 'symbolicAddress' numberLiteral                     # GlobalAddressValue
-
-                Examples:
-                  // @pre-execution-global block.timestamp = [1000, 2000]
-                  // @pre-execution-global msg.sender = address 1
-                """
         # 1) 추출: 두 개의 identifier (예: "block", "timestamp")
         left_id = ctx.identifier(0).getText()  # 예: "block"
         right_id = ctx.identifier(1).getText()  # 예: "timestamp"
@@ -569,7 +554,7 @@ class EnhancedSolidityVisitor(SolidityVisitor):
                 "block.number",
                 "block.prevrandao",
                 "block.timestamp",
-                "msg.sender",  #
+                "msg.sender",
                 "msg.value",
                 "tx.gasprice",
                 "tx.origin"
@@ -590,7 +575,7 @@ class EnhancedSolidityVisitor(SolidityVisitor):
             min_val = int(min_lit, 0)  # base=0로 10진/16진 모두 처리
             max_val = int(max_lit, 0)
             value = UnsignedIntegerInterval(min_val, max_val, 256)  # 기본 256비트로 가정 (필요시 조정)
-        elif first_child == 'address':
+        elif first_child == 'symbolicAddress':
             # GlobalAddressValue: 'address' numberLiteral
             addr_lit = global_value_ctx.numberLiteral().getText()
             # address의 경우 심볼릭한 형태로 처리 (예: "address 1")
@@ -613,7 +598,7 @@ class EnhancedSolidityVisitor(SolidityVisitor):
             global_var_obj.typeInfo.elementaryTypeName = "uint"
 
         # 5) ContractAnalyzer의 process_pre_execution_global 호출
-        self.contract_analyzer.process_pre_execution_global(global_var_obj)
+        self.contract_analyzer.process_global_var_for_debug(global_var_obj)
         return None
 
     # Visit a parse tree produced by SolidityParser#GlobalIntValue.

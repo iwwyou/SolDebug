@@ -93,7 +93,7 @@ class CFGNode:
             string_literal=string_literal,
             arguments=call_argument_list
         )
-        self.statements.append(Statement)
+        self.statements.append(revert_statement)
 
     def get_variable(self, var_name: str) -> Variables:
         """
