@@ -137,7 +137,6 @@ class ContractAnalyzer:
     def analyze_context(self, start_line, new_code):
         stripped_code = new_code.strip()
 
-        # (1) 만약 이 라인이 "@pre-execution-global", "@pre-execution-state", 등 Intent가 들어간 주석인지 확인
         if stripped_code.startswith('// @'):
             self.current_context_type = "debug"
             self.current_target_contract = self.find_contract_context(start_line)

@@ -253,8 +253,8 @@ interactiveCatchClauseUnit
 debugUnit
   : (
     debugGlobalVar
-    debugStateVar
-    debugLocalVar
+    | debugStateVar
+    | debugLocalVar
   ) * EOF;
 
 debugGlobalVar
