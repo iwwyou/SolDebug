@@ -83,6 +83,15 @@ class GlobalVariable(Variables):
         self.value = value  #Interval이 될수도 있고 그냥 address 1 이렇게 될수도 있음
         self.typeInfo = SolType()
 
+        self.default_value: Interval | str | None = None  # 런타임 기본값
+        self.debug_override: Interval | str | None = None  # 마지막 @GlobalVar 값
+        self.usage_sites: set[tuple[str, str, int]] = set()  # (func_name, node_name, line)
+
+    # helper ― override 가 있으면 그것, 없으면 value
+    @property
+    def current(self):
+        return self.debug_override if self.debug_override is not None else self.value
+
 
 class ArrayVariable(Variables):
     def __init__(self, identifier=None, base_type=None, array_length=None, is_dynamic=False, value=None,

@@ -535,70 +535,54 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by SolidityParser#debugGlobalVar.
-    def visitDebugGlobalVar(self, ctx:SolidityParser.DebugGlobalVarContext):
-
-        # 1) 추출: 두 개의 identifier (예: "block", "timestamp")
+    def visitDebugGlobalVar(self, ctx: SolidityParser.DebugGlobalVarContext):
+        # ---------- 1) 변수 이름 추출 ----------
         left_id = ctx.identifier(0).getText()  # 예: "block"
-        right_id = ctx.identifier(1).getText()  # 예: "timestamp"
-        global_var_full = f"{left_id}.{right_id}"  # 예: "block.timestamp"
-
-        # 2) 글로벌 변수 유효성 검사 함수 (내부 함수)
-        def isValidGlobalVariable(text: str) -> bool:
-            valid_globals = {
-                "block.basefee",
-                "block.blobbasefee",
-                "block.chainid",
-                "block.coinbase",
-                "block.difficulty",
-                "block.gaslimit",
-                "block.number",
-                "block.prevrandao",
-                "block.timestamp",
-                "msg.sender",
-                "msg.value",
-                "tx.gasprice",
-                "tx.origin"
-            }
-            return text in valid_globals
-
-        if not isValidGlobalVariable(global_var_full):
+        if ctx.identifier(1):  # 두번째 식별자가 있는지 체크
+            right_id = ctx.identifier(1).getText()  # 예: "timestamp"
+            global_var_full = f"{left_id}.{right_id}"  # block.timestamp, msg.sender ...
+        else:
+            global_var_full = left_id  # (이론상) 단독 식별자
+        # ---------- 2) 유효성 검사 ----------
+        valid_globals = {
+            "block.basefee", "block.blobbasefee", "block.chainid", "block.coinbase",
+            "block.difficulty", "block.gaslimit", "block.number", "block.prevrandao",
+            "block.timestamp", "msg.sender", "msg.value", "tx.gasprice", "tx.origin"
+        }
+        if global_var_full not in valid_globals:
             raise ValueError(f"Invalid global variable '{global_var_full}'")
 
-        # 3) 글로벌 값(globalValue) 처리
-        global_value_ctx = ctx.globalValue()
-        first_child = global_value_ctx.getChild(0).getText()
+        # ---------- 3) 값 파싱 ----------
+        gv_ctx = ctx.globalValue()
+        first_tok = gv_ctx.getChild(0).getText()
 
-        if first_child == '[':
-            # GlobalIntValue: [ numberLiteral , numberLiteral ]
-            min_lit = global_value_ctx.numberLiteral(0).getText()
-            max_lit = global_value_ctx.numberLiteral(1).getText()
-            min_val = int(min_lit, 0)  # base=0로 10진/16진 모두 처리
-            max_val = int(max_lit, 0)
-            value = UnsignedIntegerInterval(min_val, max_val, 256)  # 기본 256비트로 가정 (필요시 조정)
-        elif first_child == 'symbolicAddress':
-            # GlobalAddressValue: 'address' numberLiteral
-            addr_lit = global_value_ctx.numberLiteral().getText()
-            # address의 경우 심볼릭한 형태로 처리 (예: "address 1")
-            value = f"address {addr_lit}"
+        if first_tok == '[':  # [min , max]
+            min_raw = gv_ctx.numberLiteral(0).getText()
+            max_raw = gv_ctx.numberLiteral(1).getText()
+            min_val = int(min_raw, 0);
+            max_val = int(max_raw, 0)
+            if min_val > max_val:
+                raise ValueError(f"GlobalVar range invalid: {min_val}>{max_val}")
+            value = UnsignedIntegerInterval(min_val, max_val, 256)
+        elif first_tok == 'symbolicAddress':  # symbolicAddress N
+            addr_idx = gv_ctx.numberLiteral().getText()
+            value = f"symbolicAddress {addr_idx}"
         else:
             raise ValueError("Unsupported global value format.")
 
-        # 4) GlobalVariable 객체 생성 (util.py에 정의된 GlobalVariable 사용)
-        global_var_obj = GlobalVariable(
-            identifier=global_var_full,
-            value=value,
-            typeInfo=SolType()
-        )
-        # 타입 정보 설정: 주소 타입이면 "address", 그렇지 않으면 uint로 가정
-        if global_var_full in {"block.coinbase", "msg.sender", "tx.origin"}:
-            global_var_obj.typeInfo.typeCategory = "elementary"
-            global_var_obj.typeInfo.elementaryTypeName = "address"
-        else:
-            global_var_obj.typeInfo.typeCategory = "elementary"
-            global_var_obj.typeInfo.elementaryTypeName = "uint"
+        # ---------- 4) GlobalVariable 객체 생성 ----------
+        gv_obj = GlobalVariable(identifier=global_var_full,
+                                value=value,
+                                typeInfo=SolType())
 
-        # 5) ContractAnalyzer의 process_pre_execution_global 호출
-        self.contract_analyzer.process_global_var_for_debug(global_var_obj)
+        # elementary 타입정보 삽입
+        gv_obj.typeInfo.typeCategory = "elementary"
+        gv_obj.typeInfo.elementaryTypeName = (
+            "address" if global_var_full in {"block.coinbase", "msg.sender", "tx.origin"} else "uint"
+        )
+
+        # ---------- 5) ContractAnalyzer 전달 ----------
+        self.contract_analyzer.process_global_var_for_debug(gv_obj)  # ← 실제 메서드명으로 교정
         return None
 
     # Visit a parse tree produced by SolidityParser#GlobalIntValue.

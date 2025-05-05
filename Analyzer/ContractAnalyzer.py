@@ -280,12 +280,58 @@ class ContractAnalyzer:
     cfg part    
     """
 
-    def make_contract_cfg(self, contract_name):
-        if contract_name not in self.contract_cfgs:
-            # 새로운 ContractCFG 생성
-            self.contract_cfgs[contract_name] = ContractCFG(contract_name)
-            # CFG 노드를 brace_count에 저장 (cfg_node만 업데이트)
-            self.brace_count[self.current_start_line]['cfg_node'] = self.contract_cfgs[contract_name]
+    def make_contract_cfg(self, contract_name: str):
+        if contract_name in self.contract_cfgs:
+            return
+
+        cfg = ContractCFG(contract_name)
+
+        # ---------- 기본(Global) 값 ---------
+        cfg.globals = {
+            "block.basefee": GlobalVariable("block.basefee",
+                                            UnsignedIntegerInterval(0, 0, 256),
+                                            SolType(elementaryTypeName="uint")),
+            "block.blobbasefee": GlobalVariable("block.blobbasefee",
+                                                UnsignedIntegerInterval(0, 0, 256),
+                                                SolType(elementaryTypeName="uint")),
+            "block.chainid": GlobalVariable("block.chainid",
+                                            UnsignedIntegerInterval(0, 0, 256),
+                                            SolType(elementaryTypeName="uint")),
+            "block.coinbase": GlobalVariable("block.coinbase",
+                                             "symbolicAddress 0",
+                                             SolType(elementaryTypeName="address")),
+            "block.difficulty": GlobalVariable("block.difficulty",
+                                               UnsignedIntegerInterval(0, 0, 256),
+                                               SolType(elementaryTypeName="uint")),
+            "block.gaslimit": GlobalVariable("block.gaslimit",
+                                             UnsignedIntegerInterval(0, 0, 256),
+                                             SolType(elementaryTypeName="uint")),
+            "block.number": GlobalVariable("block.number",
+                                           UnsignedIntegerInterval(0, 0, 256),
+                                           SolType(elementaryTypeName="uint")),
+            "block.prevrandao": GlobalVariable("block.prevrandao",
+                                               UnsignedIntegerInterval(0, 0, 256),
+                                               SolType(elementaryTypeName="uint")),
+            "block.timestamp": GlobalVariable("block.timestamp",
+                                              UnsignedIntegerInterval(0, 0, 256),
+                                              SolType(elementaryTypeName="uint")),
+            "msg.sender": GlobalVariable("msg.sender",
+                                         "symbolicAddress 101",
+                                         SolType(elementaryTypeName="address")),
+            "msg.value": GlobalVariable("msg.value",
+                                        UnsignedIntegerInterval(0, 0, 256),
+                                        SolType(elementaryTypeName="uint")),
+            "tx.gasprice": GlobalVariable("tx.gasprice",
+                                          UnsignedIntegerInterval(0, 0, 256),
+                                          SolType(elementaryTypeName="uint")),
+            "tx.origin": GlobalVariable("tx.origin",
+                                        "symbolicAddress 100",
+                                        SolType(elementaryTypeName="address")),
+        }
+
+        # 나머지 초기화·등록 로직 동일 …
+        self.contract_cfgs[contract_name] = cfg
+        self.brace_count[self.current_start_line]['cfg_node'] = cfg
 
     def get_contract_cfg(self, contract_name):
         return self.contract_cfgs.get(contract_name)
@@ -1631,35 +1677,29 @@ class ContractAnalyzer:
 
         self.current_target_function_cfg = None
 
-    def process_global_var_for_debug(self, global_var_obj: GlobalVariable):
-        """
-        Global pre-execution intent를 처리하여, 예를 들어
-          'block.timestamp' = IntegerInterval(1000, 2000, 256)
-          'msg.sender' = "address 1"
-        와 같이 현재 타겟 컨트랙트의 CFG에 저장합니다.
-        """
-        # 1) 현재 타겟 컨트랙트의 CFG 가져오기
-        contract_cfg = self.contract_cfgs.get(self.current_target_contract)
-        if not contract_cfg:
-            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+    def process_global_var_for_debug(self, gv_obj: GlobalVariable):
+        cfg = self.contract_cfgs[self.current_target_contract]
 
-        # 2) pre_exec_globals에 저장 (키는 완전한 글로벌 변수 이름, 예: "block.timestamp")
-        contract_cfg.pre_exec_globals[global_var_obj.identifier] = global_var_obj
+        # 1) 사전 엔트리 보장
+        if gv_obj.identifier not in cfg.globals:
+            gv_obj.default_value = gv_obj.value  # 최초 호출이면 default 기록
+            cfg.globals[gv_obj.identifier] = gv_obj
+        g = cfg.globals[gv_obj.identifier]
+
+        # 2) override 반영
+        g.debug_override = gv_obj.value
+        g.value = gv_obj.value  # 실시간 해석에 쓰이도록
+
+        # 3) 모든 FunctionCFG 의 related_variables 동기화
+        for fc in cfg.functions.values():
+            if gv_obj.identifier in fc.related_variables:
+                fc.related_variables[gv_obj.identifier].value = gv_obj.value
+
+        # 4) “수정된 시점 이후만 재-해석” 을 원한다면
+        #    g.last_touch_node = self.brace_count[self.current_start_line]['cfg_node']
 
     def process_pre_execution_state(self, lhs_expr, value):
-        """
-        Process a pre-execution-state comment.
-          e.g. // @pre-execution-state myMapping[0x123] = 100
-               // @pre-execution-state myVar = true
 
-        :param lhs_expr: Expression object (from testingExpression)
-                         possible forms:
-                           - identifier only    -> myVar
-                           - index access       -> myArray[3] or myMapping[0x123]
-                           - member access      -> myStruct.member
-                           - nested form        -> myStruct.nestedArray[7]
-        :param value:    int or bool from numberBoolLiteral
-        """
         # 1) Get the current contract CFG
         contract_cfg = self.contract_cfgs.get(self.current_target_contract)
         if contract_cfg is None:
@@ -3085,25 +3125,8 @@ class ContractAnalyzer:
                 # 예시 글로벌 변수 매핑 (실제 구현 시 더 구체적인 값/Interval 필요)
                 contract_cfg = self.contract_cfgs.get(self.current_target_contract)
 
-                if full_name in contract_cfg.pre_exec_globals:
-                    return contract_cfg.pre_exec_globals[full_name].value
-                else:
-                    global_map = {
-                        "block.basefee": UnsignedIntegerInterval(1000, 1000, 256),
-                        "block.blobbasefee": UnsignedIntegerInterval(1000, 1000, 256),
-                        "block.chainid": UnsignedIntegerInterval(1000, 1000, 256),
-                        "block.coinbase": "address 0",
-                        "block.difficulty": UnsignedIntegerInterval(1000, 1000, 256),
-                        "block.gaslimit": UnsignedIntegerInterval(1000, 1000, 256),
-                        "block.number": UnsignedIntegerInterval(1000, 1000, 256),
-                        "block.prevrandao": UnsignedIntegerInterval(1000, 1000, 256),
-                        "block.timestamp": UnsignedIntegerInterval(1000, 1000, 256),
-                        "msg.sender": "address 100",
-                        "msg.value": UnsignedIntegerInterval(1000, 1000, 256),
-                        "tx.gasprice": UnsignedIntegerInterval(1000, 1000, 256),
-                        "tx.origin": "address 10"
-                    }
-                    return global_map[full_name]
+                return contract_cfg.globals[full_name].value
+
 
             elif member == "code" : # base_Val이 str 이면서 member가 code면 address.code 형태
                 return member
