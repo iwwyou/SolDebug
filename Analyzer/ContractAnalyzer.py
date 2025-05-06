@@ -1000,6 +1000,7 @@ class ContractAnalyzer:
         # 11. True 분기 후속 노드 연결
         for successor in successors:
             self.current_target_function_cfg.graph.add_edge(true_block, successor)
+            self.current_target_function_cfg.graph.add_edge(false_block, successor)
 
         # 11. function_cfg 결과를 contract_cfg에 반영
         contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
@@ -1027,12 +1028,23 @@ class ContractAnalyzer:
         if not previous_condition_node:
             raise ValueError("No previous if or else if node found for else-if statement.")
 
+        # --- 0) 기존 successor 기억
+        old_succs = [
+            s for s in self.current_target_function_cfg.graph.successors(previous_condition_node)
+            if self.current_target_function_cfg.graph.get_edge_data(previous_condition_node, s).get('condition') is True
+        ]
+
         # 3. 이전 조건 노드의 False 분기 제거
         false_successors = list(self.current_target_function_cfg.graph.successors(previous_condition_node))
         for successor in false_successors:
             edge_data = self.current_target_function_cfg.graph.get_edge_data(previous_condition_node, successor)
             if edge_data.get('condition') is False:
                 self.current_target_function_cfg.graph.remove_edge(previous_condition_node, successor)
+
+                # 2) false_block -> successor edge들도 제거
+                succs_of_false = list(self.current_target_function_cfg.graph.successors(successor))
+                for s in succs_of_false:
+                    self.current_target_function_cfg.graph.remove_edge(successor, s)
 
         # 3. 이전 조건 노드에서 False 분기 처리 (가상의 블록)
         temp_variables = self.copy_variables(previous_condition_node.variables)
@@ -1059,8 +1071,8 @@ class ContractAnalyzer:
 
         # 5. False 분기 블록 생성
         false_block = CFGNode(name=f"else_if_false_{self.current_start_line}")
-        false_block.variables = self.copy_variables(previous_condition_node.variables)
-        self.update_variables_with_condition(false_block.variables, previous_condition_node.condition_expr,
+        false_block.variables = self.copy_variables(temp_variables)
+        self.update_variables_with_condition(false_block.variables, condition_expr,
                                              is_true_branch=False)
 
         # 8. 이전 조건 블록과 새로운 else_if_condition 블록 연결
@@ -1073,6 +1085,11 @@ class ContractAnalyzer:
 
         self.current_target_function_cfg.graph.add_edge(condition_block, true_block, condition=True)
         self.current_target_function_cfg.graph.add_edge(condition_block, false_block, condition=False)
+
+        # --- 2) edge 재연결
+        for s in old_succs:
+            self.current_target_function_cfg.graph.add_edge(true_block, s)
+            self.current_target_function_cfg.graph.add_edge(false_block, s)
 
         # 11. function_cfg 결과를 contract_cfg에 반영
         contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
@@ -1100,6 +1117,11 @@ class ContractAnalyzer:
         if not condition_node:
             raise ValueError("No corresponding if or else if condition node found for else statement.")
 
+        old_succs = [
+            s for s in self.current_target_function_cfg.graph.successors(condition_node)
+            if self.current_target_function_cfg.graph.get_edge_data(condition_node, s).get('condition') is True
+        ]
+
         # 3. 이전 조건 노드의 False 분기 제거
         false_successors = list(self.current_target_function_cfg.graph.successors(condition_node))
         for successor in false_successors:
@@ -1120,6 +1142,9 @@ class ContractAnalyzer:
         # 4. CFG 연결 - 조건 노드의 False 브랜치에 else 블록 연결
         self.current_target_function_cfg.graph.add_node(else_block)
         self.current_target_function_cfg.graph.add_edge(condition_node, else_block, condition=False)
+
+        for s in old_succs:
+            self.current_target_function_cfg.graph.add_edge(else_block, s)
 
         # 5. brace_count 업데이트 - 존재하지 않으면 초기화
         if self.current_start_line not in self.brace_count:
@@ -1930,104 +1955,6 @@ class ContractAnalyzer:
 
         return copied_variables
 
-    def fixpoint(self, current_block):
-        """
-        고정점(Interval) 해석을 수행하여 루프 내 변수 상태를 수렴시킵니다.
-
-        1) 먼저 loop_condition_node와 fixpoint_evaluation_node(while_join, for_join 등)를 찾음
-        2) 루프 내 모든 노드를 수집 (traverse_loop_nodes)
-        3) in_vars[node], out_vars[node]를 반복적으로 조인(join)하여 수렴
-        4) 수렴된 뒤, 각 루프 노드의 variables를 out_vars[node]로 덮어씌움
-        5) fixpoint_evaluation_node의 out_vars를 반환 (루프 초입 시점에 대한 결과)
-
-        :param current_block: 현재 블록(CFGNode). break나 continue가 있을 경우, 이 블록은 루프 내부일 수 있음
-        :return: fixpoint_evaluation_node의 out_vars (dict: var_name -> Variables)
-        """
-        # 1) fixpoint_evaluation_node(while_join, for_join 등) 찾기
-        fixpoint_evaluation_node = self.find_fixpoint_evaluation_node(current_block)
-        if not fixpoint_evaluation_node:
-            raise ValueError("Join point node (fixpoint_evaluation_node) not found for the current block.")
-
-        # 2) loop_condition_node (while_condition, for_condition 등) 찾기
-        loop_condition_node = self.find_loop_condition_node(current_block)
-        if not loop_condition_node:
-            raise ValueError("Loop condition node not found for the current block.")
-
-        # 3) 루프 내 모든 노드 수집
-        loop_nodes = self.traverse_loop_nodes(loop_condition_node)
-
-        # in_vars, out_vars 초기화
-        in_vars = {}
-        out_vars = {}
-        for node in loop_nodes:
-            in_vars[node] = {}
-            out_vars[node] = {}
-
-        # loop_condition_node의 in_vars는
-        # 보통 fixpoint_evaluation_node.fixpoint_evaluation_node_vars에서 시작
-        # (while_join, for_join에서 복사해온 상태)
-        in_vars[loop_condition_node] = self.copy_variables(fixpoint_evaluation_node.fixpoint_evaluation_node_vars)
-
-        # 4) 워크리스트 알고리즘
-        worklist = deque([loop_condition_node])
-        max_iterations = 50
-        iteration = 0
-
-        while worklist and iteration < max_iterations:
-            iteration += 1
-            node = worklist.popleft()
-
-            # 4.1) predecessors의 out_vars를 조인하여 in_vars[node] 계산
-            new_in_vars = None
-            preds = list(self.current_target_function_cfg.graph.predecessors(node))
-
-            for pred in preds:
-                # pred가 루프 내부 노드인지 체크
-                if pred in loop_nodes:
-                    # pred의 out_vars가 이미 계산되어 있으면 조인
-                    if pred in out_vars and out_vars[pred]:
-                        if new_in_vars is None:
-                            new_in_vars = self.copy_variables(out_vars[pred])
-                        else:
-                            new_in_vars = self.join_variables(new_in_vars, out_vars[pred])
-                    else:
-                        # 혹시 pred의 out_vars가 아직 없거나, pred == node인 경우(자기참조) → 보수적으로 pass
-                        pass
-                else:
-                    # pred가 루프 밖에 있으면 => fixpoint_evaluation_node.variables와 조인
-                    # (혹은 pred의 variables를 사용할 수도 있지만, 여기서는 join_node를 대체)
-                    if new_in_vars is None:
-                        new_in_vars = self.copy_variables(fixpoint_evaluation_node.variables)
-                    else:
-                        new_in_vars = self.join_variables(new_in_vars, fixpoint_evaluation_node.variables)
-
-            # 4.2) in_vars[node] 갱신 여부
-            if new_in_vars:
-                if not self.variables_equal(in_vars[node], new_in_vars):
-                    in_vars[node] = new_in_vars
-
-            # 4.3) node의 transfer function
-            old_out_vars = out_vars[node]
-            out_vars[node] = self.transfer_function(node, in_vars[node])
-
-            # 4.4) out_vars[node]가 변화했으면 successor들을 worklist에 넣음
-            if not self.variables_equal(old_out_vars, out_vars[node]):
-                successors = list(self.current_target_function_cfg.graph.successors(node))
-                for succ in successors:
-                    if succ in loop_nodes:
-                        worklist.append(succ)
-
-            if iteration == max_iterations:
-                print("Fixpoint analysis did not converge within max_iterations.")
-                break
-
-        # 5) 최종적으로 수렴된 값으로 노드들의 variables를 갱신
-        for node in loop_nodes:
-            node.variables = out_vars[node]
-
-        # 보통 fixpoint_evaluation_node의 out_vars가 "루프 진입 시점"의 최종 상태를 의미
-        return out_vars[fixpoint_evaluation_node]
-
     def traverse_loop_nodes(self, loop_node):
         """
         루프 내의 모든 노드를 수집합니다.
@@ -2174,26 +2101,6 @@ class ContractAnalyzer:
             for statement in node.statements:
                 self.update_statement_with_variables(statement, out_vars)
         return out_vars
-
-    def update_loop_body(self, variables, current_block):
-        """
-        고정점 분석 결과를 바탕으로 while body 내의 문장들의 Interval을 업데이트합니다.
-        :param variables: 수렴된 변수 상태 딕셔너리 (var_name -> Variables 객체)
-        :param current_block: 현재 블록 (CFGNode)
-        """
-        # 1. fixpoint_evaluation_node 찾기
-        fixpoint_evaluation_node = self.find_fixpoint_evaluation_node(current_block)
-        if not fixpoint_evaluation_node:
-            raise ValueError("Join point node not found for the current block.")
-
-        # 2. 루프 내의 모든 노드 수집
-        loop_nodes = self.traverse_loop_nodes(fixpoint_evaluation_node)
-
-        # 3. 각 노드의 문장들에 대해 Interval 업데이트
-        for node in loop_nodes:
-            node_vars = node.variables
-            for statement in node.statements:
-                self.update_statement_with_variables(statement, node_vars)
 
     def update_statement_with_variables(self, stmt, current_variables):
         if stmt.statement_type == 'variableDeclaration':
