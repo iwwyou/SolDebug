@@ -115,10 +115,12 @@ class GlobalVariable(Variables):
 
 class AddressSymbolicManager:
     """
-    160-bit 주소 공간의 심볼릭 ID ↔ Interval ↔ 변수 Alias 를 한 곳에서 관리
+    160-bit 주소 공간의 심볼릭 ID ↔ Interval ↔ 변수 alias 를 한 곳에서 관리
     """
     ADDR_BITS = 160
-    _typeinfo = SolType(elementaryTypeName="address")
+    _typeinfo = SolType()                 # 빈 객체 먼저 만들고
+    _typeinfo.typeCategory = "elementary" # 필드 수동 설정
+    _typeinfo.elementaryTypeName = "address"
 
     def __init__(self):
         self._next_id: int = 1                    # fresh ID counter
@@ -172,112 +174,102 @@ class AddressSymbolicManager:
         self._id_to_vars[nid] = set()
         return nid
 
-
 class ArrayVariable(Variables):
-    def __init__(self, identifier=None, base_type=None, array_length=None, is_dynamic=False, value=None,
-                 isConstant=False, scope=None):
+    """
+    ▸ 정적/동적 배열 래퍼
+    ▸ int·uint·bool 은 interval 로,
+      address·string·bytes 등은 심볼/AddressManager 를 이용해 초기화
+    """
+
+    def __init__(self, identifier=None, *, base_type=None,
+                 array_length=None, is_dynamic=False,
+                 value=None, isConstant=False, scope=None):
         super().__init__(identifier, value, isConstant, scope)
+
         self.typeInfo = SolType()
-        self.typeInfo.typeCategory = 'array'
-        self.typeInfo.arrayBaseType = base_type  # SolType 객체 (배열의 기본 타입이 배열일 수도 있음)
-        self.typeInfo.arrayLength = array_length
+        self.typeInfo.typeCategory = "array"
+        self.typeInfo.arrayBaseType = base_type
+        self.typeInfo.arrayLength = array_length  # None → 동적
         self.typeInfo.isDynamicArray = is_dynamic
-        self.elements = []  # 배열의 요소들: Variables 객체의 리스트
+        self.elements: list[Variables | "ArrayVariable"] = []
 
-    class ArrayVariable(Variables):
+    # ────────────────────────── public API ──────────────────────────
+    def initialize_elements(self, init_iv: Interval):
+        """int / uint / bool 전용 (추상화 도메인 사용)"""
+        if self.typeInfo.isDynamicArray:
+            return
+        self._init_recursive(
+            baseT=self.typeInfo.arrayBaseType,
+            length=self.typeInfo.arrayLength or 0,
+            build_val=lambda eid, et:
+            Variables(eid, init_iv.copy() if hasattr(init_iv, "copy") else init_iv,
+                      scope=self.scope, typeInfo=et)
+        )
+
+    def initialize_not_abstracted_type(self,
+                                       sm: AddressSymbolicManager | None = None):
+        """address / bytes / string 등 — address 는 fresh interval, 나머진 심볼"""
+        if self.typeInfo.isDynamicArray:
+            return
+
+        def builder(eid, et):
+            # address
+            if (isinstance(et, SolType) and et.elementaryTypeName == "address") \
+                    or et == "address":
+                iv = sm.alloc_fresh_interval() if sm else UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
+                if sm:
+                    sm.bind_var(eid, iv.min_value)
+                return Variables(eid, iv, scope=self.scope, typeInfo=et)
+            # 그 외 string/bytes … → 심볼
+            return Variables(eid, f"symbol_{eid}", scope=self.scope, typeInfo=et)
+
+        self._init_recursive(
+            baseT=self.typeInfo.arrayBaseType,
+            length=self.typeInfo.arrayLength or 0,
+            build_val=builder
+        )
+
+    # ──────────────────────── private helper ────────────────────────
+    def _init_recursive(self, *, baseT, length: int, build_val):
         """
-        ▸ 정적/동적 배열 래퍼
-        ▸ int·uint·bool 은 interval 로,
-          address·string·bytes 등은 심볼/AddressManager 를 이용해 초기화
+        baseT : SolType 또는 문자열
+        length: 정적 배열 길이
+        build_val(eid:str, et) ➜ Variables 객체를 생성해 주는 콜백
         """
+        for i in range(length):
+            eid = f"{self.identifier}[{i}]"
 
-        def __init__(self, identifier=None, *, base_type=None,
-                     array_length=None, is_dynamic=False,
-                     value=None, isConstant=False, scope=None):
-            super().__init__(identifier, value, isConstant, scope)
+            # ─ nested array -----------------------------------------------------------------
+            if isinstance(baseT, SolType) and baseT.typeCategory == "array":
+                sub_arr = ArrayVariable(
+                    identifier=eid,
+                    base_type=baseT.arrayBaseType,
+                    array_length=baseT.arrayLength,
+                    scope=self.scope
+                )
+                # recursion – baseT.arrayBaseType 에 따라 분기
+                if self._is_abstractable(baseT.arrayBaseType):
+                    dummy = IntegerInterval.bottom() \
+                        if str(baseT.arrayBaseType.elementaryTypeName).startswith("int") \
+                        else UnsignedIntegerInterval.bottom()
+                    sub_arr.initialize_elements(dummy)
+                else:
+                    sub_arr.initialize_not_abstracted_type(sm=None)
+                self.elements.append(sub_arr)
+                continue
+            # ─ leaf element -----------------------------------------------------------------
+            self.elements.append(build_val(eid, baseT))
 
-            self.typeInfo = SolType()
-            self.typeInfo.typeCategory = "array"
-            self.typeInfo.arrayBaseType = base_type
-            self.typeInfo.arrayLength = array_length  # None → 동적
-            self.typeInfo.isDynamicArray = is_dynamic
-            self.elements: list[Variables | "ArrayVariable"] = []
+    @staticmethod
+    def _is_abstractable(bt):
+        """int / uint / bool 이면 True"""
+        if isinstance(bt, SolType):
+            et = bt.elementaryTypeName
+        else:
+            et = str(bt)
+        return et.startswith("int") or et.startswith("uint") or et == "bool"
 
-        # ────────────────────────── public API ──────────────────────────
-        def initialize_elements(self, init_iv: Interval):
-            """int / uint / bool 전용 (추상화 도메인 사용)"""
-            if self.typeInfo.isDynamicArray:
-                return
-            self._init_recursive(
-                baseT=self.typeInfo.arrayBaseType,
-                length=self.typeInfo.arrayLength or 0,
-                build_val=lambda eid, et:
-                Variables(eid, init_iv.copy() if hasattr(init_iv, "copy") else init_iv,
-                          scope=self.scope, typeInfo=et)
-            )
 
-        def initialize_not_abstracted_type(self,
-                                           sm: AddressSymbolicManager | None = None):
-            """address / bytes / string 등 — address 는 fresh interval, 나머진 심볼"""
-            if self.typeInfo.isDynamicArray:
-                return
-
-            def builder(eid, et):
-                # address
-                if (isinstance(et, SolType) and et.elementaryTypeName == "address") \
-                        or et == "address":
-                    iv = sm.alloc_fresh_interval() if sm else UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
-                    if sm:
-                        sm.bind_var(eid, iv.min_value)
-                    return Variables(eid, iv, scope=self.scope, typeInfo=et)
-                # 그 외 string/bytes … → 심볼
-                return Variables(eid, f"symbol_{eid}", scope=self.scope, typeInfo=et)
-
-            self._init_recursive(
-                baseT=self.typeInfo.arrayBaseType,
-                length=self.typeInfo.arrayLength or 0,
-                build_val=builder
-            )
-
-        # ──────────────────────── private helper ────────────────────────
-        def _init_recursive(self, *, baseT, length: int, build_val):
-            """
-            baseT : SolType 또는 문자열
-            length: 정적 배열 길이
-            build_val(eid:str, et) ➜ Variables 객체를 생성해 주는 콜백
-            """
-            for i in range(length):
-                eid = f"{self.identifier}[{i}]"
-
-                # ─ nested array -----------------------------------------------------------------
-                if isinstance(baseT, SolType) and baseT.typeCategory == "array":
-                    sub_arr = ArrayVariable(
-                        identifier=eid,
-                        base_type=baseT.arrayBaseType,
-                        array_length=baseT.arrayLength,
-                        scope=self.scope
-                    )
-                    # recursion – baseT.arrayBaseType 에 따라 분기
-                    if self._is_abstractable(baseT.arrayBaseType):
-                        dummy = IntegerInterval.bottom() \
-                            if str(baseT.arrayBaseType.elementaryTypeName).startswith("int") \
-                            else UnsignedIntegerInterval.bottom()
-                        sub_arr.initialize_elements(dummy)
-                    else:
-                        sub_arr.initialize_not_abstracted_type(eid, sm=None)
-                    self.elements.append(sub_arr)
-                    continue
-                # ─ leaf element -----------------------------------------------------------------
-                self.elements.append(build_val(eid, baseT))
-
-        @staticmethod
-        def _is_abstractable(bt):
-            """int / uint / bool 이면 True"""
-            if isinstance(bt, SolType):
-                et = bt.elementaryTypeName
-            else:
-                et = str(bt)
-            return et.startswith("int") or et.startswith("uint") or et == "bool"
 
 
 class MappingVariable(Variables):

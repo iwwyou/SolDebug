@@ -1,8 +1,6 @@
 # SolidityGuardian/Utils/CFG.py
 import networkx as nx
-import re
 from Utils.util import *
-from Utils.Interval import *
 
 class CFGNode:
     def __init__(self, name,
@@ -57,7 +55,6 @@ class CFGNode:
         """
         함수 호출문을 CFG에 추가합니다.
         :param function_expr: 함수 호출 Expression 객체
-        :param evaluated_value: 함수 호출의 평가 결과 (필요한 경우)
         """
         function_call_stmt = Statement(
             statement_type='functionCall',
@@ -69,7 +66,6 @@ class CFGNode:
         """
         반환 구문을 CFG에 추가하고, 반환 값을 업데이트합니다.
         :param return_expr: 반환할 Expression 객체
-        :param evaluated_value: 평가된 Interval 값
         """
         return_stmt = Statement(
             statement_type='return',
@@ -144,7 +140,7 @@ class ContractCFG(CFG):
 
     # Enum 정의 추가
     def define_enum(self, enum_name, enum_def):
-        if enum_name not in self.enums:
+        if enum_name not in enum_def:
             self.enumDefs[enum_name] = enum_def
         else:
             raise ValueError(f"Enum {enum_name} is already defined.")
@@ -154,7 +150,7 @@ class ContractCFG(CFG):
         self.structDefs[struct_def_obj.struct_name] = struct_def_obj
 
     def add_enum_member(self, enum_name, member_name):
-        if enum_name in self.enums:
+        if enum_name in self.enumDefs:
             self.enumDefs[enum_name].add_member(member_name)
         else:
             raise ValueError(f"Enum {enum_name} is not defined.")
@@ -180,8 +176,15 @@ class ContractCFG(CFG):
             # 새로운 state variable node를 entry node의 successor로 설정
             self.graph.add_edge(self.entry_node, self.state_variable_node)
 
-        # 상태 변수 정보를 노드에 추가
-        self.state_variable_node.add_assign_statement(variable_obj=variable, expr=expr)
+            # ② 노드에 “선언·대입” Statement 추가
+            #    LHS  : 변수 객체
+            #    RHS  : init_expr (없으면 None —  uninitialised)
+            #    OP   : '='   고정
+            self.state_variable_node.add_assign_statement(
+                exprLeft=variable,  # 좌변
+                exprRight=expr,  # 우변 (Expression | None)
+                exprOperator='='  # 연산자
+            )
 
     def add_constant_variable(self, variable, expr=None):
         if not self.state_variable_node:

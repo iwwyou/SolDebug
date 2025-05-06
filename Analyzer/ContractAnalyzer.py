@@ -1,12 +1,12 @@
 # SolidityGuardian/Analyzers/ContractAnalyzer.py
-from Utils.Interval import *
 from Utils.cfg import *
 from Utils.util import *
 from solcx import compile_source, install_solc
+from solcx.exceptions import SolcError                  # 예외는 따로!
 from collections import deque
 import solcx
-import re
 import copy
+from typing import Dict, cast
 
 
 class ContractAnalyzer:
@@ -280,58 +280,63 @@ class ContractAnalyzer:
     cfg part    
     """
 
+    # ContractAnalyzer.py  (일부)
+
     def make_contract_cfg(self, contract_name: str):
         """
-        - contract마다 최초 1 회 호출
-        - globals 중 address 항목은 *Interval* 로, uint 항목은 0-interval 로 초기화한다.
+        contract-level CFG를 처음 만들 때 한 번 호출.
+        address 계열 글로벌은 UnsignedIntegerInterval(160bit) 로,
+        uint 계열은 0-interval 로 초기화한다.
         """
         if contract_name in self.contract_cfgs:
             return
 
-        cfg = ContractCFG(contract_name)  # ← 빈 CFG
+        cfg = ContractCFG(contract_name)
 
-        # ────────────────────────── helper ──────────────────────────
+        # ────────── 1. local helpers ──────────
         def _u256(val: int = 0) -> UnsignedIntegerInterval:
+            """[val,val] 256-bit uint Interval"""
             return UnsignedIntegerInterval(val, val, 256)
 
         def _addr_fixed(nid: int) -> UnsignedIntegerInterval:
-            """
-            nid(=symbolicAddress N)을 매니저에 등록 후 Interval [N,N] 반환
-            """
-            self.sm.register_fixed_id(nid)  # 중복 호출 안전
+            """symbolicAddress nid → Interval [nid,nid] (일관성 위해 매니저에 등록)"""
+            self.sm.register_fixed_id(nid)
             return self.sm.get_interval(nid)
 
-        def _addr_fresh() -> UnsignedIntegerInterval:
-            """
-            아직 의미가 규정되지 않은 글로벌 주소값은 ‘새 심볼릭 주소’로
-            """
-            return self.sm.alloc_fresh_interval()
+        def _sol_elem(name: str, bits: int | None = None) -> SolType:
+            """elementary SolType 객체를 간단히 만들어 주는 팩토리"""
+            t = SolType()
+            t.typeCategory = "elementary"
+            t.elementaryTypeName = name
+            if bits is not None:
+                t.intTypeLength = bits
+            return t
 
-        # ────────────────────────── globals ─────────────────────────
+        # ────────── 2. 글로벌 변수 테이블 ──────────
         cfg.globals = {
-            # -------- block -----------
-            "block.basefee": GlobalVariable("block.basefee", _u256(), SolType(elementaryTypeName="uint")),
-            "block.blobbasefee": GlobalVariable("block.blobbasefee", _u256(), SolType(elementaryTypeName="uint")),
-            "block.chainid": GlobalVariable("block.chainid", _u256(), SolType(elementaryTypeName="uint")),
-            "block.coinbase": GlobalVariable("block.coinbase", _addr_fixed(0), SolType(elementaryTypeName="address")),
-            "block.difficulty": GlobalVariable("block.difficulty", _u256(), SolType(elementaryTypeName="uint")),
-            "block.gaslimit": GlobalVariable("block.gaslimit", _u256(), SolType(elementaryTypeName="uint")),
-            "block.number": GlobalVariable("block.number", _u256(), SolType(elementaryTypeName="uint")),
-            "block.prevrandao": GlobalVariable("block.prevrandao", _u256(), SolType(elementaryTypeName="uint")),
-            "block.timestamp": GlobalVariable("block.timestamp", _u256(), SolType(elementaryTypeName="uint")),
+            # --- block ---
+            "block.basefee": GlobalVariable("block.basefee", _u256(), _sol_elem("uint")),
+            "block.blobbasefee": GlobalVariable("block.blobbasefee", _u256(), _sol_elem("uint")),
+            "block.chainid": GlobalVariable("block.chainid", _u256(), _sol_elem("uint")),
+            "block.coinbase": GlobalVariable("block.coinbase", _addr_fixed(0), _sol_elem("address")),
+            "block.difficulty": GlobalVariable("block.difficulty", _u256(), _sol_elem("uint")),
+            "block.gaslimit": GlobalVariable("block.gaslimit", _u256(), _sol_elem("uint")),
+            "block.number": GlobalVariable("block.number", _u256(), _sol_elem("uint")),
+            "block.prevrandao": GlobalVariable("block.prevrandao", _u256(), _sol_elem("uint")),
+            "block.timestamp": GlobalVariable("block.timestamp", _u256(), _sol_elem("uint")),
 
-            # -------- msg -------------
-            "msg.sender": GlobalVariable("msg.sender", _addr_fixed(101), SolType(elementaryTypeName="address")),
-            "msg.value": GlobalVariable("msg.value", _u256(), SolType(elementaryTypeName="uint")),
+            # --- msg ---
+            "msg.sender": GlobalVariable("msg.sender", _addr_fixed(101), _sol_elem("address")),
+            "msg.value": GlobalVariable("msg.value", _u256(), _sol_elem("uint")),
 
-            # -------- tx --------------
-            "tx.gasprice": GlobalVariable("tx.gasprice", _u256(), SolType(elementaryTypeName="uint")),
-            "tx.origin": GlobalVariable("tx.origin", _addr_fixed(100), SolType(elementaryTypeName="address")),
+            # --- tx ---
+            "tx.gasprice": GlobalVariable("tx.gasprice", _u256(), _sol_elem("uint")),
+            "tx.origin": GlobalVariable("tx.origin", _addr_fixed(100), _sol_elem("address")),
         }
 
-        # ────────────────────────── 북-키핑 ─────────────────────────
+        # ────────── 3. bookkeeping ──────────
         self.contract_cfgs[contract_name] = cfg
-        # 현재 라인(brace_count) 에 “이 계약 CFG” 걸어두기 (기존 로직 유지)
+        # 현재 라인의 brace_count 엔트리에 contract CFG 노드 연결
         self.brace_count[self.current_start_line]['cfg_node'] = cfg
 
     def get_contract_cfg(self, contract_name):
@@ -422,7 +427,7 @@ class ContractAnalyzer:
                 elif variable_obj.typeInfo.arrayBaseType.startswith("bool") :
                     variable_obj.initialize_elements(BoolInterval.bottom())
                 elif variable_obj.typeInfo.arrayBaseType in ["address", "address payable", "string", "bytes", "Byte", "Fixed", "Ufixed"] :
-                    variable_obj.initialize_elements_of_not_abstracted_type(variable_obj.identifier)
+                    variable_obj.initialize_not_abstracted_type(variable_obj.identifier)
             elif isinstance(variable_obj, StructVariable) :
                 if variable_obj.typeInfo.structTypeName in contract_cfg.structDefs.keys():
                     struct_def = contract_cfg.structDefs[variable_obj.typeInfo.structTypeName]
@@ -482,9 +487,11 @@ class ContractAnalyzer:
         if not contract_cfg:
             raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
 
+        current_block = self.get_current_block()
+
         # 2. abstract interpretation 수행 (상수이므로 반드시 초기화 식이 있어야 함)
         if init_expr:
-            interval_result = self.evaluate_expression(init_expr)
+            interval_result = self.evaluate_expression(init_expr, current_block.variables)
             if interval_result is not None:
                 variable_obj.value = interval_result
             else:
@@ -513,12 +520,12 @@ class ContractAnalyzer:
 
         # 파라미터가 있을 경우, 이를 FunctionCFG에 추가
         for var_name, var_type_info in parameters.items():
-            modifier_cfg.add_related_variable(var_name, var_type_info)
+            modifier_cfg.add_related_variable(var_type_info)
 
         # 현재 state_variable_node에서 상태 변수를 가져와 related_variables에 추가
         if contract_cfg.state_variable_node:
             for var_name, var_info in contract_cfg.state_variable_node.variables.items():
-                modifier_cfg.add_related_variable(var_name, var_info)
+                modifier_cfg.add_related_variable(var_info)
 
         # Modifier CFG를 ContractCFG에 추가
         contract_cfg.add_function_cfg(modifier_cfg)
@@ -581,7 +588,7 @@ class ContractAnalyzer:
         # 현재 state_variable_node에서 상태 변수를 가져와 related_variables에 추가
         if contract_cfg.state_variable_node:
             for var_name, var_info in contract_cfg.state_variable_node.variables.items():
-                constructor_cfg.add_related_variable(var_name, var_info)
+                constructor_cfg.add_related_variable(var_info)
 
         self.brace_count[self.current_start_line]['cfg_node'] = constructor_cfg.get_entry_node()
 
@@ -685,7 +692,7 @@ class ContractAnalyzer:
                 raise ValueError(f"Unsupported parameter typeCategory '{p_type.typeCategory}'.")
 
             # 파라미터를 함수-관련 변수 집합에 추가
-            fcfg.add_related_variable(var_obj.identifier, var_obj)
+            fcfg.add_related_variable(var_obj)
 
         # ───────────────────────────────────────────────────────────────
         # 4. Modifier invocation → CFG 병합
@@ -698,14 +705,14 @@ class ContractAnalyzer:
         # ----------------------------------------------------------------
         if returns:
             for rvar in returns:
-                fcfg.add_related_variable(rvar.identifier, rvar)
+                fcfg.add_related_variable(rvar)
 
         # ───────────────────────────────────────────────────────────────
         # 6. 상태 변수 → related_variables 에 복사
         # ----------------------------------------------------------------
         if contract_cfg.state_variable_node:
             for var in contract_cfg.state_variable_node.variables.values():
-                fcfg.add_related_variable(var.identifier, var)
+                fcfg.add_related_variable(var)
 
         # ───────────────────────────────────────────────────────────────
         # 7. 결과를 ContractCFG 에 반영
@@ -1485,7 +1492,7 @@ class ContractAnalyzer:
         current_block.add_continue_statement()
 
         # 4. 재귀적으로 fixpoint_evaluation_node 찾기
-        fixpoint_evaluation_node = self.find_fixpoint_evaluation_node(current_block, self.current_target_function_cfg)
+        fixpoint_evaluation_node = self.find_fixpoint_evaluation_node(current_block)
         if not fixpoint_evaluation_node:
             raise ValueError("No corresponding loop join node found for continue statement.")
 
@@ -1525,7 +1532,7 @@ class ContractAnalyzer:
         current_block.add_break_statement()
 
         # 4. 재귀적으로 위로 타고 올라가서 while문 조건 노드를 찾기
-        condition_node = self.find_loop_condition_node(current_block, self.current_target_function_cfg)
+        condition_node = self.find_loop_condition_node(current_block)
         if not condition_node:
             raise ValueError("No corresponding while condition node found for break statement.")
 
@@ -1892,6 +1899,61 @@ class ContractAnalyzer:
             return int(expr_idx.literal, 0)
         return expr_idx  # symbolic 그대로
 
+    # ContractAnalyzer 내부 (임의의 util 섹션)
+    def _create_new_array_element(
+            self,
+            arr_var: ArrayVariable,
+            index: int
+    ) -> Variables | ArrayVariable:
+        """
+        동적/확장 배열에 새 element 를 생성해 돌려준다.
+        - base type 이 elementary → Variables(Interval or symbol)
+        - base type 이 array / struct → 각각 ArrayVariable / StructVariable 생성
+        """
+
+        eid = f"{arr_var.identifier}[{index}]"
+        baseT: SolType | str = arr_var.typeInfo.arrayBaseType  # 편의상
+
+        # ─ elementary ───────────────────────────────────────────
+        if isinstance(baseT, SolType) and baseT.typeCategory == "elementary":
+            et = baseT.elementaryTypeName
+
+            if et.startswith("uint"):
+                bits = baseT.intTypeLength or 256
+                val = UnsignedIntegerInterval.bottom(bits)
+
+            elif et.startswith("int"):
+                bits = baseT.intTypeLength or 256
+                val = IntegerInterval.bottom(bits)
+
+            elif et == "bool":
+                val = BoolInterval.bottom()
+
+            elif et == "address":
+                iv = self.sm.alloc_fresh_interval()
+                self.sm.bind_var(eid, iv.min_value)
+                val = iv
+
+            else:  # string / bytes …
+                val = f"symbol_{eid}"
+
+            return Variables(identifier=eid, value=val, scope="array_element",
+                             typeInfo=baseT)
+
+        # ─ baseT 가 SolType(array) 인 경우 → 다차원 배열 ──────────────
+        if isinstance(baseT, SolType) and baseT.typeCategory == "array":
+            sub_arr = ArrayVariable(identifier=eid,
+                                    base_type=baseT.arrayBaseType,
+                                    array_length=baseT.arrayLength,
+                                    is_dynamic=baseT.isDynamicArray,
+                                    scope="array_element")
+            # 하위 요소 미리 0-length 로 두고 필요 시 lazy-append
+            return sub_arr
+
+        # ─ struct / mapping 등 복합 타입은 심볼릭 처리 ───────────────
+        return Variables(identifier=eid, value=f"symbol_{eid}",
+                         scope="array_element", typeInfo=baseT)
+
     # ───────── mapping value 생성 ──────────────────────────────────────────
     def _create_new_mapping_value(
             self,
@@ -2050,7 +2112,8 @@ class ContractAnalyzer:
                     return None
                 while idx_val >= len(base_obj.elements):
                     # address/bytes 등 실제 타입 고려
-                    base_obj.elements.append(self._create_new_mapping_value(base_obj, len(base_obj.elements)))
+                    new_elem = self._create_new_array_element(base_obj,
+                                                              len(base_obj.elements))
                 elem = base_obj.elements[idx_val]
                 if new_value is not None:
                     self._apply_new_value_to_variable(elem, new_value)
@@ -2071,74 +2134,57 @@ class ContractAnalyzer:
 
         return None
 
-    def copy_variables(self, variables):
+    def copy_variables(self, src: Dict[str, Variables]) -> Dict[str, Variables]:
         """
-        주어진 변수 딕셔너리(variables)를 깊은 복사하여 반환합니다.
-        variables: var_name -> Variables 객체
+        변수 env 를 **deep copy** 하되, 원본의 서브-클래스를 그대로 보존한다.
         """
-        copied_variables = {}
-        for var_name, var_obj in variables.items():
-            if isinstance(var_obj, ArrayVariable):
-                copied_array = ArrayVariable(
-                    identifier=var_obj.identifier,
-                    base_type=var_obj.typeInfo.arrayBaseType,
-                    array_length=var_obj.typeInfo.arrayLength,
-                    is_dynamic=var_obj.typeInfo.isDynamicArray,
-                    value=copy.deepcopy(var_obj.value),
-                    isConstant=var_obj.isConstant,
-                    scope=var_obj.scope
-                )
-                # 배열의 각 요소를 깊은 복사
-                copied_array.elements = [self.copy_variables({elem.identifier: elem})[elem.identifier] for elem in
-                                         var_obj.elements]
-                copied_variables[var_name] = copied_array
+        dst: Dict[str, Variables] = {}
 
-            elif isinstance(var_obj, StructVariable):
-                copied_struct = StructVariable(
-                    identifier=var_obj.identifier,
-                    struct_type=var_obj.typeInfo.structTypeName,
-                    value=copy.deepcopy(var_obj.value),
-                    isConstant=var_obj.isConstant,
-                    scope=var_obj.scope
-                )
-                # 구조체 멤버를 깊은 복사
-                copied_struct.members = {member_name: self.copy_variables({member_name: member_obj})[member_name] for
-                                         member_name, member_obj in var_obj.members.items()}
-                copied_variables[var_name] = copied_struct
+        for name, v in src.items():
 
-            elif isinstance(var_obj, MappingVariable):
-                copied_mapping = MappingVariable(
-                    identifier=var_obj.identifier,
-                    key_type=var_obj.typeInfo.mappingKeyType,
-                    value_type=var_obj.typeInfo.mappingValueType,
-                    value=copy.deepcopy(var_obj.value),
-                    isConstant=var_obj.isConstant,
-                    scope=var_obj.scope
+            # ───────── Array ─────────
+            if isinstance(v, ArrayVariable):
+                new_arr = ArrayVariable(
+                    identifier=v.identifier,
+                    base_type=copy.deepcopy(v.typeInfo.arrayBaseType),
+                    array_length=v.typeInfo.arrayLength,
+                    is_dynamic=v.typeInfo.isDynamicArray,
+                    scope=v.scope
                 )
-                # 매핑의 키-값 쌍을 깊은 복사
-                copied_mapping.mapping = {}
-                for key, value in var_obj.mapping.items():
-                    # 값이 Variables 객체인지 확인
-                    if isinstance(value, Variables):
-                        # Variables 객체인 경우 재귀적으로 복사
-                        copied_value = self.copy_variables({key: value})[key]
-                    else:
-                        # Variables 객체가 아닌 경우 (Interval 등), 값을 그대로 복사
-                        copied_value = copy.deepcopy(value)
-                    copied_mapping.mapping[key] = copied_value
-                copied_variables[var_name] = copied_mapping
+                new_arr.elements = [
+                    self.copy_variables({e.identifier: e})[e.identifier] for e in v.elements
+                ]
+                dst[name] = new_arr
+                continue
 
-            else:
-                # 기본 Variables 타입 처리
-                copied_variables[var_name] = Variables(
-                    identifier=var_obj.identifier,
-                    value=copy.deepcopy(var_obj.value),
-                    isConstant=var_obj.isConstant,
-                    scope=var_obj.scope,
-                    typeInfo=var_obj.typeInfo  # SolType 객체 복사
+            # ───────── Struct ─────────
+            if isinstance(v, StructVariable):
+                new_st = StructVariable(
+                    identifier=v.identifier,
+                    struct_type=v.typeInfo.structTypeName,
+                    scope=v.scope
                 )
+                new_st.members = self.copy_variables(v.members)
+                dst[name] = new_st
+                continue
 
-        return copied_variables
+            # ───────── Mapping ────────
+            if isinstance(v, MappingVariable):
+                new_mp = MappingVariable(
+                    identifier=v.identifier,
+                    key_type=copy.deepcopy(v.typeInfo.mappingKeyType),
+                    value_type=copy.deepcopy(v.typeInfo.mappingValueType),
+                    scope=v.scope
+                )
+                # key-value 재귀 복사
+                new_mp.mapping = self.copy_variables(v.mapping)
+                dst[name] = new_mp
+                continue
+
+            # ───────── 기타(Variables / EnumVariable 등) ────────
+            dst[name] = copy.deepcopy(v)  # 가장 안전
+
+        return dst
 
     def traverse_loop_nodes(self, loop_node):
         """
@@ -2192,26 +2238,42 @@ class ContractAnalyzer:
 
             # ─ array ──────────────────────────────────────────────────────
             if cat == "array":
-                if len(obj1.elements) != len(obj2.elements):
+                # mypy / PyCharm 에게 ‘ArrayVariable 맞다’고 알려주기
+                obj1_arr: ArrayVariable = obj1  # type: ignore[assignment]
+                obj2_arr: ArrayVariable = obj2  # type: ignore[assignment]
+
+                if len(obj1_arr.elements) != len(obj2_arr.elements):
                     raise ValueError("join-array length mismatch")
-                for i, (e1, e2) in enumerate(zip(obj1.elements, obj2.elements)):
+
+                for i, (e1, e2) in enumerate(zip(obj1_arr.elements, obj2_arr.elements)):
                     joined = self.join_variables({e1.identifier: e1},
                                                  {e2.identifier: e2})
-                    obj1.elements[i] = joined[e1.identifier]
+                    obj1_arr.elements[i] = joined[e1.identifier]
 
-            # ─ struct ─────────────────────────────────────────────────────
+            # ─ struct ──────────────────────────────────────────────
             elif cat == "struct":
-                obj1.members = self.join_variables(obj1.members, obj2.members)
+                obj1_struct: StructVariable = cast(StructVariable, obj1)  # type: ignore[assignment]
+                obj2_struct: StructVariable = cast(StructVariable, obj2)  # type: ignore[assignment]
 
-            # ─ mapping ────────────────────────────────────────────────────
+                obj1_struct.members = self.join_variables(
+                    obj1_struct.members,
+                    obj2_struct.members
+                )
+
+            # ─ mapping ─────────────────────────────────────────────
             elif cat == "mapping":
-                for k, mv2 in obj2.mapping.items():
-                    if k in obj1.mapping:
-                        merged = self.join_variables({k: obj1.mapping[k]},
-                                                     {k: mv2})[k]
-                        obj1.mapping[k] = merged
+                obj1_map: MappingVariable = cast(MappingVariable, obj1)  # type: ignore[assignment]
+                obj2_map: MappingVariable = cast(MappingVariable, obj2)  # type: ignore[assignment]
+
+                for k, mv2 in obj2_map.mapping.items():
+                    if k in obj1_map.mapping:
+                        merged = self.join_variables(
+                            {k: obj1_map.mapping[k]},
+                            {k: mv2}
+                        )[k]
+                        obj1_map.mapping[k] = merged
                     else:
-                        obj1.mapping[k] = self.copy_variables({k: mv2})[k]
+                        obj1_map.mapping[k] = self.copy_variables({k: mv2})[k]
 
             # ─ elementary / enum / address ───────────────────────────────
             else:
@@ -2235,27 +2297,36 @@ class ContractAnalyzer:
 
             cat = o1.typeInfo.typeCategory
 
-            # ─ array ─
+            # ─ array ───────────────────────────────────────────
             if cat == "array":
-                if len(o1.elements) != len(o2.elements):
+                a1 = cast(ArrayVariable, o1)  # type: ignore[assignment]
+                a2 = cast(ArrayVariable, o2)  # type: ignore[assignment]
+
+                if len(a1.elements) != len(a2.elements):
                     return False
-                for e1, e2 in zip(o1.elements, o2.elements):
+                for e1, e2 in zip(a1.elements, a2.elements):
                     if not self.variables_equal({e1.identifier: e1},
                                                 {e2.identifier: e2}):
                         return False
 
-            # ─ struct ─
+            # ─ struct ──────────────────────────────────────────
             elif cat == "struct":
-                if not self.variables_equal(o1.members, o2.members):
+                s1 = cast(StructVariable, o1)  # type: ignore[assignment]
+                s2 = cast(StructVariable, o2)  # type: ignore[assignment]
+
+                if not self.variables_equal(s1.members, s2.members):
                     return False
 
-            # ─ mapping ─
+            # ─ mapping ─────────────────────────────────────────
             elif cat == "mapping":
-                if o1.mapping.keys() != o2.mapping.keys():
+                m1 = cast(MappingVariable, o1)  # type: ignore[assignment]
+                m2 = cast(MappingVariable, o2)  # type: ignore[assignment]
+
+                if m1.mapping.keys() != m2.mapping.keys():
                     return False
-                for k in o1.mapping:
-                    if not self.variables_equal({k: o1.mapping[k]},
-                                                {k: o2.mapping[k]}):
+                for k in m1.mapping:
+                    if not self.variables_equal({k: m1.mapping[k]},
+                                                {k: m2.mapping[k]}):
                         return False
 
             # ─ elementary / enum / address ─
@@ -2709,45 +2780,102 @@ class ContractAnalyzer:
             return f"symbolicJoin({val1},{val2})"
 
     # ――― widening-join (⊔ω) ――――――――――――――――――――――――――――――――――
-    def join_variables_with_widening(self, left_vars: dict | None,
-                                     right_vars: dict | None) -> dict:
+    def join_variables_with_widening(
+            self,
+            left_vars: dict[str, Variables] | None,
+            right_vars: dict[str, Variables] | None
+    ) -> dict[str, Variables]:
         """
-        Interval 에서는   a.widen(b)   를 사용
-        BoolInterval 등 widen 정의가 있으면 그대로, 없으면 그냥 join
+        • left_vars ⨆ right_vars  +  widening
+        • 값(Interval-계열)에 widen() 이 있으면 사용,
+          그렇지 않으면 보통 join_variable_values() 로 합집합.
         """
         if left_vars is None:
             return self.copy_variables(right_vars or {})
 
         res = self.copy_variables(left_vars)
-        for k, rv in (right_vars or {}).items():
-            if k in res and hasattr(res[k], "widen"):
-                res[k] = res[k].widen(rv)
+
+        for name, r_var in (right_vars or {}).items():
+
+            # 이미 존재하는 변수라면 widen / join
+            if name in res:
+                l_var = res[name]
+
+                # 두 변수 모두 elementary / enum / address 같은 '값'을 가진 경우
+                if hasattr(l_var.value, "widen"):
+                    l_var.value = l_var.value.widen(r_var.value)  # ★ 여기서 value.widen
+                else:
+                    l_var.value = self.join_variable_values(l_var.value,
+                                                            r_var.value)
             else:
-                res[k] = rv.copy() if hasattr(rv, "copy") else rv
+                # 새로 등장한 변수 → deep-copy 하여 추가
+                res[name] = self.copy_variables({name: r_var})[name]
+
         return res
 
     # ――― simple join (⊔)  – narrowing 단계용 ――――――――――――――――――――――
-    def join_variables_simple(self, left_vars: dict | None,
-                              right_vars: dict | None) -> dict:
+    def join_variables_simple(
+            self,
+            left_vars: dict[str, Variables] | None,
+            right_vars: dict[str, Variables] | None
+    ) -> dict[str, Variables]:
+        """
+        값(Interval-계열)에 join() 이 있으면 그것을 쓰고,
+        없으면  join_variable_values() 로 보수적 합집합을 만든다.
+        """
         if left_vars is None:
             return self.copy_variables(right_vars or {})
 
         res = self.copy_variables(left_vars)
-        for k, rv in (right_vars or {}).items():
-            if k in res and hasattr(res[k], "join"):
-                res[k] = res[k].join(rv)
+
+        for name, r_var in (right_vars or {}).items():
+
+            if name in res:
+                l_var = res[name]
+
+                # ─ elementary / enum / address ───────────────────────────
+                if hasattr(l_var.value, "join"):
+                    l_var.value = l_var.value.join(r_var.value)
+                else:
+                    # Interval 이 아니거나 join() 없음 → 보수적 합집합
+                    l_var.value = self.join_variable_values(l_var.value,
+                                                            r_var.value)
+
             else:
-                res[k] = rv.copy() if hasattr(rv, "copy") else rv
+                # 새 변수 → deep-copy
+                res[name] = self.copy_variables({name: r_var})[name]
+
         return res
 
     # ――― narrow – old ⊓ new  ―――――――――――――――――――――――――――――――――――
-    def narrow_variables(self, old_vars: dict, new_vars: dict) -> dict:
+    def narrow_variables(
+            self,
+            old_vars: dict[str, Variables],
+            new_vars: dict[str, Variables]
+    ) -> dict[str, Variables]:
+        """
+        각 변수의 value 가 지원하면  value.narrow(new_value)  를 적용한다.
+        지원하지 않는 타입은  new_value 로 덮어쓴다.
+        """
         res = self.copy_variables(old_vars)
-        for k, nv in new_vars.items():
-            if k in res and hasattr(res[k], "narrow"):
-                res[k] = res[k].narrow(nv)
+
+        for name, n_var in new_vars.items():
+
+            if name in res:
+                o_var = res[name]
+
+                # Interval / BoolInterval 같이 narrow() 를 제공하는 타입
+                if hasattr(o_var.value, "narrow"):
+                    o_var.value = o_var.value.narrow(n_var.value)
+                else:
+                    # 좁히기 연산 불가 → 보수적으로 새 값으로 교체
+                    o_var.value = self.join_variable_values(o_var.value,
+                                                            n_var.value)
+
             else:
-                res[k] = nv.copy() if hasattr(nv, "copy") else nv
+                # old_env 에 없던 새 변수 → deep-copy 후 추가
+                res[name] = self.copy_variables({name: n_var})[name]
+
         return res
 
     def get_true_block(self, condition_node):
@@ -3105,7 +3233,7 @@ class ContractAnalyzer:
         _apply_to_leaf(target_var)
         return None
 
-    def evaluate_expression(self, expr: Expression, variables: Variables, callerObject=None, callerContext=None):
+    def evaluate_expression(self, expr: Expression, variables, callerObject=None, callerContext=None):
         if expr.context == "LiteralExpContext":
             return self.evaluate_literal_context(expr, variables, callerObject, callerContext)
         elif expr.context == "IdentifierExpContext" :
@@ -3765,32 +3893,22 @@ class ContractAnalyzer:
                 else:
                     return element_var  # ArrayVariable/StructVariable 등
 
-            # (c) 범위: [min_idx..max_idx]
-            # 각 요소를 순회하며 join
+            # (c) 범위: [min_idx .. max_idx]  ─ ArrayVariable --------------------------
             joined = None
             for idx in range(min_idx, max_idx + 1):
                 if idx < 0 or idx >= len(callerObject.elements):
-                    # 범위 벗어나면 symbolic 처리
                     return f"symbolicIndexRange({callerObject.identifier}[{result}])"
 
                 elem_var = callerObject.elements[idx]
-                # elem_var가 Variables => elem_var.value가 Interval일 수도 있고,
-                # 다른 타입(주소, bool 등)일 수도 있음
-                # 여기선 "전부 Interval이면 join, 아니면 symbolic" 예시
-                val = elem_var.value if hasattr(elem_var, 'value') else elem_var
+                val = elem_var.value if hasattr(elem_var, "value") else elem_var
 
-                # 주소 or string or struct => symbolic
-                if (isinstance(val, IntegerInterval) or isinstance(val, UnsignedIntegerInterval)
-                        or isinstance(val, BoolInterval)):
-                    if joined is None:
-                        joined = val
-                    else:
-                        joined = joined.join(val)
+                # ▶ Interval 류만 join; 그 외는 symbolic 처리
+                if hasattr(val, "join"):
+                    joined = val if joined is None else joined.join(val)
                 else:
                     return f"symbolicMixedType({callerObject.identifier}[{result}])"
 
-            # 모든 요소를 Interval.join했으면 joined에 최종 Interval
-            return joined
+            return joined  # 모든 요소가 Interval·BoolInterval 이었던 경우
 
         # 3) callerObject가 MappingVariable인 경우 (비슷한 로직 확장 가능)
         if isinstance(callerObject, MappingVariable):
@@ -3814,25 +3932,19 @@ class ContractAnalyzer:
                     self.update_mapping_in_cfg(callerObject.identifier, key_str, new_var_obj)
                     return new_var_obj.value
             else:
-                # 범위 [min_idx..max_idx], 여러 entry join
-                # (실제로 주소형이나 uint형 등 다양한 키 처리 시 로직 필요)
+                # 범위 [min_idx .. max_idx]  ─ MappingVariable -----------------------------
                 joined = None
                 for k in range(min_idx, max_idx + 1):
                     k_str = str(k)
                     if k_str not in callerObject.mapping:
-                        # default
                         new_obj = self.create_default_mapping_value(callerObject, k_str)
                         self.update_mapping_in_cfg(callerObject.identifier, k_str, new_obj)
                         val = new_obj.value
                     else:
                         val = callerObject.mapping[k_str].value
 
-                    # join
-                    if isinstance(val, Interval):
-                        if joined is None:
-                            joined = val
-                        else:
-                            joined = joined.join(val)
+                    if hasattr(val, "join"):
+                        joined = val if joined is None else joined.join(val)
                     else:
                         return f"symbolicMixedType({callerObject.identifier}[{result}])"
 
@@ -4066,10 +4178,6 @@ class ContractAnalyzer:
             self.update_left_var(right_expr, new_r, '=', variables)
             return
 
-        # ---------------- fallback : 추적 불가 → 심볼릭 처리 ----------------
-        # 정보-손실을 줄이기 위해 warning 만 남기고 값은 그대로 둡니다.
-        if self.debug:
-            print(f"[Info] comparison '{left_val} {op} {right_val}' not refined (symbolic)")
 
     def refine_intervals_for_comparison(
             self,
@@ -4172,64 +4280,127 @@ class ContractAnalyzer:
                 return IntegerInterval(None, None, default_bits)  # bottom
         return IntegerInterval(None, None, default_bits)
 
-    def _update_bool_comparison(self, variables: dict,
-                                left_expr: Expression, right_expr: Expression,
-                                left_val, right_val, op: str):
+    def _update_bool_comparison(
+            self,
+            variables: dict[str, Variables],
+            left_expr: Expression,
+            right_expr: Expression,
+            left_val,  # evaluate_expression 결과
+            right_val,  # 〃
+            op: str  # '==', '!=' ...
+    ):
         """
-        예) (boolA == boolB), (boolA != true), ...
-        op in ['==','!=','<','>','<=','>='] 중 bool끼리 말이 되는건 ==, != 정도
-        ( <, > 등은 사실상 말이 안 되지만 예시로 처리)
+        bool - bool 비교식을 통해 피연산자의 BoolInterval 을 좁힌다.
+          * op == '==' : 두 피연산자가 동일 값이어야 함 → 교집합(meet)
+          * op == '!=' : 두 피연산자가 상이해야 함
+                         ─ 한쪽이 단정(True/False) ⇒ 다른 쪽은 반대값으로
+                         ─ 양쪽 모두 Top([0,1]) ⇒ 정보 부족 → 건너뜀
         """
-        # 우선 bool이 아닌쪽을 boolInterval로 변환 시도?
-        # 아니면 단순 symbolic
-        if not isinstance(left_val, BoolInterval):
-            if isinstance(right_val, BoolInterval):
-                # swap
-                left_expr, right_expr = right_expr, left_expr
-                left_val, right_val = right_val, left_val
-            else:
-                # 둘다 bool이 아님
+
+        # ───────────────── 0. BoolInterval 변환 ─────────────────
+        def _as_bool_iv(val):
+            # 이미 BoolInterval
+            if isinstance(val, BoolInterval):
+                return val
+            # 정수 Interval [0,0]/[1,1] => BoolInterval
+            if self._is_interval(val):
+                return self._convert_int_to_bool_interval(val)
+            return None  # 그밖엔 Bool 로 간주하지 않음
+
+        l_iv = _as_bool_iv(left_val)
+        r_iv = _as_bool_iv(right_val)
+        if l_iv is None or r_iv is None:
+            # 둘 다 Bool 로 환원 안 되면 관여하지 않는다
+            return
+
+        # ※ left_expr / right_expr 가 identifier 인지 → 이름 얻기
+        l_name = self._extract_identifier_if_possible(left_expr)
+        r_name = self._extract_identifier_if_possible(right_expr)
+
+        # helper ― 변수 env 에 실제 적용
+        def _replace(name, new_iv: BoolInterval):
+            if name in variables and isinstance(variables[name].value, BoolInterval):
+                variables[name].value = variables[name].value.meet(new_iv)
+
+        # ───────────────── 1. op == '==' ───────────────────────
+        if op == "==":
+            meet = l_iv.meet(r_iv)  # 교집합
+            _replace(l_name, meet)
+            _replace(r_name, meet)
+            return
+
+        # ───────────────── 2. op == '!=' ───────────────────────
+        if op == "!=":
+            # 한쪽이 [1,1]/[0,0] 처럼 단정이라면 → 다른 쪽을 반대 값으로 강제
+            def _is_const(iv: BoolInterval) -> bool:
+                return iv.min_value == iv.max_value
+
+            if _is_const(l_iv) and _is_const(r_iv):
+                # 둘 다 단정인데 현재 env 가 모순이면 meet 하면 bottom,
+                # 분석기에서는 “실행 불가” 분기로 처리하거나 그대로 둠
+                if l_iv.equals(r_iv):
+                    # a != a 는 거짓 ⇒ 해당 분기는 불가능 → 아무 것도 하지 않고 탈출
+                    return
+                # a(0) != b(1) 처럼 이미 참 ⇒ 정보 없음
                 return
 
-        # 이제 left_val은 BoolInterval 확정
-        # right_val이 BoolInterval이거나, bool literal => BoolInterval(0 or 1),
-        # 또는 int(0 or 1)
-
-        if not isinstance(right_val, BoolInterval):
-            # 만약 int(0,0) or (1,1) => 변환
-            if self._is_interval(right_val):
-                # int interval => [0,0] => false, [1,1] => true, [0,1] => unknown
-                bool_equiv = self._convert_int_to_bool_interval(right_val)
-                right_val = bool_equiv
-            else:
-                # symbolic
+            if _is_const(l_iv):
+                opposite = BoolInterval(0, 0) if l_iv.min_value == 1 else BoolInterval(1, 1)
+                _replace(r_name, opposite)
                 return
 
-        # 이제 left_val, right_val 둘 다 BoolInterval
-        # op == '==' => left==right => 교집합
-        # op == '!=' => left!=right => 부분 부정
-        # 그외 <, >, <=, >= => 논리적으로 별 의미 없음 => symbolic or skip
-        if op == '==':
-            meet_lr = left_val.meet(right_val)
-            # left_expr/right_expr가 identifier면 갱신
-            left_name = self._extract_identifier_if_possible(left_expr)
-            right_name = self._extract_identifier_if_possible(right_expr)
-            if left_name in variables:
-                variables[left_name].value = meet_lr
-            if right_name in variables:
-                variables[right_name].value = meet_lr
+            if _is_const(r_iv):
+                opposite = BoolInterval(0, 0) if r_iv.min_value == 1 else BoolInterval(1, 1)
+                _replace(l_name, opposite)
+                return
 
-        elif op == '!=':
-            # left != right
-            # 만약 left=[0,0], right=[0,0] => meet => bottom
-            # if left=[0,1], right=[0,1], => no refinement
-            # ...
-            # 여기서는 간단히 partial symbolic
-            pass
+            # 양쪽 다 [0,1] → 정보 없음
+            return
 
-        else:
-            # <, >, <=, >= => 보통 bool끼리 잘 안 씀 => symbolic
-            pass
+        # ───────────────── 3. <,>,<=,>= (불리언엔 의미 X) ──────
+        #   원하는 정책에 따라 symbolic 처리하거나 경고만 남김
+        #   여기선 그냥 통과
+        return
+
+    # ContractAnalyzer (또는 Expression helper 모듈) 내부에 추가
+    def _extract_identifier_if_possible(self, expr: Expression) -> str | None:
+        """
+        Expression 이 단순 ‘경로(path)’ 형태인지 판별해
+          -  foo                      → "foo"
+          -  foo.bar                 → "foo.bar"
+          -  foo[3]                  → "foo[3]"
+          -  foo.bar[2].baz          → "foo.bar[2].baz"
+        처럼 **오직 식별자 / 멤버 / 정수-리터럴 인덱스**만으로 이루어져 있을 때
+        그 전체 경로 문자열을 돌려준다.
+
+        산술, 함수 호출, 심볼릭 인덱스 등이 섞이면 None 반환.
+        """
+
+        # ───── 1. 멤버/인덱스가 전혀 없는 루트 ─────
+        if expr.base is None:
+            # 순수 식별자인지 확인
+            if expr.context == "IdentifierExpContext":
+                return expr.identifier
+            return None  # literal, 연산 등 → 식별자 아님
+
+        # ───── 2. 먼저 base-경로를 재귀적으로 확보 ──────
+        base_path = self._extract_identifier_if_possible(expr.base)
+        if base_path is None:
+            return None  # base 가 이미 복합 → 포기
+
+        # ───── 3.A  멤버 접근 foo.bar ──────────────
+        if expr.member is not None:
+            return f"{base_path}.{expr.member}"
+
+        # ───── 3.B  인덱스 접근 foo[3] ─────────────
+        if expr.index is not None:
+            # 인덱스가 “정수 리터럴”인지(실행 시 결정되면 안 됨)
+            if expr.index.context == "LiteralExpContext" and str(expr.index.literal).lstrip("-").isdigit():
+                return f"{base_path}[{int(expr.index.literal, 0)}]"
+            return None  # 심볼릭 인덱스면 변수 하나로 볼 수 없음
+
+        # 그 밖의 케이스(예: 슬라이스, 함수 호출 등)
+        return None
 
     def _convert_int_to_bool_interval(self, int_interval):
         """
@@ -4259,7 +4430,7 @@ class ContractAnalyzer:
 
     def evaluate_function_call_context(self, expr, variables, callerObject=None, callerContext=None):
         if expr.context == "MemberAccessContext" : # dynamic array에 대한 push, pop
-            return self.evaluate_expression((expr, variables, None, "functionCallContext"))
+            return self.evaluate_expression(expr, variables, None, "functionCallContext")
 
         if expr.function.identifier:
             function_name = expr.function.identifier

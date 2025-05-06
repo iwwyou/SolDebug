@@ -1,5 +1,3 @@
-import math
-
 INFINITY = float('inf')
 NEG_INFINITY = float('-inf')
 
@@ -79,21 +77,31 @@ class IntegerInterval(Interval):
         """
         return IntegerInterval(NEG_INFINITY, INFINITY, self.type_length)
 
-    def bottom(self, length=None):
-        """bottom(빈 집합) 표기"""
-        return IntegerInterval(None, None, length or self.type_length)
+    @staticmethod
+    def bottom(type_len: int = 256) -> "IntegerInterval":
+        """빈 집합 (⊥)"""
+        return IntegerInterval(None, None, type_len)
 
-    # ---------- 범위 초기화 ----------
-    def initialize_range(self, type_name):
-        if type_name.startswith("int"):
-            # intX
-            bits_str = ''.join(filter(str.isdigit, type_name))
-            bits = int(bits_str) if bits_str else 256
-            self.type_length = bits
-            self.min_value = -2 ** (bits - 1)
-            self.max_value = 2 ** (bits - 1) - 1
-        else:
+
+    def initialize_range(self, type_name: str) -> None:
+        """
+        type_name : 'int', 'int8', 'int256' …
+        지정된 비트 수에 맞춰 min/max 를 설정한다.
+        """
+        if not type_name.startswith("int"):
             raise ValueError(f"Unsupported signed integer type: {type_name}")
+
+        # 방법 ① 컴프리헨션 ─ 타입-체커 경고 無
+        digits = ''.join(c for c in type_name if c.isdigit())
+
+        # ▸ 방법 ② 정규식 (주석 처리; 취향에 따라 사용 가능)
+        # m = re.search(r'\d+', type_name)
+        # digits = m.group(0) if m else ""
+
+        bits = int(digits) if digits else 256  # 'int' → 256
+        self.type_length = bits
+        self.min_value = -2 ** (bits - 1)
+        self.max_value = 2 ** (bits - 1) - 1
 
     # ---------- Lattice 연산 ----------
     def join(self, other):
@@ -409,19 +417,33 @@ class UnsignedIntegerInterval(Interval):
         """
         return UnsignedIntegerInterval(0, INFINITY, self.type_length)
 
-    def bottom(self, length=None):
-        return UnsignedIntegerInterval(None, None, length or self.type_length)
+    @staticmethod
+    def bottom(type_len: int = 256) -> "UnsignedIntegerInterval":
+        return UnsignedIntegerInterval(None, None, type_len)
 
     # ---------- 범위 초기화 ----------
-    def initialize_range(self, type_name):
-        if type_name.startswith("uint"):
-            bits_str = ''.join(filter(str.isdigit, type_name))
-            bits = int(bits_str) if bits_str else 256
-            self.type_length = bits
-            self.min_value = 0
-            self.max_value = 2 ** bits - 1
-        else:
+    def initialize_range(self, type_name: str) -> None:
+        """
+        type_name : 'uint', 'uint8', 'uint256' …
+        지정된 비트 수(bit-width)에 맞춰 min/max 를 설정한다.
+        """
+        if not type_name.startswith("uint"):
             raise ValueError(f"Unsupported unsigned integer type: {type_name}")
+
+        # ────────────────────────────────────────────────
+        # ① 컴프리헨션 ― IDE 경고 無
+        digits = ''.join(c for c in type_name if c.isdigit())
+
+        # ▸ ② 정규식 사용 예시  (원한다면)
+        # import re
+        # m = re.search(r'\d+', type_name)
+        # digits = m.group(0) if m else ""
+        # ────────────────────────────────────────────────
+
+        bits = int(digits) if digits else 256  # 'uint' ⇒ 기본 256-bit
+        self.type_length = bits
+        self.min_value = 0
+        self.max_value = (1 << bits) - 1  # 2**bits − 1
 
     # ---------- Lattice 연산 ----------
     def join(self, other):
@@ -485,7 +507,7 @@ class UnsignedIntegerInterval(Interval):
             return self.add(right_interval)
         elif operator == '-':
             # 산술 빼기
-            return self.arith_sub(right_interval)
+            return self.subtract(right_interval)
         elif operator == '*':
             return self.multiply(right_interval)
         elif operator == '/':
@@ -676,10 +698,12 @@ class BoolInterval(Interval):
     def is_top(self):
         return (self.min_value == 0 and self.max_value == 1)
 
-    def top(self):
+    @staticmethod
+    def top():
         return BoolInterval(0, 1)
 
-    def bottom(self):
+    @staticmethod
+    def bottom() -> "BoolInterval":
         return BoolInterval(None, None)
 
     def calculate_interval(self, right_interval, operator):

@@ -96,23 +96,43 @@ def simulate_input(test_inputs):
         print(json.dumps(result, indent=4))
 
 test_inputs = [
-    # Contract 선언
+
     {
         'code': 'contract USDs { \n }',
         'startLine': 1,
         'endLine': 2
     },
 
-    # 상태 변수 mapping 선언 - _creditBalances
     {
         'code': 'address owner;',
         'startLine': 2,
         'endLine': 2
+    },
+
+    {
+        'code': '\n',
+        'startLine': 3,
+        'endLine': 3
+    },
+
+    {
+        'code': 'modifier onlyOwner { \n }',
+        'startLine': 4,
+        'endLine': 5
+    },
+
+    {
+        'code': 'require(msg.sender == owner);',
+        'startLine': 5,
+        'endLine': 5
+    },
+
+    {
+        'code': '_;',
+        'startLine': 6,
+        'endLine': 6
     }
 ]
-
-
-
 
 # Simulate input as if coming from VSCode with block structure assumptions
 simulate_input(test_inputs)
