@@ -536,53 +536,59 @@ class EnhancedSolidityVisitor(SolidityVisitor):
 
     # Visit a parse tree produced by SolidityParser#debugGlobalVar.
     def visitDebugGlobalVar(self, ctx: SolidityParser.DebugGlobalVarContext):
-        # ---------- 1) 변수 이름 추출 ----------
-        left_id = ctx.identifier(0).getText()  # 예: "block"
-        if ctx.identifier(1):  # 두번째 식별자가 있는지 체크
-            right_id = ctx.identifier(1).getText()  # 예: "timestamp"
-            global_var_full = f"{left_id}.{right_id}"  # block.timestamp, msg.sender ...
-        else:
-            global_var_full = left_id  # (이론상) 단독 식별자
-        # ---------- 2) 유효성 검사 ----------
-        valid_globals = {
+        # ─────────────────── 1) 식별자 추출 ───────────────────
+        left_id = ctx.identifier(0).getText()  # "block" | "msg" | "tx"
+        right_id = ctx.identifier(1).getText() if ctx.identifier(1) else None
+        global_name = f"{left_id}.{right_id}" if right_id else left_id
+
+        # ─────────────────── 2) 유효성 검사 ───────────────────
+        valid = {
             "block.basefee", "block.blobbasefee", "block.chainid", "block.coinbase",
             "block.difficulty", "block.gaslimit", "block.number", "block.prevrandao",
             "block.timestamp", "msg.sender", "msg.value", "tx.gasprice", "tx.origin"
         }
-        if global_var_full not in valid_globals:
-            raise ValueError(f"Invalid global variable '{global_var_full}'")
+        if global_name not in valid:
+            raise ValueError(f"[DebugGlobalVar] invalid global '{global_name}'")
 
-        # ---------- 3) 값 파싱 ----------
+        # ─────────────────── 3) 값 파싱 ───────────────────────
         gv_ctx = ctx.globalValue()
-        first_tok = gv_ctx.getChild(0).getText()
+        firsttok = gv_ctx.getChild(0).getText()
 
-        if first_tok == '[':  # [min , max]
-            min_raw = gv_ctx.numberLiteral(0).getText()
-            max_raw = gv_ctx.numberLiteral(1).getText()
-            min_val = int(min_raw, 0);
-            max_val = int(max_raw, 0)
-            if min_val > max_val:
-                raise ValueError(f"GlobalVar range invalid: {min_val}>{max_val}")
-            value = UnsignedIntegerInterval(min_val, max_val, 256)
-        elif first_tok == 'symbolicAddress':  # symbolicAddress N
-            addr_idx = gv_ctx.numberLiteral().getText()
-            value = f"symbolicAddress {addr_idx}"
+        # helper - bit width 결정
+        is_addr = global_name in {"block.coinbase", "msg.sender", "tx.origin"}
+        bit_len = 160 if is_addr else 256
+
+        # 3-A. [min , max] 형
+        if firsttok == '[':
+            min_v = int(gv_ctx.numberLiteral(0).getText(), 0)
+            max_v = int(gv_ctx.numberLiteral(1).getText(), 0)
+            if min_v > max_v:
+                raise ValueError(f"[DebugGlobalVar] range invalid [{min_v},{max_v}]")
+            value = UnsignedIntegerInterval(min_v, max_v, bit_len)
+
+        # 3-B. symbolicAddress N  형
+        elif firsttok == 'symbolicAddress':
+            nid = int(gv_ctx.numberLiteral().getText(), 0)
+            sm = self.contract_analyzer.sm  # AddressSymbolicManager
+            sm.register_fixed_id(nid)  # (중복 호출 안전)
+            value = sm.get_interval(nid)  # Interval [nid,nid]
+            sm.bind_var(global_name, nid)  # alias 정보 기록
+
         else:
-            raise ValueError("Unsupported global value format.")
+            raise ValueError("[DebugGlobalVar] unsupported value format")
 
-        # ---------- 4) GlobalVariable 객체 생성 ----------
-        gv_obj = GlobalVariable(identifier=global_var_full,
-                                value=value,
-                                typeInfo=SolType())
-
-        # elementary 타입정보 삽입
-        gv_obj.typeInfo.typeCategory = "elementary"
-        gv_obj.typeInfo.elementaryTypeName = (
-            "address" if global_var_full in {"block.coinbase", "msg.sender", "tx.origin"} else "uint"
+        # ─────────────────── 4) GlobalVariable 객체 구성 ─────
+        gv_obj = GlobalVariable(
+            identifier=global_name,
+            value=value,
+            typeInfo=SolType(
+                elementaryTypeName="address" if is_addr else "uint",
+                typeCategory="elementary"
+            )
         )
 
-        # ---------- 5) ContractAnalyzer 전달 ----------
-        self.contract_analyzer.process_global_var_for_debug(gv_obj)  # ← 실제 메서드명으로 교정
+        # ─────────────────── 5) ContractAnalyzer 에 전달 ─────
+        self.contract_analyzer.process_global_var_for_debug(gv_obj)
         return None
 
     # Visit a parse tree produced by SolidityParser#GlobalIntValue.
@@ -595,73 +601,73 @@ class EnhancedSolidityVisitor(SolidityVisitor):
 
     # Visit a parse tree produced by SolidityParser#debugStateVar.
     # Analyzer/EnhancedSolidityVisitor.py
+    # ──────────────────────────────────────────────────────────────
+    # helper : stateLocalValue  →   구체 객체(Interval · Bytes …)
+    # ──────────────────────────────────────────────────────────────
+    def _parse_state_local_value(self, sv_ctx):
+        """
+        grammar  stateLocalValue
+          • '[' -? numberLiteral ',' -? numberLiteral ']'       (int / uint Interval)
+          • symbolicAddress  numberLiteral
+          • symbolicArrayIndex '[' numberLiteral ',' numberLiteral ']'
+          • symbolicBytes    numberLiteral
+          • 'true' | 'false' | 'any'
+        반환 : IntegerInterval / UnsignedIntegerInterval / BoolInterval /
+              UnsignedIntegerInterval(160-bit) / str
+        """
+        tok0 = sv_ctx.getChild(0).getText()
+
+        # 1. 정수 Interval  [min,max]
+        if tok0 == '[':
+            lo = int(sv_ctx.numberLiteral(0).getText(), 0)
+            hi = int(sv_ctx.numberLiteral(1).getText(), 0)
+            interval_cls = IntegerInterval if lo < 0 else UnsignedIntegerInterval
+            return interval_cls(lo, hi, 256)
+
+        # 2. symbolicAddress N  →  160-bit Interval [N,N]
+        if tok0 == 'symbolicAddress':
+            nid = int(sv_ctx.numberLiteral().getText(), 0)
+            sm = self.contract_analyzer.sm
+            sm.register_fixed_id(nid)  # 중복 시 NOP
+            return sm.get_interval(nid)  # UnsignedIntegerInterval([nid,nid])
+
+        # 3. symbolicArrayIndex … / symbolicBytes …  (여기선 문자열 보존)
+        if tok0 == 'symbolicArrayIndex':
+            a = int(sv_ctx.numberLiteral(0).getText(), 0)
+            b = int(sv_ctx.numberLiteral(1).getText(), 0)
+            return f"symbolicArrayIndex[{a},{b}]"
+
+        if tok0 == 'symbolicBytes':
+            return f"symbolicBytes {sv_ctx.numberLiteral().getText()}"
+
+        # 4. bool  true / false / any
+        return {
+            "true": BoolInterval(1, 1),
+            "false": BoolInterval(0, 0),
+            "any": BoolInterval(0, 1)
+        }[tok0]
+
+    # ──────────────────────────────────────────────────────────────
+    #  State-level 주석  (@StateVar …)
+    # ──────────────────────────────────────────────────────────────
     def visitDebugStateVar(self, ctx: SolidityParser.DebugStateVarContext):
-        # ── 1) LHS  (testingExpression → Expression AST) ──
+        # 1) LHS (testingExpression → Expression AST)
         lhs_expr = self.visitTestingExpression(ctx.testingExpression())
 
-        # ── 2) RHS  (stateLocalValue → 구체 값) ──
-        sv_ctx = ctx.stateLocalValue()
-        first = sv_ctx.getChild(0).getText()
+        # 2) RHS
+        rhs_val = self._parse_state_local_value(ctx.stateLocalValue())
 
-        if first == '[':  # [min,max]
-            lo = int(sv_ctx.numberLiteral(0).getText(), 0)
-            hi = int(sv_ctx.numberLiteral(1).getText(), 0)
-            rhs_val = (IntegerInterval if lo < 0 else UnsignedIntegerInterval)(lo, hi, 256)
-
-        elif first == 'symbolicAddress':
-            rhs_val = f"symbolicAddress {sv_ctx.numberLiteral().getText()}"
-
-        elif first == 'symbolicArrayIndex':
-            lo = int(sv_ctx.numberLiteral(0).getText(), 0)
-            hi = int(sv_ctx.numberLiteral(1).getText(), 0)
-            rhs_val = f"symbolicArrayIndex[{lo},{hi}]"
-
-        elif first == 'symbolicBytes':
-            rhs_val = f"symbolicBytes {sv_ctx.numberLiteral().getText()}"
-
-        else:  # true | false | any
-            rhs_val = {
-                'true': BoolInterval(1, 1),
-                'false': BoolInterval(0, 0),
-                'any': BoolInterval(0, 1)
-            }[first]
-
-        # ── 3) ContractAnalyzer로 전달 ──
+        # 3) ContractAnalyzer 전달
         self.contract_analyzer.process_state_var_for_debug(lhs_expr, rhs_val)
         return None
 
-    # Visit a parse tree produced by SolidityParser#debugLocalVar.
-    def visitDebugLocalVar(self, ctx:SolidityParser.DebugLocalVarContext):
-        # ── 1) LHS  (testingExpression → Expression AST) ──
+    # ──────────────────────────────────────────────────────────────
+    #  Local-level 주석  (@LocalVar …)
+    # ──────────────────────────────────────────────────────────────
+    def visitDebugLocalVar(self, ctx: SolidityParser.DebugLocalVarContext):
         lhs_expr = self.visitTestingExpression(ctx.testingExpression())
+        rhs_val = self._parse_state_local_value(ctx.stateLocalValue())
 
-        # ── 2) RHS  (stateLocalValue → 구체 값) ──
-        sv_ctx = ctx.stateLocalValue()
-        first = sv_ctx.getChild(0).getText()
-        if first == '[':  # [min,max]
-            lo = int(sv_ctx.numberLiteral(0).getText(), 0)
-            hi = int(sv_ctx.numberLiteral(1).getText(), 0)
-            rhs_val = (IntegerInterval if lo < 0 else UnsignedIntegerInterval)(lo, hi, 256)
-
-        elif first == 'symbolicAddress':
-            rhs_val = f"symbolicAddress {sv_ctx.numberLiteral().getText()}"
-
-        elif first == 'symbolicArrayIndex':
-            lo = int(sv_ctx.numberLiteral(0).getText(), 0)
-            hi = int(sv_ctx.numberLiteral(1).getText(), 0)
-            rhs_val = f"symbolicArrayIndex[{lo},{hi}]"
-
-        elif first == 'symbolicBytes':
-            rhs_val = f"symbolicBytes {sv_ctx.numberLiteral().getText()}"
-
-        else:  # true | false | any
-            rhs_val = {
-                'true': BoolInterval(1, 1),
-                'false': BoolInterval(0, 0),
-                'any': BoolInterval(0, 1)
-            }[first]
-
-        # ── 3) ContractAnalyzer로 전달 ──
         self.contract_analyzer.process_local_var_for_debug(lhs_expr, rhs_val)
         return None
 

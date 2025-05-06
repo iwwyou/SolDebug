@@ -782,26 +782,3 @@ class BoolInterval(Interval):
         if self.is_bottom():
             return "BoolInterval(BOTTOM)"
         return f"BoolInterval([{self.min_value}, {self.max_value}])"
-
-class AddressSymbolicManager:
-    def __init__(self):
-        self.indexCounter = 0
-        self.defaultTOAddressIndex = 100
-        self.defaultMSAddressIndex = 101
-
-    def get_fresh_symbolic_address(self):
-        """
-        새로운 심볼릭 주소를 발급한다.
-        예: "symbolicAddress_1", "symbolicAddress_2", ...
-        """
-        self.indexCounter += 1
-        return f"symbolicAddress_{self.indexCounter}"
-
-    def get_symbolic_address_with_concrete_index(self, index):
-        return f"symbolicAddress_{index}"
-
-    def get_default_txorigin_address(self):
-        return f"symbolcAddress_{self.defaultTOAddressIndex}"
-
-    def get_default_msgsender_address(self):
-        return f"symbolcAddress_{self.defaultMSAddressIndex}"

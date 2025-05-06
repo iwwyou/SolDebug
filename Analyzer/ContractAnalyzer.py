@@ -11,7 +11,7 @@ import copy
 
 class ContractAnalyzer:
     def __init__(self):
-        self.addressManager = AddressSymbolicManager()
+        self.sm = AddressSymbolicManager()
 
         self.full_code = None
         self.full_code_lines = {} # 라인별 코드를 저장하는 딕셔너리
@@ -281,56 +281,57 @@ class ContractAnalyzer:
     """
 
     def make_contract_cfg(self, contract_name: str):
+        """
+        - contract마다 최초 1 회 호출
+        - globals 중 address 항목은 *Interval* 로, uint 항목은 0-interval 로 초기화한다.
+        """
         if contract_name in self.contract_cfgs:
             return
 
-        cfg = ContractCFG(contract_name)
+        cfg = ContractCFG(contract_name)  # ← 빈 CFG
 
-        # ---------- 기본(Global) 값 ---------
+        # ────────────────────────── helper ──────────────────────────
+        def _u256(val: int = 0) -> UnsignedIntegerInterval:
+            return UnsignedIntegerInterval(val, val, 256)
+
+        def _addr_fixed(nid: int) -> UnsignedIntegerInterval:
+            """
+            nid(=symbolicAddress N)을 매니저에 등록 후 Interval [N,N] 반환
+            """
+            self.sm.register_fixed_id(nid)  # 중복 호출 안전
+            return self.sm.get_interval(nid)
+
+        def _addr_fresh() -> UnsignedIntegerInterval:
+            """
+            아직 의미가 규정되지 않은 글로벌 주소값은 ‘새 심볼릭 주소’로
+            """
+            return self.sm.alloc_fresh_interval()
+
+        # ────────────────────────── globals ─────────────────────────
         cfg.globals = {
-            "block.basefee": GlobalVariable("block.basefee",
-                                            UnsignedIntegerInterval(0, 0, 256),
-                                            SolType(elementaryTypeName="uint")),
-            "block.blobbasefee": GlobalVariable("block.blobbasefee",
-                                                UnsignedIntegerInterval(0, 0, 256),
-                                                SolType(elementaryTypeName="uint")),
-            "block.chainid": GlobalVariable("block.chainid",
-                                            UnsignedIntegerInterval(0, 0, 256),
-                                            SolType(elementaryTypeName="uint")),
-            "block.coinbase": GlobalVariable("block.coinbase",
-                                             "symbolicAddress 0",
-                                             SolType(elementaryTypeName="address")),
-            "block.difficulty": GlobalVariable("block.difficulty",
-                                               UnsignedIntegerInterval(0, 0, 256),
-                                               SolType(elementaryTypeName="uint")),
-            "block.gaslimit": GlobalVariable("block.gaslimit",
-                                             UnsignedIntegerInterval(0, 0, 256),
-                                             SolType(elementaryTypeName="uint")),
-            "block.number": GlobalVariable("block.number",
-                                           UnsignedIntegerInterval(0, 0, 256),
-                                           SolType(elementaryTypeName="uint")),
-            "block.prevrandao": GlobalVariable("block.prevrandao",
-                                               UnsignedIntegerInterval(0, 0, 256),
-                                               SolType(elementaryTypeName="uint")),
-            "block.timestamp": GlobalVariable("block.timestamp",
-                                              UnsignedIntegerInterval(0, 0, 256),
-                                              SolType(elementaryTypeName="uint")),
-            "msg.sender": GlobalVariable("msg.sender",
-                                         "symbolicAddress 101",
-                                         SolType(elementaryTypeName="address")),
-            "msg.value": GlobalVariable("msg.value",
-                                        UnsignedIntegerInterval(0, 0, 256),
-                                        SolType(elementaryTypeName="uint")),
-            "tx.gasprice": GlobalVariable("tx.gasprice",
-                                          UnsignedIntegerInterval(0, 0, 256),
-                                          SolType(elementaryTypeName="uint")),
-            "tx.origin": GlobalVariable("tx.origin",
-                                        "symbolicAddress 100",
-                                        SolType(elementaryTypeName="address")),
+            # -------- block -----------
+            "block.basefee": GlobalVariable("block.basefee", _u256(), SolType(elementaryTypeName="uint")),
+            "block.blobbasefee": GlobalVariable("block.blobbasefee", _u256(), SolType(elementaryTypeName="uint")),
+            "block.chainid": GlobalVariable("block.chainid", _u256(), SolType(elementaryTypeName="uint")),
+            "block.coinbase": GlobalVariable("block.coinbase", _addr_fixed(0), SolType(elementaryTypeName="address")),
+            "block.difficulty": GlobalVariable("block.difficulty", _u256(), SolType(elementaryTypeName="uint")),
+            "block.gaslimit": GlobalVariable("block.gaslimit", _u256(), SolType(elementaryTypeName="uint")),
+            "block.number": GlobalVariable("block.number", _u256(), SolType(elementaryTypeName="uint")),
+            "block.prevrandao": GlobalVariable("block.prevrandao", _u256(), SolType(elementaryTypeName="uint")),
+            "block.timestamp": GlobalVariable("block.timestamp", _u256(), SolType(elementaryTypeName="uint")),
+
+            # -------- msg -------------
+            "msg.sender": GlobalVariable("msg.sender", _addr_fixed(101), SolType(elementaryTypeName="address")),
+            "msg.value": GlobalVariable("msg.value", _u256(), SolType(elementaryTypeName="uint")),
+
+            # -------- tx --------------
+            "tx.gasprice": GlobalVariable("tx.gasprice", _u256(), SolType(elementaryTypeName="uint")),
+            "tx.origin": GlobalVariable("tx.origin", _addr_fixed(100), SolType(elementaryTypeName="address")),
         }
 
-        # 나머지 초기화·등록 로직 동일 …
+        # ────────────────────────── 북-키핑 ─────────────────────────
         self.contract_cfgs[contract_name] = cfg
+        # 현재 라인(brace_count) 에 “이 계약 CFG” 걸어두기 (기존 로직 유지)
         self.brace_count[self.current_start_line]['cfg_node'] = cfg
 
     def get_contract_cfg(self, contract_name):
@@ -1705,62 +1706,99 @@ class ContractAnalyzer:
 
         self.current_target_function_cfg = None
 
+    # ContractAnalyzer 내부 메서드들
+    # ─────────────────────────────────────────────────────────────
     def process_global_var_for_debug(self, gv_obj: GlobalVariable):
+        """
+        @GlobalVar …   처리
+          • cfg.globals  갱신
+          • FunctionCFG.related_variables  갱신
+          •(주소형이면) AddressSymbolicManager 에 변수<->ID 바인딩
+          • 영향을 받는 함수만 재해석
+        """
         cfg = self.contract_cfgs[self.current_target_contract]
 
         # 1) 사전 엔트리 보장
         if gv_obj.identifier not in cfg.globals:
-            gv_obj.default_value = gv_obj.value  # 최초 호출이면 default 기록
+            gv_obj.default_value = gv_obj.value  # 최초 등록
             cfg.globals[gv_obj.identifier] = gv_obj
         g = cfg.globals[gv_obj.identifier]
 
         # 2) override 반영
         g.debug_override = gv_obj.value
-        g.value = gv_obj.value  # 실시간 해석에 쓰이도록
+        g.value = gv_obj.value  # 실시간 해석용
+
+        # ↳ 주소형이면 AddressSymbolicManager 에 기록
+        if g.typeInfo.elementaryTypeName == "address" and isinstance(g.value, UnsignedIntegerInterval):
+            iv = g.value
+            if iv.min_value == iv.max_value:  # [N,N] 형식 ⇒ 고정 ID
+                nid = iv.min_value
+                self.sm.register_fixed_id(nid, iv)
+                self.sm.bind_var(g.identifier, nid)
 
         # 3) 모든 FunctionCFG 의 related_variables 동기화
         for fc in cfg.functions.values():
             if gv_obj.identifier in fc.related_variables:
                 fc.related_variables[gv_obj.identifier].value = gv_obj.value
 
-        # ② 영향을 받는 함수만 재해석
-        for func_name in gv_obj.usage_sites:
+        # 4) 영향을 받는 함수만 재해석
+        for func_name in g.usage_sites:
             if func_name in cfg.functions:
                 self.interpret_function_cfg(cfg.functions[func_name])
 
+    # ─────────────────────────────────────────────────────────────
     def process_state_var_for_debug(self, lhs_expr: Expression, value):
         """
-        @StateVar ...  주석 처리
-
-        lhs_expr : Expression  (identifier / .member / [index] …)
-        value    : Interval | BoolInterval | str
+        @StateVar …   주석 처리
+        lhs_expr : Expression (identifier / .member / [index] …)
+        value    : Interval | BoolInterval | UnsignedIntegerInterval(160-bit) | str
         """
-        # 1. CFG 찾기
         cfg = self.contract_cfgs[self.current_target_contract]
         fcfg = cfg.get_function_cfg(self.current_target_function)
         if fcfg is None:
-            raise ValueError("StateVar debug must appear inside a function body.")
+            raise ValueError("@StateVar debug must appear inside a function body.")
 
-        # 2. 실제 변수 객체 해석·업데이트  (이미 있는 helper 재사용)
+        # 1) 변수 객체 위치 탐색 + 값 대입
         var_obj = self._resolve_and_update_expr(lhs_expr, fcfg, value)
         if var_obj is None:
             raise ValueError("LHS cannot be resolved to a state variable.")
 
-        # 3. 함수 한 번만 재해석
+        # 2) 주소형이면 심볼릭-ID 바인딩
+        if (getattr(var_obj.typeInfo, "elementaryTypeName", None) == "address" and
+                isinstance(var_obj.value, UnsignedIntegerInterval)):
+            iv = var_obj.value
+            if iv.min_value == iv.max_value:
+                nid = iv.min_value
+                self.sm.register_fixed_id(nid, iv)
+                self.sm.bind_var(var_obj.identifier, nid)
+
+        # 3) 해당 함수만 다시 해석
         self.interpret_function_cfg(fcfg)
 
-    def process_local_var_for_debug(self, lhs_expr, value):
+    # ─────────────────────────────────────────────────────────────
+    def process_local_var_for_debug(self, lhs_expr: Expression, value):
+        """
+        @LocalVar …   주석 처리 (함수 내부 로컬)
+        """
         cfg = self.contract_cfgs[self.current_target_contract]
         fcfg = cfg.get_function_cfg(self.current_target_function)
         if fcfg is None:
-            raise ValueError("StateVar debug must appear inside a function body.")
+            raise ValueError("@LocalVar debug must appear inside a function body.")
 
-        # 2. 실제 변수 객체 해석·업데이트  (이미 있는 helper 재사용)
         var_obj = self._resolve_and_update_expr(lhs_expr, fcfg, value)
         if var_obj is None:
-            raise ValueError("LHS cannot be resolved to a state variable.")
+            raise ValueError("LHS cannot be resolved to a local variable.")
 
-        # 3. 함수 한 번만 재해석
+        # 주소형 → 심볼릭-ID 바인딩
+        if (getattr(var_obj.typeInfo, "elementaryTypeName", None) == "address" and
+                isinstance(var_obj.value, UnsignedIntegerInterval)):
+            iv = var_obj.value
+            if iv.min_value == iv.max_value:
+                nid = iv.min_value
+                self.sm.register_fixed_id(nid, iv)
+                self.sm.bind_var(var_obj.identifier, nid)
+
+        # 함수 재해석
         self.interpret_function_cfg(fcfg)
 
     # ---------------- util helpers ---------------- #

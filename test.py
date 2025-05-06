@@ -105,7 +105,7 @@ test_inputs = [
 
     # 상태 변수 mapping 선언 - _creditBalances
     {
-        'code': 'int length = address.code.length;',
+        'code': 'address owner;',
         'startLine': 2,
         'endLine': 2
     }
