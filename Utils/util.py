@@ -61,6 +61,27 @@ class Expression:
         self.type_length = type_length  # 타입의 길이 (예: 256)
         self.context = context
 
+class SolType:
+    def __init__(self):
+        self.typeCategory = None  # 'elementary', 'array', 'mapping', 'struct', 'function', 'enum'
+
+        # elementary 타입 정보
+        self.elementaryTypeName = None  # 예: 'uint256', 'address'
+        self.intTypeLength = None  # 정수 타입의 비트 길이 (예: 256)
+
+        # 배열 타입 정보
+        self.arrayBaseType = None  # Type 객체
+        self.arrayLength = None  # 배열 길이
+        self.isDynamicArray = False  # 동적 배열 여부
+
+        # mapping 타입 정보
+        self.mappingKeyType = None  # Type 객체
+        self.mappingValueType = None  # Type 객체
+
+        # 구조체 타입 정보
+        self.structTypeName = None  # 구조체 이름 (문자열)
+        self.enumTypeName = None
+
 
 class Variables:
     def __init__(self, identifier=None, value=None,
@@ -92,6 +113,65 @@ class GlobalVariable(Variables):
     def current(self):
         return self.debug_override if self.debug_override is not None else self.value
 
+class AddressSymbolicManager:
+    """
+    160-bit 주소 공간의 심볼릭 ID ↔ Interval ↔ 변수 Alias 를 한 곳에서 관리
+    """
+    ADDR_BITS = 160
+    _typeinfo = SolType(elementaryTypeName="address")
+
+    def __init__(self):
+        self._next_id: int = 1                    # fresh ID counter
+        self._id_to_iv: dict[int, UnsignedIntegerInterval] = {}
+        self._id_to_vars: dict[int, set[str]] = {}  # 해당 ID를 쓰는 변수명 모음
+
+    # ───────────────────────────────── fresh / fixed  ID 발급
+    def fresh_id(self) -> int:
+        nid = self._next_id
+        self._next_id += 1
+        return nid
+
+    def alloc_fresh_interval(self) -> UnsignedIntegerInterval:
+        """새 ID 하나 -> Interval [id,id] 반환"""
+        nid = self.fresh_id()
+        iv  = UnsignedIntegerInterval(nid, nid, self.ADDR_BITS)
+        self._id_to_iv[nid] = iv
+        self._id_to_vars[nid] = set()
+        return iv                                  # value 필드에 그대로 쓰면 됨
+
+    def register_fixed_id(self, nid: int,
+                          iv: UnsignedIntegerInterval | None = None):
+        """
+        주석처럼 `symbolicAddress 101` 이 들어왔을 때 호출.
+        이미 등록돼 있으면 그대로 두고, 없으면 Interval을 결정해 추가.
+        """
+        if nid not in self._id_to_iv:
+            if iv is None:
+                iv = UnsignedIntegerInterval(nid, nid, self.ADDR_BITS)
+            self._id_to_iv[nid] = iv
+            self._id_to_vars[nid] = set()
+
+    # ───────────────────────────────── 변수-ID 바인딩
+    def bind_var(self, var_name: str, nid: int):
+        self._id_to_vars.setdefault(nid, set()).add(var_name)
+
+    # ───────────────────────────────── 조회
+    def get_interval(self, nid: int) -> UnsignedIntegerInterval:
+        return self._id_to_iv[nid]
+
+    def get_alias_set(self, nid: int) -> set[str]:
+        return self._id_to_vars.get(nid, set())
+
+    # ───────────────────────────────── ranged 할당 예시
+    def alloc_range(self, start: int, end: int) -> int:
+        """
+        [start,end] Interval 로 묶인 새 ID 발급 후 ID 반환
+        """
+        nid = self.fresh_id()
+        self._id_to_iv[nid] = UnsignedIntegerInterval(start, end, self.ADDR_BITS)
+        self._id_to_vars[nid] = set()
+        return nid
+
 
 class ArrayVariable(Variables):
     def __init__(self, identifier=None, base_type=None, array_length=None, is_dynamic=False, value=None,
@@ -104,65 +184,100 @@ class ArrayVariable(Variables):
         self.typeInfo.isDynamicArray = is_dynamic
         self.elements = []  # 배열의 요소들: Variables 객체의 리스트
 
-    def initialize_elements(self, initial_interval):
+    class ArrayVariable(Variables):
         """
-        정적 배열의 요소들을 초기화하는 메소드.
-        기본 타입이 배열인 경우 재귀적으로 요소들을 초기화합니다.
+        ▸ 정적/동적 배열 래퍼
+        ▸ int·uint·bool 은 interval 로,
+          address·string·bytes 등은 심볼/AddressManager 를 이용해 초기화
         """
-        if self.typeInfo.isDynamicArray :
-            return
 
-        if self.typeInfo.arrayLength is not None:
-            for i in range(self.typeInfo.arrayLength):
-                elem_id = f"{self.identifier}[{i}]"
-                # 하위 타입이 또 다른 배열이면 재귀적으로 ArrayVariable 생성
-                if (isinstance(self.typeInfo.arrayBaseType, SolType) and
-                        self.typeInfo.arrayBaseType.typeCategory == 'array'):
+        def __init__(self, identifier=None, *, base_type=None,
+                     array_length=None, is_dynamic=False,
+                     value=None, isConstant=False, scope=None):
+            super().__init__(identifier, value, isConstant, scope)
 
-                    sub_array = ArrayVariable(
-                        identifier=elem_id,
-                        base_type=self.typeInfo.arrayBaseType.arrayBaseType,
-                        array_length=self.typeInfo.arrayBaseType.arrayLength,
+            self.typeInfo = SolType()
+            self.typeInfo.typeCategory = "array"
+            self.typeInfo.arrayBaseType = base_type
+            self.typeInfo.arrayLength = array_length  # None → 동적
+            self.typeInfo.isDynamicArray = is_dynamic
+            self.elements: list[Variables | "ArrayVariable"] = []
+
+        # ────────────────────────── public API ──────────────────────────
+        def initialize_elements(self, init_iv: Interval):
+            """int / uint / bool 전용 (추상화 도메인 사용)"""
+            if self.typeInfo.isDynamicArray:
+                return
+            self._init_recursive(
+                baseT=self.typeInfo.arrayBaseType,
+                length=self.typeInfo.arrayLength or 0,
+                build_val=lambda eid, et:
+                Variables(eid, init_iv.copy() if hasattr(init_iv, "copy") else init_iv,
+                          scope=self.scope, typeInfo=et)
+            )
+
+        def initialize_not_abstracted_type(self,
+                                           sm: AddressSymbolicManager | None = None):
+            """address / bytes / string 등 — address 는 fresh interval, 나머진 심볼"""
+            if self.typeInfo.isDynamicArray:
+                return
+
+            def builder(eid, et):
+                # address
+                if (isinstance(et, SolType) and et.elementaryTypeName == "address") \
+                        or et == "address":
+                    iv = sm.alloc_fresh_interval() if sm else UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
+                    if sm:
+                        sm.bind_var(eid, iv.min_value)
+                    return Variables(eid, iv, scope=self.scope, typeInfo=et)
+                # 그 외 string/bytes … → 심볼
+                return Variables(eid, f"symbol_{eid}", scope=self.scope, typeInfo=et)
+
+            self._init_recursive(
+                baseT=self.typeInfo.arrayBaseType,
+                length=self.typeInfo.arrayLength or 0,
+                build_val=builder
+            )
+
+        # ──────────────────────── private helper ────────────────────────
+        def _init_recursive(self, *, baseT, length: int, build_val):
+            """
+            baseT : SolType 또는 문자열
+            length: 정적 배열 길이
+            build_val(eid:str, et) ➜ Variables 객체를 생성해 주는 콜백
+            """
+            for i in range(length):
+                eid = f"{self.identifier}[{i}]"
+
+                # ─ nested array -----------------------------------------------------------------
+                if isinstance(baseT, SolType) and baseT.typeCategory == "array":
+                    sub_arr = ArrayVariable(
+                        identifier=eid,
+                        base_type=baseT.arrayBaseType,
+                        array_length=baseT.arrayLength,
                         scope=self.scope
                     )
-                    sub_array.initialize_elements(initial_interval)
-                    self.elements.append(sub_array)
-                else:
-                    # 기본 타입인 경우 Variables 객체로 요소 생성
-                    element_var = Variables(identifier=elem_id,
-                                            value=initial_interval,
-                                            isConstant=False,
-                                            scope=self.scope,
-                                            typeInfo=self.typeInfo.arrayBaseType)
+                    # recursion – baseT.arrayBaseType 에 따라 분기
+                    if self._is_abstractable(baseT.arrayBaseType):
+                        dummy = IntegerInterval.bottom() \
+                            if str(baseT.arrayBaseType.elementaryTypeName).startswith("int") \
+                            else UnsignedIntegerInterval.bottom()
+                        sub_arr.initialize_elements(dummy)
+                    else:
+                        sub_arr.initialize_not_abstracted_type(eid, sm=None)
+                    self.elements.append(sub_arr)
+                    continue
+                # ─ leaf element -----------------------------------------------------------------
+                self.elements.append(build_val(eid, baseT))
 
-                    self.elements.append(element_var)
-
-    def initialize_elements_of_not_abstracted_type (self, var_name) :
-        if self.typeInfo.arrayLength is not None:
-            for i in range(self.typeInfo.arrayLength):
-                elem_id = f"{self.identifier}[{i}]"
-                # 하위 타입이 또 다른 배열이면 재귀적으로 ArrayVariable 생성
-                if (isinstance(self.typeInfo.arrayBaseType, SolType) and
-                        self.typeInfo.arrayBaseType.typeCategory == 'array'):
-
-                    value_symbol = str("arraySymbol" + var_name + i)
-
-                    sub_array = ArrayVariable(
-                        identifier=elem_id,
-                        base_type=self.typeInfo.arrayBaseType.arrayBaseType,
-                        array_length=self.typeInfo.arrayBaseType.arrayLength,
-                        scope=self.scope
-                    )
-                    sub_array.initialize_elements(value_symbol)
-                    self.elements.append(sub_array)
-                else:
-                    # 기본 타입인 경우 Variables 객체로 요소 생성
-                    element_var = Variables(identifier=elem_id,
-                                            value=str("symbol" + var_name+ i),
-                                            isConstant=False,
-                                            scope=self.scope,
-                                            typeInfo=self.typeInfo.arrayBaseType)
-                    self.elements.append(element_var)
+        @staticmethod
+        def _is_abstractable(bt):
+            """int / uint / bool 이면 True"""
+            if isinstance(bt, SolType):
+                et = bt.elementaryTypeName
+            else:
+                et = str(bt)
+            return et.startswith("int") or et.startswith("uint") or et == "bool"
 
 
 class MappingVariable(Variables):
@@ -234,56 +349,6 @@ class MappingVariable(Variables):
         # 기타 타입일 경우 None
         return None
 
-
-class StructVariable(Variables):
-    def __init__(self, identifier=None, struct_type=None, value=None, isConstant=False, scope=None):
-        super().__init__(identifier, value, isConstant, scope)
-        self.typeInfo = SolType()
-        self.typeInfo.typeCategory = 'struct'
-        self.typeInfo.structTypeName = struct_type  # 구조체 이름
-        self.members = {}  # 멤버 변수들: 필드명 -> Variables 객체
-
-    def initialize_struct(self, struct_def):
-        for member in struct_def.members :
-            m_name = member['member_name']
-            m_type = member['member_type']
-            variable_obj = None
-
-            if m_type.typeCategory == 'array':
-                variable_obj = ArrayVariable(identifier=m_name, base_type=m_type.arrayBaseType,
-                                             array_length=m_type.arrayLength)
-
-                baseType = m_type.arrayBaseType
-                # 배열 요소 초기화
-                if baseType.startswith('int'):
-                    length = int(baseType[3:]) if baseType != "int" else 256
-                    variable_obj.initialize_elements(IntegerInterval.bottom(length))  # 기본 interval 설정
-                elif baseType.startswith('uint'):
-                    length = int(baseType[4:]) if baseType != "int" else 256
-                    variable_obj.initialize_elements(UnsignedIntegerInterval.bottom(length))  # 기본 interval 설정
-                elif baseType == 'bool':
-                    variable_obj.initialize_elements(BoolInterval.bottom())
-                elif baseType in ["address", "address payable", "string", "bytes", "Byte", "Fixed", "Ufixed"]:
-                    variable_obj.initialize_elements_of_not_abstracted_type(m_name)
-
-            elif m_type.typeCategory == 'mapping': # 이거 좀 수정 필요
-                variable_obj = MappingVariable(identifier=m_name,
-                                               key_type=m_type.mappingKeyType,
-                                               value_type=m_type.mappingValueType)
-            elif m_type.typeCategory == 'elementary' :
-                variable_obj = Variables(identifier=m_name)
-                variable_obj.typeInfo = m_type
-
-                if m_type.startswith("int") :
-                    length = int(m_type[3:]) if m_type != "int" else 256  # int 타입의 길이 (기본값은 256)
-                    variable_obj.value = IntegerInterval.bottom(length)  # int의 기본 범위 반환
-                elif m_type.startswith("uint") :
-                    length = int(m_type[4:]) if m_type != "int" else 256  # int 타입의 길이 (기본값은 256)
-                    variable_obj.value = UnsignedIntegerInterval.bottom(length)  # int의 기본 범위 반환
-                elif m_type.startswith("bool") :
-                    variable_obj.value = BoolInterval.bottom()
-                    variable_obj.value = str("structSymbol" +struct_def.struct_name + "memberSymbol" + m_name)
-
 class StructDefinition:
     def __init__(self, struct_name):
         self.struct_name = struct_name
@@ -291,6 +356,146 @@ class StructDefinition:
 
     def add_member(self, var_name, type_obj):
         self.members.append({'member_name' : var_name, 'member_type' : type_obj})
+
+# utils.py  (발췌) ─ StructVariable  전체
+
+class StructVariable(Variables):
+    """
+    구조체 변수를 나타내는 래퍼.
+    ─ members : { fieldName(str) : Variables / ArrayVariable / MappingVariable … }
+    """
+
+    def __init__(
+        self,
+        identifier: str | None = None,
+        struct_type: str | None = None,
+        value=None,
+        isConstant: bool = False,
+        scope: str | None = None,
+    ):
+        super().__init__(identifier, value, isConstant, scope)
+
+        self.typeInfo = SolType()
+        self.typeInfo.typeCategory   = "struct"
+        self.typeInfo.structTypeName = struct_type       # 구조체 이름
+        self.members: dict[str, Variables] = {}          # field → variable ­obj
+
+    # ────────────────────────────────────────────────────────────
+    # 초기화
+    # ------------------------------------------------------------------
+    def initialize_struct(
+        self,
+        struct_def: StructDefinition,
+        sm: "AddressSymbolicManager | None" = None,
+    ):
+        """
+        struct_def.members :
+            [{ "member_name": str, "member_type": SolType }, ... ]
+        - sm : AddressSymbolicManager (주소 타입이면 fresh interval 발급용)
+        """
+
+        def _make_var(var_id: str, sol_t: SolType) -> Variables:
+            """SolType → 적절한 Variables/ArrayVariable/MappingVariable 생성"""
+
+            # 1) 배열  ---------------------------------------------------
+            if sol_t.typeCategory == "array":
+                arr = ArrayVariable(
+                    identifier   = var_id,
+                    base_type    = sol_t.arrayBaseType,
+                    array_length = sol_t.arrayLength,
+                    is_dynamic   = sol_t.isDynamicArray,
+                    scope        = self.scope,
+                )
+                # base type이 elementary 인지 확인 후 초기화
+                bt = sol_t.arrayBaseType
+                if isinstance(bt, SolType):
+                    # 주소 / string / bytes / bool / int 등 판단
+                    if bt.elementaryTypeName in ("int",) or bt.elementaryTypeName.startswith("int"):
+                        bits = bt.intTypeLength or 256
+                        arr.initialize_elements(IntegerInterval.bottom(bits))
+                    elif bt.elementaryTypeName in ("uint",) or bt.elementaryTypeName.startswith("uint"):
+                        bits = bt.intTypeLength or 256
+                        arr.initialize_elements(UnsignedIntegerInterval.bottom(bits))
+                    elif bt.elementaryTypeName == "bool":
+                        arr.initialize_elements(BoolInterval.bottom())
+                    else:          # address / bytes / string 등
+                        arr.initialize_not_abstracted_type(sm=sm)
+                else:
+                    # 다차원 배열(배열의 base 가 또 SolType(array)) → 재귀적으로 helper가 처리
+                    arr.initialize_not_abstracted_type(sm=sm)
+                return arr
+
+            # 2) 매핑  ---------------------------------------------------
+            if sol_t.typeCategory == "mapping":
+                return MappingVariable(
+                    identifier  = var_id,
+                    key_type    = sol_t.mappingKeyType,
+                    value_type  = sol_t.mappingValueType,
+                    scope       = self.scope,
+                )
+
+            # 3) (중첩) 구조체  ------------------------------------------
+            if sol_t.typeCategory == "struct":
+                sv = StructVariable(identifier=var_id,
+                                    struct_type=sol_t.structTypeName,
+                                    scope=self.scope)
+                # struct 정의가 이미 ContractCFG.structDefs 에 저장돼 있다고 가정
+                # **여기서 struct_def를 다시 찾아 재귀 초기화 할 수도 있음**
+                return sv  # 값은 호출 측에서 후처리
+
+            # 4) elementary  --------------------------------------------
+            v = Variables(identifier=var_id, scope=self.scope)
+            v.typeInfo = sol_t
+
+            et = sol_t.elementaryTypeName
+            if et.startswith("int"):
+                bits = sol_t.intTypeLength or 256
+                v.value = IntegerInterval.bottom(bits)
+            elif et.startswith("uint"):
+                bits = sol_t.intTypeLength or 256
+                v.value = UnsignedIntegerInterval.bottom(bits)
+            elif et == "bool":
+                v.value = BoolInterval.bottom()
+            elif et == "address":
+                iv = (
+                    sm.alloc_fresh_interval()
+                    if sm
+                    else UnsignedIntegerInterval(0, 2**160 - 1, 160)
+                )
+                v.value = iv
+                if sm:
+                    sm.bind_var(var_id, iv.min_value)
+            else:
+                # string / bytes / 기타
+                v.value = f"symbol_{var_id}"
+            return v
+
+        # ─ 실제 멤버 생성 ------------------------------------------------
+        for mem in struct_def.members:
+            m_name: str      = mem["member_name"]
+            m_type: SolType  = mem["member_type"]
+
+            self.members[m_name] = _make_var(f"{self.identifier}.{m_name}", m_type)
+
+    # 디버깅용 표현
+    def __repr__(self):
+        mem_str = ", ".join(f"{k}:{v.value}" for k, v in self.members.items())
+        return f"StructVariable({self.identifier}){{{mem_str}}}"
+
+class EnumDefinition:
+    def __init__(self, enum_name):
+        self.enum_name = enum_name
+        self.members = []  # 멤버들의 리스트
+
+    def add_member(self, member_name):
+        if member_name not in self.members:
+            self.members.append(member_name)
+        else:
+            raise ValueError(f"Member '{member_name}' is already defined in enum '{self.enum_name}'.")
+
+    def get_member(self, index):
+        return self.members[index]
+
 
 class EnumVariable(Variables):
     def __init__(self, identifier=None, enum_type=None, value=None, isConstant=False, scope=None):
@@ -320,99 +525,10 @@ class EnumVariable(Variables):
         """
         return self.current_value
 
-class EnumDefinition:
-    def __init__(self, enum_name):
-        self.enum_name = enum_name
-        self.members = []  # 멤버들의 리스트
-
-    def add_member(self, member_name):
-        if member_name not in self.members:
-            self.members.append(member_name)
-        else:
-            raise ValueError(f"Member '{member_name}' is already defined in enum '{self.enum_name}'.")
-
-    def get_member(self, index):
-        return self.members[index]
 
 
-class SolType:
-    def __init__(self):
-        self.typeCategory = None  # 'elementary', 'array', 'mapping', 'struct', 'function', 'enum'
 
-        # elementary 타입 정보
-        self.elementaryTypeName = None  # 예: 'uint256', 'address'
-        self.intTypeLength = None  # 정수 타입의 비트 길이 (예: 256)
-
-        # 배열 타입 정보
-        self.arrayBaseType = None  # Type 객체
-        self.arrayLength = None  # 배열 길이
-        self.isDynamicArray = False  # 동적 배열 여부
-
-        # mapping 타입 정보
-        self.mappingKeyType = None  # Type 객체
-        self.mappingValueType = None  # Type 객체
-
-        # 구조체 타입 정보
-        self.structTypeName = None  # 구조체 이름 (문자열)
-        self.enumTypeName = None
 
         # 기타 필요한 속성 추가 가능
 
-class AddressSymbolicManager:
-    """
-    160-bit 주소 공간의 심볼릭 ID ↔ Interval ↔ 변수 Alias 를 한 곳에서 관리
-    """
-    ADDR_BITS = 160
-    _typeinfo = SolType(elementaryTypeName="address")
 
-    def __init__(self):
-        self._next_id: int = 1                    # fresh ID counter
-        self._id_to_iv: dict[int, UnsignedIntegerInterval] = {}
-        self._id_to_vars: dict[int, set[str]] = {}  # 해당 ID를 쓰는 변수명 모음
-
-    # ───────────────────────────────── fresh / fixed  ID 발급
-    def fresh_id(self) -> int:
-        nid = self._next_id
-        self._next_id += 1
-        return nid
-
-    def alloc_fresh_interval(self) -> UnsignedIntegerInterval:
-        """새 ID 하나 -> Interval [id,id] 반환"""
-        nid = self.fresh_id()
-        iv  = UnsignedIntegerInterval(nid, nid, self.ADDR_BITS)
-        self._id_to_iv[nid] = iv
-        self._id_to_vars[nid] = set()
-        return iv                                  # value 필드에 그대로 쓰면 됨
-
-    def register_fixed_id(self, nid: int,
-                          iv: UnsignedIntegerInterval | None = None):
-        """
-        주석처럼 `symbolicAddress 101` 이 들어왔을 때 호출.
-        이미 등록돼 있으면 그대로 두고, 없으면 Interval을 결정해 추가.
-        """
-        if nid not in self._id_to_iv:
-            if iv is None:
-                iv = UnsignedIntegerInterval(nid, nid, self.ADDR_BITS)
-            self._id_to_iv[nid] = iv
-            self._id_to_vars[nid] = set()
-
-    # ───────────────────────────────── 변수-ID 바인딩
-    def bind_var(self, var_name: str, nid: int):
-        self._id_to_vars.setdefault(nid, set()).add(var_name)
-
-    # ───────────────────────────────── 조회
-    def get_interval(self, nid: int) -> UnsignedIntegerInterval:
-        return self._id_to_iv[nid]
-
-    def get_alias_set(self, nid: int) -> set[str]:
-        return self._id_to_vars.get(nid, set())
-
-    # ───────────────────────────────── ranged 할당 예시
-    def alloc_range(self, start: int, end: int) -> int:
-        """
-        [start,end] Interval 로 묶인 새 ID 발급 후 ID 반환
-        """
-        nid = self.fresh_id()
-        self._id_to_iv[nid] = UnsignedIntegerInterval(start, end, self.ADDR_BITS)
-        self._id_to_vars[nid] = set()
-        return nid

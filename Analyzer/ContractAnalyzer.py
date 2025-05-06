@@ -433,11 +433,22 @@ class ContractAnalyzer:
                 pass
             elif isinstance(variable_obj,EnumVariable) :
                 pass
-            elif variable_obj.typeCategory == "elementary" :
-                if variable_obj.elementaryTypeName.startswith("int", "uint", "bool") :
-                    variable_obj.value = self.calculate_default_interval(variable_obj.elementaryTypeName)
-                elif variable_obj.elementaryTypeName in ["address", "address payable", "string", "bytes", "Byte", "Fixed", "Ufixed"] :
-                    variable_obj.value = str('symbol' + variable_obj.identifier)
+            elif variable_obj.typeCategory == "elementary":
+                et = variable_obj.elementaryTypeName
+
+                # ── ① int / uint / bool 은 종전 로직 유지
+                if et.startswith(("int", "uint", "bool")):
+                    variable_obj.value = self.calculate_default_interval(et)
+
+                # ── ② **address → fresh symbolic interval 로 변경**
+                elif et == "address":
+                    iv = self.sm.alloc_fresh_interval()  # [N,N]
+                    variable_obj.value = iv
+                    self.sm.bind_var(variable_obj.identifier, iv.min_value)
+
+                # (string / bytes 등 - 추상화 안 할 타입은 심볼릭 문자열 그대로)
+                else:
+                    variable_obj.value = f"symbol_{variable_obj.identifier}"
         else : # 초기화 식이 있으면
             if isinstance(variable_obj, ArrayVariable) :
                 inlineArrayValues = self.evaluate_expression(init_expr, contract_cfg.state_variable_node.variables, None, None)
@@ -574,218 +585,277 @@ class ContractAnalyzer:
 
         self.brace_count[self.current_start_line]['cfg_node'] = constructor_cfg.get_entry_node()
 
-    def process_function_definition(self, function_name, parameters, modifiers, returns):
-        # 1. 현재 타겟 컨트랙트의 CFG를 가져옴
+    # ContractAnalyzer.py  ─ process_function_definition  (address-symb ✚ 최신 Array/Struct 초기화 반영)
+
+    def process_function_definition(
+            self,
+            function_name: str,
+            parameters: list[tuple[SolType, str]],
+            modifiers: list[str],
+            returns: list[Variables] | None,
+    ):
+        # ───────────────────────────────────────────────────────────────
+        # 1. 컨트랙트 CFG
+        # ----------------------------------------------------------------
         contract_cfg = self.contract_cfgs[self.current_target_contract]
-        if not contract_cfg:
-            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
 
-        # 2. 함수에 대한 FunctionCFG 생성
-        function_cfg = FunctionCFG(function_type='function', function_name=function_name)
+        if contract_cfg is None:
+            raise ValueError(f"Contract CFG for {self.current_target_contract} not found.")
 
-        # 3. 파라미터 처리
-        for type_obj, var_name in parameters:
-            variable_obj = None
+        # ───────────────────────────────────────────────────────────────
+        # 2. 함수 CFG 객체
+        # ----------------------------------------------------------------
+        fcfg = FunctionCFG(function_type="function", function_name=function_name)
 
-            # 타입에 따라 적절한 변수 클래스를 생성
-            if type_obj.typeCategory == 'array':
-                # 배열 타입인 경우 ArrayVariable 생성
-                variable_obj = ArrayVariable(
-                    identifier=var_name,
-                    base_type=type_obj.arrayBaseType,
-                    array_length=type_obj.arrayLength,
-                    scope="local"
+        # ───────────────────────────────────────────────────────────────
+        # 3. 파라미터 → related_variables
+        # ----------------------------------------------------------------
+        for p_type, p_name in parameters:
+            var_obj: Variables | ArrayVariable | MappingVariable | StructVariable
+
+            # ── 3-A  배열 파라미터
+            # ------------------------------------------------------------
+            if p_type.typeCategory == "array":
+                arr = ArrayVariable(
+                    identifier=p_name,
+                    base_type=p_type.arrayBaseType,
+                    array_length=p_type.arrayLength,
+                    is_dynamic=p_type.isDynamicArray,
+                    scope="local",
                 )
 
-                baseType = type_obj.arrayBaseType
+                base_t = p_type.arrayBaseType
+                if isinstance(base_t, SolType):
+                    et = base_t.elementaryTypeName
+                    if et and et.startswith("int"):
+                        bits = base_t.intTypeLength or 256
+                        arr.initialize_elements(IntegerInterval.bottom(bits))
+                    elif et and et.startswith("uint"):
+                        bits = base_t.intTypeLength or 256
+                        arr.initialize_elements(UnsignedIntegerInterval.bottom(bits))
+                    elif et == "bool":
+                        arr.initialize_elements(BoolInterval.bottom())
+                    else:  # address / bytes / string …
+                        arr.initialize_not_abstracted_type(sm=self.sm)
+                else:
+                    # 다차원 배열일 수도 → non-abstract 초기화(재귀 포함)
+                    arr.initialize_not_abstracted_type(sm=self.sm)
 
-                # 배열 요소 초기화
-                if baseType.startswith('int') :
-                    length = int(baseType[3:]) if baseType != "int" else 256
-                    variable_obj.initialize_elements(IntegerInterval.bottom(length))  # 기본 interval 설정
-                elif baseType.startswith('uint') :
-                    length = int(baseType[4:]) if baseType != "int" else 256
-                    variable_obj.initialize_elements(UnsignedIntegerInterval.bottom(length))  # 기본 interval 설정
-                elif baseType == 'bool' :
-                    variable_obj.initialize_elements(BoolInterval.bottom())
-                elif baseType in ["address", "address payable", "string", "bytes", "Byte", "Fixed", "Ufixed"] :
-                    variable_obj.initialize_elements_of_not_abstracted_type(var_name)
+                var_obj = arr
 
-            elif type_obj.typeCategory == 'struct':
-                if type_obj.structTypeName in contract_cfg.structDefs :
-                    struct_def = contract_cfg.structDefs[type_obj.structTypeName]
+            # ── 3-B  구조체 파라미터
+            # ------------------------------------------------------------
+            elif p_type.typeCategory == "struct":
+                struct_name = p_type.structTypeName
+                if struct_name not in contract_cfg.structDefs:
+                    raise ValueError(f"Undefined struct '{struct_name}' used as parameter.")
 
-                    variable_obj = StructVariable(
-                        identifier = var_name,
-                        struct_type = type_obj.structTypeName,
-                        socpe="local" # 이거 나중에 storage인지 memory인지 보고 고쳐야됨
-                    )
+                sv = StructVariable(
+                    identifier=p_name,
+                    struct_type=struct_name,
+                    scope="local",
+                )
+                sv.initialize_struct(contract_cfg.structDefs[struct_name], sm=self.sm)
+                var_obj = sv
 
-                    variable_obj.initialize_struct(struct_def)
+            # ── 3-C  elementary 파라미터
+            # ------------------------------------------------------------
+            elif p_type.typeCategory == "elementary":
+                v = Variables(identifier=p_name, scope="local")
+                v.typeInfo = p_type
+                et = p_type.elementaryTypeName
 
-                else :
-                    raise ValueError (f"This struct definition {type_obj.structTypeName} is not defined")
-            elif type_obj.typeCategory == "elementary":
-                # 기본 타입인 경우 Variables 객체 생성
-                variable_obj = Variables(identifier=var_name, scope="local")
-                variable_obj.typeInfo = type_obj  # SolType 객체를 typeInfo로 설정
+                if et.startswith("int"):
+                    bits = p_type.intTypeLength or 256
+                    v.value = IntegerInterval.bottom(bits)
+                elif et.startswith("uint"):
+                    bits = p_type.intTypeLength or 256
+                    v.value = UnsignedIntegerInterval.bottom(bits)
+                elif et == "bool":
+                    v.value = BoolInterval.bottom()
+                elif et == "address":
+                    iv = self.sm.alloc_fresh_interval()
+                    v.value = iv
+                    self.sm.bind_var(p_name, iv.min_value)
+                else:  # bytes/string 등
+                    v.value = f"symbol_{p_name}"
+                var_obj = v
 
-                if type_obj.elementaryTypeName.startswith('int', 'uint', 'bool') :
-                    variable_obj.value = self.calculate_default_interval(type_obj.elementaryTypeName)
-                elif type_obj.elementaryTypeName in ["address", "address payable", "string", "bytes", "Byte", "Fixed", "Ufixed"] :
-                    variable_obj.value = str("symbol" + var_name)
+            else:
+                raise ValueError(f"Unsupported parameter typeCategory '{p_type.typeCategory}'.")
 
-        # 4. Modifier 처리 및 CFG 통합
-        for modifier_name in modifiers:
-            self.process_modifier_invocation(function_cfg, modifier_name)
+            # 파라미터를 함수-관련 변수 집합에 추가
+            fcfg.add_related_variable(var_obj.identifier, var_obj)
 
-        # 5. 반환 타입 처리 (있다면)
+        # ───────────────────────────────────────────────────────────────
+        # 4. Modifier invocation → CFG 병합
+        # ----------------------------------------------------------------
+        for m_name in modifiers:
+            self.process_modifier_invocation(fcfg, m_name)
+
+        # ───────────────────────────────────────────────────────────────
+        # 5. Return 변수 처리
+        # ----------------------------------------------------------------
         if returns:
-            for variable in returns:
-                function_cfg.add_related_variable(variable)
+            for rvar in returns:
+                fcfg.add_related_variable(rvar.identifier, rvar)
 
-        # 현재 state_variable_node에서 상태 변수를 가져와 related_variables에 추가
+        # ───────────────────────────────────────────────────────────────
+        # 6. 상태 변수 → related_variables 에 복사
+        # ----------------------------------------------------------------
         if contract_cfg.state_variable_node:
-            for var_name, variable in contract_cfg.state_variable_node.variables.items():
-                function_cfg.add_related_variable(variable)
+            for var in contract_cfg.state_variable_node.variables.values():
+                fcfg.add_related_variable(var.identifier, var)
 
-        # 9. function_cfg 결과를 contract_cfg에 반영
-        contract_cfg.functions[function_name] = function_cfg
-
-        # 10. contract_cfg를 contract_cfgs에 반영
+        # ───────────────────────────────────────────────────────────────
+        # 7. 결과를 ContractCFG 에 반영
+        # ----------------------------------------------------------------
+        contract_cfg.functions[function_name] = fcfg
         self.contract_cfgs[self.current_target_contract] = contract_cfg
 
-        # 7. brace_count에 CFG 노드 정보 업데이트 (함수의 시작 라인 정보 사용)
-        self.brace_count[self.current_start_line]['cfg_node'] = function_cfg.get_entry_node()
+        # ───────────────────────────────────────────────────────────────
+        # 8. brace_count 에 함수 entry 노드 기록
+        # ----------------------------------------------------------------
+        self.brace_count[self.current_start_line]["cfg_node"] = fcfg.get_entry_node()
 
-    def process_variable_declaration(self, type_obj, var_name, init_expr=None):
-        # 1. 현재 타겟 컨트랙트의 CFG 가져오기
-        contract_cfg = self.contract_cfgs[self.current_target_contract]
-        if not contract_cfg:
-            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+    # ContractAnalyzer.py  ─ process_variable_declaration  (address-symbolic & 최신 Array/Struct 초기화 반영)
 
-        # 2. 현재 타겟 함수의 CFG 가져오기
-        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
-        if not self.current_target_function_cfg:
-            raise ValueError("No active function to add variables to.")
+    def process_variable_declaration(
+            self,
+            type_obj: SolType,
+            var_name: str,
+            init_expr: Expression | None = None,
+    ):
+        # ───────────────────────────────────────────────────────────────
+        # 1. CFG 컨텍스트
+        # ----------------------------------------------------------------
+        ccf = self.contract_cfgs[self.current_target_contract]
+        fcfg = ccf.get_function_cfg(self.current_target_function)
+        if fcfg is None:
+            raise ValueError("variableDeclaration: active FunctionCFG not found")
 
-        # 좌변 변수 객체 생성
-        variable_obj = None
-        if type_obj.typeCategory == 'array':
-            # 배열 타입인 경우 ArrayVariable 생성
-            base_type = type_obj.arrayBaseType
-            array_length = type_obj.arrayLength
-            variable_obj = ArrayVariable(identifier=var_name, base_type=base_type,
-                                         array_length=array_length, scope='local')
+        cur_blk = self.get_current_block()
 
-        elif type_obj.typeCategory == 'struct':
-            # 구조체 타입인 경우 StructVariable 생성
-            struct_type = type_obj.structTypeName
-            variable_obj = StructVariable(identifier=var_name, struct_type=struct_type, scope='local')
+        # ───────────────────────────────────────────────────────────────
+        # 2. 변수 객체 생성
+        # ----------------------------------------------------------------
+        v: Variables | ArrayVariable | StructVariable | MappingVariable | EnumVariable
 
-        elif type_obj.typeCategry == 'Enum' :
-            struct_type = type_obj.enumTypeName
-            variable_obj = EnumVariable(identifier=var_name, enum_type=struct_type, scope='local')
+        # 2-A  배열
+        if type_obj.typeCategory == "array":
+            v = ArrayVariable(
+                identifier=var_name,
+                base_type=type_obj.arrayBaseType,
+                array_length=type_obj.arrayLength,
+                is_dynamic=type_obj.isDynamicArray,
+                scope="local",
+            )
 
+        # 2-B  구조체
+        elif type_obj.typeCategory == "struct":
+            v = StructVariable(
+                identifier=var_name,
+                struct_type=type_obj.structTypeName,
+                scope="local",
+            )
+
+        # 2-C  enum
+        elif type_obj.typeCategory == "enum":
+            v = EnumVariable(identifier=var_name, enum_type=type_obj.enumTypeName, scope="local")
+
+        # 2-D  매핑
+        elif type_obj.typeCategory == "mapping":
+            v = MappingVariable(
+                identifier=var_name,
+                key_type=type_obj.mappingKeyType,
+                value_type=type_obj.mappingValueType,
+                scope="local",
+            )
+
+        # 2-E  elementary
         else:
-            # 기본 타입인 경우 Variables 객체 생성
-            variable_obj = Variables(identifier=var_name, scope="local")
-            variable_obj.typeInfo = type_obj  # SolType 객체를 typeInfo로 설정
+            v = Variables(identifier=var_name, scope="local")
+            v.typeInfo = type_obj
 
-        # 3. 현재 블록의 CFG 노드 가져오기
-        current_block = self.get_current_block()
-
-        # 우변 표현식을 저장하기 위해 init_expr를 확인
-        if init_expr is None:  # 초기화가 없으면
-            if isinstance(variable_obj, ArrayVariable):
-                if variable_obj.typeInfo.arrayBaseType.startswith("int"):
-                    variable_obj.initialize_elements(IntegerInterval.bottom())
-                elif variable_obj.typeInfo.arrayBaseType.startswith("uint"):
-                    variable_obj.initialize_elements(UnsignedIntegerInterval.bottom())
-                elif variable_obj.typeInfo.arrayBaseType.startswith("bool"):
-                    variable_obj.initialize_elements(BoolInterval.bottom())
-                elif variable_obj.typeInfo.arrayBaseType in ["address", "address payable", "string", "bytes", "Byte",
-                                                             "Fixed", "Ufixed"]:
-                    variable_obj.initialize_elements_of_not_abstracted_type(variable_obj.identifier)
-            elif isinstance(variable_obj, StructVariable):
-                if variable_obj.typeInfo.structTypeName in contract_cfg.structDefs:
-                    struct_def = contract_cfg.structDefs[variable_obj.typeInfo.structTypeName]
-                    variable_obj.initialize_struct(struct_def)
-                else:
-                    ValueError(f"This struct def {variable_obj.struct_type} is undefined")
-            elif isinstance(variable_obj, MappingVariable): # 동적으로 할당되서 선언이 딱히 없음
-                pass
-            elif isinstance(variable_obj, EnumVariable):
-                if variable_obj.typeInfo.enumTypeName in contract_cfg.enumDefs :
-                    enum_def = contract_cfg.enumDefs[variable_obj.typeInfo.enumTypeName]
-                    variable_obj.value = enum_def.members[0]
-                    variable_obj.valueIndex = 0
-
-            elif variable_obj.typeCategory == "elementary":
-                if variable_obj.elementaryTypeName.startswith("int", "uint", "bool"):
-                    variable_obj.value = self.calculate_default_interval(variable_obj.elementaryTypeName)
-                elif variable_obj.elementaryTypeName in ["address", "address payable", "string", "bytes", "Byte",
-                                                         "Fixed", "Ufixed"]:
-                    variable_obj.value = str('symbol' + variable_obj.identifier)
-
-        else : # 초기화 식이 있으면
-            if isinstance(variable_obj, ArrayVariable) :
-                inlineArrayValues = self.evaluate_expression(init_expr, current_block.variables, None)
-                for value in inlineArrayValues :
-                    variable_obj.elements.append(value)
-            elif isinstance(variable_obj, StructVariable) : # 관련된 경우 있을 것 같긴 함
-                pass
-            elif isinstance(variable_obj, MappingVariable) : # 관련된 경우 없을 듯
-                pass
-            elif isinstance(variable_obj, EnumVariable) : # 관련된 경우 있을 것 같긴 함
-                enum_val = self.evaluate_expression(init_expr, current_block.variables, None)
-
-                if isinstance(enum_val, IntegerInterval):
-                    # int값으로 들어온 경우 -> 만약 min==max라면 유효 범위인지 검사
-                    if enum_val.min_value == enum_val.max_value:
-                        index_val = enum_val.min_value
-                        # enum_def = contract_cfg.enumDefs[variable_obj.typeInfo.enumTypeName]
-                        # 여기서 index_val이 enum_def.members 범위 내인지?
-                        # (논문 스코프에선 간단히 pass 해도 됨)
-                        variable_obj.valueIndex = index_val
-                        variable_obj.value = f"EnumIndex({index_val})"
+        # ───────────────────────────────────────────────────────────────
+        # 3. 기본값 / 초기화식 해석
+        # ----------------------------------------------------------------
+        if init_expr is None:
+            # ── 배열 기본
+            if isinstance(v, ArrayVariable):
+                bt = v.typeInfo.arrayBaseType
+                if isinstance(bt, SolType):
+                    et = bt.elementaryTypeName
+                    if et and et.startswith("int"):
+                        bits = bt.intTypeLength or 256
+                        v.initialize_elements(IntegerInterval.bottom(bits))
+                    elif et and et.startswith("uint"):
+                        bits = bt.intTypeLength or 256
+                        v.initialize_elements(UnsignedIntegerInterval.bottom(bits))
+                    elif et == "bool":
+                        v.initialize_elements(BoolInterval.bottom())
                     else:
-                        # 범위가 넓으면 symbolic
-                        variable_obj.value = f"SymbolicEnumInterval({enum_val})"
+                        v.initialize_not_abstracted_type(sm=self.sm)
 
-                elif isinstance(enum_val, str):
-                    # 만약 "RED" 처럼 들어왔을 때
-                    # enum_def = contract_cfg.enumDefs[variable_obj.typeInfo.enumTypeName]
-                    # if enum_val in enum_def.members => variable_obj.valueIndex = ...
-                    variable_obj.value = enum_val
-                else:
-                    # 나머지는 symbolic
-                    variable_obj.value = f"symbolicEnum({enum_val})"
+            # ── 구조체 기본
+            elif isinstance(v, StructVariable):
+                if v.typeInfo.structTypeName not in ccf.structDefs:
+                    raise ValueError(f"Undefined struct {v.typeInfo.structTypeName}")
+                v.initialize_struct(ccf.structDefs[v.typeInfo.structTypeName], sm=self.sm)
 
-            elif variable_obj.typeCategory == "elementary" :
-                variable_obj.value = self.evaluate_expression(init_expr, current_block.variables, None)
+            # ── enum 기본 (첫 멤버)
+            elif isinstance(v, EnumVariable):
+                enum_def = ccf.enumDefs.get(v.typeInfo.enumTypeName)
+                if enum_def:
+                    v.valueIndex = 0
+                    v.value = enum_def.members[0]
 
-        # cfg node에 문장 추가
-        current_block.variables[variable_obj.identifier] = variable_obj
-        current_block.add_variable_declaration_statement(type_obj, var_name, init_expr)
+            # ── elementary 기본
+            elif isinstance(v, Variables):
+                et = v.typeInfo.elementaryTypeName
+                if et.startswith("int"):
+                    v.value = IntegerInterval.bottom(v.typeInfo.intTypeLength or 256)
+                elif et.startswith("uint"):
+                    v.value = UnsignedIntegerInterval.bottom(v.typeInfo.intTypeLength or 256)
+                elif et == "bool":
+                    v.value = BoolInterval.bottom()
+                elif et == "address":
+                    iv = self.sm.alloc_fresh_interval()
+                    v.value = iv
+                    self.sm.bind_var(var_name, iv.min_value)
+                else:  # bytes/string
+                    v.value = f"symbol_{var_name}"
 
-        # function_cfg에 지역변수 추가
-        self.current_target_function_cfg.add_related_variable(variable_obj)
+        # ───────────────────────────────────────────────────────────────
+        # 3-b. 초기화식이 존재하는 경우
+        # ----------------------------------------------------------------
+        else:
+            if isinstance(v, ArrayVariable):
+                arr_vals = self.evaluate_expression(init_expr, cur_blk.variables, None, None)
+                for e in arr_vals:
+                    v.elements.append(e)
 
-        # 11. current_block을 function CFG에 반영
-        self.current_target_function_cfg.update_block(current_block)  # 변경된 블록을 반영
+            elif isinstance(v, Variables):  # elementary / address / bool …
+                v.value = self.evaluate_expression(init_expr, cur_blk.variables, None, None)
 
-        # 12. function_cfg 결과를 contract_cfg에 반영
-        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+            # enum-init, mapping-init 등은 필요시 추가
 
-        # 13. contract_cfg를 contract_cfgs에 반영
-        self.contract_cfgs[self.current_target_contract] = contract_cfg
+        # ───────────────────────────────────────────────────────────────
+        # 4. CFG 노드 업데이트
+        # ----------------------------------------------------------------
+        cur_blk.variables[v.identifier] = v
+        cur_blk.add_variable_declaration_statement(type_obj, var_name, init_expr)
+        fcfg.add_related_variable(v.identifier, v)
+        fcfg.update_block(cur_blk)
 
-        # 14. brace_count에 CFG 노드 정보 업데이트 (함수의 시작 라인 정보 사용)
-        self.brace_count[self.current_start_line]['cfg_node'] = current_block
+        # ───────────────────────────────────────────────────────────────
+        # 5. 저장 및 brace_count
+        # ----------------------------------------------------------------
+        ccf.functions[self.current_target_function] = fcfg
+        self.contract_cfgs[self.current_target_contract] = ccf
+        self.brace_count[self.current_start_line]["cfg_node"] = cur_blk
 
         self.current_target_function_cfg = None
-
 
     def process_assignment_expression(self, expr):
         # 1. 현재 타겟 컨트랙트의 CFG 가져오기
@@ -1802,158 +1872,204 @@ class ContractAnalyzer:
         self.interpret_function_cfg(fcfg)
 
     # ---------------- util helpers ---------------- #
-    def _is_interval(x):
+    # ---------------------------------------------------------------------------
+    # Interval / value helpers  (ContractAnalyzer 내부 메서드들)
+    # ---------------------------------------------------------------------------
+
+    # ───────── static/utility ──────────────────────────────────────────────
+    @staticmethod
+    def _is_interval(x) -> bool:
+        """Integer / UnsignedInteger 계열인지 판단"""
         return isinstance(x, (IntegerInterval, UnsignedIntegerInterval))
 
-    def _extract_index_val(expr_idx):
+    @staticmethod
+    def _extract_index_val(expr_idx: Expression):
         """
-        expr_idx: Expression
-        → literal 이면 정수/주소 문자열 반환, 그 외엔 expression 자체(심볼릭) 반환
+        index Expression → 정수 literal 이면 int, 그 외엔 Expression 그대로
+        (symbolic index 처리를 위해)
         """
         if expr_idx.context == "LiteralExpContext":
             return int(expr_idx.literal, 0)
-        return expr_idx  # 심볼릭 인덱스 그대로
+        return expr_idx  # symbolic 그대로
 
-    def _create_new_mapping_value(map_var: MappingVariable, key):
-        # value 타입은 mapping 의 valueType 에서 꺼낸다.
-        val_type = map_var.valueType
-        if val_type.startswith("uint"):
-            bit = 256 if len(val_type) == 4 else int(val_type[4:])
-            v = UnsignedIntegerInterval.bottom(bit)
-        elif val_type.startswith("int"):
-            bit = 256 if len(val_type) == 3 else int(val_type[3:])
-            v = IntegerInterval.bottom(bit)
-        elif val_type == "bool":
-            v = BoolInterval.bottom()
-        else:  # address, struct 등
-            v = f"symbolic<{map_var.identifier}[{key}]>"
-        child = Variables(identifier=f"{map_var.identifier}[{key}]",
-                          value=v, scope="mapping_value")
-        child.typeInfo = map_var.typeInfo.valueTypeInfo  # deep copy 필요 시 복제
+    # ───────── mapping value 생성 ──────────────────────────────────────────
+    def _create_new_mapping_value(
+            self,
+            map_var: MappingVariable,
+            key: str | int,
+    ) -> Variables:
+        """
+        새 key 접근 시, 기본 값을 가진 child Variables 생성.
+
+        * address value 인 경우 AddressSymbolicManager 로 fresh interval 지급.
+        * 그 밖의 elementary → bottom interval.
+        * 배열/구조체/매핑 등의 value 타입은 보수적으로 symbol 로 둠.
+        """
+        eid = f"{map_var.identifier}[{key}]"
+        val_type: SolType = map_var.typeInfo.mappingValueType
+
+        # elementary --------------------------------------------------------
+        if val_type.typeCategory == "elementary":
+            et = val_type.elementaryTypeName
+
+            if et.startswith("uint"):
+                bits = val_type.intTypeLength or 256
+                val = UnsignedIntegerInterval.bottom(bits)
+
+            elif et.startswith("int"):
+                bits = val_type.intTypeLength or 256
+                val = IntegerInterval.bottom(bits)
+
+            elif et == "bool":
+                val = BoolInterval.bottom()
+
+            elif et == "address":
+                iv = self.sm.alloc_fresh_interval()
+                self.sm.bind_var(eid, iv.min_value)
+                val = iv
+
+            else:  # bytes, string …
+                val = f"symbol_{eid}"
+
+        # non-elementary ----------------------------------------------------
+        else:
+            # (array / struct / mapping 등은 본 연구 범위 밖 → symbol 처리)
+            val = f"symbol_{eid}"
+
+        child = Variables(identifier=eid, value=val, scope="mapping_value", typeInfo=val_type)
         return child
 
-    # ------------------------------------------------ #
-
-    def _apply_new_value_to_variable(self, var_obj, new_value):
+    # ───────── 값 덮어쓰기 (debug 주석용) ────────────────────────────────────
+    def _apply_new_value_to_variable(self, var_obj: Variables, new_value):
         """
-        new_value 가능 유형
-          - IntegerInterval / UnsignedIntegerInterval
-          - int / bool (단정 값)
-          - 'symbolicAddress N'  (str)
-          - BoolInterval          (top, 단정)
-        내부 로직:
-          1) RHS 가 이미 Interval 계열이면 그대로 대입
-          2) elementary type 에 맞춰 wrap
-          3) 'any' → BoolInterval.top()
+        new_value 유형
+          • IntegerInterval / UnsignedIntegerInterval / BoolInterval
+          • 단일 int / bool
+          • 'symbolicAddress N'  (str)
+          • 기타 str   (symbolic tag)
         """
-
-        # 0. Interval 객체가 오면 그대로
-        if self._is_interval(new_value):
+        # 0) 이미 Interval 객체면 그대로
+        if self._is_interval(new_value) or isinstance(new_value, BoolInterval):
             var_obj.value = new_value
             return
 
-        # 1. elementary type 정보 추출
-        if var_obj.typeInfo is None or var_obj.typeInfo.elementaryTypeName is None:
-            # struct / array / mapping 등 (현재 스코프에선 직접 업데이트 X)
+        # 1) elementary 타입 확인
+        if not (var_obj.typeInfo and var_obj.typeInfo.elementaryTypeName):
             print(f"[Info] _apply_new_value_to_variable: skip non-elementary '{var_obj.identifier}'")
             return
 
         etype = var_obj.typeInfo.elementaryTypeName
+        bits = var_obj.typeInfo.intTypeLength or 256
 
-        # 2. wrap
+        # ---- int / uint ---------------------------------------------------
         if etype.startswith("int"):
-            bit = var_obj.typeInfo.intTypeLength or 256
-            iv = new_value if isinstance(new_value, IntegerInterval) else \
-                IntegerInterval(int(new_value), int(new_value), bit)
+            iv = (
+                new_value
+                if isinstance(new_value, IntegerInterval)
+                else IntegerInterval(int(new_value), int(new_value), bits)
+            )
             var_obj.value = iv
 
         elif etype.startswith("uint"):
-            bit = var_obj.typeInfo.intTypeLength or 256
-            uv = new_value if isinstance(new_value, UnsignedIntegerInterval) else \
-                UnsignedIntegerInterval(int(new_value), int(new_value), bit)
+            uv = (
+                new_value
+                if isinstance(new_value, UnsignedIntegerInterval)
+                else UnsignedIntegerInterval(int(new_value), int(new_value), bits)
+            )
             var_obj.value = uv
 
+        # ---- bool ---------------------------------------------------------
         elif etype == "bool":
-            if isinstance(new_value, BoolInterval):
-                var_obj.value = new_value
-            elif isinstance(new_value, str) and new_value.lower() == "any":
+            if isinstance(new_value, str) and new_value.lower() == "any":
                 var_obj.value = BoolInterval.top()
+            elif isinstance(new_value, (bool, int)):
+                b = bool(new_value)
+                var_obj.value = BoolInterval(int(b), int(b))
             else:
-                var_obj.value = BoolInterval(bool(new_value), bool(new_value))
+                var_obj.value = new_value  # already BoolInterval
 
+        # ---- address ------------------------------------------------------
         elif etype == "address":
-            # 주소는 문자열 그대로 두거나 심볼릭 처리
-            var_obj.value = str(new_value)
+            if isinstance(new_value, UnsignedIntegerInterval):
+                var_obj.value = new_value
+                self.sm.bind_var(var_obj.identifier, new_value.min_value)
 
+            elif isinstance(new_value, str) and new_value.startswith("symbolicAddress"):
+                nid = int(new_value.split()[1])
+                self.sm.register_fixed_id(nid)
+                iv = self.sm.get_interval(nid)
+                var_obj.value = iv
+                self.sm.bind_var(var_obj.identifier, nid)
+
+            else:  # 임의 문자열 → symbol 처리
+                var_obj.value = f"symbol_{new_value}"
+
+        # ---- fallback -----------------------------------------------------
         else:
-            print(f"[Warning] _apply_new_value_to_variable: unhandled elementary type '{etype}'")
-            var_obj.value = new_value  # fallback
+            print(f"[Warning] _apply_new_value_to_variable: unhandled type '{etype}'")
+            var_obj.value = new_value
 
-    def _resolve_and_update_expr(self, expr: Expression, function_cfg, new_value):
+    # ───────── debug LHS 해석 (member / index 접근) ────────────────────────
+    def _resolve_and_update_expr(self, expr: Expression, fcfg: FunctionCFG, new_value):
         """
-        디버그용 LHS(Expression) 탐색 & value 업데이트.
-        반환: 실제로 갱신된 Variables 객체 (없으면 None)
+        testingExpression (AST) → 실제 변수 객체를 찾아 value 업데이트
         """
-        # 1️⃣ root 식별자
+        # 1) 루트 식별자
         if expr.base is None:
-            var_obj = function_cfg.get_related_variable(expr.identifier)
-            if var_obj:
-                if new_value is not None:  # 루트일 수도, 최종 leaf 일 수도
-                    self._apply_new_value_to_variable(var_obj, new_value)
-            else:
-                print(f"[Warn] '{expr.identifier}' not in related_variables of '{function_cfg.function_name}'")
-            return var_obj
+            v = fcfg.get_related_variable(expr.identifier)
+            if v and new_value is not None:
+                self._apply_new_value_to_variable(v, new_value)
+            return v
 
-        # 2️⃣ 하위 경로 탐색 (member / index)
-        base_obj = self._resolve_and_update_expr(expr.base, function_cfg, None)
+        # 2) base  먼저 해석
+        base_obj = self._resolve_and_update_expr(expr.base, fcfg, None)
         if base_obj is None:
             return None
 
-        # ---- member access (struct) ----
+        # ─ member access (struct) ─────────────────────────────────────────
         if expr.member is not None:
             if not isinstance(base_obj, StructVariable):
                 print(f"[Warn] member access on non-struct '{base_obj.identifier}'")
                 return None
-            member_name = expr.member
-            mem_var = base_obj.members.get(member_name)
-            if mem_var is None:
-                print(f"[Warn] struct '{base_obj.identifier}' has no member '{member_name}'")
+            m = base_obj.members.get(expr.member)
+            if m is None:
+                print(f"[Warn] struct '{base_obj.identifier}' has no member '{expr.member}'")
                 return None
             if new_value is not None:
-                self._apply_new_value_to_variable(mem_var, new_value)
-            return mem_var
+                self._apply_new_value_to_variable(m, new_value)
+            return m
 
-        # ---- index access (array / mapping) ----
+        # ─ index access (array / mapping) ─────────────────────────────────
         if expr.index is not None:
-            if isinstance(base_obj, ArrayVariable):
-                idx = self._extract_index_val(expr.index)
-                if not isinstance(idx, int) or idx < 0:
-                    print(f"[Warn] non-literal or negative array index '{idx}'")
-                    return None
-                # 동적 배열인 경우 길이 확장
-                while idx >= len(base_obj.elements):
-                    base_obj.elements.append(self._create_new_mapping_value(base_obj, len(base_obj.elements)))
-                elem_var = base_obj.elements[idx]
-                if new_value is not None:
-                    self._apply_new_value_to_variable(elem_var, new_value)
-                return elem_var
+            idx_val = self._extract_index_val(expr.index)
 
-            elif isinstance(base_obj, MappingVariable):
-                key = str(self._extract_index_val(expr.index))
+            # ▸ 배열
+            if isinstance(base_obj, ArrayVariable):
+                if not isinstance(idx_val, int) or idx_val < 0:
+                    print("[Warn] array index must be non-negative literal")
+                    return None
+                while idx_val >= len(base_obj.elements):
+                    # address/bytes 등 실제 타입 고려
+                    base_obj.elements.append(self._create_new_mapping_value(base_obj, len(base_obj.elements)))
+                elem = base_obj.elements[idx_val]
+                if new_value is not None:
+                    self._apply_new_value_to_variable(elem, new_value)
+                return elem
+
+            # ▸ 매핑
+            if isinstance(base_obj, MappingVariable):
+                key = str(idx_val)
                 if key not in base_obj.mapping:
                     base_obj.mapping[key] = self._create_new_mapping_value(base_obj, key)
-                mapped_var = base_obj.mapping[key]
+                tgt = base_obj.mapping[key]
                 if new_value is not None:
-                    self._apply_new_value_to_variable(mapped_var, new_value)
-                return mapped_var
+                    self._apply_new_value_to_variable(tgt, new_value)
+                return tgt
 
-            else:
-                print(f"[Warn] index access on non-array/mapping '{base_obj.identifier}'")
-                return None
+            print(f"[Warn] index access on non-array/mapping '{base_obj.identifier}'")
+            return None
 
-        return None  # 다른 케이스가 없으면
-
-    import copy
+        return None
 
     def copy_variables(self, variables):
         """
@@ -2047,109 +2163,110 @@ class ContractAnalyzer:
                 stack.append(succ)
         return visited
 
-    def join_variables(self, vars1, vars2):
+
+    def join_variables(self, vars1: dict[str, Variables],
+                       vars2: dict[str, Variables]) -> dict[str, Variables]:
         """
-        두 변수 상태(vars1, vars2)를 조인하여(합집합) 반환.
-        - array: 요소별 join
-        - struct: 멤버별 join
-        - mapping: 매핑 key별 join
-        - 기본타입: Interval join
+        두 variable-env 를 ⨆(join) 한다.
+
+        * elementary (int/uint/bool/address/enum)  → 값 Interval.join
+          - address 값이 UnsignedIntegerInterval 이면 그대로 join.
+          - 문자열(symbolic)  둘이 다르면  "symbolicJoin(...)" 로 보수화.
+        * array     → 동일 인덱스 별도 join  (길이 불일치 ⇒ 오류)
+        * struct    → 멤버별 join
+        * mapping   → key 합집합, value 각각 join  (새 key 는 deep-copy)
         """
-        result = self.copy_variables(vars1)
+        res = self.copy_variables(vars1)  # 깊은 복사
 
-        for var_name, var_obj2 in vars2.items():
-            if var_name in result:
-                var_obj1 = result[var_name]
+        for v, obj2 in vars2.items():
+            if v not in res:
+                res[v] = self.copy_variables({v: obj2})[v]
+                continue
 
-                # 타입 동일성
-                if var_obj1.typeInfo.typeCategory != var_obj2.typeInfo.typeCategory:
-                    raise TypeError(f"Cannot join different typeCategories: {var_obj1.typeInfo.typeCategory} "
-                                    f"vs {var_obj2.typeInfo.typeCategory}")
+            obj1 = res[v]
+            cat = obj1.typeInfo.typeCategory
 
-                cat = var_obj1.typeInfo.typeCategory
-                if cat == 'array':
-                    # 길이 같음 전제(동적 배열 등은 별도 정책)
-                    if len(var_obj1.elements) != len(var_obj2.elements):
-                        raise ValueError("Cannot join arrays of different lengths (static array).")
-                    for i, (e1, e2) in enumerate(zip(var_obj1.elements, var_obj2.elements)):
-                        joined_elem = self.join_variables({e1.identifier: e1}, {e2.identifier: e2})
-                        var_obj1.elements[i] = joined_elem[e1.identifier]
+            # ——— 동일 typeCategory 보장 ———
+            if cat != obj2.typeInfo.typeCategory:
+                raise TypeError(f"join type mismatch: {cat} vs {obj2.typeInfo.typeCategory}")
 
-                elif cat == 'struct':
-                    # 멤버별 join
-                    var_obj1.members = self.join_variables(var_obj1.members, var_obj2.members)
+            # ─ array ──────────────────────────────────────────────────────
+            if cat == "array":
+                if len(obj1.elements) != len(obj2.elements):
+                    raise ValueError("join-array length mismatch")
+                for i, (e1, e2) in enumerate(zip(obj1.elements, obj2.elements)):
+                    joined = self.join_variables({e1.identifier: e1},
+                                                 {e2.identifier: e2})
+                    obj1.elements[i] = joined[e1.identifier]
 
-                elif cat == 'mapping':
-                    # 매핑된 키-값 each join
-                    for key, mvar2 in var_obj2.mapping.items():
-                        if key not in var_obj1.mapping:
-                            # 없는 키 => 새로 복사
-                            var_obj1.mapping[key] = self.copy_variables({key: mvar2})[key]
-                        else:
-                            # 기존 키 => join
-                            mvar1 = var_obj1.mapping[key]
-                            joined_map = self.join_variables({key: mvar1}, {key: mvar2})
-                            var_obj1.mapping[key] = joined_map[key]
+            # ─ struct ─────────────────────────────────────────────────────
+            elif cat == "struct":
+                obj1.members = self.join_variables(obj1.members, obj2.members)
 
-                else:
-                    # elementary => interval join
-                    var_obj1.value = self.join_variable_values(var_obj1.value, var_obj2.value)
+            # ─ mapping ────────────────────────────────────────────────────
+            elif cat == "mapping":
+                for k, mv2 in obj2.mapping.items():
+                    if k in obj1.mapping:
+                        merged = self.join_variables({k: obj1.mapping[k]},
+                                                     {k: mv2})[k]
+                        obj1.mapping[k] = merged
+                    else:
+                        obj1.mapping[k] = self.copy_variables({k: mv2})[k]
+
+            # ─ elementary / enum / address ───────────────────────────────
             else:
-                # 새 변수
-                result[var_name] = self.copy_variables({var_name: var_obj2})[var_name]
-        return result
+                obj1.value = self.join_variable_values(obj1.value, obj2.value)
 
-    def variables_equal(self, vars1, vars2):
+        return res
+
+    def variables_equal(self, vars1: dict[str, Variables],
+                        vars2: dict[str, Variables]) -> bool:
         """
-        두 변수 딕셔너리가 동일한지 비교
-        - array: length/각 요소
-        - struct: 멤버별
-        - mapping: 동일 key, 동일 값
-        - elementary: interval 동등성 체크
+        두 variable-env 가 완전히 동일한지 비교.
+        구조 동일 + 값(equals) 동일해야 True
         """
         if vars1.keys() != vars2.keys():
             return False
 
-        for var_name in vars1:
-            if var_name not in vars2:
+        for v in vars1:
+            o1, o2 = vars1[v], vars2[v]
+            if o1.typeInfo.typeCategory != o2.typeInfo.typeCategory:
                 return False
 
-            obj1 = vars1[var_name]
-            obj2 = vars2[var_name]
+            cat = o1.typeInfo.typeCategory
 
-            cat = obj1.typeInfo.typeCategory
-            if cat != obj2.typeInfo.typeCategory:
-                return False
-
-            if cat == 'array':
-                if len(obj1.elements) != len(obj2.elements):
+            # ─ array ─
+            if cat == "array":
+                if len(o1.elements) != len(o2.elements):
                     return False
-                for e1, e2 in zip(obj1.elements, obj2.elements):
-                    # 재귀
-                    if not self.variables_equal({e1.identifier: e1}, {e2.identifier: e2}):
+                for e1, e2 in zip(o1.elements, o2.elements):
+                    if not self.variables_equal({e1.identifier: e1},
+                                                {e2.identifier: e2}):
                         return False
 
-            elif cat == 'struct':
-                if not self.variables_equal(obj1.members, obj2.members):
+            # ─ struct ─
+            elif cat == "struct":
+                if not self.variables_equal(o1.members, o2.members):
                     return False
 
-            elif cat == 'mapping':
-                # 키 동일성
-                if obj1.mapping.keys() != obj2.mapping.keys():
+            # ─ mapping ─
+            elif cat == "mapping":
+                if o1.mapping.keys() != o2.mapping.keys():
                     return False
-                for key in obj1.mapping:
-                    if not self.variables_equal({key: obj1.mapping[key]}, {key: obj2.mapping[key]}):
+                for k in o1.mapping:
+                    if not self.variables_equal({k: o1.mapping[k]},
+                                                {k: o2.mapping[k]}):
                         return False
+
+            # ─ elementary / enum / address ─
             else:
-                # elementary (int/uint/bool/enum 등) 비교
-                if hasattr(obj1.value, "equals") and hasattr(obj2.value, "equals"):
-                    if not obj1.value.equals(obj2.value):
+                v1, v2 = o1.value, o2.value
+                if hasattr(v1, "equals") and hasattr(v2, "equals"):
+                    if not v1.equals(v2):
                         return False
                 else:
-                    # Interval 이 아닌 단순 값(예: enum 리터럴 index, symbolic address 등)
-                    if obj1.value != obj2.value:
+                    if v1 != v2:
                         return False
-
         return True
 
     def transfer_function(self, node, in_vars):
@@ -2758,143 +2875,235 @@ class ContractAnalyzer:
         # index expression에 대한 재귀
         self.update_left_var(expr.index, rVal, operator, variables, base_obj, "IndexAccessContext")
 
-    def update_left_var_of_member_access_context(self, expr, rVal, operator, variables,
-                                                 callerObject=None, callerContext=None) :
-        base_obj = self.update_left_var(expr.base, rVal, operator, variables, None, "MemberAccessContext")
+    def update_left_var_of_member_access_context(
+            self, expr, rVal, operator, variables,
+            callerObject=None, callerContext=None):
+
+        # ① 먼저 base 부분을 재귀-업데이트
+        base_obj = self.update_left_var(expr.base, rVal, operator,
+                                        variables, None, "MemberAccessContext")
         member = expr.member
 
-        if isinstance(base_obj, StructVariable) :
-            if member in base_obj.members :
-                nestedMember = base_obj.members[member]
-                if isinstance(nestedMember, Variables) or isinstance(nestedMember, EnumVariable):
-                    nestedMember.value = self.compound_assignment(nestedMember.value, rVal, operator)
-                elif isinstance(nestedMember, StructVariable) or isinstance(nestedMember, ArrayVariable) :
-                    return nestedMember  # 구조체 안에 member가 ArrayVariable, StructVariable 등인경우
-                else :
-                    raise ValueError(f"This object '{nestedMember}' is not expected in this context")
-            else :
-                raise ValueError(f"This member '{member}' is not included in struct '{base_obj.identifier}'")
+        # ② base 가 StructVariable 인지 확인
+        if not isinstance(base_obj, StructVariable):
+            raise ValueError(f"Member access on non-struct '{base_obj.identifier}'")
 
-    def update_left_var_of_literal_context(self, expr, rVal, operator, variables,
-                                           callerObject=None):
-        literal_str = expr.literal  # 예: "123", "0x1A", "true", "false", "Hello", ...
-        expr_type = expr.expr_type  # 예: 'uint', 'int', 'bool', 'string'
+        # ③ 멤버 존재 확인
+        if member not in base_obj.members:
+            raise ValueError(f"Member '{member}' not in struct '{base_obj.identifier}'")
 
-        # assignment의 좌변 변수에 대해서는 literal은 callerObject 없이 있을 수 없는듯
-        if callerObject is not None:
-            # assignment의 좌변 변수에 대해서, literal이 오는 경우는 Array랑 Mapping 밖에 없는듯?
-            if isinstance(callerObject, ArrayVariable):
-                if literal_str.isdigit():
-                    # 인덱스로 해석 (음수인지도 체크 가능)
-                    idx = int(literal_str)
-                    if idx < 0 or idx >= len(callerObject.elements):
-                        raise IndexError(f"Index {idx} out of range in array '{callerObject.identifier}'")
+        nested = base_obj.members[member]
 
-                    element = callerObject.elements[idx]
-                    if isinstance(element, Variables) or isinstance(element, EnumVariable) :
-                        if not self._is_interval(rVal) :
-                            if rVal.startswith('-') or rVal.isdigit() or rVal in ["true", "false"] :
-                                rVal = self.convert_literal_to_interval(rVal, element)
-                        element.value = self.compound_assignment(element.value, rVal, operator)
-                        return None
-                    elif isinstance(element, ArrayVariable) or isinstance(element, StructVariable) :
-                        return element
-                    return None
+        # ── elementary / enum ──────────────────────────────
+        if isinstance(nested, (Variables, EnumVariable)):
+            nested.value = self.compound_assignment(nested.value, rVal, operator)
+            return nested  # ← 작업 완료
+
+        # ── 배열 / 중첩 구조체 ──────────────────────────────
+        if isinstance(nested, (StructVariable, ArrayVariable, MappingVariable)):
+            # 더 깊은 member access가 이어질 수 있으므로 그대로 반환
+            return nested
+
+        # ── 예외 처리 ──────────────────────────────────────
+        raise ValueError(f"Unexpected member-type '{type(nested).__name__}'")
+
+    def update_left_var_of_literal_context(
+            self, expr, rVal, operator, variables,
+            callerObject: Variables | ArrayVariable | MappingVariable | None = None):
+
+        # ───────────────────────── 0. 준비 ─────────────────────────
+        lit = expr.literal  # 예: "123", "0x1a", "true"
+        lit_str = str(lit)
+        lit_iv = None  # 필요 시 Interval 변환 결과
+        if callerObject is None:
+            raise ValueError(f"Literal '{lit_str}' cannot appear standalone on LHS")
+
+        # bool·int·uint·address Literal → Interval 변환 helper  ───── 💡
+        def _to_interval(ref_var: Variables, literal_text: str):
+            if self._is_interval(rVal):  # 이미 Interval이라면 그대로
+                return rVal
+
+            # 숫자   -------------------------------------------------
+            if literal_text.startswith(('-', '0x')) or literal_text.isdigit():
+                v = int(literal_text, 0)  # auto base
+                et = ref_var.typeInfo.elementaryTypeName
+                if et.startswith("int"):
+                    b = ref_var.typeInfo.intTypeLength or 256
+                    return IntegerInterval(v, v, b)
+                if et.startswith("uint"):
+                    b = ref_var.typeInfo.intTypeLength or 256
+                    return UnsignedIntegerInterval(v, v, b)
+
+            # 불리언 -------------------------------------------------
+            if literal_text in ("true", "false"):
+                return BoolInterval(1, 1) if literal_text == "true" else BoolInterval(0, 0)
+
+            # 주소 hex (0x…) ---------------------------------------- 💡
+            if literal_text.startswith("0x") and len(literal_text) <= 42:
+                v = int(literal_text, 16)
+                return UnsignedIntegerInterval(v, v, 160)
+
+            # 그 외 문자열/bytes 등 -> 그대로 symbol 처리
+            return literal_text
+
+        # ───────────────────────── 1. Array LHS ────────────────────
+        if isinstance(callerObject, ArrayVariable):
+            if not lit_str.isdigit():
+                return None  # 비정수 인덱스 → 상위에서 오류/다른 케이스 처리
+
+            idx = int(lit_str)
+            if idx < 0:
+                raise IndexError(f"Negative index {idx} for array '{callerObject.identifier}'")
+
+            # 💡 동적 배열이라면 빈 element 채워넣기
+            while idx >= len(callerObject.elements):
+                # address/bytes 등은 symbolic 으로
+                callerObject.elements.append(
+                    Variables(f"{callerObject.identifier}[{len(callerObject.elements)}]",
+                              f"symbol_{callerObject.identifier}_{len(callerObject.elements)}",
+                              scope=callerObject.scope,
+                              typeInfo=callerObject.typeInfo.arrayBaseType)
+                )
+
+            elem = callerObject.elements[idx]
+
+            # leaf (elementary or enum)
+            if isinstance(elem, (Variables, EnumVariable)):
+                lit_iv = _to_interval(elem, rVal if isinstance(rVal, str) else lit_str)
+                elem.value = self.compound_assignment(elem.value, lit_iv, operator)
                 return None
-            elif isinstance(callerObject, MappingVariable):
-                if literal_str in callerObject.mapping :
-                    mapVar = callerObject.mapping[literal_str]
-                    if isinstance(mapVar, Variables) or isinstance(mapVar, EnumVariable) :
-                        if not self._is_interval(rVal) :
-                            if rVal.startswith('-') or rVal.isdigit() or rVal in ["true", "false"]:
-                                rVal = self.convert_literal_to_interval(rVal, mapVar)
-                        mapVar.value = self.compound_assignment(mapVar.value, rVal, operator)
-                        return None
-                    elif isinstance(mapVar, ArrayVariable) or isinstance(mapVar, StructVariable)\
-                            or isinstance(mapVar, MappingVariable):
-                        return mapVar
-                    return None
-                return None
+
+            # 중첩 array/struct → 계속 내려감
+            if isinstance(elem, (ArrayVariable, StructVariable, MappingVariable)):
+                return elem
             return None
-        else :
-            raise ValueError(f"This literal context '{literal_str}' is wrong context")
 
-    def update_left_var_of_identifier_context(self, expr, rVal, operator, variables:dict,
-                                              callerObject=None, callerContext=None):
-        ident_str = expr.identifier
+        # ───────────────────────── 2. Mapping LHS ──────────────────
+        if isinstance(callerObject, MappingVariable):
+            key = lit_str  # mapping key 는 문자열 그대로 보존
+            if key not in callerObject.mapping:  # 없으면 새 child 생성
+                callerObject.mapping[key] = self._create_new_mapping_value(callerObject, key)
+            mvar = callerObject.mapping[key]
 
-        if callerObject is not None :
-            if isinstance(callerObject, Variables) or isinstance(callerObject, EnumVariable) :
-                callerObject.value = self.compound_assignment(callerObject.value, rVal, operator)
-            elif isinstance(callerObject, ArrayVariable) : # index
-                if ident_str not in variables:
-                    raise ValueError(f"Index identifier '{ident_str}' not found in variables.")
-                index_var_obj = variables[ident_str]
-                if isinstance(index_var_obj, Variables):
-                    if index_var_obj.value.min_value == index_var_obj.value.max_value:
-                        idx = index_var_obj.value.min_value
+            if isinstance(mvar, (Variables, EnumVariable)):
+                lit_iv = _to_interval(mvar, rVal if isinstance(rVal, str) else lit_str)
+                mvar.value = self.compound_assignment(mvar.value, lit_iv, operator)
+                return None
+
+            if isinstance(mvar, (ArrayVariable, StructVariable, MappingVariable)):
+                return mvar
+            return None
+
+        # ───────────────────────── 3. 기타(Struct 등) ───────────────
+        raise ValueError(f"Literal context '{lit_str}' not handled for '{type(callerObject).__name__}'")
+
+    def update_left_var_of_identifier_context(
+            self,
+            expr: Expression,
+            rVal,  # Interval | int | str …
+            operator: str,
+            variables: dict[str, Variables],
+            callerObject: Variables | ArrayVariable | StructVariable | MappingVariable | None = None,
+            callerContext: str | None = None):
+
+        ident = expr.identifier
+
+        # ───────────────────────── helper ──────────────────────────
+        def _apply_to_leaf(var_obj: Variables | EnumVariable):
+            """compound-assignment 를 leaf 변수에 적용"""
+            # rVal 이 원시(숫자·true 등)라면 Interval 로 래핑
+            if not self._is_interval(rVal) and isinstance(var_obj, Variables):
+                if isinstance(rVal, str):
+                    # 숫자/bool literal → Interval
+                    if rVal.lstrip('-').isdigit() or rVal.startswith('0x'):
+                        et = var_obj.typeInfo.elementaryTypeName
+                        if et.startswith("int"):
+                            bit = var_obj.typeInfo.intTypeLength or 256
+                            rv = IntegerInterval(int(rVal, 0), int(rVal, 0), bit)
+                        elif et.startswith("uint"):
+                            bit = var_obj.typeInfo.intTypeLength or 256
+                            rv = UnsignedIntegerInterval(int(rVal, 0), int(rVal, 0), bit)
+                        elif et == "bool":
+                            rv = BoolInterval(1, 1) if rVal == "true" else BoolInterval(0, 0)
+                        else:
+                            rv = rVal  # address / bytes → 그대로
+                    else:
+                        rv = rVal
                 else:
-                    raise ValueError(f"This excuse should be analyzed : '{ident_str}'")
-
-                # 경계검사
-                if idx < 0 or idx >= len(callerObject.elements):
-                    raise IndexError(f"Index {idx} out of range in array '{callerObject.identifier}'")
-
-                element = callerObject.elements[idx]
-                if isinstance(element, Variables) or isinstance(element, EnumVariable) :
-                    element.value = self.compound_assignment(element.value, rVal, operator)
-                elif isinstance(element, ArrayVariable) or isinstance(element, StructVariable) :
-                    return element
-                elif isinstance(element, MappingVariable) :
-                    raise ValueError(f"Is Mapping Variable is available of Array Variable's elements?")
-            elif isinstance(callerObject, StructVariable) :
-                if ident_str not in callerObject.members:
-                    raise ValueError(f"member identifier '{ident_str}' not found in struct variables.")
-
-                member = callerObject.members[ident_str]
-
-                if isinstance(member, Variables) or isinstance(member, EnumVariable) :
-                    member.value = self.compound_assignment(member.value, rVal, operator)
-                elif isinstance(member, ArrayVariable) or isinstance(member, StructVariable) \
-                        or isinstance(member, MappingVariable) :
-                    return member
-            elif isinstance(callerObject, MappingVariable) :
-                if ident_str not in callerObject.mapping:
-                    raise ValueError(f"mapping identifier '{ident_str}' not found in mapping variables.")
-
-                mapVar = callerObject.mapping[ident_str]
-
-                if isinstance(mapVar, Variables) or isinstance(mapVar, EnumVariable) :
-                    mapVar.value = self.compound_assignment(mapVar.value, rVal, operator)
-                elif isinstance(mapVar, ArrayVariable) or isinstance(mapVar, StructVariable) \
-                        or isinstance(mapVar, MappingVariable) :
-                    return mapVar
-
-        if callerContext is not None :
-            if callerContext == "IndexAccessContext" or "MemberAccessContext" :
-                if ident_str in variables : # base에 대한 탐색
-                    return variables[ident_str]
-
-        if ident_str in variables :
-            if isinstance(variables[ident_str], Variables) :
-                variables[ident_str].value = self.compound_assignment(variables[ident_str].value, rVal, operator)
-
-    def convert_literal_to_interval(self, literalValue:str, variableObj:Variables):
-        if literalValue.startswith('-') or literalValue.isdigit() :
-            varType = variableObj.typeInfo.elementaryTypeName
-            varLen = variableObj.typeInfo.intTypeLength
-            if varType.startswith("int") :
-                return IntegerInterval(int(literalValue), int(literalValue), varLen)
-            elif varType.startswith("uint") :
-                return UnsignedIntegerInterval(int(literalValue), int(literalValue), varLen)
-        elif literalValue in ["true", "false"] :
-            lower_str = literalValue.lower()
-            if lower_str == "true":
-                return BoolInterval(1, 1)
-            elif lower_str == "false":
-                return BoolInterval(0, 0)
+                    rv = rVal
             else:
-                raise ValueError(f"Invalid boolean literal '{literalValue}'")
+                rv = rVal
+
+            var_obj.value = self.compound_assignment(var_obj.value, rv, operator)
+
+        # ─────────────────────── 1. 상위 객체 존재 ──────────────────
+        if callerObject is not None:
+
+            # 1-A) 단순 변수/enum → 그대로 leaf 갱신
+            if isinstance(callerObject, (Variables, EnumVariable)):
+                _apply_to_leaf(callerObject)
+                return None
+
+            # 1-B) ArrayVariable  (ident 는 index 변수명)
+            if isinstance(callerObject, ArrayVariable):
+                if ident not in variables:
+                    raise ValueError(f"Index identifier '{ident}' not found.")
+                idx_var = variables[ident]
+
+                # 스칼라인지 보장
+                if not self._is_interval(idx_var.value) or \
+                        idx_var.value.min_value != idx_var.value.max_value:
+                    raise ValueError(f"Array index '{ident}' must resolve to single constant.")
+
+                idx = idx_var.value.min_value
+                if idx < 0 or idx >= len(callerObject.elements):
+                    raise IndexError(f"Index {idx} out of range for array '{callerObject.identifier}'")
+
+                elem = callerObject.elements[idx]
+                if isinstance(elem, (Variables, EnumVariable)):
+                    _apply_to_leaf(elem)
+                    return None
+                return elem  # nested array / struct / mapping
+
+            # 1-C) StructVariable  → 멤버 접근
+            if isinstance(callerObject, StructVariable):
+                if ident not in callerObject.members:
+                    raise ValueError(f"Struct '{callerObject.identifier}' has no member '{ident}'")
+                mem = callerObject.members[ident]
+                if isinstance(mem, (Variables, EnumVariable)):
+                    _apply_to_leaf(mem)
+                    return None
+                return mem
+
+            # 1-D) MappingVariable → key 가 식별자인 케이스
+            if isinstance(callerObject, MappingVariable):
+                if ident not in callerObject.mapping:
+                    callerObject.mapping[ident] = self._create_new_mapping_value(callerObject, ident)
+                mvar = callerObject.mapping[ident]
+                if isinstance(mvar, (Variables, EnumVariable)):
+                    _apply_to_leaf(mvar)
+                    return None
+                return mvar
+
+            # 예기치 못한 상위 타입
+            raise ValueError(f"Unhandled callerObject type: {type(callerObject).__name__}")
+
+        # ─────────────────────── 2. 상위 객체 없음 ──────────────────
+        # (IndexAccess / MemberAccess 의 base 식별자를 해결하기 위한 분기)
+        if callerContext in ("IndexAccessContext", "MemberAccessContext"):
+            return variables.get(ident)  # 상위에서 None 체크
+
+        # ─────────────────────── 3. 일반 대입식 ─────────────────────
+        # 로컬-스코프 or state-scope 변수 직접 갱신
+        if ident not in variables:
+            raise ValueError(f"Variable '{ident}' not declared in current scope.")
+
+        target_var = variables[ident]
+        if not isinstance(target_var, (Variables, EnumVariable)):
+            raise ValueError(f"Assignment to non-scalar variable '{ident}' must use member/index access.")
+
+        _apply_to_leaf(target_var)
+        return None
 
     def evaluate_expression(self, expr: Expression, variables: Variables, callerObject=None, callerContext=None):
         if expr.context == "LiteralExpContext":
@@ -2922,74 +3131,85 @@ class ContractAnalyzer:
         if expr.left is not None and expr.right is not None :
             return self.evaluate_binary_operator(expr, variables, callerObject, callerContext)
 
-    def evaluate_literal_context(self, expr: Expression, variables, callerObject=None, callerContext=None):
-        literal_str = expr.literal  # 예: "123", "0x1A", "true", "false", "Hello", ...
-        expr_type = expr.expr_type  # 예: 'uint', 'int', 'bool', 'string'
+    # ───────────────────── evaluate_literal_context ──────────────
+    def evaluate_literal_context(
+            self,
+            expr: Expression,
+            variables: dict[str, Variables],
+            callerObject: Variables | ArrayVariable | MappingVariable | None = None,
+            callerContext: str | None = None):
 
-        # 1) if we have a callerObject that is an ArrayVariable, and the literal is a digit
-        if callerObject is not None :
-            if isinstance(callerObject, ArrayVariable) :
-                if literal_str.isdigit() :
-                    # 인덱스로 해석 (음수인지도 체크 가능)
-                    idx = int(literal_str)
-                    if idx < 0 or idx >= len(callerObject.elements):
-                        raise IndexError(f"Index {idx} out of range in array '{callerObject.identifier}'")
-                    return callerObject.elements[idx]  # element: Variables, ArrayVariable, etc.
-                else:
-                    raise ValueError(
-                        f"Array '{callerObject.identifier}' index must be integer literal, got '{literal_str}'")
+        lit = expr.literal  # 예: "123", "0x1A", "true", ...
+        ety = expr.expr_type  # 'uint'·'int'·'bool'·'string'·'address' 등
 
-            # 1-2) MappingVariable
-            elif isinstance(callerObject, MappingVariable):
-                # 맵핑 키로 사용. Solidity에선 key가 uint/address/bytes 등 가능하나,
-                # 여기선 예시로 'string' key 로 처리
-                if literal_str in callerObject.mapping:
-                    return callerObject.mapping[literal_str]
-                else:
-                    # 새로 엔트리 생성
-                    new_var_obj = self.create_default_mapping_value(callerObject, literal_str)
+        def _to_scalar_int(txt: str) -> int:
+            """10진·16진(0x)·8진(0o) 등을 int 로 변환, 부호 허용"""
+            return int(txt, 0)  # base=0  →  자동 판별
 
-                    # callerObject.mapping[literal_str] = new_var_obj
-                    # state_variable_node / function_cfg 둘 다 업데이트
-                    self.update_mapping_in_cfg(callerObject.identifier, literal_str, new_var_obj)
+        def _literal_is_address(txt: str) -> bool:
+            """
+            0x 로 시작하고 20 바이트(40 hex) 또는 0x0 처럼 짧아도 ‘주소 literal’ 로 간주
+            실제 Solidity lexer 는 0x 포함 42자 고정이지만, 여기선 분석 편의상 느슨하게 허용
+            """
+            return txt.lower().startswith("0x") and all(c in "0123456789abcdefABCDEF" for c in txt[2:])
 
-                    return new_var_obj.value
+        # ───────── 1. 상위 객체(Array / Mapping) 인덱싱 ──────────
+        if callerObject is not None:
+            # 1-A) 배열 인덱스
+            if isinstance(callerObject, ArrayVariable):
+                if not lit.lstrip("-").isdigit():
+                    raise ValueError(f"Array index must be decimal literal, got '{lit}'")
+                idx = int(lit)
+                if idx < 0 or idx >= len(callerObject.elements):
+                    raise IndexError(f"Index {idx} out of range for array '{callerObject.identifier}'")
+                return callerObject.elements[idx]  # element (Variables | …)
 
-        if callerContext is not None : # callerObject는 없고 callerContext가 있는 경우
-            if callerContext == "IndexAccessContext" : # literal_str이 이면서 IndexAccess면 mapping key 호출 밖에 없을듯?
-                return literal_str
+            # 1-B) 매핑 키 – 문자열·hex·decimal 모두 허용
+            if isinstance(callerObject, MappingVariable):
+                key = lit
+                if key not in callerObject.mapping:
+                    # 새 엔트리 생성
+                    new_var = self._create_new_mapping_value(callerObject, key)
+                    # CFG 에 반영
+                    self.update_mapping_in_cfg(callerObject.identifier, key, new_var)
+                return callerObject.mapping[key]
 
-        # callerObject, callerContext 둘다 없으면 그냥 값 리턴
-        if expr_type == "uint":
-            # int() with base=0로 파싱해 다양한 16진/10진 포맷 허용
-            val = int(literal_str, 0)
+        # ───────── 2. 상위 없음 & 인덱스/멤버 base 해결 ──────────
+        if callerContext in ("IndexAccessContext", "MemberAccessContext"):
+            return lit  # key 로 그대로 사용
+
+        # ───────── 3. 실제 값으로 해석해 반환 ──────────
+        if ety == "uint":
+            val = _to_scalar_int(lit)
             if val < 0:
-                raise ValueError(f"Literal '{literal_str}' is negative, not valid for uint.")
-            # 기본 비트 길이 설정
-            length = expr.type_length if expr.type_length else 256
-            return UnsignedIntegerInterval(val, val, length)
+                raise ValueError("uint literal cannot be negative")
+            bits = expr.type_length or 256
+            return UnsignedIntegerInterval(val, val, bits)
 
-        elif expr_type == "int":
-            val = int(literal_str, 0)
-            length = expr.type_length if expr.type_length else 256
-            return IntegerInterval(val, val, length)
+        if ety == "int":
+            bits = expr.type_length or 256
+            val = _to_scalar_int(lit)
+            return IntegerInterval(val, val, bits)
 
-        elif expr_type == "bool":
-            lower_str = literal_str.lower()
-            if lower_str == "true":
+        if ety == "bool":
+            if lit.lower() == "true":
                 return BoolInterval(1, 1)
-            elif lower_str == "false":
+            if lit.lower() == "false":
                 return BoolInterval(0, 0)
-            else:
-                raise ValueError(f"Invalid boolean literal '{literal_str}'")
+            raise ValueError(f"Invalid bool literal '{lit}'")
 
-        elif expr_type == "string":
-            # 여기서 그대로 문자열 반환.
-            # 필요하면 앞뒤 따옴표 제거 로직도 추가할 수 있음.
-            return literal_str
+        # 새로 추가 ───────── address / bytes / string ─────────
+        if ety == "address":
+            if not _literal_is_address(lit):
+                raise ValueError(f"Malformed address literal '{lit}'")
+            val_int = int(lit, 16)
+            return UnsignedIntegerInterval(val_int, val_int, 160)  # 160-bit 고정
 
-        else:
-            raise ValueError(f"Unsupported literal expr_type '{expr_type}'")
+        if ety in ("string", "bytes"):
+            return lit  # 심볼릭 취급 ― 추가 분석시 필요하면 해시 등 사용
+
+        # 기타 타입
+        raise ValueError(f"Unsupported literal expr_type '{ety}'")
 
     def evaluate_identifier_context(self, expr:Expression, variables, callerObject=None, callerContext=None):
         ident_str = expr.identifier
@@ -3050,114 +3270,135 @@ class ContractAnalyzer:
         else:
             raise ValueError(f"This '{ident_str}' is may be elementary variable but may not be declared")
 
-    def evaluate_member_access_context(self, expr: Expression, variables, callerObject=None, callerContext=None):
+    def evaluate_member_access_context(
+            self,
+            expr: Expression,
+            variables: dict[str, Variables],
+            callerObject: Variables | None = None,
+            callerContext: str | None = None):
 
-        # 1. base expression 재귀적으로 평가
-        base_val = self.evaluate_expression(expr.base, variables, None, "MemberAccessContext")
+        sm = self.sm  # AddressSymbolicManager ─ 주소 심볼릭 ID 관리
+        baseVal = self.evaluate_expression(expr.base, variables, None,
+                                           "MemberAccessContext")
         member = expr.member
+        # ──────────────────────────────────────────────────────────────
+        # 1. Global-var (block / msg / tx)
+        # ──────────────────────────────────────────────────────────────
+        if isinstance(baseVal, str):
+            if baseVal in {"block", "msg", "tx"}:
+                full_name = f"{baseVal}.{member}"
+                contractCfg = self.contract_cfgs[self.current_target_contract]
 
-        # 2. 글로벌 변수 접근 (예: block, msg, tx)
-        if isinstance(base_val, str) :
-            if base_val in {"block", "msg", "tx"}:
-                full_name = f"{base_val}.{member}"
-                contract_cfg = self.contract_cfgs[self.current_target_contract]
+                gv_obj = contractCfg.globals[full_name]
+                funcName = self.current_target_function
+                gv_obj.usage_sites.add(funcName)
 
-                gv_obj = contract_cfg.globals[full_name]
-                func_name = self.current_target_function
-                gv_obj.usage_sites.add(func_name)  # ✔ 함수명만 저장
+                return gv_obj.current  # Interval or address-interval
 
-                return gv_obj.current
+            # address.code / address.code.length
+            if baseVal == "code":
+                if member == "length":
+                    # 코드 사이즈 – 예시로 고정 상수
+                    return UnsignedIntegerInterval(0, 24_000, 256)
+                return member  # address.code → 다음 단계에서 .length 접근
 
-            elif member == "code" : # base_Val이 str 이면서 member가 code면 address.code 형태
-                return member
+            if member == "code":  # <addr>.code
+                return "code"  # 상위 계층에서 재귀적으로 처리
 
-            elif base_val == "code" :
-                if member == "length" :
-                    return UnsignedIntegerInterval(1000, 1000, 256)
-            else :
-                ValueError(f"member '{member}' is not global variable member'.")
+            raise ValueError(f"member '{member}' is not a recognised global-member.")
 
-        elif isinstance(base_val, ArrayVariable) :
-            if callerContext == "functionCallContext" :
-                if not base_val.typeInfo.isDynamicArray :
-                    raise ValueError ("This variable's type is array and callerContext is functionCall "
-                                      "but not dynamic array")
-                base_type = base_val.typeInfo.arrayBaseType
-                if member == "push" :
-                    elementVar = Variables(identifier=base_val.identifier)
-                    if base_type.startswith("int", "uint", "bool") :
-                        elementVar.value = self.calculate_default_interval(base_type)
+        # ──────────────────────────────────────────────────────────────
+        # 2. ArrayVariable  ( .myArray.length  /  .push() / .pop() )
+        # ──────────────────────────────────────────────────────────────
+        if isinstance(baseVal, ArrayVariable):
+            # .push() / .pop()  – 동적배열만 허용
+            if callerContext == "functionCallContext":
+                if not baseVal.typeInfo.isDynamicArray:
+                    raise ValueError("push / pop available only on dynamic arrays")
+                elemType = baseVal.typeInfo.arrayBaseType
 
-                    elif base_type in ["address", "address payable", "string", "bytes", "Byte",
-                                                         "Fixed", "Ufixed"] :
-                        elementVar.value = str('symbol' + base_val.identifier + "index" + len(base_val.elements))
-                    base_val.elements.append(elementVar)
-                    base_val.typeInfo.arrayLength += 1
-                elif member == "pop" :
-                    base_val.elements.pop()
+                if member == "push":
+                    new_elem_id = f"{baseVal.identifier}[{len(baseVal.elements)}]"
+                    # ▶ 기본-타입 요소 새로 만들어 배열에 append
+                    if (isinstance(elemType, SolType) and
+                            elemType.typeCategory == "elementary" and
+                            elemType.elementaryTypeName == "address"):
 
-            if member == "length" : # myArray.length
-                length_val = len(base_val.elements)
-                return UnsignedIntegerInterval(length_val, length_val, 256)
+                        iv = sm.alloc_fresh_interval()
+                        sm.bind_var(new_elem_id, iv.min_value)
+                        new_var = Variables(new_elem_id, iv, scope=baseVal.scope,
+                                            typeInfo=elemType)
+                    else:
+                        # 숫자·bool 등
+                        default_iv = self.calculate_default_interval(elemType
+                                                                     if isinstance(elemType, str)
+                                                                     else elemType.elementaryTypeName)
+                        new_var = Variables(new_elem_id, default_iv, scope=baseVal.scope,
+                                            typeInfo=elemType)
+                    baseVal.elements.append(new_var)
+                    baseVal.typeInfo.arrayLength += 1
+                    return None
 
-        elif isinstance(base_val, StructVariable) :
-            if member in base_val.members :
-                nestedMember = base_val.members[member]
-                if isinstance(nestedMember, Variables) or isinstance(nestedMember, EnumVariable) :
-                    return nestedMember.value # Variable 객체 이므로 Interval 값 등의 value를 리턴
-                elif isinstance(nestedMember, StructVariable) or isinstance(nestedMember, ArrayVariable) :
-                    return nestedMember # 구조체 안에 member가 ArrayVariable, StructVariable 등인경우
-            else :
-                raise ValueError(f"This member '{member}' is not included in struct '{base_val}'")
+                if member == "pop":
+                    if not baseVal.elements:
+                        raise IndexError("pop from empty array")
+                    baseVal.elements.pop()
+                    baseVal.typeInfo.arrayLength -= 1
+                    return None
 
-        elif isinstance(base_val, EnumDefinition) : # 이거 좀 수정해야됨
-            for enumMemberIndex in range(len(base_val.members)) :
-                if member == base_val.members[enumMemberIndex] :
-                    return enumMemberIndex
+            if member == "length":
+                ln = len(baseVal.elements)
+                return UnsignedIntegerInterval(ln, ln, 256)
 
-        #elif isinstance(base_val, MappingVariable) : #base_Val이 Mapping이면서 value type이 enum, struct 인경우
+        # ──────────────────────────────────────────────────────────────
+        # 3. StructVariable  ( struct.field )
+        # ──────────────────────────────────────────────────────────────
+        if isinstance(baseVal, StructVariable):
+            if member not in baseVal.members:
+                raise ValueError(f"'{member}' not in struct '{baseVal.identifier}'")
+            nested = baseVal.members[member]
+            # elementary / enum → 값, 복합 → 객체 반환
+            return nested.value if isinstance(nested, (Variables, EnumVariable)) else nested
 
-        # 5. 타입 정보 접근 (예: type(uint256).max, type(uint256).min)
-        if isinstance(base_val, dict) and base_val.get("isType", False):
-            T = base_val["typeName"]
-            if member == "max":
-                if T.startswith("uint"):
-                    length = int(T[4:]) if len(T) > 4 else 256
-                    return UnsignedIntegerInterval(2 ** length - 1, 2 ** length - 1, length)
-                elif T.startswith("int"):
-                    length = int(T[3:]) if len(T) > 3 else 256
-                    return IntegerInterval(2 ** (length - 1) - 1, 2 ** (length - 1) - 1, length)
-                else:
-                    raise ValueError(f"Unsupported type for max: {T}")
-            elif member == "min":
-                if T.startswith("uint"):
-                    return UnsignedIntegerInterval(0, 0, 256)
-                elif T.startswith("int"):
-                    length = int(T[3:]) if len(T) > 3 else 256
-                    return IntegerInterval(-2 ** (length - 1), -2 ** (length - 1), length)
-                else:
-                    raise ValueError(f"Unsupported type for min: {T}")
-            else:
-                raise ValueError(f"Unsupported type member '{member}' for type '{T}'")
+        # ──────────────────────────────────────────────────────────────
+        # 4. EnumDefinition  (EnumType.RED)
+        # ──────────────────────────────────────────────────────────────
+        if isinstance(baseVal, EnumDefinition):
+            try:
+                idx = baseVal.members.index(member)
+                return UnsignedIntegerInterval(idx, idx, 256)
+            except ValueError:
+                raise ValueError(f"'{member}' not a member of enum '{baseVal.enum_name}'")
 
-        # 6. Enum 멤버 접근 (base가 enum type을 나타내는 dict)
-        if isinstance(base_val, dict) and "enumType" in base_val:
-            enum_type = base_val["enumType"]
-            # 심볼릭하게 "EnumType.Member"를 리턴 (실제 구현은 contract_cfg에서 값 조회 필요)
-            return f"{enum_type}.{member}"
+        # ──────────────────────────────────────────────────────────────
+        # 5. Solidity type(uint).max / min  (baseVal == dict with "isType")
+        # ──────────────────────────────────────────────────────────────
+        if isinstance(baseVal, dict) and baseVal.get("isType"):
+            T = baseVal["typeName"]
+            if member not in {"max", "min"}:
+                raise ValueError(f"Unsupported type property '{member}' for {T}")
 
-        # 7. 컨트랙트 인스턴스 접근 (base가 contract instance를 나타내는 dict)
-        if isinstance(base_val, dict) and "contractInstance" in base_val:
-            if member == "address":
-                return base_val["address"]
-            return f"{base_val['contractInstance']}.{member}"
+            if T.startswith("uint"):
+                bits = int(T[4:]) if len(T) > 4 else 256
+                if member == "max":
+                    mx = 2 ** bits - 1
+                    return UnsignedIntegerInterval(mx, mx, bits)
+                return UnsignedIntegerInterval(0, 0, bits)  # min
 
-        # 8. 라이브러리 확장 메소드 (callerContext가 "library")
-        if callerObject == "library":
-            return f"library_function({base_val}).{member}"
+            if T.startswith("int"):
+                bits = int(T[3:]) if len(T) > 3 else 256
+                if member == "max":
+                    mx = 2 ** (bits - 1) - 1
+                    return IntegerInterval(mx, mx, bits)
+                mn = -2 ** (bits - 1)
+                return IntegerInterval(mn, mn, bits)
 
-        # 9. 만약 위 케이스에 해당하지 않으면 심볼릭하게 표현
-        return f"symbolic({base_val}.{member})"
+            raise ValueError(f"type() with unsupported base '{T}'")
+
+        # ──────────────────────────────────────────────────────────────
+        # 6. 기타 – 심볼릭 보수적 값
+        # ──────────────────────────────────────────────────────────────
+        return f"symbolic({baseVal}.{member})"
 
     def evaluate_index_access_context(self, expr, variables, callerObject=None, callerContext=None):
         """
@@ -3352,15 +3593,6 @@ class ContractAnalyzer:
             return self.evaluate_binary_operator_of_index(result, callerObject)
         else :
             return result
-
-    def evaluate_array_expression(self, variable_obj=None, init_expr=None, variables=None):
-        return
-
-    def evaluate_enum_expression(self, expr, variables=None):
-        return
-
-    def evaluate_struct_expression(self, variable_obj, init_expr):
-        return
 
     def convert_to_uint(self, sub_val, bits):
         """
@@ -3702,262 +3934,243 @@ class ContractAnalyzer:
         else :
             raise ValueError(f"This operator '{op}' is not expected operator")
 
-    def _update_single_condition(self, variables: dict, condition_expr: Expression, is_true_branch: bool):
-        """
-        예) if (myBoolVar) / while (myBoolVar) / ...
-            - true branch => myBoolVar ∈ [1,1]
-            - false branch => myBoolVar ∈ [0,0]
-        """
-        # condition_expr가 IdentifierExpContext or literalExpContext( true / false ) 등인 경우
-        # 1) evaluate_expression으로 값을 가져옴
-        cond_val = self.evaluate_expression(condition_expr, variables, None, None)
-        if isinstance(cond_val, BoolInterval):
-            # is_true_branch면 cond_val = [1,1], false면 [0,0]로 좁힘
-            new_val = None
-            if is_true_branch:
-                # meet with [1,1]
-                new_val = cond_val.meet(BoolInterval(1, 1))
+    def _update_single_condition(self, vars_, cond_expr, is_true_branch):
+        # bool literal인 경우는 영향 없음
+        if cond_expr.context == "LiteralExpContext":
+            return
+
+        val = self.evaluate_expression(cond_expr, vars_, None, None)
+        # ▸ bool interval로 강제 변환
+        if not isinstance(val, BoolInterval):
+            if self._is_interval(val):  # 숫자/주소
+                val = self._convert_int_to_bool_interval(val)
             else:
-                # meet with [0,0]
-                new_val = cond_val.meet(BoolInterval(0, 0))
-            # cond_val이 변수의 interval일 수도, 아니면 literal일 수도 있으므로
-            # 만약 “단일 변수” 식이라면, 그 변수를 찾아서 interval 교체
-            var_name = None
-            if condition_expr.context == "IdentifierExpContext":
-                var_name = condition_expr.identifier
-            if var_name and var_name in variables:
-                # 교집합 결과로 갱신
-                if isinstance(variables[var_name].value, BoolInterval):
-                    updated_val = variables[var_name].value.meet(new_val)
-                    variables[var_name].value = updated_val
-                # struct 일수도 있을듯 추후 수정
-        else:
-            # cond_val이 BoolInterval이 아닐 수도 있으므로, 간단히 symbolic 처리 or pass
-            pass
+                return  # symbol 등 – 포기
 
-    def _update_logical_condition(self, variables: dict, cond_expr: Expression, is_true_branch: bool):
+        tgt = BoolInterval(1, 1) if is_true_branch else BoolInterval(0, 0)
+        refined = val.meet(tgt)
+
+        name = (cond_expr.identifier
+                if cond_expr.context == "IdentifierExpContext" else None)
+        if name and name in vars_:
+            vars_[name].value = refined
+
+    def _update_logical_condition(
+            self,
+            variables: dict[str, Variables],
+            cond_expr: Expression,
+            is_true_branch: bool) -> None:
+
         op = cond_expr.operator  # '&&', '||', '!'
+        # ───────── NOT ─────────
         if op == '!':
-            # ! X => true branch => X = false, false branch => X=true
-            # => is_true_branch = true => X=[0,0], else => X=[1,1]
-            # cond_expr.expression 이 실제 operand
-            operand_expr = cond_expr.expression
-            # 재귀적으로 single_condition 등 호출
-            return self._update_single_condition(variables, operand_expr, not is_true_branch)
+            # !X : true-branch → X=false, false-branch → X=true
+            return self._update_single_condition(
+                variables,
+                cond_expr.expression,  # operand
+                not is_true_branch)
 
-        elif op == '&&':
-            # (condA && condB)
-            # true branch => condA=true and condB=true
-            # false branch => condA=false OR condB=false (정보손실: 둘 중 하나만 false면 되니까)
-            condA = cond_expr.left
-            condB = cond_expr.right
+        # AND / OR 는 좌·우 피연산자 필요
+        condA = cond_expr.left
+        condB = cond_expr.right
 
-            if is_true_branch:
-                # A=true, B=true
+        # ───────── AND ─────────
+        if op == '&&':
+            if is_true_branch:  # 둘 다 참이어야 함
                 self.update_variables_with_condition(variables, condA, True)
                 self.update_variables_with_condition(variables, condB, True)
-            else:
-                # A=false or B=false
-                # 단일 Interval domain에선 “둘 중 하나 false”를 따로 분기해서 저장하기 어렵다.
-                # 보수적으로 A= [0,1], B=[0,1] 정도로 그냥 pass 하거나, symbolic
-                pass
-
-        elif op == '||':
-            # (condA || condB)
-            # true branch => condA=true or condB=true (Info-loss)
-            # false branch => condA=false AND condB=false
-            condA = cond_expr.left
-            condB = cond_expr.right
-
-            if is_true_branch:
-                # A=true or B=true → Interval domain에서는 크게 좁히기 어렵다.
-                pass
-            else:
-                # both false
+            else:  # A==false  또는  B==false
+                # 두 피연산자 모두 “0 가능”하도록 meet
                 self.update_variables_with_condition(variables, condA, False)
                 self.update_variables_with_condition(variables, condB, False)
+            return
 
-    def _update_comparison_condition(self, variables: dict, cond_expr: Expression, is_true_branch: bool):
+        # ───────── OR ─────────
+        if op == '||':
+            if is_true_branch:  # A==true  또는  B==true
+                # 둘 다 “1 가능”으로 넓힘 (정보 손실 최소화)
+                self.update_variables_with_condition(variables, condA, True)
+                self.update_variables_with_condition(variables, condB, True)
+            else:  # 둘 다 false
+                self.update_variables_with_condition(variables, condA, False)
+                self.update_variables_with_condition(variables, condB, False)
+            return
+
+        raise ValueError(f"Unexpected logical operator '{op}'")
+
+    def _update_comparison_condition(
+            self,
+            variables: dict[str, Variables],
+            cond_expr: Expression,
+            is_true_branch: bool) -> None:
         """
-        cond_expr.operator in ['<','>','<=','>=','==','!=']
-        cond_expr.left, cond_expr.right => Expression
-        is_true_branch => True면 cond_expr.operator 그대로 쓰고,
-                          False면 negate_operator를 적용
+        cond_expr.operator ∈ {'<','>','<=','>=','==','!='}
+        is_true_branch :
+            · True  ⇒ op 그대로
+            · False ⇒ negate_operator(op) 적용
         """
+
         op = cond_expr.operator
-        # negate operator (if is_true_branch==False) => eq <-> !=, < -> >=, ...
         actual_op = op if is_true_branch else self.negate_operator(op)
 
         left_expr = cond_expr.left
         right_expr = cond_expr.right
 
-        # 1) evaluate_expression으로 좌우 값을 먼저 가져옴
+        # ───────── 1. 값 평가 ─────────
         left_val = self.evaluate_expression(left_expr, variables, None, None)
         right_val = self.evaluate_expression(right_expr, variables, None, None)
 
-        # ========================= CASE 1: 양쪽이 Interval =========================
+        # ---------------- CASE 1 : 둘 다 Interval ----------------
         if self._is_interval(left_val) and self._is_interval(right_val):
-            # 예) a < b → clamp a, b
-            updated_left, updated_right = self.refine_intervals_for_comparison(
-                left_val, right_val, actual_op
-            )
+            new_l, new_r = self.refine_intervals_for_comparison(left_val, right_val, actual_op)
+            self.update_left_var(left_expr, new_l, '=', variables)
+            self.update_left_var(right_expr, new_r, '=', variables)
+            return
 
-            self.update_left_var(left_expr, updated_left, '=', variables)
-            self.update_left_var(right_expr, updated_right, '=', variables)
+        # ---------------- CASE 2-A : Interval  vs  스칼라/리터럴 ----------------
+        if self._is_interval(left_val) and not self._is_interval(right_val):
+            coerced_r = self._coerce_literal_to_interval(right_val, left_val.type_length)
+            new_l, _ = self.refine_intervals_for_comparison(left_val, coerced_r, actual_op)
+            self.update_left_var(left_expr, new_l, '=', variables)
+            return
 
-        # ========================= CASE 2: 한쪽 Interval, 한쪽 literal =========================
-        # 예) a < 10, 혹은 0 < b
-        elif self._is_interval(left_val) and isinstance(right_val, (int, float, str)):
-            # ex) a < 10
-            # 1) 우변 literal -> Interval로 변환 시도 (예: int => [10, 10])
-            right_intv = self._coerce_literal_to_interval(right_val, left_val.type_length)
-            updated_left, _ = self.refine_intervals_for_comparison(
-                left_val, right_intv, actual_op
-            )
-            self.update_left_var(left_expr, updated_left, '=', variables)
+        # ---------------- CASE 2-B : 리터럴  vs  Interval ----------------
+        if self._is_interval(right_val) and not self._is_interval(left_val):
+            coerced_l = self._coerce_literal_to_interval(left_val, right_val.type_length)
+            _, new_r = self.refine_intervals_for_comparison(coerced_l, right_val, actual_op)
+            self.update_left_var(right_expr, new_r, '=', variables)
+            return
 
-        elif self._is_interval(right_val) and isinstance(left_val, (int, float, str)):
-            # ex) 0 < b
-            left_intv = self._coerce_literal_to_interval(left_val, right_val.type_length)
-            # 실제 op가 (left op right)이므로, left=literal, right=interval
-            # refine_intervals_for_comparison은 (a_interval, b_interval, op) 순
-            updated_left, updated_right = self.refine_intervals_for_comparison(
-                left_intv, right_val, actual_op
-            )
-            self.update_left_var(right_expr, updated_right, '=', variables)
+        # ---------------- CASE 3 : BoolInterval 비교 ----------------
+        if isinstance(left_val, BoolInterval) or isinstance(right_val, BoolInterval):
+            self._update_bool_comparison(
+                variables,
+                left_expr, right_expr,
+                left_val, right_val,
+                actual_op)
+            return
 
-        # ========================= CASE 3: BoolInterval 비교 =========================
-        # 예) a == true, boolA != boolB, etc.
-        elif isinstance(left_val, BoolInterval) or isinstance(right_val, BoolInterval):
-            # 실제론 bool끼리의 <, >는 이상하긴 하지만,
-            # == / != 는 가능
-            self._update_bool_comparison(variables, left_expr, right_expr, left_val, right_val, actual_op)
+        # ---------------- CASE 4 : 주소 Interval(address) 비교 ▲ ----------------
+        # (주소 literal ‘0x…’ → UnsignedIntegerInterval(…,160) 로 강제 변환)
+        if (self._is_interval(left_val) and left_val.type_length == 160) or \
+                (self._is_interval(right_val) and right_val.type_length == 160):
 
-        else:
-            # 그 외 => symbolic or pass
-            pass
+            # 좌·우 모두 Interval 로 맞추기
+            if not self._is_interval(left_val):
+                left_val = self._coerce_literal_to_interval(left_val, 160)
+            if not self._is_interval(right_val):
+                right_val = self._coerce_literal_to_interval(right_val, 160)
 
-    def refine_intervals_for_comparison(self, a_interval, b_interval, op):
-        """
-        a_interval, b_interval: Interval (IntegerInterval or UnsignedIntegerInterval)
-        op: '<', '>', '<=', '>=', '==', '!='
-        return: (new_a, new_b)
-        """
-        # 복사본 생성
-        new_a = a_interval.copy()
-        new_b = b_interval.copy()
+            new_l, new_r = self.refine_intervals_for_comparison(left_val, right_val, actual_op)
+            self.update_left_var(left_expr, new_l, '=', variables)
+            self.update_left_var(right_expr, new_r, '=', variables)
+            return
 
-        # ---------- 1) a < b ----------
+        # ---------------- fallback : 추적 불가 → 심볼릭 처리 ----------------
+        # 정보-손실을 줄이기 위해 warning 만 남기고 값은 그대로 둡니다.
+        if self.debug:
+            print(f"[Info] comparison '{left_val} {op} {right_val}' not refined (symbolic)")
+
+    def refine_intervals_for_comparison(
+            self,
+            a_iv,  # IntegerInterval | UnsignedIntegerInterval
+            b_iv,
+            op: str):
+
+        # ── bottom short-cut ─────────────────────────
+        if a_iv.is_bottom() or b_iv.is_bottom():
+            return (a_iv.bottom(a_iv.type_length),
+                    b_iv.bottom(b_iv.type_length))
+
+        A, B = a_iv.copy(), b_iv.copy()
+
+        # 내부 헬퍼 -----------------------------------
+        def clamp_max(iv, new_max):
+            if iv.is_bottom():
+                return iv
+            if new_max < iv.min_value:
+                return iv.bottom(iv.type_length)
+            iv.max_value = min(iv.max_value, new_max)
+            return iv
+
+        def clamp_min(iv, new_min):
+            if iv.is_bottom():
+                return iv
+            if new_min > iv.max_value:
+                return iv.bottom(iv.type_length)
+            iv.min_value = max(iv.min_value, new_min)
+            return iv
+
+        # --------------------------------------------
+
+        # <  ------------------------------------------------
         if op == '<':
-            # a.max < b.min
-            # clamp: a.max <= b.min - 1
-            if new_b.min_value != float('-inf'):
-                candidate_max = new_b.min_value - 1
-                if candidate_max < new_a.min_value:
-                    new_a = new_a.bottom(new_a.type_length)
-                else:
-                    new_a.max_value = min(new_a.max_value, candidate_max)
+            if B.min_value != NEG_INFINITY:
+                A = clamp_max(A, B.min_value - 1)
+            if not A.is_bottom() and A.max_value != INFINITY:
+                B = clamp_min(B, A.max_value + 1)
+            return A, B
 
-            # b.min >= a.max+1
-            if not new_a.is_bottom() and new_a.max_value != float('inf'):
-                candidate_min = new_a.max_value + 1
-                if candidate_min > new_b.max_value:
-                    new_b = new_b.bottom(new_b.type_length)
-                else:
-                    new_b.min_value = max(new_b.min_value, candidate_min)
-
-            return (new_a, new_b)
-
-        # ---------- 2) a <= b ----------
-        if op == '<=':
-            # a.max <= b.max
-            # a <= b => a.max <= b.min?  (아닌가? Actually: a <= b => a.max <= b.max, b.min >= a.min..)
-            # 보수적으로 a.max <= b.max, b.min >= a.min
-            # 좀더 정확히: a <= b => a.max <= b.min if we treat strict domain
-            # (실제로는 a <= b => a.max <= b.min ? => that’s effectively <)
-            # => a <= b is basically (a < b) or (a==b)
-            # 여기서는 a <= b => a.max <= b.max (너무 약함)
-            # 혹은 (a < b) U (a==b) => clamp both
-            # 간단 구현: treat as a < b, then a==b join
-            # => pass
-            # 아래선 a <= b를 "a < b or a==b"로 처리
-            # => a< b clamp + a==b clamp => union => in Interval Domain, union 연산은 join
-            lt_a, lt_b = self.refine_intervals_for_comparison(a_interval, b_interval, '<')
-            eq_a, eq_b = self.refine_intervals_for_comparison(a_interval, b_interval, '==')
-            # join
-            join_a = lt_a.join(eq_a)
-            join_b = lt_b.join(eq_b)
-            return (join_a, join_b)
-
-        # ---------- 3) a > b ----------
+        # >  ------------------------------------------------
         if op == '>':
-            # a.min > b.max
-            # clamp a.min >= b.max+1
-            if new_b.max_value != float('inf'):
-                candidate_min = new_b.max_value + 1
-                if candidate_min > new_a.max_value:
-                    new_a = new_a.bottom(new_a.type_length)
-                else:
-                    new_a.min_value = max(new_a.min_value, candidate_min)
-            # b.max <= a.min-1
-            if not new_a.is_bottom() and new_a.min_value != float('-inf'):
-                candidate_max = new_a.min_value - 1
-                if candidate_max < new_b.min_value:
-                    new_b = new_b.bottom(new_b.type_length)
-                else:
-                    new_b.max_value = min(new_b.max_value, candidate_max)
-            return (new_a, new_b)
+            if B.max_value != INFINITY:
+                A = clamp_min(A, B.max_value + 1)
+            if not A.is_bottom() and A.min_value != NEG_INFINITY:
+                B = clamp_max(B, A.min_value - 1)
+            return A, B
 
-        # ---------- 4) a >= b ----------
+        # <=  -----------------------------------------------
+        if op == '<=':
+            lt_a, lt_b = self.refine_intervals_for_comparison(a_iv, b_iv, '<')
+            eq_a, eq_b = self.refine_intervals_for_comparison(a_iv, b_iv, '==')
+            return lt_a.join(eq_a), lt_b.join(eq_b)
+
+        # >=  -----------------------------------------------
         if op == '>=':
-            # a >= b => same trick => union of (a> b) and (a==b)
-            gt_a, gt_b = self.refine_intervals_for_comparison(a_interval, b_interval, '>')
-            eq_a, eq_b = self.refine_intervals_for_comparison(a_interval, b_interval, '==')
-            join_a = gt_a.join(eq_a)
-            join_b = gt_b.join(eq_b)
-            return (join_a, join_b)
+            gt_a, gt_b = self.refine_intervals_for_comparison(a_iv, b_iv, '>')
+            eq_a, eq_b = self.refine_intervals_for_comparison(a_iv, b_iv, '==')
+            return gt_a.join(eq_a), gt_b.join(eq_b)
 
-        # ---------- 5) a == b ----------
+        # ==  -----------------------------------------------
         if op == '==':
-            # a == b => meet(a,b)
-            meet_ab = new_a.meet(new_b)
-            return (meet_ab, meet_ab)
+            meet = A.meet(B)
+            return meet, meet
 
-        # ---------- 6) a != b ----------
+        # !=  -----------------------------------------------
         if op == '!=':
-            # a != b => (a,b) NOT in (a==b)
-            # Interval Domain에서 정확히 "not equal"을 표현하기 어려움
-            # 단일 정수라면 exclude => a,b 교집합 빼기
-            # 간단히 "no refinement" or symbolic
-            return (new_a, new_b)
+            if (A.min_value == A.max_value ==
+                    B.min_value == B.max_value):
+                # 동일 싱글톤이면 모순
+                return (A.bottom(A.type_length),
+                        B.bottom(B.type_length))
+            return A, B
 
-        # fallback
-        return (new_a, new_b)
+        # 알 수 없는 op → 변경 없음
+        return A, B
 
-    def _coerce_literal_to_interval(self, literal_value, default_bits=256):
-        """
-        literal_value가 int, float, str('123' 같은)이면
-        IntegerInterval/UnsignedIntegerInterval 로 대충 변환
-        - 여기선 부호 추정이 어려우므로 int인지 uint인지는
-          대략 정하거나, int라고 가정
-        - 실제론 parse해서 음수/양수 구분, base등 처리 가능
-        """
-        if isinstance(literal_value, (int, float)):
-            # int 범위 - 여기선 int라고 가정
-            # 실제론 unsigned 구분 필요
-            int_val = int(literal_value)
-            return IntegerInterval(int_val, int_val, default_bits)
-        if isinstance(literal_value, str):
-            # 만약 '123'이면 int 변환
-            # 만약 'hello'이면 symbolic?
+    def _coerce_literal_to_interval(self, lit, default_bits=256):
+        def _hex_addr_to_interval(hex_txt: str) -> UnsignedIntegerInterval:
+            """‘0x…’ 문자열을 160-bit UnsignedInterval 로 변환"""
+            val = int(hex_txt, 16)
+            return UnsignedIntegerInterval(val, val, 160)
+
+        def _is_address_literal(txt: str) -> bool:
+            return txt.lower().startswith("0x") and all(c in "0123456789abcdef" for c in txt[2:])
+
+        if isinstance(lit, (int, float)):
+            v = int(lit)
+            return IntegerInterval(v, v, default_bits) if v < 0 \
+                else UnsignedIntegerInterval(v, v, default_bits)
+        if isinstance(lit, str):
+            if _is_address_literal(lit):
+                return _hex_addr_to_interval(lit)  # ◀︎ NEW
             try:
-                int_val = int(literal_value, 0)
-                return IntegerInterval(int_val, int_val, default_bits)
+                v = int(lit, 0)
+                return IntegerInterval(v, v, default_bits) if v < 0 \
+                    else UnsignedIntegerInterval(v, v, default_bits)
             except ValueError:
-                # symbolic
-                return IntegerInterval(None, None, default_bits).make_bottom()
-        # fallback
-        return IntegerInterval(None, None, default_bits).make_bottom()
+                return IntegerInterval(None, None, default_bits)  # bottom
+        return IntegerInterval(None, None, default_bits)
 
     def _update_bool_comparison(self, variables: dict,
                                 left_expr: Expression, right_expr: Expression,
@@ -4032,18 +4245,6 @@ class ContractAnalyzer:
             return BoolInterval(1, 1)  # always true
         else:
             return BoolInterval(0, 1)  # unknown
-
-    def _is_interval(self, val):
-        return isinstance(val, (IntegerInterval, UnsignedIntegerInterval, BoolInterval))
-
-    def _extract_variable_of_expression(self, expr):
-        """
-        expr가 IdentifierExpContext인지 검사하여, 맞으면 expr.identifier 리턴
-        아니면 None
-        """
-        if expr.context == "IdentifierExpContext":
-            return expr.identifier
-        return None
 
     def negate_operator(self, op: str) -> str:
         neg_map = {
