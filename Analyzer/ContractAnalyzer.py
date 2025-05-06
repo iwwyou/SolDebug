@@ -771,11 +771,6 @@ class ContractAnalyzer:
         # function_cfg에 지역변수 추가
         self.current_target_function_cfg.add_related_variable(variable_obj)
 
-        # variableDeclarationStatement가 loop 안에 있으면 fixpoint 알고리즘 수행
-        if current_block.is_loop_body :
-            vars = self.fixpoint(current_block)
-            self.update_loop_body(vars, current_block)
-
         # 11. current_block을 function CFG에 반영
         self.current_target_function_cfg.update_block(current_block)  # 변경된 블록을 반영
 
@@ -812,10 +807,6 @@ class ContractAnalyzer:
 
         current_block.add_assign_statement(expr.left, expr.operator, expr.right)
 
-        if current_block.is_loop_body:
-            vars = self.fixpoint(current_block)
-            self.update_loop_body(vars, current_block)
-
         # 9. current_block을 function CFG에 반영
         self.current_target_function_cfg.update_block(current_block)  # 변경된 블록을 반영
 
@@ -842,7 +833,6 @@ class ContractAnalyzer:
         # 3. 현재 블록의 CFG 노드 가져오기
         current_block = self.get_current_block()
 
-
         literalExp = Expression(literal=1, context='LiteralExpContext')
 
         if expr.operator == "++" :
@@ -851,10 +841,6 @@ class ContractAnalyzer:
         elif expr.operator == "--" :
             self.update_left_var(expr.expression, 1, '-=', current_block.variables, None, None)
             current_block.add_assign_statement(expr.expression, '-=', literalExp)
-
-        if current_block.is_loop_body:
-            vars = self.fixpoint(current_block)
-            self.update_loop_body(vars, current_block)
 
         # 10. current_block을 function CFG에 반영
         self.current_target_function_cfg.update_block(current_block)  # 변경된 블록을 반영
@@ -869,7 +855,6 @@ class ContractAnalyzer:
         self.brace_count[self.current_start_line]['cfg_node'] = current_block
 
         self.current_target_function_cfg = None
-
 
     def process_unary_suffix_operation(self, expr):
         # 1. 현재 타겟 컨트랙트의 CFG 가져오기
@@ -895,10 +880,6 @@ class ContractAnalyzer:
             self.update_left_var(expr.expression, 1, '-=', current_block.variables, None, None)
             current_block.add_assign_statement(expr.expression, '-=', literalExp)
 
-        if current_block.is_loop_body:
-            vars = self.fixpoint(current_block)
-            self.update_loop_body(vars, current_block)
-
         # 10. current_block을 function CFG에 반영
         self.current_target_function_cfg.update_block(current_block)  # 변경된 블록을 반영
 
@@ -912,7 +893,6 @@ class ContractAnalyzer:
         self.brace_count[self.current_start_line]['cfg_node'] = current_block
 
         self.current_target_function_cfg = None
-
 
     def process_function_call(self, expr):
         """
@@ -933,15 +913,10 @@ class ContractAnalyzer:
 
         current_block = self.get_current_block()
 
-
         # 3. 함수 표현식 가져오기
         function_expr = expr.function
 
         _ = self.evaluate_function_call_context(function_expr, current_block.variables, None, None)
-
-        if current_block.is_loop_body:
-            vars = self.fixpoint(current_block)
-            self.update_loop_body(vars, current_block)
 
         current_block.add_function_call_statement(function_expr)
 
@@ -958,7 +933,6 @@ class ContractAnalyzer:
         self.brace_count[self.current_start_line]['cfg_node'] = current_block
 
         self.current_target_function_cfg = None
-
 
     def process_payable_function_call(self, expr):
         # Handle payable function calls
@@ -988,8 +962,6 @@ class ContractAnalyzer:
         condition_block.condition_expr = condition_expr
         # 7. True 분기에서 변수 상태 복사 및 업데이트
         condition_block.variables = self.copy_variables(current_block.variables)
-        if current_block.is_loop_body == False :
-            condition_block.is_loop_body = True
 
         # 4. brace_count 업데이트 - 존재하지 않으면 초기화
         if self.current_start_line not in self.brace_count:
@@ -1001,8 +973,7 @@ class ContractAnalyzer:
 
         # 7. True 분기에서 변수 상태 복사 및 업데이트
         true_block.variables = self.copy_variables(condition_block.variables)
-        if current_block.is_loop_body == False :
-            condition_block.is_loop_body = True
+
         self.update_variables_with_condition(true_block.variables, condition_expr, is_true_branch=True)
 
         false_block = CFGNode(name=f"if_false_{self.current_start_line}")
@@ -1040,7 +1011,6 @@ class ContractAnalyzer:
         self.brace_count[self.current_start_line]['cfg_node'] = condition_block
 
         self.current_target_function_cfg = None
-
 
     def process_else_if_statement(self, condition_expr):
         # 1. 현재 컨트랙트와 함수의 CFG 가져오기
@@ -1080,8 +1050,6 @@ class ContractAnalyzer:
             self.brace_count[self.current_start_line] = {}
         self.brace_count[self.current_start_line]['cfg_node'] = condition_block
 
-
-
         # 6. True 분기 블록 생성
         true_block = CFGNode(name=f"else_if_true_{self.current_start_line + 1}")
 
@@ -1116,7 +1084,6 @@ class ContractAnalyzer:
         self.brace_count[self.current_start_line]['cfg_node'] = condition_block
 
         self.current_target_function_cfg = None
-
 
     def process_else_statement(self):
         # 1. 현재 컨트랙트와 함수의 CFG 가져오기
@@ -1243,7 +1210,6 @@ class ContractAnalyzer:
         self.contract_cfgs[self.current_target_contract] = contract_cfg
 
         self.current_target_function_cfg = None
-
 
     def process_for_statement(self, initial_statement=None, condition_expr=None, increment_expr=None):
 
@@ -1375,7 +1341,6 @@ class ContractAnalyzer:
 
         self.current_target_function_cfg = None
 
-
     def process_continue_statement(self):
         # 1. 현재 컨트랙트와 함수의 CFG 가져오기
         contract_cfg = self.contract_cfgs.get(self.current_target_contract)
@@ -1404,10 +1369,6 @@ class ContractAnalyzer:
 
         # 6. 현재 블록을 fixpoint_evaluation_node로 연결 (loop로 다시 돌아감)
         self.current_target_function_cfg.graph.add_edge(current_block, fixpoint_evaluation_node)
-
-        if current_block.is_loop_body:
-            vars = self.fixpoint(current_block)
-            self.update_loop_body(vars, current_block)
 
         # 8. Return 노드에 대한 brace_count 업데이트
         if self.current_start_line not in self.brace_count:
@@ -1453,10 +1414,6 @@ class ContractAnalyzer:
 
         # 7. 현재 블록을 loop_exit_node로 연결 (루프에서 빠져나감)
         self.current_target_function_cfg.graph.add_edge(current_block, loop_exit_node)
-
-        if current_block.is_loop_body:
-            vars = self.fixpoint(current_block)
-            self.update_loop_body(vars, current_block)
 
         # 8. Return 노드에 대한 brace_count 업데이트
         if self.current_start_line not in self.brace_count:
@@ -1537,10 +1494,6 @@ class ContractAnalyzer:
         # 7. current_block에서 exit_node로 직접 연결
         self.current_target_function_cfg.graph.add_edge(current_block, exit_node)
 
-        if current_block.is_loop_body:
-            vars = self.fixpoint(current_block)
-            self.update_loop_body(vars, current_block)
-
         # 8. CFG 업데이트
         contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
         self.contract_cfgs[self.current_target_contract] = contract_cfg
@@ -1561,7 +1514,6 @@ class ContractAnalyzer:
 
         # 3. 현재 블록 가져오기
         current_block = self.get_current_block()
-
 
         current_block.add_revert_statement(revert_identifier, string_literal, call_argument_list)
 
@@ -1639,7 +1591,6 @@ class ContractAnalyzer:
 
         self.current_target_function_cfg = None
 
-
     def process_assert_statement(self, condition_expr, string_literal):
         # 1. 현재 컨트랙트와 함수의 CFG 가져오기
         contract_cfg = self.contract_cfgs[self.current_target_contract]
@@ -1697,7 +1648,6 @@ class ContractAnalyzer:
         self.contract_cfgs[self.current_target_contract] = contract_cfg
 
         self.current_target_function_cfg = None
-
 
     def process_global_var_for_debug(self, gv_obj: GlobalVariable):
         cfg = self.contract_cfgs[self.current_target_contract]
