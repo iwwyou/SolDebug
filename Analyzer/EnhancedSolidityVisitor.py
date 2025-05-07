@@ -787,6 +787,8 @@ class EnhancedSolidityVisitor(SolidityVisitor):
             self.contract_analyzer.process_payable_function_call(expr)
         elif isinstance(expr_ctx, SolidityParser.FunctionCallOptionsContext):
             self.contract_analyzer.process_function_call_options(expr)
+        elif isinstance(expr_ctx, SolidityParser.IdentifierExpContext) :
+            self.contract_analyzer.process_identifier_expression(expr)
         else:
             raise ValueError(f"Unsupported expression context in interactiveExpressionStatement: {ctx}")
 

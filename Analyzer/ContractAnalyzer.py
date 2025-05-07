@@ -10,6 +10,7 @@ from typing import Dict, cast
 
 
 class ContractAnalyzer:
+
     def __init__(self):
         self.sm = AddressSymbolicManager()
 
@@ -201,12 +202,13 @@ class ContractAnalyzer:
             brace_info = self.brace_count.get(line, {'open': 0, 'close': 0, 'cfg_node': None})
             if brace_info['open'] > 0 and brace_info['cfg_node']:
                 context_type = self.determine_top_level_context(self.full_code_lines[line])
-                if context_type == "function":
+                if context_type in ["function", "modifier"] :
                     # 함수 이름 뒤에 붙은 '('를 기준으로 함수 이름만 추출
                     function_declaration = self.full_code_lines[line]
                     function_name = function_declaration.split()[1]  # 첫 번째는 함수 선언, 두 번째는 함수 이름 포함
                     function_name = function_name.split('(')[0]  # 함수 이름만 추출
                     return function_name
+
         return None
 
     def find_struct_context(self, line_number):
@@ -286,7 +288,7 @@ class ContractAnalyzer:
         """
         contract-level CFG를 처음 만들 때 한 번 호출.
         address 계열 글로벌은 UnsignedIntegerInterval(160bit) 로,
-        uint 계열은 0-interval 로 초기화한다.
+        uint  계열은 [0,0] 256-bit Interval 로 초기화한다.
         """
         if contract_name in self.contract_cfgs:
             return
@@ -304,39 +306,76 @@ class ContractAnalyzer:
             return self.sm.get_interval(nid)
 
         def _sol_elem(name: str, bits: int | None = None) -> SolType:
-            """elementary SolType 객체를 간단히 만들어 주는 팩토리"""
-            t = SolType()
-            t.typeCategory = "elementary"
-            t.elementaryTypeName = name
+            T = SolType()
+            T.typeCategory = "elementary"
+            T.elementaryTypeName = name
             if bits is not None:
-                t.intTypeLength = bits
-            return t
+                T.intTypeLength = bits
+            return T
 
         # ────────── 2. 글로벌 변수 테이블 ──────────
         cfg.globals = {
             # --- block ---
-            "block.basefee": GlobalVariable("block.basefee", _u256(), _sol_elem("uint")),
-            "block.blobbasefee": GlobalVariable("block.blobbasefee", _u256(), _sol_elem("uint")),
-            "block.chainid": GlobalVariable("block.chainid", _u256(), _sol_elem("uint")),
-            "block.coinbase": GlobalVariable("block.coinbase", _addr_fixed(0), _sol_elem("address")),
-            "block.difficulty": GlobalVariable("block.difficulty", _u256(), _sol_elem("uint")),
-            "block.gaslimit": GlobalVariable("block.gaslimit", _u256(), _sol_elem("uint")),
-            "block.number": GlobalVariable("block.number", _u256(), _sol_elem("uint")),
-            "block.prevrandao": GlobalVariable("block.prevrandao", _u256(), _sol_elem("uint")),
-            "block.timestamp": GlobalVariable("block.timestamp", _u256(), _sol_elem("uint")),
+            "block.basefee": GlobalVariable(
+                identifier="block.basefee",
+                value=_u256(),
+                typeInfo=_sol_elem("uint")),
+            "block.blobbasefee": GlobalVariable(
+                identifier="block.blobbasefee",
+                value=_u256(),
+                typeInfo=_sol_elem("uint")),
+            "block.chainid": GlobalVariable(
+                identifier="block.chainid",
+                value=_u256(),
+                typeInfo=_sol_elem("uint")),
+            "block.coinbase": GlobalVariable(
+                identifier="block.coinbase",
+                value=_addr_fixed(0),
+                typeInfo=_sol_elem("address")),
+            "block.difficulty": GlobalVariable(
+                identifier="block.difficulty",
+                value=_u256(),
+                typeInfo=_sol_elem("uint")),
+            "block.gaslimit": GlobalVariable(
+                identifier="block.gaslimit",
+                value=_u256(),
+                typeInfo=_sol_elem("uint")),
+            "block.number": GlobalVariable(
+                identifier="block.number",
+                value=_u256(),
+                typeInfo=_sol_elem("uint")),
+            "block.prevrandao": GlobalVariable(
+                identifier="block.prevrandao",
+                value=_u256(),
+                typeInfo=_sol_elem("uint")),
+            "block.timestamp": GlobalVariable(
+                identifier="block.timestamp",
+                value=_u256(),
+                typeInfo=_sol_elem("uint")),
 
             # --- msg ---
-            "msg.sender": GlobalVariable("msg.sender", _addr_fixed(101), _sol_elem("address")),
-            "msg.value": GlobalVariable("msg.value", _u256(), _sol_elem("uint")),
+            "msg.sender": GlobalVariable(
+                identifier="msg.sender",
+                value=_addr_fixed(101),
+                typeInfo=_sol_elem("address")),
+            "msg.value": GlobalVariable(
+                identifier="msg.value",
+                value=_u256(),
+                typeInfo=_sol_elem("uint")),
 
             # --- tx ---
-            "tx.gasprice": GlobalVariable("tx.gasprice", _u256(), _sol_elem("uint")),
-            "tx.origin": GlobalVariable("tx.origin", _addr_fixed(100), _sol_elem("address")),
+            "tx.gasprice": GlobalVariable(
+                identifier="tx.gasprice",
+                value=_u256(),
+                typeInfo=_sol_elem("uint")),
+            "tx.origin": GlobalVariable(
+                identifier="tx.origin",
+                value=_addr_fixed(100),
+                typeInfo=_sol_elem("address")),
         }
 
         # ────────── 3. bookkeeping ──────────
         self.contract_cfgs[contract_name] = cfg
-        # 현재 라인의 brace_count 엔트리에 contract CFG 노드 연결
         self.brace_count[self.current_start_line]['cfg_node'] = cfg
 
     def get_contract_cfg(self, contract_name):
@@ -438,8 +477,8 @@ class ContractAnalyzer:
                 pass
             elif isinstance(variable_obj,EnumVariable) :
                 pass
-            elif variable_obj.typeCategory == "elementary":
-                et = variable_obj.elementaryTypeName
+            elif variable_obj.typeInfo.typeCategory == "elementary":
+                et = variable_obj.typeInfo.elementaryTypeName
 
                 # ── ① int / uint / bool 은 종전 로직 유지
                 if et.startswith(("int", "uint", "bool")):
@@ -447,9 +486,9 @@ class ContractAnalyzer:
 
                 # ── ② **address → fresh symbolic interval 로 변경**
                 elif et == "address":
-                    iv = self.sm.alloc_fresh_interval()  # [N,N]
-                    variable_obj.value = iv
-                    self.sm.bind_var(variable_obj.identifier, iv.min_value)
+                    # 초기화식이 없으면 전체 주소 공간으로 보수적으로 설정
+                    variable_obj.value = UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
+                    # fresh-ID 는 **발급하지 않는다** → sm.bind_var 도 호출하지 않음
 
                 # (string / bytes 등 - 추상화 안 할 타입은 심볼릭 문자열 그대로)
                 else:
@@ -508,58 +547,112 @@ class ContractAnalyzer:
         # 5. brace_count 업데이트
         self.brace_count[self.current_start_line]['cfg_node'] = contract_cfg.state_variable_node
 
-    def process_modifier_definition(self, modifier_name, parameters):
-        # 현재 컨텍스트에서 타겟 컨트랙트를 가져옴
+    def process_modifier_definition(self,
+                                    modifier_name: str,
+                                    parameters: dict[str, SolType] | None = None) -> None:
+        """
+        modifier 정의를 분석하여 FunctionCFG 로 등록
+        parameters: { param_name : SolType, ... }  또는 None
+        """
         contract_cfg = self.contract_cfgs[self.current_target_contract]
-
-        if not contract_cfg:
+        if contract_cfg is None:
             raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
 
-        # Modifier에 대한 FunctionCFG 생성
-        modifier_cfg = FunctionCFG(function_type='modifier', function_name=modifier_name)
+        # 1) 빈 CFG 생성
+        modifier_cfg = FunctionCFG(function_type='modifier',
+                                   function_name=modifier_name)
 
-        # 파라미터가 있을 경우, 이를 FunctionCFG에 추가
-        for var_name, var_type_info in parameters.items():
-            modifier_cfg.add_related_variable(var_type_info)
+        # 2) 파라미터 처리 (없으면 {} 로 대체)
+        parameters = parameters or {}
+        for var_name, type_info in parameters.items():
+            # 파라미터용 Variables 객체 한 개 생성
+            var_obj = Variables(identifier=var_name, scope="local")
+            var_obj.typeInfo = type_info
 
-        # 현재 state_variable_node에서 상태 변수를 가져와 related_variables에 추가
+            # elementary 타입이면 보수적 default 값 부여
+            if type_info.typeCategory == "elementary":
+                et = type_info.elementaryTypeName
+                if et.startswith(("int", "uint", "bool")):
+                    var_obj.value = self.calculate_default_interval(et)
+                elif et == "address":
+                    # 파라미터 address → 전체 범위
+                    var_obj.value = UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
+                else:  # bytes / string 등
+                    var_obj.value = f"symbol_{var_name}"
+
+            modifier_cfg.add_related_variable(var_obj)
+
         if contract_cfg.state_variable_node:
-            for var_name, var_info in contract_cfg.state_variable_node.variables.items():
-                modifier_cfg.add_related_variable(var_info)
+            for var in contract_cfg.state_variable_node.variables.values():
+                modifier_cfg.add_related_variable(var)
 
-        # Modifier CFG를 ContractCFG에 추가
-        contract_cfg.add_function_cfg(modifier_cfg)
-
-        # 10. contract_cfg를 contract_cfgs에 반영
+        # 3) CFG 저장
+        contract_cfg.functions[modifier_name] = modifier_cfg
         self.contract_cfgs[self.current_target_contract] = contract_cfg
-
-        # brace_count 업데이트 (필요시)
         self.brace_count[self.current_start_line]['cfg_node'] = modifier_cfg.get_entry_node()
 
-    def process_modifier_invocation(self, function_cfg, modifier_name):
-        # 현재 타겟 컨트랙트의 CFG를 가져옴
+    # ContractAnalyzer.py  ----------------------------------------------
+
+    def process_modifier_invocation(self,
+                                    fn_cfg: FunctionCFG,
+                                    modifier_name: str) -> None:
+        """
+        fn_cfg  ← 방금 만들고 있는 함수-CFG
+        modifier_name  ← 'onlyOwner' 처럼 한 개
+
+        ① 컨트랙트에 등록돼 있는 modifier-CFG 가져오기
+        ② modifier-CFG 를 *얕은 복사* 하여 fn_cfg.graph 에 붙인다.
+        ③ placeholder 노드(들)를 fn-entry/exit 로 스플라이스
+        """
+
         contract_cfg = self.contract_cfgs[self.current_target_contract]
 
-        if not contract_cfg:
-            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+        # ── ① modifier 존재 확인 ──────────────────────────────────
+        if modifier_name not in contract_cfg.modifiers:
+            raise ValueError(f"Modifier '{modifier_name}' is not defined.")
 
-        # ContractCFG에서 modifier CFG를 가져옴
-        modifier_cfg = contract_cfg.get_modifier_cfg(modifier_name)
+        mod_cfg: FunctionCFG = contract_cfg.modifiers[modifier_name]
 
-        if not modifier_cfg:
-            raise ValueError(f"Modifier {modifier_name} not found in contract {self.current_target_contract}")
+        # ── ② modifier-CFG 의 노드·엣지를 함수-CFG 로 복사 ───────
+        g_fn = fn_cfg.graph
+        g_mod = mod_cfg.graph
 
-        # Modifier를 function CFG에 통합 (entry와 exit 노드 연결)
-        function_cfg.integrate_modifier(modifier_cfg)
+        # 노드 이름이 겹칠 위험이 있으니 prefix 붙여서 복사
+        node_map: dict[CFGNode, CFGNode] = {}
+        for n in g_mod.nodes:
+            new_n = CFGNode(f"{modifier_name}::{n.name}")
+            # 변수 환경은 빈 딕셔너리로 시작
+            new_n.variables = self.copy_variables(getattr(n, "variables", {}))
+            node_map[n] = new_n
+            g_fn.add_node(new_n)
 
-        # function_cfg에 modifier 이름 추가
-        function_cfg.modifiers[modifier_name] = modifier_cfg
+        for u, v in g_mod.edges:
+            g_fn.add_edge(node_map[u], node_map[v])
 
-        # 9. function_cfg 결과를 contract_cfg에 반영
-        contract_cfg.functions[self.current_target_function] = function_cfg
+        # ── ③ placeholder 스플라이스 ─────────────────────────────
+        entry = fn_cfg.get_entry_node()
+        exit_ = fn_cfg.get_exit_node()
 
-        # 10. contract_cfg를 contract_cfgs에 반영
-        self.contract_cfgs[self.current_target_contract] = contract_cfg
+        for mod_node_orig in g_mod.nodes:
+            if mod_node_orig.name.startswith("MOD_PLACEHOLDER"):
+                ph = node_map[mod_node_orig]  # 복사된 placeholder
+
+                preds = list(g_fn.predecessors(ph))
+                succs = list(g_fn.successors(ph))
+
+                # placeholder 제거
+                g_fn.remove_node(ph)
+
+                # preds  →  entry
+                for p in preds:
+                    g_fn.add_edge(p, entry)
+
+                # exit  →  succs
+                for s in succs:
+                    g_fn.add_edge(exit_, s)
+
+        # (선택) ④ modifier 의 global/상태 변수 사용 정보를
+        #        fn_cfg.related_variables 와 join 하고 싶다면 여기서 처리
 
     def process_constructor_definition(self, constructor_name, parameters, modifiers):
         # 현재 컨텍스트에서 타겟 컨트랙트를 가져옴
@@ -1783,6 +1876,52 @@ class ContractAnalyzer:
 
         self.current_target_function_cfg = None
 
+    # ContractAnalyzer.py  (추가/수정)
+
+    def process_identifier_expression(self, ident_expr: Expression):
+        """
+        · ident_expr.identifier 가 '_' 이고,
+        · 현재 CFG 가 modifier 이면 → placeholder 처리
+        · 아니면 평범한 identifier 로서 evaluate
+        """
+        ident_str = ident_expr.identifier
+        cfg = self.contract_cfgs[self.current_target_contract]
+        fcfg = cfg.get_function_cfg(self.current_target_function)
+
+        # ───── modifier placeholder “_”인지 검사 ─────
+        if ident_str == "_" and fcfg and fcfg.function_type == "modifier":
+            self._create_modifier_placeholder_node(fcfg)
+            return  # 값-업데이트 없음
+
+        # ───── 일반 identifier 처리 (필요 시 evaluate) ─────
+        self.evaluate_expression(
+            ident_expr,
+            self.get_current_block().variables,
+            None, None)
+
+    # --------------------------------------------------
+    def _create_modifier_placeholder_node(self, fcfg: FunctionCFG):
+        """
+        modifier 안의 '_' 를 만났을 때 임시 노드를 만든다.
+        ─ ① cur_blk ← 현재 CFGBlock
+        ─ ② PLACEHOLDER 노드를 cur_blk 다음에 삽입
+        ─ ③ cur_blk 의 기존 successor 들을 PLACEHOLDER 뒤로 밀기
+        """
+        cur_blk = self.get_current_block()
+
+        idx = len(getattr(fcfg, "placeholders", []))
+        ph = CFGNode(f"MOD_PLACEHOLDER_{idx}")
+        fcfg.placeholders = getattr(fcfg, "placeholders", []) + [ph]
+
+        g = fcfg.graph
+        succs = list(g.successors(cur_blk))
+
+        g.add_node(ph)
+        g.add_edge(cur_blk, ph)
+        for s in succs:
+            g.add_edge(ph, s)
+            g.remove_edge(cur_blk, s)
+
     # ContractAnalyzer 내부 메서드들
     # ─────────────────────────────────────────────────────────────
     def process_global_var_for_debug(self, gv_obj: GlobalVariable):
@@ -2933,6 +3072,19 @@ class ContractAnalyzer:
     """
     Abstract Interpretation part
     """
+    # ContractAnalyzer 내부
+
+    _GLOBAL_BASES = {"block", "msg", "tx"}
+
+    def _is_global_expr(self, expr: Expression) -> bool:
+        """
+        Expression 이 block.xxx / msg.xxx / tx.xxx 형태인지 검사.
+        """
+        return (
+                expr.member is not None  # x.y 형태
+                and expr.base is not None
+                and getattr(expr.base, "identifier", None) in self._GLOBAL_BASES
+        )
 
     @staticmethod
     def calculate_default_interval(var_type):
@@ -2955,6 +3107,10 @@ class ContractAnalyzer:
             raise ValueError(f"Unsupported type for default interval: {var_type}")
 
     def update_left_var(self, expr, rVal, operator, variables, callerObject=None, callerContext=None):
+        # ── ① 글로벌이면 갱신 금지 ─────────────────────────
+        if self._is_global_expr(expr):
+            return None
+
         if expr.context == "IndexAccessContext" :
             return self.update_left_var_of_index_access_context(expr, rVal, operator, variables,
                                                                 callerObject, callerContext)

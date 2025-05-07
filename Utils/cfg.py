@@ -186,6 +186,8 @@ class ContractCFG(CFG):
                 exprOperator='='  # 연산자
             )
 
+            self.state_variable_node.variables[variable.identifier] = variable
+
     def add_constant_variable(self, variable, expr=None):
         if not self.state_variable_node:
             self.state_variable_node = CFGNode('State_Variable')
@@ -233,9 +235,6 @@ class FunctionCFG(CFG):
         self.modifiers = {}
         self.related_variables = {}
         self.exit_node.function_exit_node = True
-
-        self.pre_exec_state = {}
-        self.pre_exec_local = {}
 
     def update_block(self, block_node):
         """

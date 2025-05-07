@@ -92,8 +92,8 @@ def simulate_input(test_inputs):
         visitor.visit(tree)
 
         # Get and print the analysis result
-        result = contract_analyzer.get_analysis_result()
-        print(json.dumps(result, indent=4))
+        #result = contract_analyzer.get_analysis_result()
+        #print(json.dumps(result, indent=4))
 
 test_inputs = [
 
