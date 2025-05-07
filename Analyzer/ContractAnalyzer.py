@@ -971,12 +971,14 @@ class ContractAnalyzer:
         # 3. 현재 블록의 CFG 노드 가져오기
         current_block = self.get_current_block()
 
-
         # assignment에 대한 abstract interpretation 수행
         rExpVal = self.evaluate_expression(expr.right, current_block.variables, None, None)
         self.update_left_var(expr.left, rExpVal, expr.operator, current_block.variables, None, None)
 
         current_block.add_assign_statement(expr.left, expr.operator, expr.right)
+
+        if self.current_target_function_cfg.function_type == "constructor" :
+            self._overwrite_state_vars_from_block(contract_cfg, current_block.variables)
 
         # 9. current_block을 function CFG에 반영
         self.current_target_function_cfg.update_block(current_block)  # 변경된 블록을 반영
@@ -1652,6 +1654,29 @@ class ContractAnalyzer:
         self.contract_cfgs[self.current_target_contract] = contract_cfg
 
         self.current_target_function_cfg = None
+
+    # ContractAnalyzer.py ──────────────────────────────────────────────
+
+    # ---------------------------------------------------------- #
+    #  constructor 내부 상태-변수 → State_Variable 노드 동기화
+    # ---------------------------------------------------------- #
+    # ContractAnalyzer.py ─────────────────────────────────────────
+    def _overwrite_state_vars_from_block(
+            self,
+            contract_cfg: ContractCFG,
+            block_vars: dict[str, Variables],
+    ) -> None:
+        """
+        constructor 내부에서 수정된 state-변수를
+        ContractCFG.state_variable_node 에 *그대로 덮어쓴다*.
+        """
+        state_vars = contract_cfg.state_variable_node.variables
+
+        # ③ scope=='state' 인 항목을 그대로 복사해 덮어쓰기
+        for name, var in block_vars.items():
+            if getattr(var, "scope", None) != "state":
+                continue
+            state_vars[name] = self.copy_variables({name: var})[name]
 
     def find_fixpoint_evaluation_node(self, current_node):
         """
