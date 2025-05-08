@@ -65,6 +65,12 @@ class ContractAnalyzer:
                 self.full_code_lines[old_line_no + offset] = self.full_code_lines.pop(old_line_no)
                 self.update_brace_count(old_line_no + offset, self.full_code_lines[old_line_no + offset])
 
+            # ───── B. analysis_per_line 이동 (추가) ─────
+            for old_line_no in keys_to_shift:
+                if old_line_no in self.analysis_per_line:
+                    self.analysis_per_line[old_line_no + offset] = \
+                        self.analysis_per_line.pop(old_line_no)
+
             # 2. 새로운 코드 라인 삽입
             for i, line_no in enumerate(range(start_line, end_line + 1)):
                 self.full_code_lines[line_no] = lines[i]
