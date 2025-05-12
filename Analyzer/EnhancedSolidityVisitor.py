@@ -835,7 +835,7 @@ class EnhancedSolidityVisitor(SolidityVisitor):
 
     # Visit a parse tree produced by SolidityParser#uncheckedBlock.
     def visitUncheckedBlock(self, ctx:SolidityParser.UncheckedBlockContext):
-        return self.visitChildren(ctx)
+        return self.contract_analyzer.process_unchecked_indicator()
 
     # Visit a parse tree produced by SolidityParser#statement.
     def visitStatement(self, ctx:SolidityParser.StatementContext):

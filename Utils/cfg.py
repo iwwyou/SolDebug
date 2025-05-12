@@ -91,6 +91,10 @@ class CFGNode:
         )
         self.statements.append(revert_statement)
 
+    def add_unchecked_block(self):
+        unchecked_block = Statement(statement_type='unchecked')
+        self.statements.append(unchecked_block)
+
     def get_variable(self, var_name: str) -> Variables:
         """
         변수 이름을 받아 관련 변수를 반환합니다.

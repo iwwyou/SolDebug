@@ -1943,14 +1943,29 @@ class ContractAnalyzer:
             self._create_modifier_placeholder_node(fcfg)
             return  # 값-업데이트 없음
 
-        # ───── 일반 identifier 처리 (필요 시 evaluate) ─────
-        self.evaluate_expression(
-            ident_expr,
-            self.get_current_block().variables,
-            None, None)
-
     def process_unchecked_indicator(self):
-        return
+        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+
+        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not self.current_target_function_cfg:
+            raise ValueError("No active function to process the require statement.")
+
+        # 2. 현재 블록 가져오기
+        current_block = self.get_current_block()
+        current_block.add_unchecked_block()
+
+        self.brace_count.setdefault(self.current_start_line, {})["cfg_node"] = current_block
+        # ====================================================================
+
+        # ── 10 CFG / contract 갱신
+        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+        self.current_target_function_cfg = None
+
+
 
     # ContractAnalyzer.py ──────────────────────────────────────────────
 
@@ -2657,6 +2672,8 @@ class ContractAnalyzer:
             return self.interpret_return_statement(stmt, current_variables)
         elif stmt.statement_type == 'revert':
             return self.interpret_revert_statement(stmt, current_variables)
+        elif stmt.statement_type == 'unchecked' :
+            return current_variables
         else:
             raise ValueError(f"Statement '{stmt.statement_type}' is not implemented.")
 
