@@ -1949,6 +1949,9 @@ class ContractAnalyzer:
             self.get_current_block().variables,
             None, None)
 
+    def process_unchecked_indicator(self):
+        return
+
     # ContractAnalyzer.py ──────────────────────────────────────────────
 
     # ---------------------------------------------------------- #
