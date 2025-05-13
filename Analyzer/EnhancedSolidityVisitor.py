@@ -106,36 +106,49 @@ class EnhancedSolidityVisitor(SolidityVisitor):
 
 
     # Visit a parse tree produced by SolidityParser#constantVariableDeclaration.
-    def visitConstantVariableDeclaration(self, ctx:SolidityParser.ConstantVariableDeclarationContext):
-        var_type = ctx.typeName().getText()
+    # ---------------------------------------------------------------------------
+    # ① constant 변수 선언 방문      (예:  uint256 constant DECIMALS = 18;)
+    # ---------------------------------------------------------------------------
+    def visitConstantVariableDeclaration(self,
+                                         ctx: SolidityParser.ConstantVariableDeclarationContext):
+
         var_name = ctx.identifier().getText()
 
-        # 타입 분석
-        type_context = ctx.typeName()
+        # 1) 타입 분석 → SolType 객체
+        type_ctx = ctx.typeName()
+        type_obj = SolType()
+        type_obj = self.visitTypeName(type_ctx, type_obj)
 
-        # 기본 자료형인 경우
-        if isinstance(type_context, SolidityParser.ElementaryTypeNameContext):
-            if var_type.startswith('int') or var_type.startswith('uint'):
-                if var_type == 'int' or var_type == 'uint':
-                    length = 256  # 기본 길이는 256
-                else:
-                    length = int(var_type[len('int'):])  # 타입의 길이 추출
-                variable_obj = Variables(var_name, metaType='elementary', var_type=var_type, intTypeLength=length)
-            else:
-                variable_obj = Variables(var_name, metaType='elementary', var_type=var_type)
+        # 2) 변수 객체 생성 (state 변수와 동일한 분기)
+        if type_obj.typeCategory == "array":
+            variable_obj = ArrayVariable(identifier=var_name,
+                                         base_type=type_obj.arrayBaseType,
+                                         array_length=type_obj.arrayLength,
+                                         scope="state")
+        elif type_obj.typeCategory == "struct":
+            variable_obj = StructVariable(identifier=var_name,
+                                          struct_type=type_obj.structTypeName,
+                                          scope="state")
+        elif type_obj.typeCategory == "mapping":
+            variable_obj = MappingVariable(identifier=var_name,
+                                           key_type=type_obj.mappingKeyType,
+                                           value_type=type_obj.mappingValueType,
+                                           scope="state")
+        elif type_obj.typeCategory == "enum":
+            variable_obj = EnumVariable(identifier=var_name,
+                                        enum_type=type_obj.enumTypeName,
+                                        scope="state")
+        else:  # elementary
+            variable_obj = Variables(identifier=var_name, scope="state")
+            variable_obj.typeInfo = type_obj
 
-        # Mapping 타입이나 배열 등의 다른 타입 처리 필요 시 추가
+        variable_obj.isConstant = True  # ← 상수 표시
 
-        # 초기화 식 처리
-        if ctx.expression():
-            init_expr = self.visitExpression(ctx.expression())
-        else:
-            init_expr = None
+        # 3) 초기화식 (Expression) 파싱
+        init_expr = self.visitExpression(ctx.expression()) if ctx.expression() else None
 
-        # ContractAnalyzer 호출
+        # 4) ContractAnalyzer 로 위임
         self.contract_analyzer.process_constant_variable(variable_obj, init_expr)
-
-        return
 
     # Visit a parse tree produced by SolidityParser#contractBodyElement.
     def visitContractBodyElement(self, ctx:SolidityParser.ContractBodyElementContext):
@@ -1627,22 +1640,10 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by SolidityParser#TupleExp.
-    def visitTupleExp(self, ctx:SolidityParser.TupleExpContext):
-        # 요소들 추출
-        elements = []
-        expression_list = ctx.expression()
-        for expr_ctx in expression_list:
-            element_expr = self.visitExpression(expr_ctx)
-            elements.append(element_expr)
-
-        # Expression 객체 생성
-        result_expr = Expression(
-            elements=elements,
-            operator='tuple',
-            context='TupleExpContext'
-        )
-
-        return result_expr
+    # (1)  (expr1, expr2, …)   ← SolidityParser.TupleExpressionContext
+    def visitTupleExpression(self, ctx: SolidityParser.TupleExpressionContext):
+        elems = [self.visit(e) for e in ctx.expression()]
+        return Expression(context="TupleExpressionContext", elements=elems)
 
     # Visit a parse tree produced by SolidityParser#Assignment.
     def visitAssignment(self, ctx:SolidityParser.AssignmentContext):

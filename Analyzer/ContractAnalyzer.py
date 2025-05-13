@@ -526,33 +526,41 @@ class ContractAnalyzer:
         # 7. brace_count 업데이트
         self.brace_count[self.current_start_line]['cfg_node'] = contract_cfg.state_variable_node
 
+    # ---------------------------------------------------------------------------
+    # ② constant 변수 처리 (CFG·심볼 테이블 반영)
+    # ---------------------------------------------------------------------------
     def process_constant_variable(self, variable_obj, init_expr):
-        # 1. 현재 타겟 컨트랙트의 CFG 가져오기
-        contract_cfg = self.contract_cfgs[self.current_target_contract]
 
-        if not contract_cfg:
+        # 1. 컨트랙트 CFG 확보
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+        if contract_cfg is None:
             raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
 
-        current_block = self.get_current_block()
+        # 2. 반드시 초기화식이 있어야 함
+        if init_expr is None:
+            raise ValueError(f"Constant variable '{variable_obj.identifier}' must have an initializer.")
 
-        # 2. abstract interpretation 수행 (상수이므로 반드시 초기화 식이 있어야 함)
-        if init_expr:
-            interval_result = self.evaluate_expression(init_expr, current_block.variables)
-            if interval_result is not None:
-                variable_obj.value = interval_result
-            else:
-                raise ValueError(f"Unable to evaluate constant expression for {variable_obj.identifier}")
-        else:
-            raise ValueError(f"Constant variable {variable_obj.identifier} must have an initializer.")
+        #    평가 컨텍스트는 현재까지의 state-variable 노드 변수들
+        state_vars = contract_cfg.state_variable_node.variables
+        value = self.evaluate_expression(init_expr, state_vars, None, None)
+        if value is None:
+            raise ValueError(f"Unable to evaluate constant expression for '{variable_obj.identifier}'")
 
-        # 4. 상수임을 표시
-        variable_obj.isConstant = True
+        variable_obj.value = value
+        variable_obj.isConstant = True  # (안전용 중복 설정)
 
-        # 3. 상태 변수를 ContractCFG에 추가
-        contract_cfg.add_state_variable(variable_obj.identifier, variable_obj)
+        # 3. ContractCFG 에 추가 (state 변수와 동일 API 사용)
+        contract_cfg.add_state_variable(variable_obj, expr=init_expr)
 
-        # 5. brace_count 업데이트
-        self.brace_count[self.current_start_line]['cfg_node'] = contract_cfg.state_variable_node
+        # 4. 이미 생성된 모든 FunctionCFG 에 read-only 변수로 연동
+        for fn_cfg in contract_cfg.functions.values():
+            fn_cfg.add_related_variable(variable_obj.identifier, variable_obj)
+
+        # 5. 전역 map 업데이트
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
+
+        # 6. brace_count 갱신 → IDE/커서 매핑
+        self.brace_count[self.current_start_line]["cfg_node"] = contract_cfg.state_variable_node
 
     def process_modifier_definition(self,
                                     modifier_name: str,
@@ -1707,8 +1715,6 @@ class ContractAnalyzer:
 
         # 2. 현재 블록 가져오기
         current_block = self.get_current_block()
-
-
 
         # 3. 반환값이 있는 경우 expression 평가
         if return_expr:
@@ -3663,6 +3669,9 @@ class ContractAnalyzer:
             return self.evaluate_inline_array_expression_context(expr, variables, callerObject, callerContext)
         elif expr.context == "FunctionCallContext" :
             return self.evaluate_function_call_context(expr, variables, callerObject, callerContext)
+        elif expr.context == "TupleExpressionContext":
+            return self.evaluate_tuple_expression_context(expr, variables,
+                                                          callerObject, callerContext)
 
         # 단항 연산자
         if expr.operator in ['-', '!', '~'] and expr.expression :
@@ -4081,6 +4090,12 @@ class ContractAnalyzer:
         # 여기서는 단순히 그대로 반환
 
         return results
+
+    def evaluate_tuple_expression_context(self, expr, variables,
+                                          callerObject=None, callerContext=None):
+        values = [self.evaluate_expression(e, variables, None, "TupleElem")
+                  for e in expr.elements]
+        return values  # list 그대로 돌려줌
 
     def evaluate_unary_operator(self, expr, variables, callerObject=None, callerContext=None):
         operand_interval = self.evaluate_expression(expr.expression, variables, None, "Unary")
