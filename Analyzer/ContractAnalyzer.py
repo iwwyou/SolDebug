@@ -510,7 +510,7 @@ class ContractAnalyzer:
                 pass
             elif isinstance(variable_obj, MappingVariable) : # 관련된 경우 없을 듯
                 pass
-            elif variable_obj.typeCategory == "elementary" :
+            elif variable_obj.typeInfo.typeCategory == "elementary" :
                 variable_obj.value = self.evaluate_expression(init_expr, contract_cfg.state_variable_node.variables, None, None)
 
         # 4. 상태 변수를 ContractCFG에 추가
@@ -5270,6 +5270,10 @@ class ContractAnalyzer:
                 return f"[{v.min_value},{v.max_value}]"
             return str(v)
 
+        # ───── ① 함수 본문 밖이면 아무것도 기록하지 않음 ─────
+        if self.current_target_function is None:
+            return
+
         line_info = {"kind": stmt_type}
 
         # A) 특정 식 하나만 기록
@@ -5285,3 +5289,19 @@ class ContractAnalyzer:
             line_info["vars"] = flat
 
         self.analysis_per_line[line_no].append(line_info)
+
+        # Analyzer/ContractAnalyzer.py  (끝부분쯤)
+
+    # 신규 ▶  방금 추가된 라인(들)의 분석 결과를 돌려주는 작은 헬퍼
+    def get_line_analysis(self, start_ln: int, end_ln: int) -> dict[int, list[dict]]:
+        """
+        [start_ln, end_ln] 구간에 대해
+        { line_no: [ {kind: ..., vars:{...}}, ... ], ... }  형태 반환
+        (구간 안에 기록이 없으면 key 자체가 없다)
+        """
+        return {
+            ln: self.analysis_per_line[ln]
+            for ln in range(start_ln, end_ln + 1)
+            if ln in self.analysis_per_line
+        }
+
