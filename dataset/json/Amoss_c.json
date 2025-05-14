@@ -1,0 +1,147 @@
+[
+  {
+    "code": "contract Amoss {\n}",
+    "startLine": 1,
+    "endLine": 2
+  },
+  {
+    "code": "uint256 private _totalSupply = 1*10**(9+18);",
+    "startLine": 2,
+    "endLine": 2
+  },
+  {
+    "code": "\n",
+    "startLine": 3,
+    "endLine": 3
+  },
+  {
+    "code": "mapping(address => uint256) private _balances;",
+    "startLine": 4,
+    "endLine": 4
+  },
+  {
+    "code": "\n",
+    "startLine": 5,
+    "endLine": 5
+  },
+  {
+    "code": "mapping(address => mapping(address => uint256)) private _allowances;",
+    "startLine": 6,
+    "endLine": 6
+  },
+  {
+    "code": "\n",
+    "startLine": 7,
+    "endLine": 7
+  },
+  {
+    "code": "function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual {\n}",
+    "startLine": 8,
+    "endLine": 9
+  },
+  {
+    "code": "\n",
+    "startLine": 10,
+    "endLine": 10
+  },
+  {
+    "code": "function _afterTokenTransfer(address from, address to, uint256 amount) internal virtual {\n}",
+    "startLine": 11,
+    "endLine": 12
+  },
+  {
+    "code": "\n",
+    "startLine": 13,
+    "endLine": 13
+  },
+  {
+    "code": "function _approve(address owner, address spender, uint256 amount) internal virtual {\n}",
+    "startLine": 14,
+    "endLine": 15
+  },
+  {
+    "code": "require(owner != address(0), \"ERC20: approve from the zero address\");",
+    "startLine": 15,
+    "endLine": 15
+  },
+  {
+    "code": "require(spender != address(0), \"ERC20: approve to the zero address\");",
+    "startLine": 16,
+    "endLine": 16
+  },
+  {
+    "code": "\n",
+    "startLine": 17,
+    "endLine": 17
+  },
+  {
+    "code": "_allowances[owner][spender] = amount;",
+    "startLine": 18,
+    "endLine": 18
+  },
+  {
+    "code": "\n",
+    "startLine": 20,
+    "endLine": 20
+  },
+  {
+    "code": "function _burn(address account, uint256 amount) internal virtual {\n}",
+    "startLine": 21,
+    "endLine": 22
+  },
+  {
+    "code": "require(account != address(0), \"ERC20: burn from the zero address\");",
+    "startLine": 22,
+    "endLine": 22
+  },
+  {
+    "code": "\n",
+    "startLine": 23,
+    "endLine": 23
+  },
+  {
+    "code": "_beforeTokenTransfer(account, address(0), amount);",
+    "startLine": 24,
+    "endLine": 24
+  },
+  {
+    "code": "\n",
+    "startLine": 25,
+    "endLine": 25
+  },
+  {
+    "code": "uint256 accountBalance = _balances[account];",
+    "startLine": 26,
+    "endLine": 26
+  },
+  {
+    "code": "require(accountBalance >= amount, \"ERC20: burn amount exceeds balance\");",
+    "startLine": 27,
+    "endLine": 27
+  },
+  {
+    "code": "unchecked {\n}",
+    "startLine": 28,
+    "endLine": 29
+  },
+  {
+    "code": "_balances[account] = accountBalance - amount;",
+    "startLine": 29,
+    "endLine": 29
+  },
+  {
+    "code": "_totalSupply -= amount;",
+    "startLine": 31,
+    "endLine": 31
+  },
+  {
+    "code": "\n",
+    "startLine": 32,
+    "endLine": 32
+  },
+  {
+    "code": "_afterTokenTransfer(account, address(0), amount);",
+    "startLine": 33,
+    "endLine": 33
+  }
+]
