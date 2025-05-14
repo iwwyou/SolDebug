@@ -1,0 +1,202 @@
+[
+  {
+    "code": "contract AOC_BEP {\n}",
+    "startLine": 1,
+    "endLine": 2
+  },
+  {
+    "code": "struct UserInfo {\n}",
+    "startLine": 2,
+    "endLine": 3
+  },
+  {
+    "code": "uint256 balance;",
+    "startLine": 3,
+    "endLine": 3
+  },
+  {
+    "code": "uint256 level;",
+    "startLine": 4,
+    "endLine": 4
+  },
+  {
+    "code": "uint256 year;",
+    "startLine": 5,
+    "endLine": 5
+  },
+  {
+    "code": "uint256 month;",
+    "startLine": 6,
+    "endLine": 6
+  },
+  {
+    "code": "\n",
+    "startLine": 8,
+    "endLine": 8
+  },
+  {
+    "code": "struct Level {\n}",
+    "startLine": 9,
+    "endLine": 10
+  },
+  {
+    "code": "uint256 start;",
+    "startLine": 10,
+    "endLine": 10
+  },
+  {
+    "code": "uint256 end;",
+    "startLine": 11,
+    "endLine": 11
+  },
+  {
+    "code": "uint256 percentage;",
+    "startLine": 12,
+    "endLine": 12
+  },
+  {
+    "code": "\n",
+    "startLine": 14,
+    "endLine": 14
+  },
+  {
+    "code": "mapping(address => UserInfo) public userInfo;",
+    "startLine": 15,
+    "endLine": 15
+  },
+  {
+    "code": "mapping(uint256 => Level) public levels;",
+    "startLine": 16,
+    "endLine": 16
+  },
+  {
+    "code": "\n",
+    "startLine": 17,
+    "endLine": 17
+  },
+  {
+    "code": "uint256 private _totalSupply;",
+    "startLine": 18,
+    "endLine": 18
+  },
+  {
+    "code": "\n",
+    "startLine": 19,
+    "endLine": 19
+  },
+  {
+    "code": "function updateUserInfo(address account, uint256 year, uint256 month) internal {\n}",
+    "startLine": 20,
+    "endLine": 21
+  },
+  {
+    "code": "userInfo[account].balance = _balances[account];",
+    "startLine": 21,
+    "endLine": 21
+  },
+  {
+    "code": "userInfo[account].year = year;",
+    "startLine": 22,
+    "endLine": 22
+  },
+  {
+    "code": "userInfo[account].month = month;",
+    "startLine": 23,
+    "endLine": 23
+  },
+  {
+    "code": "for(uint256 i = 1; i <= 4; i++) {\n}",
+    "startLine": 24,
+    "endLine": 25
+  },
+  {
+    "code": "if(i == 4) {\n}",
+    "startLine": 25,
+    "endLine": 26
+  },
+  {
+    "code": "userInfo[account].level = i;",
+    "startLine": 26,
+    "endLine": 26
+  },
+  {
+    "code": "break;",
+    "startLine": 27,
+    "endLine": 27
+  },
+  {
+    "code": "if(block.timestamp >= levels[i].start && block.timestamp <= levels[i].end) {\n}",
+    "startLine": 29,
+    "endLine": 30
+  },
+  {
+    "code": "userInfo[account].level = i;",
+    "startLine": 30,
+    "endLine": 30
+  },
+  {
+    "code": "break;",
+    "startLine": 31,
+    "endLine": 31
+  },
+  {
+    "code": "\n",
+    "startLine": 35,
+    "endLine": 35
+  },
+  {
+    "code": "function _mint(address account, uint256 amount) internal virtual {\n}",
+    "startLine": 36,
+    "endLine": 37
+  },
+  {
+    "code": "require(account != address(0), \"BEP20: mint to the zero address\");",
+    "startLine": 37,
+    "endLine": 37
+  },
+  {
+    "code": "_totalSupply += amount;",
+    "startLine": 38,
+    "endLine": 38
+  },
+  {
+    "code": "_balances[account] += amount;",
+    "startLine": 39,
+    "endLine": 39
+  },
+  {
+    "code": "\n",
+    "startLine": 41,
+    "endLine": 41
+  },
+  {
+    "code": "function _burn(address account, uint256 amount) internal virtual {\n}",
+    "startLine": 42,
+    "endLine": 43
+  },
+  {
+    "code": "require(account != address(0), \"BEP20: burn from the zero address\");",
+    "startLine": 43,
+    "endLine": 43
+  },
+  {
+    "code": "uint256 accountBalance = _balances[account];",
+    "startLine": 44,
+    "endLine": 44
+  },
+  {
+    "code": "require(accountBalance >= amount, \"BEP20: burn amount exceeds balance\");",
+    "startLine": 45,
+    "endLine": 45
+  },
+  {
+    "code": "_balances[account] = accountBalance - amount;",
+    "startLine": 46,
+    "endLine": 46
+  },
+  {
+    "code": "_totalSupply -= amount;",
+    "startLine": 47,
+    "endLine": 47
+  }
+]

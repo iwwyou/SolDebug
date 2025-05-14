@@ -1,0 +1,72 @@
+[
+  {
+    "code": "contract PoolKeeper {\n}",
+    "startLine": 1,
+    "endLine": 2
+  },
+  {
+    "code": "uint256 public constant BASE_TIP = 5;",
+    "startLine": 2,
+    "endLine": 2
+  },
+  {
+    "code": "uint256 public constant TIP_DELTA_PER_BLOCK = 5;",
+    "startLine": 3,
+    "endLine": 3
+  },
+  {
+    "code": "uint256 public constant BLOCK_TIME = 13;",
+    "startLine": 4,
+    "endLine": 4
+  },
+  {
+    "code": "uint256 public constant MAX_TIP = 100;",
+    "startLine": 5,
+    "endLine": 5
+  },
+  {
+    "code": "\n",
+    "startLine": 6,
+    "endLine": 6
+  },
+  {
+    "code": "function keeperTip(uint256 _savedPreviousUpdatedTimestamp, uint256 _poolInterval) public view returns (uint256) {\n}",
+    "startLine": 7,
+    "endLine": 8
+  },
+  {
+    "code": "uint256 elapsedBlocksNumerator = (block.timestamp - (_savedPreviousUpdatedTimestamp + _poolInterval));",
+    "startLine": 8,
+    "endLine": 8
+  },
+  {
+    "code": "uint256 keeperTip = BASE_TIP + (TIP_DELTA_PER_BLOCK * elapsedBlocksNumerator) / BLOCK_TIME;",
+    "startLine": 9,
+    "endLine": 9
+  },
+  {
+    "code": "\n",
+    "startLine": 10,
+    "endLine": 10
+  },
+  {
+    "code": "if (keeperTip > MAX_TIP) {\n}",
+    "startLine": 11,
+    "endLine": 12
+  },
+  {
+    "code": "return MAX_TIP;",
+    "startLine": 12,
+    "endLine": 12
+  },
+  {
+    "code": "} else {\n}",
+    "startLine": 13,
+    "endLine": 14
+  },
+  {
+    "code": "return keeperTip;",
+    "startLine": 14,
+    "endLine": 14
+  }
+]

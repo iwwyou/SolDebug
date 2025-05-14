@@ -1,0 +1,117 @@
+[
+  {
+    "code": "contract DeltaNeutralPencakeWorker02 {\n}",
+    "startLine": 1,
+    "endLine": 2
+  },
+  {
+    "code": "address public wNative;",
+    "startLine": 2,
+    "endLine": 2
+  },
+  {
+    "code": "address public override baseToken;",
+    "startLine": 3,
+    "endLine": 3
+  },
+  {
+    "code": "address public cake;",
+    "startLine": 4,
+    "endLine": 4
+  },
+  {
+    "code": "\n",
+    "startLine": 5,
+    "endLine": 5
+  },
+  {
+    "code": "address[] public reinvestPath;",
+    "startLine": 6,
+    "endLine": 6
+  },
+  {
+    "code": "\n",
+    "startLine": 7,
+    "endLine": 7
+  },
+  {
+    "code": "function getReinvestPath() public view returns (address[] memory) {\n}",
+    "startLine": 8,
+    "endLine": 9
+  },
+  {
+    "code": "if (reinvestPath.length != 0)  {\n}",
+    "startLine": 9,
+    "endLine": 10
+  },
+  {
+    "code": "return reinvestPath;",
+    "startLine": 10,
+    "endLine": 10
+  },
+  {
+    "code": "\n",
+    "startLine": 12,
+    "endLine": 12
+  },
+  {
+    "code": "address[] memory path;",
+    "startLine": 13,
+    "endLine": 13
+  },
+  {
+    "code": "if (baseToken == wNative) {\n}",
+    "startLine": 14,
+    "endLine": 15
+  },
+  {
+    "code": "path = new address[](2);",
+    "startLine": 15,
+    "endLine": 15
+  },
+  {
+    "code": "path[0] = address(cake);",
+    "startLine": 16,
+    "endLine": 16
+  },
+  {
+    "code": "path[1] = address(wNative);",
+    "startLine": 17,
+    "endLine": 17
+  },
+  {
+    "code": "else {\n}",
+    "startLine": 19,
+    "endLine": 20
+  },
+  {
+    "code": "path = new address[](3);",
+    "startLine": 20,
+    "endLine": 20
+  },
+  {
+    "code": "path[0] = address(cake);",
+    "startLine": 21,
+    "endLine": 21
+  },
+  {
+    "code": "path[1] = address(wNative);",
+    "startLine": 22,
+    "endLine": 22
+  },
+  {
+    "code": "path[2] = address(baseToken);",
+    "startLine": 23,
+    "endLine": 23
+  },
+  {
+    "code": "\n",
+    "startLine": 25,
+    "endLine": 25
+  },
+  {
+    "code": "return path;",
+    "startLine": 26,
+    "endLine": 26
+  }
+]

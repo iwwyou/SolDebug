@@ -1,0 +1,72 @@
+[
+  {
+    "code": "contract FraxCrossChainLiquidityTracker {\n}",
+    "startLine": 1,
+    "endLine": 2
+  },
+  {
+    "code": "uint256[] public chain_ids_array;",
+    "startLine": 2,
+    "endLine": 2
+  },
+  {
+    "code": "mapping(uint256 => bool) public valid_chains;",
+    "startLine": 3,
+    "endLine": 3
+  },
+  {
+    "code": "\n",
+    "startLine": 4,
+    "endLine": 4
+  },
+  {
+    "code": "mapping(uint256 => uint256) public frax_minted;",
+    "startLine": 5,
+    "endLine": 5
+  },
+  {
+    "code": "mapping(uint256 => uint256) public fxs_minted;",
+    "startLine": 6,
+    "endLine": 6
+  },
+  {
+    "code": "mapping(uint256 => uint256) public collat_bridged;",
+    "startLine": 7,
+    "endLine": 7
+  },
+  {
+    "code": "\n",
+    "startLine": 8,
+    "endLine": 8
+  },
+  {
+    "code": "function totalsAcrossChains() public view returns (uint256 frax_tally, uint256 fxs_tally, uint256 collat_tally) {\n}",
+    "startLine": 9,
+    "endLine": 10
+  },
+  {
+    "code": "for (uint256 i = 0; i < chain_ids_array.length; i++){\n}",
+    "startLine": 10,
+    "endLine": 11
+  },
+  {
+    "code": "uint256 chain_id = chain_ids_array[i];",
+    "startLine": 11,
+    "endLine": 11
+  },
+  {
+    "code": "frax_tally += frax_minted[chain_id];",
+    "startLine": 12,
+    "endLine": 12
+  },
+  {
+    "code": "fxs_tally += fxs_minted[chain_id];",
+    "startLine": 13,
+    "endLine": 13
+  },
+  {
+    "code": "collat_tally += collat_bridged[chain_id];",
+    "startLine": 14,
+    "endLine": 14
+  }
+]

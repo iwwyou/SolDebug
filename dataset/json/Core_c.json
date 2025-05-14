@@ -1,0 +1,107 @@
+[
+  {
+    "code": "contract Core {\n}",
+    "startLine": 1,
+    "endLine": 2
+  },
+  {
+    "code": "mapping(address => bool) public governorMap;",
+    "startLine": 2,
+    "endLine": 2
+  },
+  {
+    "code": "\n",
+    "startLine": 3,
+    "endLine": 3
+  },
+  {
+    "code": "address[] internal _stablecoinList;",
+    "startLine": 4,
+    "endLine": 4
+  },
+  {
+    "code": "\n",
+    "startLine": 5,
+    "endLine": 5
+  },
+  {
+    "code": "modifier onlyGovernor() {\n}",
+    "startLine": 6,
+    "endLine": 7
+  },
+  {
+    "code": "require(governorMap[msg.sender], \"1\");",
+    "startLine": 7,
+    "endLine": 7
+  },
+  {
+    "code": "_;",
+    "startLine": 8,
+    "endLine": 8
+  },
+  {
+    "code": "\n",
+    "startLine": 10,
+    "endLine": 10
+  },
+  {
+    "code": "function revokeStableMaster(address stableMaster) external override onlyGovernor {\n}",
+    "startLine": 11,
+    "endLine": 12
+  },
+  {
+    "code": "uint256 stablecoinListLength = _stablecoinList.length;",
+    "startLine": 12,
+    "endLine": 12
+  },
+  {
+    "code": "\n",
+    "startLine": 13,
+    "endLine": 13
+  },
+  {
+    "code": "require(stablecoinListLength >= 1, \"45\");",
+    "startLine": 14,
+    "endLine": 14
+  },
+  {
+    "code": "uint256 indexMet;",
+    "startLine": 15,
+    "endLine": 15
+  },
+  {
+    "code": "for (uint256 i = 0; i < stablecoinListLength - 1; i++) {\n}",
+    "startLine": 16,
+    "endLine": 17
+  },
+  {
+    "code": "if (_stablecoinList[i] == stableMaster) {\n}",
+    "startLine": 17,
+    "endLine": 18
+  },
+  {
+    "code": "indexMet = 1;",
+    "startLine": 18,
+    "endLine": 18
+  },
+  {
+    "code": "_stablecoinList[i] = _stablecoinList[stablecoinListLength - 1];",
+    "startLine": 19,
+    "endLine": 19
+  },
+  {
+    "code": "break;",
+    "startLine": 20,
+    "endLine": 20
+  },
+  {
+    "code": "require(indexMet == 1 || _stablecoinList[stablecoinListLength - 1] == stableMaster, \"45\");",
+    "startLine": 23,
+    "endLine": 23
+  },
+  {
+    "code": "_stablecoinList.pop();",
+    "startLine": 24,
+    "endLine": 24
+  }
+]

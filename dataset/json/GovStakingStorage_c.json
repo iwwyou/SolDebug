@@ -1,0 +1,262 @@
+[
+  {
+    "code": "contract GovStakingStorage {\n}",
+    "startLine": 1,
+    "endLine": 2
+  },
+  {
+    "code": "uint256 totalLockedGogo;",
+    "startLine": 2,
+    "endLine": 2
+  },
+  {
+    "code": "uint256 totalRewardRates;",
+    "startLine": 3,
+    "endLine": 3
+  },
+  {
+    "code": "uint256 totalRewardMultiplier;",
+    "startLine": 4,
+    "endLine": 4
+  },
+  {
+    "code": "\n",
+    "startLine": 5,
+    "endLine": 5
+  },
+  {
+    "code": "struct UserInfo {\n}",
+    "startLine": 6,
+    "endLine": 7
+  },
+  {
+    "code": "uint256 amount;",
+    "startLine": 7,
+    "endLine": 7
+  },
+  {
+    "code": "uint256 lockStart;",
+    "startLine": 8,
+    "endLine": 8
+  },
+  {
+    "code": "uint256 lockPeriod;",
+    "startLine": 9,
+    "endLine": 9
+  },
+  {
+    "code": "uint256 lastClaimed;",
+    "startLine": 10,
+    "endLine": 10
+  },
+  {
+    "code": "uint256 unclaimedAmount;",
+    "startLine": 11,
+    "endLine": 11
+  },
+  {
+    "code": "uint256 rewardRate;",
+    "startLine": 12,
+    "endLine": 12
+  },
+  {
+    "code": "uint256 rewardMultiplier;",
+    "startLine": 13,
+    "endLine": 13
+  },
+  {
+    "code": "uint256 userRewardPerTokenPaid;",
+    "startLine": 14,
+    "endLine": 14
+  },
+  {
+    "code": "uint256 index;",
+    "startLine": 15,
+    "endLine": 15
+  },
+  {
+    "code": "\n",
+    "startLine": 17,
+    "endLine": 17
+  },
+  {
+    "code": "mapping(address => UserInfo) public userInfo;",
+    "startLine": 18,
+    "endLine": 18
+  },
+  {
+    "code": "address[] public userList;",
+    "startLine": 19,
+    "endLine": 19
+  },
+  {
+    "code": "\n",
+    "startLine": 20,
+    "endLine": 20
+  },
+  {
+    "code": "modifier isAllowed() {\n}",
+    "startLine": 21,
+    "endLine": 22
+  },
+  {
+    "code": "require(allowed[msg.sender], \"sender is not allowed to write\");",
+    "startLine": 22,
+    "endLine": 22
+  },
+  {
+    "code": "_;",
+    "startLine": 23,
+    "endLine": 23
+  },
+  {
+    "code": "\n",
+    "startLine": 25,
+    "endLine": 25
+  },
+  {
+    "code": "function removeUser(address user) external isAllowed {\n}",
+    "startLine": 26,
+    "endLine": 27
+  },
+  {
+    "code": "require(userInfo[user].index != 0, \"user does not exist\");",
+    "startLine": 27,
+    "endLine": 27
+  },
+  {
+    "code": "if (userList.length > 1) {\n}",
+    "startLine": 28,
+    "endLine": 29
+  },
+  {
+    "code": "address lastAddress = userList[userList.length - 1];",
+    "startLine": 29,
+    "endLine": 29
+  },
+  {
+    "code": "uint256 oldIndex = userInfo[user].index;",
+    "startLine": 30,
+    "endLine": 30
+  },
+  {
+    "code": "userList[oldIndex] = lastAddress;",
+    "startLine": 31,
+    "endLine": 31
+  },
+  {
+    "code": "userInfo[lastAddress].index = oldIndex;",
+    "startLine": 32,
+    "endLine": 32
+  },
+  {
+    "code": "userList.pop();",
+    "startLine": 34,
+    "endLine": 34
+  },
+  {
+    "code": "totalRewardMultiplier -= userInfo[user].rewardMultiplier;",
+    "startLine": 35,
+    "endLine": 35
+  },
+  {
+    "code": "delete userInfo[user];",
+    "startLine": 36,
+    "endLine": 36
+  },
+  {
+    "code": "\n",
+    "startLine": 38,
+    "endLine": 38
+  },
+  {
+    "code": "function updateRewardMultiplier(address user, uint256 oldRate, uint256 newRate, uint256 passedTime, uint256 oldLockPeriod, uint256 newLockPeriod, uint256 oldAmount, uint256 newAmount) external isAllowed {\n}",
+    "startLine": 39,
+    "endLine": 40
+  },
+  {
+    "code": "UserInfo storage info = userInfo[user];",
+    "startLine": 40,
+    "endLine": 40
+  },
+  {
+    "code": "uint256 toRemove = ((((oldLockPeriod - passedTime) / 1 weeks) * oldRate) * oldAmount) / 100000;",
+    "startLine": 41,
+    "endLine": 41
+  },
+  {
+    "code": "uint256 toAdd = (((newLockPeriod / 1 weeks) * newRate) * newAmount) / 100000;",
+    "startLine": 42,
+    "endLine": 42
+  },
+  {
+    "code": "info.rewardMultiplier = info.rewardMultiplier + toAdd - toRemove;",
+    "startLine": 43,
+    "endLine": 43
+  },
+  {
+    "code": "totalRewardMultiplier = totalRewardMultiplier + toAdd - toRemove;",
+    "startLine": 44,
+    "endLine": 44
+  },
+  {
+    "code": "\n",
+    "startLine": 46,
+    "endLine": 46
+  },
+  {
+    "code": "function addRewardMultiplier(address user, uint256 rate, uint256 period, uint256 amount) external isAllowed {\n}",
+    "startLine": 47,
+    "endLine": 48
+  },
+  {
+    "code": "UserInfo storage info = userInfo[user];",
+    "startLine": 48,
+    "endLine": 48
+  },
+  {
+    "code": "info.rewardMultiplier += ((((rate * period) / 1 weeks) * amount)) / 100000;",
+    "startLine": 49,
+    "endLine": 49
+  },
+  {
+    "code": "totalRewardMultiplier += ((((rate * period) / 1 weeks) * amount)) / 100000;",
+    "startLine": 50,
+    "endLine": 50
+  },
+  {
+    "code": "\n",
+    "startLine": 52,
+    "endLine": 52
+  },
+  {
+    "code": "function getUserInfoByIndex(uint256 from, uint256 to) external view returns (UserInfo[] memory) {\n}",
+    "startLine": 53,
+    "endLine": 54
+  },
+  {
+    "code": "uint256 to_ = to > userList.length ? userList.length : to;",
+    "startLine": 54,
+    "endLine": 54
+  },
+  {
+    "code": "UserInfo[] memory result = new UserInfo[](to - from);",
+    "startLine": 55,
+    "endLine": 55
+  },
+  {
+    "code": "for (uint256 i = 0; i < to_ - from; i++) {\n}",
+    "startLine": 56,
+    "endLine": 57
+  },
+  {
+    "code": "result[i] = userInfo[userList[i + from]];",
+    "startLine": 57,
+    "endLine": 57
+  },
+  {
+    "code": "return result;",
+    "startLine": 59,
+    "endLine": 59
+  }
+]

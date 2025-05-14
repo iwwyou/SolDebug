@@ -55,52 +55,52 @@
     "endLine": 13
   },
   {
-    "code": "function _approve(address owner, address spender, uint256 amount) internal virtual {\n}",
+    "code": "function _burn(address account, uint256 amount) internal virtual {\n}",
     "startLine": 14,
     "endLine": 15
   },
   {
-    "code": "require(owner != address(0), \"ERC20: approve from the zero address\");",
+    "code": "require(account != address(0), \"ERC20: burn from the zero address\");",
     "startLine": 15,
     "endLine": 15
   },
   {
-    "code": "require(spender != address(0), \"ERC20: approve to the zero address\");",
+    "code": "\n",
     "startLine": 16,
     "endLine": 16
   },
   {
-    "code": "\n",
+    "code": "_beforeTokenTransfer(account, address(0), amount);",
     "startLine": 17,
     "endLine": 17
   },
   {
-    "code": "_allowances[owner][spender] = amount;",
+    "code": "\n",
     "startLine": 18,
     "endLine": 18
   },
   {
-    "code": "\n",
+    "code": "uint256 accountBalance = _balances[account];",
+    "startLine": 19,
+    "endLine": 19
+  },
+  {
+    "code": "require(accountBalance >= amount, \"ERC20: burn amount exceeds balance\");",
     "startLine": 20,
     "endLine": 20
   },
   {
-    "code": "function _burn(address account, uint256 amount) internal virtual {\n}",
+    "code": "unchecked {\n}",
     "startLine": 21,
     "endLine": 22
   },
   {
-    "code": "require(account != address(0), \"ERC20: burn from the zero address\");",
+    "code": "_balances[account] = accountBalance - amount;",
     "startLine": 22,
     "endLine": 22
   },
   {
-    "code": "\n",
-    "startLine": 23,
-    "endLine": 23
-  },
-  {
-    "code": "_beforeTokenTransfer(account, address(0), amount);",
+    "code": "_totalSupply -= amount;",
     "startLine": 24,
     "endLine": 24
   },
@@ -110,38 +110,8 @@
     "endLine": 25
   },
   {
-    "code": "uint256 accountBalance = _balances[account];",
+    "code": "_afterTokenTransfer(account, address(0), amount);",
     "startLine": 26,
     "endLine": 26
-  },
-  {
-    "code": "require(accountBalance >= amount, \"ERC20: burn amount exceeds balance\");",
-    "startLine": 27,
-    "endLine": 27
-  },
-  {
-    "code": "unchecked {\n}",
-    "startLine": 28,
-    "endLine": 29
-  },
-  {
-    "code": "_balances[account] = accountBalance - amount;",
-    "startLine": 29,
-    "endLine": 29
-  },
-  {
-    "code": "_totalSupply -= amount;",
-    "startLine": 31,
-    "endLine": 31
-  },
-  {
-    "code": "\n",
-    "startLine": 32,
-    "endLine": 32
-  },
-  {
-    "code": "_afterTokenTransfer(account, address(0), amount);",
-    "startLine": 33,
-    "endLine": 33
   }
 ]

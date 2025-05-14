@@ -1,0 +1,357 @@
+[
+  {
+    "code": "contract GreenHouse {\n}",
+    "startLine": 1,
+    "endLine": 2
+  },
+  {
+    "code": "uint256 constant internal BONUS_POOL_NEW_STAKEHOLDER_TIME_ADDITION = 900;",
+    "startLine": 2,
+    "endLine": 2
+  },
+  {
+    "code": "uint256 constant internal BONUS_POOL_TIMER_INITIAL = 21600;",
+    "startLine": 3,
+    "endLine": 3
+  },
+  {
+    "code": "uint256 internal _bonusPoolLeaderboardFirst = 1;",
+    "startLine": 4,
+    "endLine": 4
+  },
+  {
+    "code": "uint256 internal _bonusPoolLeaderboardLast = 0;",
+    "startLine": 5,
+    "endLine": 5
+  },
+  {
+    "code": "uint256 internal _bonusPoolLastDistributedAt = 0;",
+    "startLine": 6,
+    "endLine": 6
+  },
+  {
+    "code": "uint256 internal _bonusPoolTimer;",
+    "startLine": 7,
+    "endLine": 7
+  },
+  {
+    "code": "mapping(uint256 => address) internal _bonusPoolLeaderboard;",
+    "startLine": 8,
+    "endLine": 8
+  },
+  {
+    "code": "mapping(address => uint256) internal _bonusPoolLeaderboardPositionsCount;",
+    "startLine": 9,
+    "endLine": 9
+  },
+  {
+    "code": "\n",
+    "startLine": 10,
+    "endLine": 10
+  },
+  {
+    "code": "function _bonusPoolLeaderboardUsersCount() internal view returns(uint256) {\n}",
+    "startLine": 11,
+    "endLine": 12
+  },
+  {
+    "code": "return _bonusPoolLeaderboardLast + 1 - _bonusPoolLeaderboardFirst;",
+    "startLine": 12,
+    "endLine": 12
+  },
+  {
+    "code": "\n",
+    "startLine": 14,
+    "endLine": 14
+  },
+  {
+    "code": "function bonusPoolLeaderboard() external view returns(address[] memory) {\n}",
+    "startLine": 15,
+    "endLine": 16
+  },
+  {
+    "code": "uint256 leaderboardUsersCount = _bonusPoolLeaderboardUsersCount();",
+    "startLine": 16,
+    "endLine": 16
+  },
+  {
+    "code": "address[] memory leaderboard = new address[](leaderboardUsersCount);",
+    "startLine": 17,
+    "endLine": 17
+  },
+  {
+    "code": "uint256 ptr = 0;",
+    "startLine": 18,
+    "endLine": 18
+  },
+  {
+    "code": "for (uint256 i = _bonusPoolLeaderboardFirst; i <= _bonusPoolLeaderboardLast; i++) {\n}",
+    "startLine": 19,
+    "endLine": 20
+  },
+  {
+    "code": "leaderboard[ptr] = _bonusPoolLeaderboard[i];",
+    "startLine": 20,
+    "endLine": 20
+  },
+  {
+    "code": "ptr++;",
+    "startLine": 21,
+    "endLine": 21
+  },
+  {
+    "code": "return leaderboard;",
+    "startLine": 23,
+    "endLine": 23
+  },
+  {
+    "code": "\n",
+    "startLine": 25,
+    "endLine": 25
+  },
+  {
+    "code": "function bonusRewardPoolCountdown() public view returns(uint256) {\n}",
+    "startLine": 26,
+    "endLine": 27
+  },
+  {
+    "code": "uint256 timeSinceLastDistributed = block.timestamp - _bonusPoolLastDistributedAt;",
+    "startLine": 27,
+    "endLine": 27
+  },
+  {
+    "code": "if (timeSinceLastDistributed >= _bonusPoolTimer) {\n}",
+    "startLine": 28,
+    "endLine": 29
+  },
+  {
+    "code": "return 0;",
+    "startLine": 29,
+    "endLine": 29
+  },
+  {
+    "code": "return _bonusPoolTimer - timeSinceLastDistributed;",
+    "startLine": 31,
+    "endLine": 31
+  },
+  {
+    "code": "\n",
+    "startLine": 33,
+    "endLine": 33
+  },
+  {
+    "code": "function _bonusPoolLeaderboardPush(address value) internal {\n}",
+    "startLine": 34,
+    "endLine": 35
+  },
+  {
+    "code": "_bonusPoolLeaderboardLast++;",
+    "startLine": 35,
+    "endLine": 35
+  },
+  {
+    "code": "_bonusPoolLeaderboard[_bonusPoolLeaderboardLast] = value;",
+    "startLine": 36,
+    "endLine": 36
+  },
+  {
+    "code": "_bonusPoolLeaderboardPositionsCount[value] += 1;",
+    "startLine": 37,
+    "endLine": 37
+  },
+  {
+    "code": "if((bonusRewardPoolCountdown()+BONUS_POOL_NEW_STAKEHOLDER_TIME_ADDITION) >= BONUS_POOL_TIMER_INITIAL){\n}",
+    "startLine": 38,
+    "endLine": 39
+  },
+  {
+    "code": "_bonusPoolTimer += 0;",
+    "startLine": 39,
+    "endLine": 39
+  },
+  {
+    "code": "} else {\n}",
+    "startLine": 40,
+    "endLine": 41
+  },
+  {
+    "code": "_bonusPoolTimer += BONUS_POOL_NEW_STAKEHOLDER_TIME_ADDITION;",
+    "startLine": 41,
+    "endLine": 41
+  },
+  {
+    "code": "\n",
+    "startLine": 44,
+    "endLine": 44
+  },
+  {
+    "code": "function _bonusPoolLeaderboardPop() internal {\n}",
+    "startLine": 45,
+    "endLine": 46
+  },
+  {
+    "code": "address removed = _bonusPoolLeaderboard[_bonusPoolLeaderboardFirst];",
+    "startLine": 46,
+    "endLine": 46
+  },
+  {
+    "code": "delete _bonusPoolLeaderboard[_bonusPoolLeaderboardFirst];",
+    "startLine": 47,
+    "endLine": 47
+  },
+  {
+    "code": "_bonusPoolLeaderboardFirst++;",
+    "startLine": 48,
+    "endLine": 48
+  },
+  {
+    "code": "_bonusPoolLeaderboardPositionsCount[removed]--;",
+    "startLine": 49,
+    "endLine": 49
+  },
+  {
+    "code": "if (_bonusPoolLeaderboardPositionsCount[removed] == 0) {\n}",
+    "startLine": 50,
+    "endLine": 51
+  },
+  {
+    "code": "delete _bonusPoolLeaderboardPositionsCount[removed];",
+    "startLine": 51,
+    "endLine": 51
+  },
+  {
+    "code": "\n",
+    "startLine": 54,
+    "endLine": 54
+  },
+  {
+    "code": "function _bonusPoolLeaderboardPush(address value) internal {\n}",
+    "startLine": 55,
+    "endLine": 56
+  },
+  {
+    "code": "_bonusPoolLeaderboardLast++;",
+    "startLine": 56,
+    "endLine": 56
+  },
+  {
+    "code": "_bonusPoolLeaderboard[_bonusPoolLeaderboardLast] = value;",
+    "startLine": 57,
+    "endLine": 57
+  },
+  {
+    "code": "_bonusPoolLeaderboardPositionsCount[value] += 1;",
+    "startLine": 58,
+    "endLine": 58
+  },
+  {
+    "code": "if((bonusRewardPoolCountdown()+BONUS_POOL_NEW_STAKEHOLDER_TIME_ADDITION) >= BONUS_POOL_TIMER_INITIAL){\n}",
+    "startLine": 59,
+    "endLine": 60
+  },
+  {
+    "code": "_bonusPoolTimer += 0;",
+    "startLine": 60,
+    "endLine": 60
+  },
+  {
+    "code": "else{\n}",
+    "startLine": 62,
+    "endLine": 63
+  },
+  {
+    "code": "_bonusPoolTimer += BONUS_POOL_NEW_STAKEHOLDER_TIME_ADDITION;",
+    "startLine": 63,
+    "endLine": 63
+  },
+  {
+    "code": "\n",
+    "startLine": 66,
+    "endLine": 66
+  },
+  {
+    "code": "function _bonusPoolLeaderboardKick(address stakeholder, uint256 positions) internal {\n}",
+    "startLine": 67,
+    "endLine": 68
+  },
+  {
+    "code": "uint256 positionsLeftToKick = positions;",
+    "startLine": 68,
+    "endLine": 68
+  },
+  {
+    "code": "address[] memory leaderboard = new address[](_bonusPoolLeaderboardUsersCount() - positions);",
+    "startLine": 69,
+    "endLine": 69
+  },
+  {
+    "code": "uint256 ptr = 0;",
+    "startLine": 70,
+    "endLine": 70
+  },
+  {
+    "code": "\n",
+    "startLine": 71,
+    "endLine": 71
+  },
+  {
+    "code": "for (uint256 i = _bonusPoolLeaderboardFirst; i <= _bonusPoolLeaderboardLast; i++) {\n}",
+    "startLine": 72,
+    "endLine": 73
+  },
+  {
+    "code": "if (positionsLeftToKick > 0 && _bonusPoolLeaderboard[i] == stakeholder) {\n}",
+    "startLine": 73,
+    "endLine": 74
+  },
+  {
+    "code": "positionsLeftToKick--;",
+    "startLine": 74,
+    "endLine": 74
+  },
+  {
+    "code": "else {\n}",
+    "startLine": 76,
+    "endLine": 77
+  },
+  {
+    "code": "leaderboard[ptr] = _bonusPoolLeaderboard[i];",
+    "startLine": 77,
+    "endLine": 77
+  },
+  {
+    "code": "ptr++;",
+    "startLine": 78,
+    "endLine": 78
+  },
+  {
+    "code": "\n",
+    "startLine": 81,
+    "endLine": 81
+  },
+  {
+    "code": "while (_bonusPoolLeaderboardUsersCount() > 0) {\n}",
+    "startLine": 82,
+    "endLine": 83
+  },
+  {
+    "code": "_bonusPoolLeaderboardPop();",
+    "startLine": 83,
+    "endLine": 83
+  },
+  {
+    "code": "\n",
+    "startLine": 85,
+    "endLine": 85
+  },
+  {
+    "code": "for (uint256 i = 0; i < leaderboard.length; ++i) {\n}",
+    "startLine": 86,
+    "endLine": 87
+  },
+  {
+    "code": "_bonusPoolLeaderboardPush(leaderboard[i]);",
+    "startLine": 87,
+    "endLine": 87
+  }
+]

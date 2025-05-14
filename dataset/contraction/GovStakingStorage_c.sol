@@ -4,14 +4,14 @@ contract GovStakingStorage {
     uint256 totalRewardMultiplier;
     
     struct UserInfo {
-        uint256 amount; // current locked amount
-        uint256 lockStart; // for governance staking
-        uint256 lockPeriod; // for governance staking
-        uint256 lastClaimed; // govGoGo
-        uint256 unclaimedAmount; // govGoGo
-        uint256 rewardRate; // for governance staking
-        uint256 rewardMultiplier; // for gogo reward fee distribution
-        uint256 userRewardPerTokenPaid; // for gogo reward fee distribution
+        uint256 amount; 
+        uint256 lockStart; 
+        uint256 lockPeriod; 
+        uint256 lastClaimed; 
+        uint256 unclaimedAmount; 
+        uint256 rewardRate; 
+        uint256 rewardMultiplier; 
+        uint256 userRewardPerTokenPaid; 
         uint256 index;
     }
 

@@ -1,0 +1,122 @@
+[
+  {
+    "code": "contract Lock {\n}",
+    "startLine": 1,
+    "endLine": 2
+  },
+  {
+    "code": "struct LockedData {\n}",
+    "startLine": 2,
+    "endLine": 3
+  },
+  {
+    "code": "uint256 total;",
+    "startLine": 3,
+    "endLine": 3
+  },
+  {
+    "code": "uint256 pending;",
+    "startLine": 4,
+    "endLine": 4
+  },
+  {
+    "code": "uint256 estUnlock;",
+    "startLine": 5,
+    "endLine": 5
+  },
+  {
+    "code": "uint256 unlockedAmounts;",
+    "startLine": 6,
+    "endLine": 6
+  },
+  {
+    "code": "\n",
+    "startLine": 8,
+    "endLine": 8
+  },
+  {
+    "code": "mapping(address => LockedData) public data;",
+    "startLine": 9,
+    "endLine": 9
+  },
+  {
+    "code": "uint256 public startLock;",
+    "startLine": 10,
+    "endLine": 10
+  },
+  {
+    "code": "uint256 public unlockDuration = 30 days;",
+    "startLine": 11,
+    "endLine": 11
+  },
+  {
+    "code": "uint256 public lockedTime = 6 * 30 days;",
+    "startLine": 12,
+    "endLine": 12
+  },
+  {
+    "code": "\n",
+    "startLine": 13,
+    "endLine": 13
+  },
+  {
+    "code": "function pending(address _account) public view returns(uint256 _pending) {\n}",
+    "startLine": 14,
+    "endLine": 15
+  },
+  {
+    "code": "LockedData memory _data = data[_account];",
+    "startLine": 15,
+    "endLine": 15
+  },
+  {
+    "code": "uint256 _totalLockRemain =  _data.total - _data.unlockedAmounts - _data.pending;",
+    "startLine": 16,
+    "endLine": 16
+  },
+  {
+    "code": "if (_totalLockRemain > 0) {\n}",
+    "startLine": 17,
+    "endLine": 18
+  },
+  {
+    "code": "if (block.timestamp >= startLock + lockedTime) {\n}",
+    "startLine": 18,
+    "endLine": 19
+  },
+  {
+    "code": "_pending = _totalLockRemain;",
+    "startLine": 19,
+    "endLine": 19
+  },
+  {
+    "code": "} else {\n}",
+    "startLine": 20,
+    "endLine": 21
+  },
+  {
+    "code": "uint256 _nUnlock = (lockedTime - (block.timestamp - startLock) - 1) / unlockDuration + 1;",
+    "startLine": 21,
+    "endLine": 21
+  },
+  {
+    "code": "_pending = _totalLockRemain - _data.estUnlock * _nUnlock;",
+    "startLine": 22,
+    "endLine": 22
+  },
+  {
+    "code": "if (_data.pending > 0) {\n}",
+    "startLine": 25,
+    "endLine": 26
+  },
+  {
+    "code": "_pending += _data.pending;",
+    "startLine": 26,
+    "endLine": 26
+  },
+  {
+    "code": "\n",
+    "startLine": 30,
+    "endLine": 30
+  }
+]
