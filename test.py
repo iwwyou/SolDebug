@@ -101,9 +101,13 @@ def simulate_inputs(test_inputs: list[dict], *, silent: bool = False) -> None:
 
         # 5) (옵션)  중간 결과 로그
         if not silent:
-            for ln, infos in contract_analyzer.get_line_analysis(start_line, end_line).items():
-                for info in infos:  # 같은 줄에 여러 기록이 있을 수 있음
+            for ln, infos in contract_analyzer.analysis_per_line.items():
+                for info in infos:
                     print(f"[line {ln}] {json.dumps(info, ensure_ascii=False)}")
+
+            print("--------------------------------------------------------")
+
+
 test_inputs = [
     {
         "code": "contract AloeBlend {\n}",
@@ -278,6 +282,12 @@ test_inputs = [
         "startLine": 30,
         "endLine": 30,
         "event": "add"
+    },
+    {
+        "code": "// @LocalVar earned0 = [10,100]",
+        "startLine": 19,
+        "endLine": 19,
+        "event" : "add"
     },
     {
         "code": "// @LocalVar earned1 = [100,200]",

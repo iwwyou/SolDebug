@@ -34,6 +34,7 @@ class ContractAnalyzer:
         self.current_target_struct = None
 
         self.current_edit_event = None
+        self._record_enabled = False
 
         # for Multiple Contract
         self.contract_cfgs = {} # name -> CFG
@@ -612,7 +613,7 @@ class ContractAnalyzer:
         self._register_var(variable_obj)
 
         # 4. 상태 변수를 ContractCFG에 추가
-        contract_cfg.add_state_variable(variable_obj, expr=init_expr)
+        contract_cfg.add_state_variable(variable_obj, expr=init_expr, line_no=self.current_start_line)
 
         # 5. ContractCFG에 있는 모든 FunctionCFG에 상태 변수 추가
         for function_cfg in contract_cfg.functions.values():
@@ -653,7 +654,7 @@ class ContractAnalyzer:
         self._register_var(variable_obj)
 
         # 3. ContractCFG 에 추가 (state 변수와 동일 API 사용)
-        contract_cfg.add_state_variable(variable_obj, expr=init_expr)
+        contract_cfg.add_state_variable(variable_obj, expr=init_expr, line_no=self.current_start_line)
 
         # 4. 이미 생성된 모든 FunctionCFG 에 read-only 변수로 연동
         for fn_cfg in contract_cfg.functions.values():
@@ -994,7 +995,7 @@ class ContractAnalyzer:
         # 4. CFG 노드 업데이트
         # ----------------------------------------------------------------
         cur_blk.variables[v.identifier] = v
-        cur_blk.add_variable_declaration_statement(type_obj, var_name, init_expr)
+        cur_blk.add_variable_declaration_statement(type_obj, var_name, init_expr, self.current_start_line)
         self.current_target_function_cfg.add_related_variable(v)
         self.current_target_function_cfg.update_block(cur_blk)
 
@@ -1033,7 +1034,7 @@ class ContractAnalyzer:
         rExpVal = self.evaluate_expression(expr.right, current_block.variables, None, None)
         self.update_left_var(expr.left, rExpVal, expr.operator, current_block.variables, None, None)
 
-        current_block.add_assign_statement(expr.left, expr.operator, expr.right)
+        current_block.add_assign_statement(expr.left, expr.operator, expr.right, self.current_start_line)
 
         if self.current_target_function_cfg.function_type == "constructor" :
             self._overwrite_state_vars_from_block(contract_cfg, current_block.variables)
@@ -1041,6 +1042,7 @@ class ContractAnalyzer:
         # 2) 방금 변경된 변수 객체 다시 가져오기 (new_value=None ⇒ 탐색만)
         target_var = self._resolve_and_update_expr(
             expr.left,
+            current_block.variables,
             self.current_target_function_cfg,
             None
         )
@@ -1088,7 +1090,7 @@ class ContractAnalyzer:
             self._overwrite_state_vars_from_block(ccf, cur_blk.variables)
 
         # ── 3) 갱신된 변수 객체 얻어서 analysis 기록
-        target_var = self._resolve_and_update_expr(expr, fcfg, None)
+        target_var = self._resolve_and_update_expr(expr, cur_blk.variables, fcfg, None)
         self._record_analysis(
             line_no=self.current_start_line,
             stmt_type=stmt_kind,
@@ -1143,7 +1145,7 @@ class ContractAnalyzer:
 
         _ = self.evaluate_function_call_context(function_expr, current_block.variables, None, None)
 
-        current_block.add_function_call_statement(function_expr)
+        current_block.add_function_call_statement(function_expr, self.current_start_line)
 
         # 10. current_block을 function CFG에 반영
         self.current_target_function_cfg.update_block(current_block)  # 변경된 블록을 반영
@@ -1667,7 +1669,7 @@ class ContractAnalyzer:
         current_block = self.get_current_block()
 
         # 3. 현재 블록에 continue statement 추가 (Statement 객체로 추가)
-        current_block.add_continue_statement()
+        current_block.add_continue_statement(self.current_start_line)
 
         # 4. 재귀적으로 fixpoint_evaluation_node 찾기
         fixpoint_evaluation_node = self.find_fixpoint_evaluation_node(current_block)
@@ -1707,7 +1709,7 @@ class ContractAnalyzer:
         current_block = self.get_current_block()
 
         # 3. 현재 블록에 break statement 추가 (Statement 객체로 추가)
-        current_block.add_break_statement()
+        current_block.add_break_statement(self.current_start_line)
 
         # 4. 재귀적으로 위로 타고 올라가서 while문 조건 노드를 찾기
         condition_node = self.find_loop_condition_node(current_block)
@@ -1777,7 +1779,7 @@ class ContractAnalyzer:
             )
 
         # 4. Return 구문을 current_block에 추가
-        current_block.add_return_statement(return_expr=return_expr)
+        current_block.add_return_statement(return_expr=return_expr, line_no=self.current_start_line)
 
         # 5. function_exit_node에 return 값을 저장
         exit_node = self.current_target_function_cfg.get_exit_node()
@@ -2296,13 +2298,14 @@ class ContractAnalyzer:
         value    : Interval | BoolInterval | UnsignedIntegerInterval(160-bit) | str
         """
         cfg = self.contract_cfgs[self.current_target_contract]
-        fcfg = cfg.get_function_cfg(self.current_target_function)
+        self.current_target_function_cfg = cfg.get_function_cfg(self.current_target_function)
         ev = self.current_edit_event
-        if fcfg is None:
+        if self.current_target_function_cfg is None:
             raise ValueError("@StateVar debug must appear inside a function body.")
 
         # 1) 변수 객체 위치 탐색 + 값 대입
-        var_obj = self._resolve_and_update_expr(lhs_expr, fcfg, value)
+        var_obj = self._resolve_and_update_expr(lhs_expr, self.current_target_function_cfg.related_variables,
+                                                self.current_target_function_cfg, value)
         if var_obj is None:
             raise ValueError("LHS cannot be resolved to a state variable.")
 
@@ -2327,7 +2330,9 @@ class ContractAnalyzer:
                 self.sm.bind_var(var_obj.identifier, nid)
 
         # 3) 해당 함수만 다시 해석
-        self.interpret_function_cfg(fcfg)
+        self.interpret_function_cfg(self.current_target_function_cfg)
+
+        self.current_target_function_cfg = None
 
     # ─────────────────────────────────────────────────────────────
     def process_local_var_for_debug(self, lhs_expr: Expression, value):
@@ -2336,11 +2341,13 @@ class ContractAnalyzer:
         """
         ev = self.current_edit_event
         cfg = self.contract_cfgs[self.current_target_contract]
-        fcfg = cfg.get_function_cfg(self.current_target_function)
-        if fcfg is None:
+        self.current_target_function_cfg = cfg.get_function_cfg(self.current_target_function)
+        if self.current_target_function_cfg is None:
             raise ValueError("@LocalVar debug must appear inside a function body.")
 
-        var_obj = self._resolve_and_update_expr(lhs_expr, fcfg, value)
+        var_obj = self._resolve_and_update_expr(lhs_expr, self.current_target_function_cfg.related_variables,
+                                                self.current_target_function_cfg, value)
+
         if var_obj is None:
             raise ValueError("LHS cannot be resolved to a local variable.")
 
@@ -2364,7 +2371,9 @@ class ContractAnalyzer:
                 self.sm.bind_var(var_obj.identifier, nid)
 
         # 함수 재해석
-        self.interpret_function_cfg(fcfg)
+        self.interpret_function_cfg(self.current_target_function_cfg)
+
+        self.current_target_function_cfg = None
 
     # ---------------- util helpers ---------------- #
     # ---------------------------------------------------------------------------
@@ -2560,19 +2569,31 @@ class ContractAnalyzer:
             var_obj.value = new_value
 
     # ───────── debug LHS 해석 (member / index 접근) ────────────────────────
-    def _resolve_and_update_expr(self, expr: Expression, fcfg: FunctionCFG, new_value):
-        """
-        testingExpression (AST) → 실제 변수 객체를 찾아 value 업데이트
-        """
+    def _resolve_and_update_expr(
+            self,
+            expr: Expression,
+            var_env: dict[str, Variables],  # ← 새 파라미터
+            fcfg: FunctionCFG,
+            new_value):
+
         # 1) 루트 식별자
         if expr.base is None:
+            # 1-a. 먼저 현재 블록 / 현재 env 에서 찾기
+            if expr.identifier in var_env:
+                v = var_env[expr.identifier]
+                if new_value is not None:
+                    self._apply_new_value_to_variable(v, new_value)
+                return v
+
+            # 1-b. 없으면 함수-관련(초기) 테이블에서
             v = fcfg.get_related_variable(expr.identifier)
             if v and new_value is not None:
                 self._apply_new_value_to_variable(v, new_value)
             return v
 
         # 2) base  먼저 해석
-        base_obj = self._resolve_and_update_expr(expr.base, fcfg, None)
+        base_obj = self._resolve_and_update_expr(expr.base, var_env, fcfg, None)
+
         if base_obj is None:
             return None
 
@@ -5165,73 +5186,76 @@ class ContractAnalyzer:
 
         return return_value
 
-    def interpret_function_cfg(self, function_cfg):
-        """
-        수정된 interpret_function_cfg 로직 예시
-        """
-        entry_block = function_cfg.get_entry_node()
-        successors = list(function_cfg.graph.successors(entry_block))
-        if len(successors) != 1:
-            raise ValueError("Entry block must have exactly one successor.")
-        start_block = successors[0]
+    def interpret_function_cfg(self, fcfg: FunctionCFG):
 
-        # block_queue에는 now just nodes, no variables
-        block_queue = deque()
-        block_queue.append(start_block)
+        # ─── ① 호출 이전 컨텍스트 백업 ─────────────────────────
+        _old_func = self.current_target_function
+        _old_fcfg = self.current_target_function_cfg
 
-        # 함수 내 변수 환경은 CFG 노드에 저장됨.
-        # entry_block의 successor 시작 시, entry_block.variables를 start_block에 전달
-        # entry_block.variables는 아마 constructor나 state_variable_node 해석 후 초기값이 세팅되어 있을 것이라 가정
-        # start_block은 predecessor가 entry_block 하나이므로 그냥 그 값 복사
-        start_block.variables = self.copy_variables(entry_block.variables)
+        # ─── ② 현재 해석 대상 함수로 설정 ─────────────────────
+        self.current_target_function = fcfg.function_name
+        self.current_target_function_cfg = fcfg
+
+        for blk in fcfg.graph.nodes:
+            for st in blk.statements:
+                ln = getattr(st, "src_line", None)
+                if ln is not None:
+                    self.analysis_per_line[ln].clear()  # ← 기존 기록 삭제
+
+        entry = fcfg.get_entry_node()
+        start_block, = fcfg.graph.successors(entry)  # exactly one successor
+        start_block.variables = self.copy_variables(fcfg.related_variables)
+
+        # ────────────────── work-list 초기화 ───────────────────────────────
+        work = deque([start_block])
+        visited: set[CFGNode] = set()  # 첫 블록도 분석해야 하므로 비워 둠
 
         # return_values를 모아둘 자료구조 (나중에 exit node에서 join)
         return_values = []
 
-        visited = set()
-
-        while block_queue:
-            analyzingNode = block_queue.popleft()
-            if analyzingNode in visited:
+        self._record_enabled = True
+        while work:
+            node = work.popleft()
+            if node in visited:
                 continue
-            visited.add(analyzingNode)
+            visited.add(node)
 
             # 이전 block 분석 결과 반영
             # join_point_node인 경우 predecessor들의 결과를 join한뒤 analyzingNode에 반영
             # 아니면 predecessor 하나가 있을 것이므로 그 predecessor의 variables를 복사
-            predecessors = list(function_cfg.graph.predecessors(analyzingNode))
+            preds = list(fcfg.graph.predecessors(node))
 
-            # join node 처리
-            # predecessor들의 variables를 join
-            joined_vars = None
-            for pred in predecessors:
-                if joined_vars is None:
-                    joined_vars = self.copy_variables(pred.variables)
-                else:
-                    joined_vars = self.join_variables(joined_vars, pred.variables)
-            analyzingNode.variables = joined_vars
+            if preds:  # join 이 필요한 경우
+                joined = None
+                for p in preds:
+                    if not p.variables:  # “실질-빈” → skip
+                        continue
+                    joined = (self.copy_variables(p.variables)
+                              if joined is None
+                              else self.join_variables(joined, p.variables))
+                if joined is not None:  # 무언가 합쳐졌을 때만 덮어쓰기
+                    node.variables = joined
 
-            current_block = analyzingNode
-            current_variables = current_block.variables
+            cur_vars = node.variables
 
             # condition node 처리
-            if current_block.condition_node:
-                condition_expr = current_block.condition_expr
+            if node.condition_node:
+                condition_expr = node.condition_expr
 
-                if current_block.condition_node_type in ["if", "else if"]:
+                if node.condition_node_type in ["if", "else if"]:
                     # true/false branch 각각 하나의 successor 가정
-                    true_successors = [s for s in function_cfg.graph.successors(current_block) if
-                                       function_cfg.graph.edges[current_block, s].get('condition') == True]
-                    false_successors = [s for s in function_cfg.graph.successors(current_block) if
-                                        function_cfg.graph.edges[current_block, s].get('condition') == False]
+                    true_successors = [s for s in fcfg.graph.successors(node) if
+                                       fcfg.graph.edges[node, s].get('condition') == True]
+                    false_successors = [s for s in fcfg.graph.successors(node) if
+                                        fcfg.graph.edges[node, s].get('condition') == False]
 
                     # 각각 한 개라 가정
                     if len(true_successors) != 1 or len(false_successors) != 1:
                         raise ValueError(
                             "if/else if node must have exactly one true successor and one false successor.")
 
-                    true_variables = self.copy_variables(current_variables)
-                    false_variables = self.copy_variables(current_variables)
+                    true_variables = self.copy_variables(cur_vars)
+                    false_variables = self.copy_variables(cur_vars)
 
                     self.update_variables_with_condition(true_variables, condition_expr, is_true_branch=True)
                     self.update_variables_with_condition(false_variables, condition_expr, is_true_branch=False)
@@ -5239,40 +5263,40 @@ class ContractAnalyzer:
                     # true branch로 이어지는 successor enqueue
                     true_succ = true_successors[0]
                     true_succ.variables = true_variables
-                    block_queue.append(true_succ)
+                    work.append(true_succ)
 
                     # false branch로 이어지는 successor enqueue
                     false_succ = false_successors[0]
                     false_succ.variables = false_variables
-                    block_queue.append(false_succ)
+                    work.append(false_succ)
                     continue
 
-                elif current_block.condition_node_type in ["require", "assert"]:
+                elif node.condition_node_type in ["require", "assert"]:
                     # true branch만 존재한다고 가정
-                    true_successors = [s for s in function_cfg.graph.successors(current_block) if
-                                       function_cfg.graph.edges[current_block, s].get('condition') == True]
+                    true_successors = [s for s in fcfg.graph.successors(node) if
+                                       fcfg.graph.edges[node, s].get('condition') == True]
 
                     if len(true_successors) != 1:
                         raise ValueError("require/assert node must have exactly one true successor.")
 
-                    true_variables = self.copy_variables(current_variables)
+                    true_variables = self.copy_variables(cur_vars)
                     self.update_variables_with_condition(true_variables, condition_expr, is_true_branch=True)
 
                     true_succ = true_successors[0]
                     true_succ.variables = true_variables
-                    block_queue.append(true_succ)
+                    work.append(true_succ)
                     continue
 
-                elif current_block.condition_node_type in ["while", "for", "do_while"]:
+                elif node.condition_node_type in ["while", "for", "do_while"]:
                     # while 루프 처리
                     # fixpoint 계산 후 exit_node 반환
-                    exit_node = self.fixpoint(current_block)
+                    exit_node = self.fixpoint(node)
                     # exit_node의 successor는 하나라고 가정
-                    successors = list(function_cfg.graph.successors(exit_node))
+                    successors = list(fcfg.graph.successors(exit_node))
                     if len(successors) == 1:
                         next_node = successors[0]
                         next_node.variables = self.copy_variables(exit_node.variables)
-                        block_queue.append(next_node)
+                        work.append(next_node)
                     elif len(successors) == 0:
                         # while 종료 후 아무 successor도 없으면 끝
                         pass
@@ -5280,28 +5304,32 @@ class ContractAnalyzer:
                         raise ValueError("While exit node must have exactly one successor.")
                     continue
 
-                elif current_block.fixpoint_evaluation_node:
+                elif node.fixpoint_evaluation_node:
                     # 그냥 continue
                     continue
                 else:
-                    raise ValueError(f"Unknown condition node type: {current_block.condition_node_type}")
+                    raise ValueError(f"Unknown condition node type: {node.condition_node_type}")
 
             else:
                 # condition node가 아닌 일반 블록
                 # 블록 내 문장 해석
-                for stmt in current_block.statements:
-                    current_variables = self.update_statement_with_variables(stmt, current_variables)
+                for stmt in node.statements:
+                    cur_vars = self.update_statement_with_variables(stmt, cur_vars)
 
                 # return이나 revert를 만나지 않았다면 successors 방문
-                successors = list(function_cfg.graph.successors(current_block))
+                successors = list(fcfg.graph.successors(node))
                 if len(successors) == 1:
                     next_node = successors[0]
                     # next_node에 현재 변수 상태를 반영
-                    next_node.variables = self.copy_variables(current_variables)
-                    block_queue.append(next_node)
+                    next_node.variables = self.copy_variables(cur_vars)
+                    work.append(next_node)
                 elif len(successors) > 1:
                     raise ValueError("Non-condition, non-join node should not have multiple successors.")
                 # successors가 없으면 리프노드이므로 그냥 끝.
+
+        self._record_enabled = False
+        self.current_target_function = _old_func
+        self.current_target_function_cfg = _old_fcfg
 
         # exit node에 도달했다면 return_values join
         # 모든 return을 모아 exit node에서 join 처리할 수 있으나, 여기서는 단순히 top-level에서 return_values를 join
@@ -5340,19 +5368,37 @@ class ContractAnalyzer:
         elif isinstance(variableObj, MappingVariable) : # mapping은 있을수가 없음
             raise ValueError (f"Mapping variable is not expected in variable declaration context")
         elif isinstance(variableObj, Variables) :
-            if varType.typeCategory == "elementary" :
-                variableObj.value = self.evaluate_expression(initExpr, variables, None, None)
-                return variables
+            variableObj.value = self.evaluate_expression(initExpr, variables, None, None)
+            if self._record_enabled:
+                lhs_expr = Expression(identifier=varName, context="IdentifierExpContext")
+                self._record_analysis(
+                    line_no=stmt.src_line,
+                    stmt_type=stmt.statement_type,
+                    expr=lhs_expr,
+                    var_obj=variableObj
+                )
+            return variables
         else :
             raise ValueError (f"Unexpected type of variable object")
 
     def interpret_assignment_statement(self, stmt, variables):
-        leftExpr = stmt.left
-        operator = stmt.operator
-        rightExpr = stmt.right
+        lexp, rexpr, op = stmt.left, stmt.right, stmt.operator
+        r_val = self.evaluate_expression(rexpr, variables, None, None)
+        self.update_left_var(lexp, r_val, op, variables, None, None)
 
-        rExpVal = self.evaluate_expression(rightExpr, variables, None, None)
-        self.update_left_var(leftExpr, rExpVal, operator, variables, None, None)
+        # ① target 변수 찾아서 로그
+        if self._record_enabled:
+            tgt = self._resolve_and_update_expr(lexp,  # 탐색만
+                                                variables,
+                                                self.current_target_function_cfg,
+                                                None)
+            if tgt:
+                self._record_analysis(
+                    line_no=stmt.src_line,
+                    stmt_type=stmt.statement_type,
+                    expr=lexp,
+                    var_obj=tgt
+                )
 
         return variables
 
@@ -5363,13 +5409,33 @@ class ContractAnalyzer:
         return variables
 
     def interpret_return_statement(self, stmt, variables):
-        returnExpr = stmt.return_expr
-        returnValue = self.evaluate_expression(returnExpr, variables, None, None)
+        rexpr = stmt.return_expr
+        r_val = self.evaluate_expression(rexpr, variables, None, None)
 
-        # 5. function_exit_node에 return 값을 저장
+        if self._record_enabled:
+            if (rexpr and  # 반환식이 있고
+                    getattr(rexpr, "context", "") == "TupleExpressionContext"):
+                # ── (1)  earned0 / earned1  …  각각 따로 찍기 ─────────────
+                flat = {}
+                for sub_e, sub_v in zip(rexpr.elements, r_val):
+                    k = self._expr_to_str(sub_e)  # "earned0" / "earned1"
+                    flat[k] = self._serialize_val(sub_v)
+                self.analysis_per_line[stmt.src_line].append(
+                    {"kind": stmt.statement_type, "vars": flat}
+                )
+            else:
+                # ── (2)  단일 반환값 (기존 로직) ──────────────────────────
+                dummy = Variables(identifier="__ret__", value=r_val, scope="tmp")
+                self._record_analysis(
+                    line_no=stmt.src_line,
+                    stmt_type=stmt.statement_type,
+                    expr=rexpr,
+                    var_obj=dummy
+                )
+
+        # exit-node 에 값 저장 (변경 없음)
         exit_node = self.current_target_function_cfg.get_exit_node()
-        exit_node.return_vals[self.current_start_line] = returnValue  # 반환 값을 exit_node의 return_val에 기록
-
+        exit_node.return_vals[stmt.src_line] = r_val
         return variables
 
     def interpret_revert_statement(self, stmt, variables):
@@ -5434,8 +5500,6 @@ class ContractAnalyzer:
             raise ValueError(f"Unsupported comparison operator: {operator}")
 
         return BoolInterval(is_true, is_false)
-
-
 
     def _expr_to_str(self, e: Expression) -> str:
         """Expression AST → Solidity 소스 형태 문자열"""

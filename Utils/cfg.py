@@ -29,68 +29,76 @@ class CFGNode:
         self.function_exit_node = False
         self.return_vals = {}
 
-    def add_variable_declaration_statement(self, typeObj, varName, initExpr):
+    def add_variable_declaration_statement(self, typeObj, varName, initExpr, line_no):
 
         # Statement 생성
         variableDeclarationStatment = Statement(
             statement_type='variableDeclaration',
             type_obj=typeObj,
             var_name=varName,
-            init_expr=initExpr
+            init_expr=initExpr,
+            src_line=line_no
         )
 
         self.statements.append(variableDeclarationStatment)
 
-    def add_assign_statement(self, exprLeft, exprOperator, exprRight):
+    def add_assign_statement(self, exprLeft, exprOperator, exprRight, line_no):
 
         # Statement 생성
         assignment_stmt = Statement(
             statement_type='assignment',
             left=exprLeft,
             operator=exprOperator,
-            right=exprRight
+            right=exprRight,
+            src_line=line_no
         )
         self.statements.append(assignment_stmt)
 
         # 변수 정보 업데이트는 update_left_Var 관련 함수에서 수행
 
-    def add_function_call_statement(self, function_expr: Expression):
+    def add_function_call_statement(self, function_expr: Expression, line_no):
         """
         함수 호출문을 CFG에 추가합니다.
         :param function_expr: 함수 호출 Expression 객체
         """
         function_call_stmt = Statement(
             statement_type='functionCall',
-            function_expr=function_expr
+            function_expr=function_expr,
+            src_line=line_no
         )
         self.statements.append(function_call_stmt)
 
-    def add_return_statement(self, return_expr: Expression):
+    def add_return_statement(self, return_expr: Expression, line_no):
         """
         반환 구문을 CFG에 추가하고, 반환 값을 업데이트합니다.
         :param return_expr: 반환할 Expression 객체
         """
         return_stmt = Statement(
             statement_type='return',
-            return_expr=return_expr
+            return_expr=return_expr,
+            src_line=line_no
         )
         self.statements.append(return_stmt)
 
-    def add_continue_statement(self):
-        continue_stmt = Statement(statement_type='continue')
+    def add_continue_statement(self, line_no):
+        continue_stmt = Statement(statement_type='continue',
+                                  src_line=line_no)
         self.statements.append(continue_stmt)
 
-    def add_break_statement(self):
-        break_stmt = Statement(statement_type='break')
+    def add_break_statement(self, line_no):
+        break_stmt = Statement(statement_type='break',
+                               src_line=line_no)
         self.statements.append(break_stmt)
 
-    def add_revert_statement(self, revert_identifier=None, string_literal=None, call_argument_list=None):
+    def add_revert_statement(self, revert_identifier=None, string_literal=None, call_argument_list=None,
+                             line_no=None):
         # 4. Revert 문장을 Statement 객체로 만들어서 현재 블록에 추가
         revert_statement = Statement(
             statement_type="revert",
             identifier=revert_identifier,
             string_literal=string_literal,
-            arguments=call_argument_list
+            arguments=call_argument_list,
+            src_line=line_no
         )
         self.statements.append(revert_statement)
 
@@ -177,11 +185,12 @@ class ContractCFG(CFG):
         else :
             raise ValueError(f"Struct {struct_def_name} is not defined/")
 
-    def add_state_variable(self, variable, expr=None): # variable : Variables, expr : Interval
+    def add_state_variable(self, variable, expr=None, line_no=None): # variable : Variables, expr : Interval
         self.state_variable_node.add_assign_statement(
             exprLeft=variable,  # 좌변
             exprRight=expr,  # 우변 (Expression | None)
-            exprOperator='='  # 연산자
+            exprOperator='=',  # 연산자
+            line_no=line_no
         )
 
         self.state_variable_node.variables[variable.identifier] = variable

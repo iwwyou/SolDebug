@@ -18,8 +18,6 @@ class SnapshotManager:
             deserializer(obj, copy.deepcopy(snap))
 
 
-
-
 class Statement:
     def __init__(self, statement_type, **kwargs):
         self.statement_type = statement_type  # 'assignment', 'if', 'while', 'for', 'return', 'require', 'assert' 등
@@ -33,18 +31,23 @@ class Statement:
             self.type_obj = kwargs.get('type_obj')  # SolType
             self.var_name = kwargs.get('var_name')
             self.init_expr = kwargs.get('init_expr')
+            self.src_line = kwargs.get('src_line')
         elif statement_type == 'assignment':
             self.left = kwargs.get('left')        # 좌변 Expression
             self.operator = kwargs.get('operator')  # 할당 연산자 (예: '=', '+=', '-=' 등)
             self.right = kwargs.get('right')      # 우변 Expression
+            self.src_line = kwargs.get('src_line')
         elif statement_type == "functionCall" :
             self.function_expr = kwargs.get('function_expr')
+            self.src_line = kwargs.get('src_line')
         elif statement_type == 'return':
             self.return_expr = kwargs.get('return_expr')
+            self.src_line = kwargs.get('src_line')
         elif statement_type == 'revert' :
             self.identifier = kwargs.get('identifier')
             self.string_literal = kwargs.get('string_literal')
             self.arguments = kwargs.get('arguments')
+            self.src_line = kwargs.get('src_line')
 
 
 
