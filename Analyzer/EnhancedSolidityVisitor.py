@@ -186,45 +186,46 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by SolidityParser#stateVariableDeclaration.
-    def visitStateVariableDeclaration(self, ctx: SolidityParser.StateVariableDeclarationContext):
+    # EnhancedSolidityVisitor.py
+    def visitStateVariableDeclaration(self,
+                                      ctx: SolidityParser.StateVariableDeclarationContext):
+
         var_name = ctx.identifier().getText()
 
-        # 1. 기본 Variables 객체 생성 (초기에는 타입을 모름)
-        variable_obj = None
-
-        # 2. 타입 분석
+        # ── ① 타입 해석 ─────────────────────────────────────────────
         type_ctx = ctx.typeName()
-        type_obj = SolType()
-        type_obj = self.visitTypeName(type_ctx, type_obj)  # SolType 객체 반환
+        type_info = self.visitTypeName(type_ctx, SolType())  # ← SolType 객체
 
-        # 3. 변수 객체 생성 (타입에 따라 다름)
-        if type_obj.typeCategory == 'array':
-            variable_obj = ArrayVariable(identifier=var_name, base_type=type_obj.arrayBaseType,
-                                         array_length=type_obj.arrayLength, scope='state')
-        elif type_obj.typeCategory == 'struct':
-            variable_obj = StructVariable(identifier=var_name, struct_type=type_obj.structTypeName, scope='state')
-        elif type_obj.typeCategory == 'mapping':
-            variable_obj = MappingVariable(identifier=var_name,
-                                           key_type=type_obj.mappingKeyType,
-                                           value_type=type_obj.mappingValueType,
-                                           scope='state')
-        elif type_obj.typeCategory == 'enum' :
-            variable_obj = EnumVariable(identifier=var_name,
-                                        enum_type=type_obj.enumTypeName,
-                                        scope='state')
+        # ── ② 변수 object  생성 (array / struct / mapping / enum / elementary) ──
+        if type_info.typeCategory == "array":
+            var_obj = ArrayVariable(var_name, type_info.arrayBaseType,
+                                    type_info.arrayLength, scope="state")
+        elif type_info.typeCategory == "struct":
+            var_obj = StructVariable(var_name, type_info.structTypeName, scope="state")
+        elif type_info.typeCategory == "mapping":
+            var_obj = MappingVariable(var_name,
+                                      type_info.mappingKeyType,
+                                      type_info.mappingValueType,
+                                      scope="state")
+        elif type_info.typeCategory == "enum":
+            var_obj = EnumVariable(var_name, type_info.enumTypeName, scope="state")
+        else:  # elementary / address / bool …
+            var_obj = Variables(var_name, scope="state")
+            var_obj.typeInfo = type_info
+
+        # ── ③ 초기화식 (있을 수도, 없을 수도) ────────────────────────
+        init_expr = self.visitExpression(ctx.expression()) if ctx.expression() else None
+
+        # ── ④ ‘constant’ 토큰 존재 여부 판별 ────────────────────────
+        #     antlr4 는 토큰 이름으로 <rule>.<TokenName>() 메서드를 준다.
+        has_constant = len(ctx.ConstantKeyword()) > 0
+
+        if has_constant:
+            # `constant`이면 별도 로직으로
+            self.contract_analyzer.process_constant_variable(var_obj, init_expr)
         else:
-            variable_obj = Variables(identifier=var_name, scope='state')
-            variable_obj.typeInfo = type_obj
-
-        # 4. 초기값 처리 (있을 경우)
-        if ctx.expression():
-            init_expr_ctx = ctx.expression()
-            init_expr = self.visitExpression(init_expr_ctx)  # Expression 객체 반환
-        else:
-            init_expr = None
-
-        # 5. ContractAnalyzer 호출 (processStateVariable)
-        self.contract_analyzer.process_state_variable(variable_obj, init_expr)
+            # 일반 state-var
+            self.contract_analyzer.process_state_variable(var_obj, init_expr)
 
     # Visit a parse tree produced by SolidityParser#errorDefinition.
     def visitErrorDefinition(self, ctx:SolidityParser.ErrorDefinitionContext):
@@ -282,35 +283,25 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by SolidityParser#functionDefinition.
-    def visitFunctionDefinition(self, ctx:SolidityParser.FunctionDefinitionContext):
-        # 1. Function Name 확인 (identifier만 처리)
-        function_name = ctx.identifier().getText() if ctx.identifier() else None
-        if not function_name:
-            raise ValueError("Function name is missing")
+    def visitFunctionDefinition(self, ctx: SolidityParser.FunctionDefinitionContext):
+        fname = ctx.identifier().getText() if ctx.identifier() else None
+        if not fname:
+            raise ValueError("function name missing")
 
-        # 2. 파라미터 처리
-        parameters = {}
-        if ctx.parameterList():
-            parameters = self.visitParameterList(ctx.parameterList(0))
+        params = self.visitParameterList(ctx.parameterList(0)) \
+            if ctx.parameterList(0) else []
+        rets = self.visitParameterList(ctx.parameterList(1)) \
+            if ctx.parameterList(1) else []
 
-        # 3. Modifier 처리
-        modifiers = []
-        for spec in ctx.getChildren():
-            if isinstance(spec, SolidityParser.ModifierInvocationContext):
-                modifier_name = spec.identifierPath().getText()
-                modifiers.append(modifier_name)
+        mods = [m.identifierPath().getText()
+                for m in ctx.getChildren()
+                if isinstance(m, SolidityParser.ModifierInvocationContext)]
 
-        # 4. 반환 타입 처리 (returns)
-        returns = {}
-        if ctx.parameterList(1):  # 두 번째 parameterList가 반환 타입
-            returns = self.visitParameterList(ctx.parameterList(1))
-
-        # 5. FunctionDefinition을 처리하여 ContractAnalyzer에 넘김
         self.contract_analyzer.process_function_definition(
-            function_name=function_name,
-            parameters=parameters,
-            modifiers=modifiers,
-            returns=returns
+            function_name=fname,
+            parameters=params,
+            modifiers=mods,
+            returns=rets
         )
 
     # Visit a parse tree produced by SolidityParser#eventDefinition.
@@ -322,44 +313,33 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by SolidityParser#parameterList.
-    def visitParameterList(self, ctx:SolidityParser.ParameterListContext):
-        parameters = []
+    def visitParameterList(self,
+                           ctx: SolidityParser.ParameterListContext
+                           ) -> list[tuple[SolType, str | None]]:
+        params: list[tuple[SolType, str | None]] = []
 
-        # children 중에서 ','로 파라미터를 나누기 위한 리스트 생성
-        param_groups = []
-        current_param = []
-
-        # 각 children을 순회하면서 ',' (TerminalNodeImpl)를 기준으로 파라미터 그룹을 나눔
-        for child in ctx.children:
-            if child.getText() == ',':
-                # ','를 만나면 하나의 파라미터 그룹을 완성하여 param_groups에 추가
-                param_groups.append(current_param)
-                current_param = []
+        cur: list = []
+        for ch in ctx.children:
+            if ch.getText() == ',':
+                if cur:
+                    params.append(self._param_from_group(cur))
+                    cur = []
             else:
-                # ','가 아니면 해당 child를 현재 파라미터 그룹에 추가
-                current_param.append(child)
+                cur.append(ch)
+        if cur:
+            params.append(self._param_from_group(cur))
+        return params
 
-        # 마지막 파라미터 그룹 추가 (리스트가 끝날 때)
-        if current_param:
-            param_groups.append(current_param)
-
-        # 각 param_group에서 타입과 변수를 추출
-        for param_group in param_groups:
-            type_obj = SolType()  # SolType 객체 생성
-            var_name = None
-
-            # param_group 내에서 각 요소를 확인
-            for elem in param_group:
-                if isinstance(elem, SolidityParser.TypeNameContext):
-                    # 1. 타입 정보 추출
-                    type_obj = self.visitTypeName(elem, type_obj)
-                elif isinstance(elem, SolidityParser.IdentifierContext):
-                    # 2. 변수 이름 추출
-                    var_name = elem.getText()
-
-            parameters.append([type_obj, var_name])
-
-        return parameters
+    def _param_from_group(self, group: list
+                          ) -> tuple[SolType, str | None]:
+        t = SolType()
+        name: str | None = None
+        for el in group:
+            if isinstance(el, SolidityParser.TypeNameContext):
+                t = self.visitTypeName(el, t)
+            elif isinstance(el, SolidityParser.IdentifierContext):
+                name = el.getText()
+        return t, name
 
     # Visit a parse tree produced by SolidityParser#eventParameter.
     def visitEventParameter(self, ctx:SolidityParser.EventParameterContext):

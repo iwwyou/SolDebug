@@ -181,7 +181,7 @@ class ArrayVariable(Variables):
       address·string·bytes 등은 심볼/AddressManager 를 이용해 초기화
     """
 
-    def __init__(self, identifier=None, *, base_type=None,
+    def __init__(self, identifier=None, base_type=None,
                  array_length=None, is_dynamic=False,
                  value=None, isConstant=False, scope=None):
         super().__init__(identifier, value, isConstant, scope)
@@ -269,9 +269,6 @@ class ArrayVariable(Variables):
             et = str(bt)
         return et.startswith("int") or et.startswith("uint") or et == "bool"
 
-
-
-
 class MappingVariable(Variables):
     def __init__(self, identifier=None, key_type=None, value_type=None, value=None,
                  isConstant=False, scope=None):
@@ -280,7 +277,7 @@ class MappingVariable(Variables):
         self.typeInfo.typeCategory = 'mapping'
         self.typeInfo.mappingKeyType = key_type    # SolType 객체
         self.typeInfo.mappingValueType = value_type # SolType 객체
-        self.mapping = {}  # key(str) -> Variables 객체
+        self.mapping = {}
 
     def add_mapping(self, key_str, value_var):
         """

@@ -34,6 +34,7 @@ def map_context_type(context_type):
         'break': 'interactiveBlockUnit',
         'continue': 'interactiveBlockUnit',
         'emit': 'interactiveBlockUnit',
+        'unchecked': 'interactiveBlockUnit',
         'doWhileWhile': 'interactiveDoWhileUnit',
         'catch': 'interactiveCatchClauseUnit',
         'else_if': 'interactiveIfElseUnit',

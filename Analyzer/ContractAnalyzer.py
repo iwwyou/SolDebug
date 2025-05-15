@@ -6,7 +6,7 @@ from solcx.exceptions import SolcError                  # 예외는 따로!
 from collections import deque
 import solcx
 import copy
-from typing import Dict, cast
+from typing import Dict, cast, Tuple
 from collections import defaultdict
 
 
@@ -272,6 +272,10 @@ class ContractAnalyzer:
                 return "catch"
             elif stripped_code.startswith("assembly"):
                 return "assembly"
+            elif stripped_code.startswith("unchecked"):
+                return "unchecked"
+            elif stripped_code.startswith("return") :
+                return "return"
             else:
                 raise ValueError(f"Unknown context type for line: {code_line}")
 
@@ -463,16 +467,19 @@ class ContractAnalyzer:
         if not contract_cfg:
             raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
 
+        if not contract_cfg.state_variable_node:
+            contract_cfg.initialize_state_variable_node()
+
         # 우변 표현식을 저장하기 위해 init_expr를 확인
         if init_expr is None: # 초기화가 없으면
             if isinstance(variable_obj, ArrayVariable) :
-                if variable_obj.typeInfo.arrayBaseType.startswith("int") :
+                if variable_obj.typeInfo.arrayBaseType.elementaryTypeName.startswith("int") :
                     variable_obj.initialize_elements(IntegerInterval.bottom())
-                elif variable_obj.typeInfo.arrayBaseType.startswith("uint") :
+                elif variable_obj.typeInfo.arrayBaseType.elementaryTypeName.startswith("uint") :
                     variable_obj.initialize_elements(UnsignedIntegerInterval.bottom())
-                elif variable_obj.typeInfo.arrayBaseType.startswith("bool") :
+                elif variable_obj.typeInfo.arrayBaseType.elementaryTypeName.startswith("bool") :
                     variable_obj.initialize_elements(BoolInterval.bottom())
-                elif variable_obj.typeInfo.arrayBaseType in ["address", "address payable", "string", "bytes", "Byte", "Fixed", "Ufixed"] :
+                elif variable_obj.typeInfo.arrayBaseType.elementaryTypeName in ["address", "address payable", "string", "bytes", "Byte", "Fixed", "Ufixed"] :
                     variable_obj.initialize_not_abstracted_type(variable_obj.identifier)
             elif isinstance(variable_obj, StructVariable) :
                 if variable_obj.typeInfo.structTypeName in contract_cfg.structDefs.keys():
@@ -539,6 +546,9 @@ class ContractAnalyzer:
         # 2. 반드시 초기화식이 있어야 함
         if init_expr is None:
             raise ValueError(f"Constant variable '{variable_obj.identifier}' must have an initializer.")
+
+        if not contract_cfg.state_variable_node:
+            contract_cfg.initialize_state_variable_node()
 
         #    평가 컨텍스트는 현재까지의 state-variable 노드 변수들
         state_vars = contract_cfg.state_variable_node.variables
@@ -726,81 +736,9 @@ class ContractAnalyzer:
         # 3. 파라미터 → related_variables
         # ----------------------------------------------------------------
         for p_type, p_name in parameters:
-            var_obj: Variables | ArrayVariable | MappingVariable | StructVariable
-
-            # ── 3-A  배열 파라미터
-            # ------------------------------------------------------------
-            if p_type.typeCategory == "array":
-                arr = ArrayVariable(
-                    identifier=p_name,
-                    base_type=p_type.arrayBaseType,
-                    array_length=p_type.arrayLength,
-                    is_dynamic=p_type.isDynamicArray,
-                    scope="local",
-                )
-
-                base_t = p_type.arrayBaseType
-                if isinstance(base_t, SolType):
-                    et = base_t.elementaryTypeName
-                    if et and et.startswith("int"):
-                        bits = base_t.intTypeLength or 256
-                        arr.initialize_elements(IntegerInterval.bottom(bits))
-                    elif et and et.startswith("uint"):
-                        bits = base_t.intTypeLength or 256
-                        arr.initialize_elements(UnsignedIntegerInterval.bottom(bits))
-                    elif et == "bool":
-                        arr.initialize_elements(BoolInterval.bottom())
-                    else:  # address / bytes / string …
-                        arr.initialize_not_abstracted_type(sm=self.sm)
-                else:
-                    # 다차원 배열일 수도 → non-abstract 초기화(재귀 포함)
-                    arr.initialize_not_abstracted_type(sm=self.sm)
-
-                var_obj = arr
-
-            # ── 3-B  구조체 파라미터
-            # ------------------------------------------------------------
-            elif p_type.typeCategory == "struct":
-                struct_name = p_type.structTypeName
-                if struct_name not in contract_cfg.structDefs:
-                    raise ValueError(f"Undefined struct '{struct_name}' used as parameter.")
-
-                sv = StructVariable(
-                    identifier=p_name,
-                    struct_type=struct_name,
-                    scope="local",
-                )
-                sv.initialize_struct(contract_cfg.structDefs[struct_name], sm=self.sm)
-                var_obj = sv
-
-            # ── 3-C  elementary 파라미터
-            # ------------------------------------------------------------
-            elif p_type.typeCategory == "elementary":
-                v = Variables(identifier=p_name, scope="local")
-                v.typeInfo = p_type
-                et = p_type.elementaryTypeName
-
-                if et.startswith("int"):
-                    bits = p_type.intTypeLength or 256
-                    v.value = IntegerInterval.bottom(bits)
-                elif et.startswith("uint"):
-                    bits = p_type.intTypeLength or 256
-                    v.value = UnsignedIntegerInterval.bottom(bits)
-                elif et == "bool":
-                    v.value = BoolInterval.bottom()
-                elif et == "address":
-                    iv = self.sm.alloc_fresh_interval()
-                    v.value = iv
-                    self.sm.bind_var(p_name, iv.min_value)
-                else:  # bytes/string 등
-                    v.value = f"symbol_{p_name}"
-                var_obj = v
-
-            else:
-                raise ValueError(f"Unsupported parameter typeCategory '{p_type.typeCategory}'.")
-
-            # 파라미터를 함수-관련 변수 집합에 추가
-            fcfg.add_related_variable(var_obj)
+            if p_name:  # 이름이 있는 것만 변수화
+                var = self._make_param_variable(p_type, p_name, scope="local")
+                fcfg.add_related_variable(var)
 
         # ───────────────────────────────────────────────────────────────
         # 4. Modifier invocation → CFG 병합
@@ -811,9 +749,13 @@ class ContractAnalyzer:
         # ───────────────────────────────────────────────────────────────
         # 5. Return 변수 처리
         # ----------------------------------------------------------------
-        if returns:
-            for rvar in returns:
-                fcfg.add_related_variable(rvar)
+        for r_type, r_name in returns:
+            if r_name:
+                rv = self._make_param_variable(r_type, r_name, scope="local")
+                fcfg.add_related_variable(rv)
+                fcfg.return_vars.append(rv)
+            else:
+                fcfg.return_types.append(r_type)
 
         # ───────────────────────────────────────────────────────────────
         # 6. 상태 변수 → related_variables 에 복사
@@ -845,8 +787,8 @@ class ContractAnalyzer:
         # 1. CFG 컨텍스트
         # ----------------------------------------------------------------
         ccf = self.contract_cfgs[self.current_target_contract]
-        fcfg = ccf.get_function_cfg(self.current_target_function)
-        if fcfg is None:
+        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+        if self.current_target_function_cfg is None:
             raise ValueError("variableDeclaration: active FunctionCFG not found")
 
         cur_blk = self.get_current_block()
@@ -960,8 +902,8 @@ class ContractAnalyzer:
         # ----------------------------------------------------------------
         cur_blk.variables[v.identifier] = v
         cur_blk.add_variable_declaration_statement(type_obj, var_name, init_expr)
-        fcfg.add_related_variable(v.identifier, v)
-        fcfg.update_block(cur_blk)
+        self.current_target_function_cfg.add_related_variable(v)
+        self.current_target_function_cfg.update_block(cur_blk)
 
         lhs_expr = Expression(identifier=var_name, context="IdentifierExpContext")
         self._record_analysis(
@@ -974,7 +916,7 @@ class ContractAnalyzer:
         # ───────────────────────────────────────────────────────────────
         # 5. 저장 및 brace_count
         # ----------------------------------------------------------------
-        ccf.functions[self.current_target_function] = fcfg
+        ccf.functions[self.current_target_function] = self.current_target_function_cfg
         self.contract_cfgs[self.current_target_contract] = ccf
         self.brace_count[self.current_start_line]["cfg_node"] = cur_blk
 
@@ -1979,6 +1921,95 @@ class ContractAnalyzer:
     #  constructor 내부 상태-변수 → State_Variable 노드 동기화
     # ---------------------------------------------------------- #
     # ContractAnalyzer.py ────────────────────────────────────────────
+    # ContractAnalyzer.py  내부 ― 클래스 메서드로 추가
+    # --------------------------------------------------
+    def _make_param_variable(
+            self,
+            sol_type: SolType,
+            ident: str,
+            *,
+            scope: str = "local"
+    ) -> Variables | ArrayVariable | StructVariable | EnumVariable:
+        """
+        <type, name> 쌍을 받아 Variables / ArrayVariable / StructVariable … 객체를
+        하나 만들어 초기값(추상간격)까지 넣어 반환한다.
+
+        ▸ scope      : "local"  (파라미터 · 리턴) / "state" 등
+        ▸ self.sm    : AddressSymbolicManager  (주소 심볼릭 ID 발급용)
+        """
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+
+        # ──────────────────────────── ① array ────────────────────────────
+        if sol_type.typeCategory == "array":
+            arr = ArrayVariable(
+                identifier=ident,
+                base_type=sol_type.arrayBaseType,
+                array_length=sol_type.arrayLength,
+                is_dynamic=sol_type.isDynamicArray,
+                scope=scope,
+            )
+
+            base_t = sol_type.arrayBaseType
+            if isinstance(base_t, SolType):  # 1-D 배열
+                et = base_t.elementaryTypeName
+                if et and et.startswith("int"):
+                    arr.initialize_elements(IntegerInterval.bottom(base_t.intTypeLength or 256))
+                elif et and et.startswith("uint"):
+                    arr.initialize_elements(UnsignedIntegerInterval.bottom(base_t.intTypeLength or 256))
+                elif et == "bool":
+                    arr.initialize_elements(BoolInterval.bottom())
+                else:  # address / bytes / string / struct 등
+                    arr.initialize_not_abstracted_type(sm=self.sm)
+            else:  # 다차원
+                arr.initialize_not_abstracted_type(sm=self.sm)
+            return arr
+
+        # ──────────────────────────── ② struct ───────────────────────────
+        if sol_type.typeCategory == "struct":
+            sname = sol_type.structTypeName
+            if sname not in contract_cfg.structDefs:
+                raise ValueError(f"Undefined struct '{sname}' used as parameter/return.")
+            sv = StructVariable(identifier=ident, struct_type=sname, scope=scope)
+            sv.initialize_struct(contract_cfg.structDefs[sname], sm=self.sm)
+            return sv
+
+        # ──────────────────────────── ③ enum ────────────────────────────
+        if sol_type.typeCategory == "enum":
+            ev = EnumVariable(identifier=ident,
+                              enum_type=sol_type.enumTypeName,
+                              scope=scope)
+            ev.valueIndex = 0  # 기본값 : 첫 멤버
+            return ev
+
+        # ──────────────────────────── ④ elementary ───────────────────────
+        if sol_type.typeCategory == "elementary":
+            v = Variables(identifier=ident, scope=scope)
+            v.typeInfo = sol_type
+            et = sol_type.elementaryTypeName
+
+            if et.startswith("int"):
+                v.value = IntegerInterval.bottom(sol_type.intTypeLength or 256)
+            elif et.startswith("uint"):
+                v.value = UnsignedIntegerInterval.bottom(sol_type.intTypeLength or 256)
+            elif et == "bool":
+                v.value = BoolInterval.bottom()
+            elif et == "address":
+                iv = self.sm.alloc_fresh_interval()
+                v.value = iv
+                self.sm.bind_var(ident, iv.min_value)
+            else:  # bytes / string …
+                v.value = f"symbol_{ident}"
+            return v
+
+        # ──────────────────────────── ⑤ mapping (rare) ───────────────────
+        if sol_type.typeCategory == "mapping":
+            return MappingVariable(identifier=ident,
+                                   key_type=sol_type.mappingKeyType,
+                                   value_type=sol_type.mappingValueType,
+                                   scope=scope)
+
+        raise ValueError(f"Unsupported typeCategory '{sol_type.typeCategory}'")
+
     def _clone_env(self, src: dict[str, Variables]) -> dict[str, Variables]:
         """deep-copy wrapper"""
         return self.copy_variables(src)
@@ -4116,6 +4147,14 @@ class ContractAnalyzer:
 
         result = None
 
+        if (isinstance(leftInterval, Interval) and leftInterval.is_bottom()) or \
+                (isinstance(rightInterval, Interval) and rightInterval.is_bottom()):
+            # 산술/비트/시프트 → ⊥,  비교/논리 → BoolInterval ⊤(= [0,1])
+            if operator in ['==', '!=', '<', '>', '<=', '>=', '&&', '||']:
+                return BoolInterval.top()
+            return _bottom(leftInterval if not leftInterval.is_bottom()
+                           else rightInterval)
+
         if operator == '+':
             result = leftInterval.add(rightInterval)
         elif operator == '-':
@@ -5199,6 +5238,19 @@ class ContractAnalyzer:
 
         return BoolInterval(is_true, is_false)
 
+    def _bottom(interval) -> "Interval":
+        """
+        interval 과 동일한 클래스·bit-width로 ⊥(bottom) 을 만들어 준다.
+        (IntegerInterval.bottom(bits) 같은 헬퍼 통일)
+        """
+        if isinstance(interval, IntegerInterval):
+            return IntegerInterval.bottom(interval.type_length)
+        if isinstance(interval, UnsignedIntegerInterval):
+            return UnsignedIntegerInterval.bottom(interval.type_length)
+        if isinstance(interval, BoolInterval):
+            return BoolInterval.bottom()
+        return Interval(None, None)  # fallback – 거의 안 옴
+
     def _expr_to_str(self, e: Expression) -> str:
         """Expression AST → Solidity 소스 형태 문자열"""
         if e is None:
@@ -5279,7 +5331,16 @@ class ContractAnalyzer:
         # A) 특정 식 하나만 기록
         if expr is not None and var_obj is not None:
             key = self._expr_to_str(expr)
-            line_info["vars"] = {key: _serialize_val(var_obj.value)}
+
+            # ── (a) 단일 값(e.g., uint, bool, enum, address …)
+            if isinstance(var_obj, (Variables, EnumVariable)):
+                line_info["vars"] = {key: _serialize_val(getattr(var_obj, "value", None))}
+
+            # ── (b) 배열 / 구조체 / 매핑 → 재귀로 평탄화
+            else:  # ArrayVariable | StructVariable | MappingVariable
+                flat = {}
+                self._flatten_var(var_obj, key, flat)  # key 가 루트 prefix 가 됨
+                line_info["vars"] = flat
 
         # B) 환경 전체(flatten)
         elif env is not None:

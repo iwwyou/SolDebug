@@ -141,6 +141,19 @@ class ContractCFG(CFG):
 
         self.globals: dict[str, GlobalVariable] = {}
 
+    def initialize_state_variable_node(self):
+        self.state_variable_node = CFGNode('State_Variable')
+        self.graph.add_node(self.state_variable_node)
+
+        # 기존 entry node의 successor를 새로운 state variable node의 successor로 설정
+        successors = list(self.graph.successors(self.entry_node))
+        for succ in successors:
+            self.graph.add_edge(self.state_variable_node, succ)
+            self.graph.remove_edge(self.entry_node, succ)
+
+        # 새로운 state variable node를 entry node의 successor로 설정
+        self.graph.add_edge(self.entry_node, self.state_variable_node)
+
 
     # Enum 정의 추가
     def define_enum(self, enum_name, enum_def):
@@ -166,31 +179,13 @@ class ContractCFG(CFG):
             raise ValueError(f"Struct {struct_def_name} is not defined/")
 
     def add_state_variable(self, variable, expr=None): # variable : Variables, expr : Interval
-        # 상태 변수 노드가 없는 경우 생성
-        if not self.state_variable_node:
-            self.state_variable_node = CFGNode('State_Variable')
-            self.graph.add_node(self.state_variable_node)
+        self.state_variable_node.add_assign_statement(
+            exprLeft=variable,  # 좌변
+            exprRight=expr,  # 우변 (Expression | None)
+            exprOperator='='  # 연산자
+        )
 
-            # 기존 entry node의 successor를 새로운 state variable node의 successor로 설정
-            successors = list(self.graph.successors(self.entry_node))
-            for succ in successors:
-                self.graph.add_edge(self.state_variable_node, succ)
-                self.graph.remove_edge(self.entry_node, succ)
-
-            # 새로운 state variable node를 entry node의 successor로 설정
-            self.graph.add_edge(self.entry_node, self.state_variable_node)
-
-            # ② 노드에 “선언·대입” Statement 추가
-            #    LHS  : 변수 객체
-            #    RHS  : init_expr (없으면 None —  uninitialised)
-            #    OP   : '='   고정
-            self.state_variable_node.add_assign_statement(
-                exprLeft=variable,  # 좌변
-                exprRight=expr,  # 우변 (Expression | None)
-                exprOperator='='  # 연산자
-            )
-
-            self.state_variable_node.variables[variable.identifier] = variable
+        self.state_variable_node.variables[variable.identifier] = variable
 
     def add_constant_variable(self, variable, expr=None):
         if not self.state_variable_node:
@@ -238,7 +233,11 @@ class FunctionCFG(CFG):
         self.function_name = function_name
         self.modifiers = {}
         self.related_variables = {}
+        self.return_types: list[SolType] = []   # 이름 없는 리턴
+        self.return_vars : list = [] # 이름이 있는 리턴
+
         self.exit_node.function_exit_node = True
+
 
     def update_block(self, block_node):
         """
