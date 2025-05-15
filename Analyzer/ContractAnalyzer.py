@@ -35,6 +35,7 @@ class ContractAnalyzer:
 
         self.current_edit_event = None
         self._record_enabled = False
+        self._seen_stmt_ids: set[int] = set()
 
         # for Multiple Contract
         self.contract_cfgs = {} # name -> CFG
@@ -61,22 +62,40 @@ class ContractAnalyzer:
     Prev analysis part
     """
 
-    def _insert_lines(self, start_ln, end_ln, new_lines):
-        offset = end_ln - start_ln + 1
-        # 뒤로 밀기
-        keys = sorted([ln for ln in self.full_code_lines if ln >= start_ln],
-                      reverse=True)
-        for old in keys:
-            self.full_code_lines[old + offset] = self.full_code_lines.pop(old)
-            if old in self.brace_count:
-                self.brace_count[old + offset] = self.brace_count.pop(old)
-            if old in self.analysis_per_line:
-                self.analysis_per_line[old + offset] = self.analysis_per_line.pop(old)
+    # ────────────────────────────────────────────────────────────────
+    #  ContractAnalyzer   (class body 안)
+    # ----------------------------------------------------------------
+    def _shift_meta(self, old_ln: int, new_ln: int):
+        """
+        소스 라인 이동(old_ln → new_ln)에 맞춰
+        brace_count / analysis_per_line / Statement.src_line  를 모두 동기화
+        """
+        # ① brace_count · analysis_per_line
+        for d in (self.brace_count, self.analysis_per_line):
+            if old_ln in d:
+                d[new_ln] = d.pop(old_ln)
 
-        # 새 줄 쓰기
-        for idx, ln in enumerate(range(start_ln, end_ln + 1)):
-            self.full_code_lines[ln] = new_lines[idx]
-            self.update_brace_count(ln, new_lines[idx])
+        # ② 이미 생성된 CFG-Statement 들의 src_line 보정
+        for ccf in self.contract_cfgs.values():
+            for fcfg in ccf.functions.values():
+                for blk in fcfg.graph.nodes:
+                    for st in blk.statements:
+                        if getattr(st, "src_line", None) == old_ln:
+                            st.src_line = new_ln
+
+    def _insert_lines(self, start: int, new_lines: list[str]):
+        offset = len(new_lines)
+
+        # ① 뒤 라인 밀기 (내림차순)
+        for old_ln in sorted([ln for ln in self.full_code_lines if ln >= start],
+                             reverse=True):
+            self.full_code_lines[old_ln + offset] = self.full_code_lines.pop(old_ln)
+            self._shift_meta(old_ln, old_ln + offset)  # ★
+
+        # ② 새 코드 삽입
+        for i, ln in enumerate(range(start, start + offset)):
+            self.full_code_lines[ln] = new_lines[i]
+            self.update_brace_count(ln, new_lines[i])
 
     def update_code(self,
                     start_line: int,
@@ -106,47 +125,44 @@ class ContractAnalyzer:
         # ② event별 분기
         # ----------------------------------------------------------
         if event == "add":
-            self._insert_lines(start_line, end_line, lines)  # ← 종전 알고리즘
+            self._insert_lines(start_line, lines)  # ← 종전 알고리즘
 
         elif event == "modify":
             # “삭제 후 삽입” ··· 삭제 분석 → 삽입 분석 두 번 호출
             self.update_code(start_line, end_line, "", event="delete")
-            self.update_code(start_line, end_line, new_code, event="add")
+            self.update_code(start_line, start_line + len(lines) - 1,
+                             new_code, event="add")
 
-        else:  # ─── delete ───
-            #
-            # A.  *삭제 전*  →  기존 내용을 analyse_context 에 넘겨
-            #    “지워진 라인에서 선언된 변수 rollback”  등의 처리를 먼저 수행
-            #
-            old_src = "\n".join(self.full_code_lines.get(ln, "")
-                                for ln in range(start_line, end_line + 1))
-            if old_src.strip():
-                self.analyze_context(start_line, old_src)
 
-            #
-            # B.  실제 삭제
-            #
+        elif event == "delete":
+
             offset = end_line - start_line + 1
 
-            # 1) pop 메타데이터
+            # A.  삭제 전 rollback (종전 그대로)  …
+
+            # B-1.  메타데이터 pop
+
             for ln in range(start_line, end_line + 1):
                 self.full_code_lines.pop(ln, None)
+
                 self.brace_count.pop(ln, None)
+
                 self.analysis_per_line.pop(ln, None)
 
-            # 2) 뒤쪽 라인을 앞으로 당김
+            # B-2.  뒤쪽 라인을 앞으로 당김
+
             keys_to_shift = sorted(
-                [ln for ln in self.full_code_lines.keys() if ln > end_line]
+
+                [ln for ln in self.full_code_lines if ln > end_line]
+
             )
+
             for old_ln in keys_to_shift:
-                self.full_code_lines[old_ln - offset] = self.full_code_lines.pop(old_ln)
-                # brace & analysis 이동
-                if old_ln in self.brace_count:
-                    self.brace_count[old_ln - offset] = self.brace_count.pop(old_ln)
-                if old_ln in self.analysis_per_line:
-                    self.analysis_per_line[old_ln - offset] = self.analysis_per_line.pop(old_ln)
+                new_ln = old_ln - offset
 
+                self.full_code_lines[new_ln] = self.full_code_lines.pop(old_ln)
 
+                self._shift_meta(old_ln, new_ln)  # ★
 
         # ──────────────────────────────────────────────────────────
         # ③ full-code 재조합 & optional compile check
@@ -1040,17 +1056,13 @@ class ContractAnalyzer:
             self._overwrite_state_vars_from_block(contract_cfg, current_block.variables)
 
         # 2) 방금 변경된 변수 객체 다시 가져오기 (new_value=None ⇒ 탐색만)
-        target_var = self._resolve_and_update_expr(
-            expr.left,
-            current_block.variables,
-            self.current_target_function_cfg,
-            None
-        )
+        target_var = self._resolve_and_update_expr(expr.left, current_block.variables,
+                                                   self.current_target_function_cfg, None)
 
         # 3) analysis 기록
         self._record_analysis(
             line_no=self.current_start_line,
-            stmt_type="assign",
+            stmt_type="assignment",
             expr=expr.left,
             var_obj=target_var
         )
@@ -2569,12 +2581,10 @@ class ContractAnalyzer:
             var_obj.value = new_value
 
     # ───────── debug LHS 해석 (member / index 접근) ────────────────────────
-    def _resolve_and_update_expr(
-            self,
-            expr: Expression,
-            var_env: dict[str, Variables],  # ← 새 파라미터
-            fcfg: FunctionCFG,
-            new_value):
+    def _resolve_and_update_expr(self, expr: Expression,
+                                 var_env: dict[str, Variables],  # ← 새로 넣었는지?
+                                 fcfg: FunctionCFG,
+                                 new_value):
 
         # 1) 루트 식별자
         if expr.base is None:
@@ -3467,77 +3477,6 @@ class ContractAnalyzer:
                     if brace_info['cfg_node'] != None and \
                             brace_info['cfg_node'].condition_node_type in ['if', 'else if']:
                         return brace_info['cfg_node']
-        return None
-
-    def _resolve_and_update_expr(
-            self,
-            expr: Expression,
-            fcfg: FunctionCFG,
-            new_value  # Interval | BoolInterval | str | None
-    ) -> Variables | ArrayVariable | StructVariable | MappingVariable | EnumVariable | None:
-        """
-        Expression → Variables (or container) 객체 탐색
-        · new_value 가 주어지면 update_left_var 처럼 **값도 갱신**
-        · new_value 가 None 이면 **탐색만** 수행
-        """
-
-        # ───── 0. 글로벌 변수인가? ───────────────────────────────────
-        if self._is_global_expr(expr):
-            gv = self._get_global_var(expr)
-            # 글로벌은 값 갱신을 허용하지 않는다
-            return gv
-
-        # ───── 1. 루트 식별자 (base 없음) ────────────────────────────
-        if expr.base is None:
-            root_name = expr.identifier
-            var_obj = fcfg.get_related_variable(root_name)
-            if var_obj and new_value is not None:
-                self._apply_new_value_to_variable(var_obj, new_value)
-            return var_obj
-
-        # ───── 2. base 부터 재귀로 찾기 ─────────────────────────────
-        base_obj = self._resolve_and_update_expr(expr.base, fcfg, None)
-        if base_obj is None:
-            return None
-
-        # 2-A. 멤버(Struct) ---------------------------------------------------
-        if expr.member is not None:
-            if not isinstance(base_obj, StructVariable):
-                return None
-            mem = base_obj.members.get(expr.member)
-            if mem and new_value is not None:
-                self._apply_new_value_to_variable(mem, new_value)
-            return mem
-
-        # 2-B. 인덱스(Array / Mapping) ---------------------------------------
-        if expr.index is not None:
-            idx_val = self._extract_index_val(expr.index)
-
-            # Array ───────────────────────────────────────────────
-            if isinstance(base_obj, ArrayVariable):
-                if not isinstance(idx_val, int) or idx_val < 0:
-                    return None
-                # 동적 배열 길이 확장 필요 시
-                while idx_val >= len(base_obj.elements):
-                    base_obj.elements.append(
-                        self._create_new_mapping_value(base_obj, len(base_obj.elements))
-                    )
-                elem = base_obj.elements[idx_val]
-                if new_value is not None:
-                    self._apply_new_value_to_variable(elem, new_value)
-                return elem
-
-            # Mapping ────────────────────────────────────────────
-            if isinstance(base_obj, MappingVariable):
-                key = str(idx_val)
-                if key not in base_obj.mapping:
-                    base_obj.mapping[key] = self._create_new_mapping_value(base_obj, key)
-                child = base_obj.mapping[key]
-                if new_value is not None:
-                    self._apply_new_value_to_variable(child, new_value)
-                return child
-
-        # ───── 그 밖의 경우 ─────────────────────────────────────────
         return None
 
     """
@@ -5196,11 +5135,13 @@ class ContractAnalyzer:
         self.current_target_function = fcfg.function_name
         self.current_target_function_cfg = fcfg
 
-        for blk in fcfg.graph.nodes:
+        self._record_enabled = True  # ★ 항상 켠다
+        self._seen_stmt_ids.clear()  # ← 중복 방지용 세트 초기화
+        for blk in fcfg.graph.nodes:  # ← 기존 로그 전부 clear
             for st in blk.statements:
                 ln = getattr(st, "src_line", None)
                 if ln is not None:
-                    self.analysis_per_line[ln].clear()  # ← 기존 기록 삭제
+                    self.analysis_per_line[ln].clear()
 
         entry = fcfg.get_entry_node()
         start_block, = fcfg.graph.successors(entry)  # exactly one successor
@@ -5213,7 +5154,6 @@ class ContractAnalyzer:
         # return_values를 모아둘 자료구조 (나중에 exit node에서 join)
         return_values = []
 
-        self._record_enabled = True
         while work:
             node = work.popleft()
             if node in visited:
@@ -5347,47 +5287,44 @@ class ContractAnalyzer:
     def interpret_variable_declaration_statement(self, stmt, variables):
         varType = stmt.type_obj
         varName = stmt.var_name
-        initExpr = stmt.init_expr
+        initExpr = stmt.init_expr  # None 가능
 
-        # 이미 process_variable_declaration에서 변수 객체 만들어져 있을 것이기 때문에
-        # 초기화 식 없으면 그냥 리턴하면 됨
-        if initExpr is None :
-            return variables
+        # ① 변수 객체 찾기 (process 단계에서 이미 cur_blk.variables 에 들어있음)
+        if varName not in variables:
+            raise ValueError(f"no variable '{varName}' in env")
+        vobj = variables[varName]
 
-        variableObj = None
-        if varName in variables :
-            variableObj = variables[varName]
-        else :
-            raise ValueError (f"There is no variable '{varName}' in variables dictionary")
+        # ② 초기화 식 평가 (있을 때만)
+        if initExpr is not None:
+            if isinstance(vobj, ArrayVariable):
+                pass  # inline array 등 필요시
+            elif isinstance(vobj, Variables):
+                vobj.value = self.evaluate_expression(initExpr,
+                                                      variables, None, None)
 
-        # 초기화 식이 있는데, array면 inline array expression 밖에 없을듯
-        if isinstance(variableObj, ArrayVariable) :
-            return variables
-        elif isinstance(variableObj, StructVariable) : # 관련된거 있을 것 같긴 한데 일단 pass
-            pass
-        elif isinstance(variableObj, MappingVariable) : # mapping은 있을수가 없음
-            raise ValueError (f"Mapping variable is not expected in variable declaration context")
-        elif isinstance(variableObj, Variables) :
-            variableObj.value = self.evaluate_expression(initExpr, variables, None, None)
-            if self._record_enabled:
-                lhs_expr = Expression(identifier=varName, context="IdentifierExpContext")
-                self._record_analysis(
-                    line_no=stmt.src_line,
-                    stmt_type=stmt.statement_type,
-                    expr=lhs_expr,
-                    var_obj=variableObj
-                )
-            return variables
-        else :
-            raise ValueError (f"Unexpected type of variable object")
+        stmt_id = id(stmt)
+        # ③ ★ 반드시 로그 기록 – initExpr 유무와 무관 ★
+        if self._record_enabled and stmt_id not in self._seen_stmt_ids:
+            self._seen_stmt_ids.add(stmt_id)
+            lhs = Expression(identifier=varName, context="IdentifierExpContext")
+            self._record_analysis(
+                line_no=stmt.src_line,
+                stmt_type=stmt.statement_type,  # 'variableDeclaration'
+                expr=lhs,
+                var_obj=vobj
+            )
+
+        return variables
 
     def interpret_assignment_statement(self, stmt, variables):
         lexp, rexpr, op = stmt.left, stmt.right, stmt.operator
         r_val = self.evaluate_expression(rexpr, variables, None, None)
         self.update_left_var(lexp, r_val, op, variables, None, None)
 
-        # ① target 변수 찾아서 로그
-        if self._record_enabled:
+        stmt_id = id(stmt)
+        # ③ ★ 반드시 로그 기록 – initExpr 유무와 무관 ★
+        if self._record_enabled and stmt_id not in self._seen_stmt_ids:
+            self._seen_stmt_ids.add(stmt_id)
             tgt = self._resolve_and_update_expr(lexp,  # 탐색만
                                                 variables,
                                                 self.current_target_function_cfg,
@@ -5412,7 +5349,10 @@ class ContractAnalyzer:
         rexpr = stmt.return_expr
         r_val = self.evaluate_expression(rexpr, variables, None, None)
 
-        if self._record_enabled:
+        stmt_id = id(stmt)
+        # ③ ★ 반드시 로그 기록 – initExpr 유무와 무관 ★
+        if self._record_enabled and stmt_id not in self._seen_stmt_ids:
+            self._seen_stmt_ids.add(stmt_id)
             if (rexpr and  # 반환식이 있고
                     getattr(rexpr, "context", "") == "TupleExpressionContext"):
                 # ── (1)  earned0 / earned1  …  각각 따로 찍기 ─────────────
