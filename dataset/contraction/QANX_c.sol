@@ -1,11 +1,11 @@
 contract QANX {
     struct Lock {
-        uint256 tokenAmount;    // HOW MANY TOKENS ARE LOCKED
-        uint32 hardLockUntil;   // UNTIL WHEN NO LOCKED TOKENS CAN BE ACCESSED
-        uint32 softLockUntil;   // UNTIL WHEN LOCKED TOKENS CAN BE GRADUALLY RELEASED
-        uint8 allowedHops;      // HOW MANY TRANSFERS LEFT WITH SAME LOCK PARAMS
-        uint32 lastUnlock;      // LAST GRADUAL UNLOCK TIME (SOFTLOCK PERIOD)
-        uint256 unlockPerSec;   // HOW MANY TOKENS ARE UNLOCKABLE EACH SEC FROM HL -> SL
+        uint256 tokenAmount;    
+        uint32 hardLockUntil;   
+        uint32 softLockUntil;   
+        uint8 allowedHops;      
+        uint32 lastUnlock;      
+        uint256 unlockPerSec;   
     }
 
     mapping (address => Lock) private _locks;

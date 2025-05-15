@@ -14,7 +14,8 @@
   {
     "code": "\n",
     "startLine": 3,
-    "endLine": 3
+    "endLine": 3,
+    "event": "add"
   },
   {
     "code": "uint256 public maintenanceBudget0;",
@@ -25,7 +26,8 @@
   {
     "code": "\n",
     "startLine": 5,
-    "endLine": 5
+    "endLine": 5,
+    "event": "add"
   },
   {
     "code": "uint256 public maintenanceBudget1;",
@@ -36,7 +38,8 @@
   {
     "code": "\n",
     "startLine": 7,
-    "endLine": 7
+    "endLine": 7,
+    "event": "add"
   },
   {
     "code": "uint224[10] public rewardPerGas0Array;",
@@ -47,7 +50,8 @@
   {
     "code": "\n",
     "startLine": 9,
-    "endLine": 9
+    "endLine": 9,
+    "event": "add"
   },
   {
     "code": "uint224[10] public rewardPerGas1Array;",
@@ -58,7 +62,8 @@
   {
     "code": "\n",
     "startLine": 11,
-    "endLine": 11
+    "endLine": 11,
+    "event": "add"
   },
   {
     "code": "uint224 public rewardPerGas0Accumulator;",
@@ -69,7 +74,8 @@
   {
     "code": "\n",
     "startLine": 13,
-    "endLine": 13
+    "endLine": 13,
+    "event": "add"
   },
   {
     "code": "uint224 public rewardPerGas1Accumulator;",
@@ -80,7 +86,8 @@
   {
     "code": "\n",
     "startLine": 15,
-    "endLine": 15
+    "endLine": 15,
+    "event": "add"
   },
   {
     "code": "uint64 public rebalanceCount;",
@@ -91,7 +98,8 @@
   {
     "code": "\n",
     "startLine": 17,
-    "endLine": 17
+    "endLine": 17,
+    "event": "add"
   },
   {
     "code": "function _earmarkSomeForMaintenance(uint256 earned0, uint256 earned1) private returns (uint256, uint256) {\n}",
@@ -108,7 +116,8 @@
   {
     "code": "\n",
     "startLine": 20,
-    "endLine": 20
+    "endLine": 20,
+    "event": "add"
   },
   {
     "code": "unchecked {\n}",
@@ -155,7 +164,8 @@
   {
     "code": "\n",
     "startLine": 29,
-    "endLine": 29
+    "endLine": 29,
+    "event": "add"
   },
   {
     "code": "return (earned0, earned1);",
@@ -166,7 +176,8 @@
   {
     "code": "\n",
     "startLine": 32,
-    "endLine": 32
+    "endLine": 32,
+    "event": "add"
   },
   {
     "code": "function pushRewardPerGas0(uint224 rewardPerGas0) private {\n}",
@@ -201,7 +212,8 @@
   {
     "code": "\n",
     "startLine": 40,
-    "endLine": 40
+    "endLine": 40,
+    "event": "add"
   },
   {
     "code": "function pushRewardPerGas1(uint224 rewardPerGas1) private {\n}",

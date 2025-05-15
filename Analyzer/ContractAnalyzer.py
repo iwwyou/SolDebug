@@ -10,7 +10,7 @@ from solcx import (
 )
 from solcx.exceptions import SolcError
 import copy
-from typing import Dict, cast, Tuple
+from typing import Dict, cast
 from collections import defaultdict
 
 
@@ -54,7 +54,7 @@ class ContractAnalyzer:
 
     # 공통 ‘한 줄 helper’
     def _register_var(self, var_obj):
-        self.snapman.register(var_obj, self._ser, self._de)
+        self.snapman.register(var_obj, self._ser)
 
     """
     Prev analysis part
@@ -1757,14 +1757,24 @@ class ContractAnalyzer:
         else:
             return_value = None
 
-            # ────────── ✨ 분석 결과 기록 ✨ ──────────
-            self._record_analysis(  # ← 추가 ①
+        # ────────── ✨ 분석 결과 기록 ✨ ──────────
+        if return_expr and return_expr.context == "TupleExpressionContext":
+            # ① 각 원소별 key 생성
+            flat = {}
+            for sub_e, sub_val in zip(return_expr.elements, return_value):
+                k = self._expr_to_str(sub_e)  # earned0 / earned1
+                flat[k] = self._serialize_val(sub_val)  # helper 그대로 활용
+            line_info = {"kind": "return", "vars": flat}
+            self.analysis_per_line[self.current_start_line].append(line_info)
+        else:
+            # 단일 반환값(기존 코드) --------------------
+            self._record_analysis(
                 line_no=self.current_start_line,
                 stmt_type="return",
-                expr=return_expr,  # Expression 을 key 로 직렬화
-                var_obj=Variables(  # ← dummy-wrap 해서 value 전달
+                expr=return_expr,
+                var_obj=Variables(
                     identifier="__ret__", value=return_value, scope="tmp")
-            )  # ← 추가 ②
+            )
 
         # 4. Return 구문을 current_block에 추가
         current_block.add_return_statement(return_expr=return_expr)
@@ -2138,12 +2148,12 @@ class ContractAnalyzer:
 
         # ② true-env
         if true_env is not None:
-            tl = cond_line + 0.1  # 소수점으로 “가상 줄 번호” 구분
+            tl = cond_line + 1  # 소수점으로 “가상 줄 번호” 구분
             self._record_analysis(tl, "branch_true", env=true_env)
 
         # ③ false-env (else 또는 if-false)
         if false_env is not None:
-            fl = cond_line + 0.2
+            fl = cond_line + 2
             self._record_analysis(fl, "branch_false", env=false_env)
 
     # ContractAnalyzer.py ─────────────────────────────────────────
@@ -3026,6 +3036,12 @@ class ContractAnalyzer:
         loop_condition_node : while / for / doWhile 의 condition CFGNode
         return              : loop 의 exit-node  (CFGNode)
         """
+        def _src_line_from_name(node: CFGNode) -> int | None:
+            # 끝에 _숫자 패턴이면 추출
+            try:
+                return int(node.name.rsplit('_', 1)[-1])
+            except ValueError:
+                return None
 
         # ── 0. exit-node 찾기 ────────────────────────
         exit_nodes = self.find_loop_exit_nodes(loop_condition_node)
@@ -3125,9 +3141,10 @@ class ContractAnalyzer:
             exit_env = self.join_variables_simple(exit_env, src) if exit_env else self.copy_variables(src)
         exit_node.variables = exit_env if exit_env else {}
 
+
         # ───── 분석 스냅샷 ②: loop-fixpoint ──────────
         self._record_analysis(
-            line_no=loop_condition_node.src_line + 0.9,  # 같은 라인 그룹에 살짝 뒤에
+            line_no=_src_line_from_name(loop_condition_node),  # 같은 라인 그룹에 살짝 뒤에
             stmt_type="loop-fixpoint",
             env=exit_node.variables
         )
@@ -5474,6 +5491,11 @@ class ContractAnalyzer:
                 self._flatten_var(mv, f"{prefix}[{k}]", out)
             return
 
+    def _serialize_val(self, v):
+        if hasattr(v, 'min_value'):
+            return f"[{v.min_value},{v.max_value}]"
+        return str(v)
+
     def _record_analysis(
             self,
             line_no: int,
@@ -5486,10 +5508,6 @@ class ContractAnalyzer:
         · expr  → 지금 건드린 Expression 을 그대로 key 로
         · var_obj → expr 가 가리키는 Variables  (value 직렬화용)
         """
-        def _serialize_val(v):
-            if hasattr(v, 'min_value'):  # Interval · BoolInterval
-                return f"[{v.min_value},{v.max_value}]"
-            return str(v)
 
         # ───── ① 함수 본문 밖이면 아무것도 기록하지 않음 ─────
         if self.current_target_function is None:
@@ -5503,7 +5521,7 @@ class ContractAnalyzer:
 
             # ── (a) 단일 값(e.g., uint, bool, enum, address …)
             if isinstance(var_obj, (Variables, EnumVariable)):
-                line_info["vars"] = {key: _serialize_val(getattr(var_obj, "value", None))}
+                line_info["vars"] = {key: self._serialize_val(getattr(var_obj, "value", None))}
 
             # ── (b) 배열 / 구조체 / 매핑 → 재귀로 평탄화
             else:  # ArrayVariable | StructVariable | MappingVariable

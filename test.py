@@ -120,7 +120,8 @@ test_inputs = [
     {
         "code": "\n",
         "startLine": 3,
-        "endLine": 3
+        "endLine": 3,
+        "event": "add"
     },
     {
         "code": "uint256 public maintenanceBudget0;",
@@ -131,7 +132,8 @@ test_inputs = [
     {
         "code": "\n",
         "startLine": 5,
-        "endLine": 5
+        "endLine": 5,
+        "event": "add"
     },
     {
         "code": "uint256 public maintenanceBudget1;",
@@ -142,7 +144,8 @@ test_inputs = [
     {
         "code": "\n",
         "startLine": 7,
-        "endLine": 7
+        "endLine": 7,
+        "event": "add"
     },
     {
         "code": "uint224[10] public rewardPerGas0Array;",
@@ -153,7 +156,8 @@ test_inputs = [
     {
         "code": "\n",
         "startLine": 9,
-        "endLine": 9
+        "endLine": 9,
+        "event": "add"
     },
     {
         "code": "uint224[10] public rewardPerGas1Array;",
@@ -164,7 +168,8 @@ test_inputs = [
     {
         "code": "\n",
         "startLine": 11,
-        "endLine": 11
+        "endLine": 11,
+        "event": "add"
     },
     {
         "code": "uint224 public rewardPerGas0Accumulator;",
@@ -175,7 +180,8 @@ test_inputs = [
     {
         "code": "\n",
         "startLine": 13,
-        "endLine": 13
+        "endLine": 13,
+        "event": "add"
     },
     {
         "code": "uint224 public rewardPerGas1Accumulator;",
@@ -186,7 +192,8 @@ test_inputs = [
     {
         "code": "\n",
         "startLine": 15,
-        "endLine": 15
+        "endLine": 15,
+        "event": "add"
     },
     {
         "code": "uint64 public rebalanceCount;",
@@ -197,7 +204,8 @@ test_inputs = [
     {
         "code": "\n",
         "startLine": 17,
-        "endLine": 17
+        "endLine": 17,
+        "event": "add"
     },
     {
         "code": "function _earmarkSomeForMaintenance(uint256 earned0, uint256 earned1) private returns (uint256, uint256) {\n}",
@@ -214,7 +222,8 @@ test_inputs = [
     {
         "code": "\n",
         "startLine": 20,
-        "endLine": 20
+        "endLine": 20,
+        "event": "add"
     },
     {
         "code": "unchecked {\n}",
@@ -261,7 +270,8 @@ test_inputs = [
     {
         "code": "\n",
         "startLine": 29,
-        "endLine": 29
+        "endLine": 29,
+        "event": "add"
     },
     {
         "code": "return (earned0, earned1);",
@@ -269,26 +279,24 @@ test_inputs = [
         "endLine": 30,
         "event": "add"
     },
-  {
-    "code": "// @LocalVar earned0 = [10,100]",
-    "startLine": 19,
-    "endLine": 19
-  },
-  {
-    "code": "// @LocalVar earned1 = [100,200]",
-    "startLine": 20,
-    "endLine": 20
-  },
-  {
-    "code": "// @StateVar maintenanceBudget0 = [1000,2000]",
-    "startLine": 21,
-    "endLine": 21
-  },
-{
-    "code": "// @StateVar maintenanceBudget1 = [2000,2000]",
-    "startLine": 22,
-    "endLine": 22
-  },
+    {
+        "code": "// @LocalVar earned1 = [100,200]",
+        "startLine": 20,
+        "endLine": 20,
+        "event" : "add"
+    },
+    {
+        "code": "// @StateVar maintenanceBudget0 = [1000,2000]",
+        "startLine": 21,
+        "endLine": 21,
+        "event" : "add"
+    },
+    {
+        "code": "// @StateVar maintenanceBudget1 = [2000,2000]",
+        "startLine": 22,
+        "endLine": 22,
+        "event" : "add"
+    }
 ]
 
 

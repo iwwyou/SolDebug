@@ -41,7 +41,7 @@ class CFGNode:
 
         self.statements.append(variableDeclarationStatment)
 
-    def add_assign_statement(self, exprLeft, exprRight, exprOperator):
+    def add_assign_statement(self, exprLeft, exprOperator, exprRight):
 
         # Statement 생성
         assignment_stmt = Statement(
