@@ -2,12 +2,14 @@
   {
     "code": "contract ERC20 {\n}",
     "startLine": 1,
-    "endLine": 2
+    "endLine": 2,
+    "event": "add"
   },
   {
     "code": "mapping (address => mapping (address => uint256)) private _allowances;",
     "startLine": 2,
-    "endLine": 2
+    "endLine": 2,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -17,17 +19,20 @@
   {
     "code": "function _approve(address owner, address spender, uint256 amount) internal virtual {\n}",
     "startLine": 4,
-    "endLine": 5
+    "endLine": 5,
+    "event": "add"
   },
   {
     "code": "require(owner != address(0), \"ERC20: approve from the zero address\");",
     "startLine": 5,
-    "endLine": 5
+    "endLine": 5,
+    "event": "add"
   },
   {
     "code": "require(spender != address(0), \"ERC20: approve to the zero address\");",
     "startLine": 6,
-    "endLine": 6
+    "endLine": 6,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -37,11 +42,13 @@
   {
     "code": "_allowances[owner][spender] = amount;",
     "startLine": 8,
-    "endLine": 8
+    "endLine": 8,
+    "event": "add"
   },
   {
     "code": "emit Approval(owner, spender, amount);",
     "startLine": 9,
-    "endLine": 9
+    "endLine": 9,
+    "event": "add"
   }
 ]

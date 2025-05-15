@@ -83,9 +83,10 @@ def simulate_inputs(test_inputs: list[dict], *, silent: bool = False) -> None:
         code       = rec["code"]
         start_line = rec["startLine"]
         end_line   = rec["endLine"]
+        ev         = rec["event"]
 
         # 1) source‑buffer 업데이트
-        contract_analyzer.update_code(start_line, end_line, code)
+        contract_analyzer.update_code(start_line, end_line, code, ev)
 
         # 2) 완전한 공백 라인은 skip  (brace 카운트만 반영)
         if code.strip() == "":
@@ -104,151 +105,170 @@ def simulate_inputs(test_inputs: list[dict], *, silent: bool = False) -> None:
                 for info in infos:  # 같은 줄에 여러 기록이 있을 수 있음
                     print(f"[line {ln}] {json.dumps(info, ensure_ascii=False)}")
 test_inputs = [
-  {
-    "code": "contract AloeBlend {\n}",
-    "startLine": 1,
-    "endLine": 2
-  },
-  {
-    "code": "uint8 public constant MAINTENANCE_FEE = 10;",
-    "startLine": 2,
-    "endLine": 2
-  },
-  {
-    "code": "\n",
-    "startLine": 3,
-    "endLine": 3
-  },
-  {
-    "code": "uint256 public maintenanceBudget0;",
-    "startLine": 4,
-    "endLine": 4
-  },
-  {
-    "code": "\n",
-    "startLine": 5,
-    "endLine": 5
-  },
-  {
-    "code": "uint256 public maintenanceBudget1;",
-    "startLine": 6,
-    "endLine": 6
-  },
-  {
-    "code": "\n",
-    "startLine": 7,
-    "endLine": 7
-  },
-  {
-    "code": "uint224[10] public rewardPerGas0Array;",
-    "startLine": 8,
-    "endLine": 8
-  },
-  {
-    "code": "\n",
-    "startLine": 9,
-    "endLine": 9
-  },
-  {
-    "code": "uint224[10] public rewardPerGas1Array;",
-    "startLine": 10,
-    "endLine": 10
-  },
-  {
-    "code": "\n",
-    "startLine": 11,
-    "endLine": 11
-  },
-  {
-    "code": "uint224 public rewardPerGas0Accumulator;",
-    "startLine": 12,
-    "endLine": 12
-  },
-  {
-    "code": "\n",
-    "startLine": 13,
-    "endLine": 13
-  },
-  {
-    "code": "uint224 public rewardPerGas1Accumulator;",
-    "startLine": 14,
-    "endLine": 14
-  },
-  {
-    "code": "\n",
-    "startLine": 15,
-    "endLine": 15
-  },
-  {
-    "code": "uint64 public rebalanceCount;",
-    "startLine": 16,
-    "endLine": 16
-  },
-  {
-    "code": "\n",
-    "startLine": 17,
-    "endLine": 17
-  },
-  {
-    "code": "function _earmarkSomeForMaintenance(uint256 earned0, uint256 earned1) private returns (uint256, uint256) {\n}",
-    "startLine": 18,
-    "endLine": 19
-  },
-  {
-    "code": "uint256 toMaintenance;",
-    "startLine": 19,
-    "endLine": 19
-  },
-  {
-    "code": "\n",
-    "startLine": 20,
-    "endLine": 20
-  },
-  {
-    "code": "unchecked {\n}",
-    "startLine": 21,
-    "endLine": 22
-  },
-  {
-    "code": "toMaintenance = earned0 / MAINTENANCE_FEE;",
-    "startLine": 22,
-    "endLine": 22
-  },
-  {
-    "code": "earned0 -= toMaintenance;",
-    "startLine": 23,
-    "endLine": 23
-  },
-  {
-    "code": "maintenanceBudget0 += toMaintenance;",
-    "startLine": 24,
-    "endLine": 24
-  },
-  {
-    "code": "toMaintenance = earned1 / MAINTENANCE_FEE;",
-    "startLine": 25,
-    "endLine": 25
-  },
-  {
-    "code": "earned1 -= toMaintenance;",
-    "startLine": 26,
-    "endLine": 26
-  },
-  {
-    "code": "maintenanceBudget1 += toMaintenance;",
-    "startLine": 27,
-    "endLine": 27
-  },
-  {
-    "code": "\n",
-    "startLine": 29,
-    "endLine": 29
-  },
-  {
-    "code": "return (earned0, earned1);",
-    "startLine": 30,
-    "endLine": 30
-  },
+    {
+        "code": "contract AloeBlend {\n}",
+        "startLine": 1,
+        "endLine": 2,
+        "event": "add"
+    },
+    {
+        "code": "uint8 public constant MAINTENANCE_FEE = 10;",
+        "startLine": 2,
+        "endLine": 2,
+        "event": "add"
+    },
+    {
+        "code": "\n",
+        "startLine": 3,
+        "endLine": 3
+    },
+    {
+        "code": "uint256 public maintenanceBudget0;",
+        "startLine": 4,
+        "endLine": 4,
+        "event": "add"
+    },
+    {
+        "code": "\n",
+        "startLine": 5,
+        "endLine": 5
+    },
+    {
+        "code": "uint256 public maintenanceBudget1;",
+        "startLine": 6,
+        "endLine": 6,
+        "event": "add"
+    },
+    {
+        "code": "\n",
+        "startLine": 7,
+        "endLine": 7
+    },
+    {
+        "code": "uint224[10] public rewardPerGas0Array;",
+        "startLine": 8,
+        "endLine": 8,
+        "event": "add"
+    },
+    {
+        "code": "\n",
+        "startLine": 9,
+        "endLine": 9
+    },
+    {
+        "code": "uint224[10] public rewardPerGas1Array;",
+        "startLine": 10,
+        "endLine": 10,
+        "event": "add"
+    },
+    {
+        "code": "\n",
+        "startLine": 11,
+        "endLine": 11
+    },
+    {
+        "code": "uint224 public rewardPerGas0Accumulator;",
+        "startLine": 12,
+        "endLine": 12,
+        "event": "add"
+    },
+    {
+        "code": "\n",
+        "startLine": 13,
+        "endLine": 13
+    },
+    {
+        "code": "uint224 public rewardPerGas1Accumulator;",
+        "startLine": 14,
+        "endLine": 14,
+        "event": "add"
+    },
+    {
+        "code": "\n",
+        "startLine": 15,
+        "endLine": 15
+    },
+    {
+        "code": "uint64 public rebalanceCount;",
+        "startLine": 16,
+        "endLine": 16,
+        "event": "add"
+    },
+    {
+        "code": "\n",
+        "startLine": 17,
+        "endLine": 17
+    },
+    {
+        "code": "function _earmarkSomeForMaintenance(uint256 earned0, uint256 earned1) private returns (uint256, uint256) {\n}",
+        "startLine": 18,
+        "endLine": 19,
+        "event": "add"
+    },
+    {
+        "code": "uint256 toMaintenance;",
+        "startLine": 19,
+        "endLine": 19,
+        "event": "add"
+    },
+    {
+        "code": "\n",
+        "startLine": 20,
+        "endLine": 20
+    },
+    {
+        "code": "unchecked {\n}",
+        "startLine": 21,
+        "endLine": 22,
+        "event": "add"
+    },
+    {
+        "code": "toMaintenance = earned0 / MAINTENANCE_FEE;",
+        "startLine": 22,
+        "endLine": 22,
+        "event": "add"
+    },
+    {
+        "code": "earned0 -= toMaintenance;",
+        "startLine": 23,
+        "endLine": 23,
+        "event": "add"
+    },
+    {
+        "code": "maintenanceBudget0 += toMaintenance;",
+        "startLine": 24,
+        "endLine": 24,
+        "event": "add"
+    },
+    {
+        "code": "toMaintenance = earned1 / MAINTENANCE_FEE;",
+        "startLine": 25,
+        "endLine": 25,
+        "event": "add"
+    },
+    {
+        "code": "earned1 -= toMaintenance;",
+        "startLine": 26,
+        "endLine": 26,
+        "event": "add"
+    },
+    {
+        "code": "maintenanceBudget1 += toMaintenance;",
+        "startLine": 27,
+        "endLine": 27,
+        "event": "add"
+    },
+    {
+        "code": "\n",
+        "startLine": 29,
+        "endLine": 29
+    },
+    {
+        "code": "return (earned0, earned1);",
+        "startLine": 30,
+        "endLine": 30,
+        "event": "add"
+    },
   {
     "code": "// @LocalVar earned0 = [10,100]",
     "startLine": 19,

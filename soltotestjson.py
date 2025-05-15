@@ -30,7 +30,7 @@ def slice_solidity(source: str) -> List[Dict[str, str | int]]:
 
         # 1) 빈 줄 ──────────────────────────────────────────────
         if _only_ws.match(raw):
-            inputs.append({"code": "\n", "startLine": cur_line, "endLine": cur_line})
+            inputs.append({"code": "\n", "startLine": cur_line, "endLine": cur_line, "event": "add"})
             cur_line += 1
             i += 1
             continue
@@ -47,7 +47,8 @@ def slice_solidity(source: str) -> List[Dict[str, str | int]]:
             inputs.append({
                 "code":      block_code,
                 "startLine": cur_line,
-                "endLine":   cur_line + 1                # 헤더+1 ⇒ 2-line block
+                "endLine":   cur_line + 1,                # 헤더+1 ⇒ 2-line block
+                "event": "add"
             })
             cur_line += 1        # ※ 실제 소스엔 닫는 ‘}’ 가 없으므로 +1만
             i += 1
@@ -55,7 +56,7 @@ def slice_solidity(source: str) -> List[Dict[str, str | int]]:
 
         # 4) 세미콜론으로 끝나는 한 줄 문장  ─────────────────────
         if _one_liner.search(txt):
-            inputs.append({"code": txt, "startLine": cur_line, "endLine": cur_line})
+            inputs.append({"code": txt, "startLine": cur_line, "endLine": cur_line, "event": "add"})
             cur_line += 1
             i += 1
             continue

@@ -1,5 +1,25 @@
 from Utils.Interval import *
 
+# util.py
+import copy
+
+class SnapshotManager:
+    def __init__(self):
+        self._store = {}          # id(obj) → dict-snapshot
+
+    def register(self, obj, serializer):
+        """(add/modify) 처음 보이는 변수는 snapshot 저장"""
+        self._store[id(obj)] = copy.deepcopy(serializer(obj))
+
+    def restore(self, obj, deserializer):
+        """(delete) 초기 snapshot 으로 복원"""
+        snap = self._store.get(id(obj))
+        if snap is not None:
+            deserializer(obj, copy.deepcopy(snap))
+
+
+
+
 class Statement:
     def __init__(self, statement_type, **kwargs):
         self.statement_type = statement_type  # 'assignment', 'if', 'while', 'for', 'return', 'require', 'assert' 등
@@ -94,6 +114,7 @@ class Variables:
 
         # 값 정보
         self.value = value  # interval
+        self.initial_value = copy.deepcopy(value)  # ← NEW
 
 
 class GlobalVariable(Variables):

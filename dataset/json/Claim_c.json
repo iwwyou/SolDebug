@@ -2,12 +2,14 @@
   {
     "code": "contract Claim {\n}",
     "startLine": 1,
-    "endLine": 2
+    "endLine": 2,
+    "event": "add"
   },
   {
     "code": "mapping(address => uint256) public claimable;",
     "startLine": 2,
-    "endLine": 2
+    "endLine": 2,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -17,12 +19,14 @@
   {
     "code": "uint256 locktime;",
     "startLine": 4,
-    "endLine": 4
+    "endLine": 4,
+    "event": "add"
   },
   {
     "code": "uint256 startTime = 0;",
     "startLine": 5,
-    "endLine": 5
+    "endLine": 5,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -32,32 +36,38 @@
   {
     "code": "function getCurrentClaimAmount(address user) public view returns (uint256) {\n}",
     "startLine": 7,
-    "endLine": 8
+    "endLine": 8,
+    "event": "add"
   },
   {
     "code": "if (!claimedOnce[user] && block.timestamp < (startTime + locktime)) {\n}",
     "startLine": 8,
-    "endLine": 9
+    "endLine": 9,
+    "event": "add"
   },
   {
     "code": "return (claimable[user] * 30) / 100;",
     "startLine": 9,
-    "endLine": 9
+    "endLine": 9,
+    "event": "add"
   },
   {
     "code": "} else if (block.timestamp >= (startTime + locktime)) {\n}",
     "startLine": 10,
-    "endLine": 11
+    "endLine": 11,
+    "event": "add"
   },
   {
     "code": "return claimable[user];",
     "startLine": 11,
-    "endLine": 11
+    "endLine": 11,
+    "event": "add"
   },
   {
     "code": "return 0;",
     "startLine": 13,
-    "endLine": 13
+    "endLine": 13,
+    "event": "add"
   },
   {
     "code": "\n",

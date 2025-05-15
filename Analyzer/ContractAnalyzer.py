@@ -18,6 +18,7 @@ class ContractAnalyzer:
 
     def __init__(self):
         self.sm = AddressSymbolicManager()
+        self.snapman = SnapshotManager()
 
         self.full_code = None
         self.full_code_lines = {} # 라인별 코드를 저장하는 딕셔너리
@@ -32,64 +33,133 @@ class ContractAnalyzer:
         self.current_target_function_cfg = None
         self.current_target_struct = None
 
+        self.current_edit_event = None
+
         # for Multiple Contract
         self.contract_cfgs = {} # name -> CFG
 
         self.analysis_per_line: dict[int, list[dict]] = defaultdict(list)
 
+    # ──────────────────────────────────────────────────────────────
+    # Snapshot 전용 내부 헬퍼  ―  외부에서 쓸 일 없으므로 “프라이빗” 네이밍
+    # ----------------------------------------------------------------
+    @staticmethod
+    def _ser(v):  # obj → dict
+        return v.__dict__
+
+    @staticmethod
+    def _de(v, snap):  # dict → obj
+        v.__dict__.clear()
+        v.__dict__.update(snap)
+
+    # 공통 ‘한 줄 helper’
+    def _register_var(self, var_obj):
+        self.snapman.register(var_obj, self._ser, self._de)
+
     """
     Prev analysis part
     """
 
-    def update_code(self, start_line, end_line, new_code):
+    def _insert_lines(self, start_ln, end_ln, new_lines):
+        offset = end_ln - start_ln + 1
+        # 뒤로 밀기
+        keys = sorted([ln for ln in self.full_code_lines if ln >= start_ln],
+                      reverse=True)
+        for old in keys:
+            self.full_code_lines[old + offset] = self.full_code_lines.pop(old)
+            if old in self.brace_count:
+                self.brace_count[old + offset] = self.brace_count.pop(old)
+            if old in self.analysis_per_line:
+                self.analysis_per_line[old + offset] = self.analysis_per_line.pop(old)
+
+        # 새 줄 쓰기
+        for idx, ln in enumerate(range(start_ln, end_ln + 1)):
+            self.full_code_lines[ln] = new_lines[idx]
+            self.update_brace_count(ln, new_lines[idx])
+
+    def update_code(self,
+                    start_line: int,
+                    end_line: int,
+                    new_code: str,
+                    event: str):
         """
-        1) 기존 로직 그대로 유지: 라인들을 self.full_code_lines에 삽입/갱신
-        2) 만약 new_code가 "@during-execution" 주석이라면, 기존 라인을 수정 (append) 하여 코드가 '밀리지' 않도록 처리
+        event ∈  {"add", "modify", "delete"}
+
+        • add     :  기존 로직 (뒤를 밀고 새 줄 삽입)
+        • modify  :  같은 줄 범위를 *덮어쓰기*  (라인 수는 유지)
+        • delete  :  먼저  analyse_context → 그 다음 완전히 없애고 뒤를 당김
         """
 
+        # ──────────────────────────────────────────────────────────
+        # ① 사전 준비
+        # ----------------------------------------------------------
         self.current_start_line = start_line
         self.current_end_line = end_line
+        self.current_edit_event = event
+        lines = new_code.split("\n")  # add / modify 용
 
-        lines = new_code.split('\n')
+        if event not in {"add", "modify", "delete"}:
+            raise ValueError(f"unknown event '{event}'")
 
-        # 새 라인들 삽입/밀기 등
-        if not self.full_code_lines:  # initialize
-            for i, line_no in enumerate(range(start_line, end_line + 1)):
-                self.full_code_lines[line_no] = lines[i]
-                self.update_brace_count(line_no, lines[i])
-        else:
+        # ──────────────────────────────────────────────────────────
+        # ② event별 분기
+        # ----------------------------------------------------------
+        if event == "add":
+            self._insert_lines(start_line, end_line, lines)  # ← 종전 알고리즘
+
+        elif event == "modify":
+            # “삭제 후 삽입” ··· 삭제 분석 → 삽입 분석 두 번 호출
+            self.update_code(start_line, end_line, "", event="delete")
+            self.update_code(start_line, end_line, new_code, event="add")
+
+        else:  # ─── delete ───
+            #
+            # A.  *삭제 전*  →  기존 내용을 analyse_context 에 넘겨
+            #    “지워진 라인에서 선언된 변수 rollback”  등의 처리를 먼저 수행
+            #
+            old_src = "\n".join(self.full_code_lines.get(ln, "")
+                                for ln in range(start_line, end_line + 1))
+            if old_src.strip():
+                self.analyze_context(start_line, old_src)
+
+            #
+            # B.  실제 삭제
+            #
             offset = end_line - start_line + 1
 
-            # 1. 기존 라인 뒤로 밀기
+            # 1) pop 메타데이터
+            for ln in range(start_line, end_line + 1):
+                self.full_code_lines.pop(ln, None)
+                self.brace_count.pop(ln, None)
+                self.analysis_per_line.pop(ln, None)
+
+            # 2) 뒤쪽 라인을 앞으로 당김
             keys_to_shift = sorted(
-                [line_no for line_no in self.full_code_lines.keys() if line_no >= start_line],
-                reverse=True
+                [ln for ln in self.full_code_lines.keys() if ln > end_line]
             )
-            for old_line_no in keys_to_shift:
-                self.full_code_lines[old_line_no + offset] = self.full_code_lines.pop(old_line_no)
-                self.update_brace_count(old_line_no + offset, self.full_code_lines[old_line_no + offset])
+            for old_ln in keys_to_shift:
+                self.full_code_lines[old_ln - offset] = self.full_code_lines.pop(old_ln)
+                # brace & analysis 이동
+                if old_ln in self.brace_count:
+                    self.brace_count[old_ln - offset] = self.brace_count.pop(old_ln)
+                if old_ln in self.analysis_per_line:
+                    self.analysis_per_line[old_ln - offset] = self.analysis_per_line.pop(old_ln)
 
-            # ───── B. analysis_per_line 이동 (추가) ─────
-            for old_line_no in keys_to_shift:
-                if old_line_no in self.analysis_per_line:
-                    self.analysis_per_line[old_line_no + offset] = \
-                        self.analysis_per_line.pop(old_line_no)
 
-            # 2. 새로운 코드 라인 삽입
-            for i, line_no in enumerate(range(start_line, end_line + 1)):
-                self.full_code_lines[line_no] = lines[i]
-                self.update_brace_count(line_no, lines[i])
 
-        # 3. full_code 재구성
-        self.full_code = '\n'.join(
-            [self.full_code_lines[line_no] for line_no in sorted(self.full_code_lines.keys())]
+        # ──────────────────────────────────────────────────────────
+        # ③ full-code 재조합 & optional compile check
+        # ----------------------------------------------------------
+        self.full_code = "\n".join(
+            self.full_code_lines[ln] for ln in sorted(self.full_code_lines)
         )
 
-        # 4. analyze_context
-        if new_code != "\n":
+        # add / modify 는 새 코드를 바로 분석
+        if event in {"add", "modify"} and new_code.strip():
             self.analyze_context(start_line, new_code)
 
-        self.compile_check()
+        # 실험 코드라면 컴파일 생략 가능
+        # self.compile_check()
 
     def compile_check(self) -> None:
         wanted = '0.8.0'
@@ -400,6 +470,10 @@ class ContractAnalyzer:
                 typeInfo=_sol_elem("address")),
         }
 
+        # ── 새로 추가: 모든 global 을 SnapshotManager に 등록
+        for gv in cfg.globals.values():
+            self._register_var(gv)
+
         # ────────── 3. bookkeeping ──────────
         self.contract_cfgs[contract_name] = cfg
         self.brace_count[self.current_start_line]['cfg_node'] = cfg
@@ -535,6 +609,8 @@ class ContractAnalyzer:
             elif variable_obj.typeInfo.typeCategory == "elementary" :
                 variable_obj.value = self.evaluate_expression(init_expr, contract_cfg.state_variable_node.variables, None, None)
 
+        self._register_var(variable_obj)
+
         # 4. 상태 변수를 ContractCFG에 추가
         contract_cfg.add_state_variable(variable_obj, expr=init_expr)
 
@@ -573,6 +649,8 @@ class ContractAnalyzer:
 
         variable_obj.value = value
         variable_obj.isConstant = True  # (안전용 중복 설정)
+
+        self._register_var(variable_obj)
 
         # 3. ContractCFG 에 추가 (state 변수와 동일 API 사용)
         contract_cfg.add_state_variable(variable_obj, expr=init_expr)
@@ -1989,6 +2067,8 @@ class ContractAnalyzer:
                     arr.initialize_not_abstracted_type(sm=self.sm)
             else:  # 다차원
                 arr.initialize_not_abstracted_type(sm=self.sm)
+
+            self._register_var(arr)
             return arr
 
         # ──────────────────────────── ② struct ───────────────────────────
@@ -1998,6 +2078,8 @@ class ContractAnalyzer:
                 raise ValueError(f"Undefined struct '{sname}' used as parameter/return.")
             sv = StructVariable(identifier=ident, struct_type=sname, scope=scope)
             sv.initialize_struct(contract_cfg.structDefs[sname], sm=self.sm)
+
+            self._register_var(sv)
             return sv
 
         # ──────────────────────────── ③ enum ────────────────────────────
@@ -2026,14 +2108,9 @@ class ContractAnalyzer:
                 self.sm.bind_var(ident, iv.min_value)
             else:  # bytes / string …
                 v.value = f"symbol_{ident}"
-            return v
 
-        # ──────────────────────────── ⑤ mapping (rare) ───────────────────
-        if sol_type.typeCategory == "mapping":
-            return MappingVariable(identifier=ident,
-                                   key_type=sol_type.mappingKeyType,
-                                   value_type=sol_type.mappingValueType,
-                                   scope=scope)
+            self._register_var(v)
+            return v
 
         raise ValueError(f"Unsupported typeCategory '{sol_type.typeCategory}'")
 
@@ -2159,17 +2236,29 @@ class ContractAnalyzer:
           •(주소형이면) AddressSymbolicManager 에 변수<->ID 바인딩
           • 영향을 받는 함수만 재해석
         """
+        ev = self.current_edit_event
         cfg = self.contract_cfgs[self.current_target_contract]
 
-        # 1) 사전 엔트리 보장
+        # ── 등록이 처음이면 snapshot ⬇︎
         if gv_obj.identifier not in cfg.globals:
-            gv_obj.default_value = gv_obj.value  # 최초 등록
+            gv_obj.default_value = gv_obj.value
             cfg.globals[gv_obj.identifier] = gv_obj
+            self.snapman.register(gv_obj, self._ser)  # ★ 스냅
+
         g = cfg.globals[gv_obj.identifier]
 
-        # 2) override 반영
-        g.debug_override = gv_obj.value
-        g.value = gv_obj.value  # 실시간 해석용
+        # ── add/modify ───────────────────────────────────────────
+        if ev in ("add", "modify"):
+            g.debug_override = gv_obj.value
+            g.value = gv_obj.value
+
+        # ── delete  → snapshot 복원 + override 해제 ───────────────
+        elif ev == "delete":
+            self.snapman.restore(g, self._de)  # ★ 롤백
+            g.debug_override = None
+
+        else:
+            raise ValueError(f"unknown event {ev!r}")
 
         # ↳ 주소형이면 AddressSymbolicManager 에 기록
         if g.typeInfo.elementaryTypeName == "address" and isinstance(g.value, UnsignedIntegerInterval):
@@ -2198,6 +2287,7 @@ class ContractAnalyzer:
         """
         cfg = self.contract_cfgs[self.current_target_contract]
         fcfg = cfg.get_function_cfg(self.current_target_function)
+        ev = self.current_edit_event
         if fcfg is None:
             raise ValueError("@StateVar debug must appear inside a function body.")
 
@@ -2205,6 +2295,17 @@ class ContractAnalyzer:
         var_obj = self._resolve_and_update_expr(lhs_expr, fcfg, value)
         if var_obj is None:
             raise ValueError("LHS cannot be resolved to a state variable.")
+
+        # 최초 등록 시 snapshot
+        if id(var_obj) not in self.snapman._store:
+            self.snapman.register(var_obj, self._ser)
+
+        if ev in ("add", "modify"):  # 값 덮어쓰기
+            var_obj.value = value
+        elif ev == "delete":  # 롤백
+            self.snapman.restore(var_obj, self._de)
+        else:
+            raise ValueError(f"unknown event {ev!r}")
 
         # 2) 주소형이면 심볼릭-ID 바인딩
         if (getattr(var_obj.typeInfo, "elementaryTypeName", None) == "address" and
@@ -2223,6 +2324,7 @@ class ContractAnalyzer:
         """
         @LocalVar …   주석 처리 (함수 내부 로컬)
         """
+        ev = self.current_edit_event
         cfg = self.contract_cfgs[self.current_target_contract]
         fcfg = cfg.get_function_cfg(self.current_target_function)
         if fcfg is None:
@@ -2231,6 +2333,16 @@ class ContractAnalyzer:
         var_obj = self._resolve_and_update_expr(lhs_expr, fcfg, value)
         if var_obj is None:
             raise ValueError("LHS cannot be resolved to a local variable.")
+
+        if id(var_obj) not in self.snapman._store:
+            self.snapman.register(var_obj, self._ser)
+
+        if ev in ("add", "modify"):
+            var_obj.value = value
+        elif ev == "delete":
+            self.snapman.restore(var_obj, self._de)
+        else:
+            raise ValueError(f"unknown event {ev!r}")
 
         # 주소형 → 심볼릭-ID 바인딩
         if (getattr(var_obj.typeInfo, "elementaryTypeName", None) == "address" and
@@ -2757,6 +2869,10 @@ class ContractAnalyzer:
                 line,
                 {"open": 0, "close": 0, "cfg_node": None},
             )
+
+            txt = self.full_code_lines.get(line, "").strip()
+            if txt == "" or txt.startswith("//"):  # ← 공백 + 주석 모두 건너뜀
+                continue
 
             # 공백/주석 전용 라인 스킵
             if brace_info["open"] == brace_info["close"] == 0 and brace_info["cfg_node"] is None:

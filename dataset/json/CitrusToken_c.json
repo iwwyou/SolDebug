@@ -2,12 +2,14 @@
   {
     "code": "contract BEP20 {\n}",
     "startLine": 1,
-    "endLine": 2
+    "endLine": 2,
+    "event": "add"
   },
   {
     "code": "mapping (address=>uint256) balances;",
     "startLine": 2,
-    "endLine": 2
+    "endLine": 2,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -17,7 +19,8 @@
   {
     "code": "uint256 public totalSupply;",
     "startLine": 4,
-    "endLine": 4
+    "endLine": 4,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -27,7 +30,8 @@
   {
     "code": "mapping (address=>mapping (address=>uint256)) allowed;",
     "startLine": 6,
-    "endLine": 6
+    "endLine": 6,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -37,27 +41,32 @@
   {
     "code": "function transfer(address _to, uint256 _amount) public returns (bool success) {\n}",
     "startLine": 8,
-    "endLine": 9
+    "endLine": 9,
+    "event": "add"
   },
   {
     "code": "require (balances[msg.sender]>=_amount&&_amount>0&&balances[_to]+_amount>balances[_to]);",
     "startLine": 9,
-    "endLine": 9
+    "endLine": 9,
+    "event": "add"
   },
   {
     "code": "balances[msg.sender]-=_amount;",
     "startLine": 10,
-    "endLine": 10
+    "endLine": 10,
+    "event": "add"
   },
   {
     "code": "balances[_to]+=_amount;",
     "startLine": 11,
-    "endLine": 11
+    "endLine": 11,
+    "event": "add"
   },
   {
     "code": "return true;",
     "startLine": 12,
-    "endLine": 12
+    "endLine": 12,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -67,32 +76,38 @@
   {
     "code": "function transferFrom(address _from,address _to,uint256 _amount) public returns (bool success) {\n}",
     "startLine": 15,
-    "endLine": 16
+    "endLine": 16,
+    "event": "add"
   },
   {
     "code": "require (balances[_from]>=_amount&&allowed[_from][msg.sender]>=_amount&&_amount>0&&balances[_to]+_amount>balances[_to]);",
     "startLine": 16,
-    "endLine": 16
+    "endLine": 16,
+    "event": "add"
   },
   {
     "code": "balances[_from]-=_amount;",
     "startLine": 17,
-    "endLine": 17
+    "endLine": 17,
+    "event": "add"
   },
   {
     "code": "allowed[_from][msg.sender]-=_amount;",
     "startLine": 18,
-    "endLine": 18
+    "endLine": 18,
+    "event": "add"
   },
   {
     "code": "balances[_to]+=_amount;",
     "startLine": 19,
-    "endLine": 19
+    "endLine": 19,
+    "event": "add"
   },
   {
     "code": "return true;",
     "startLine": 20,
-    "endLine": 20
+    "endLine": 20,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -102,7 +117,8 @@
   {
     "code": "function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual {\n}",
     "startLine": 23,
-    "endLine": 24
+    "endLine": 24,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -112,12 +128,14 @@
   {
     "code": "function _mint(address account, uint256 amount) internal virtual {\n}",
     "startLine": 26,
-    "endLine": 27
+    "endLine": 27,
+    "event": "add"
   },
   {
     "code": "require(account != address(0), \"BEP20: mint to the zero address\");",
     "startLine": 27,
-    "endLine": 27
+    "endLine": 27,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -127,7 +145,8 @@
   {
     "code": "_beforeTokenTransfer(address(0), account, amount);",
     "startLine": 29,
-    "endLine": 29
+    "endLine": 29,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -137,12 +156,14 @@
   {
     "code": "totalSupply += amount;",
     "startLine": 31,
-    "endLine": 31
+    "endLine": 31,
+    "event": "add"
   },
   {
     "code": "balances[account] += amount;",
     "startLine": 32,
-    "endLine": 32
+    "endLine": 32,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -157,12 +178,14 @@
   {
     "code": "function _burn(address account, uint256 amount) internal virtual {\n}",
     "startLine": 36,
-    "endLine": 37
+    "endLine": 37,
+    "event": "add"
   },
   {
     "code": "require(account != address(0), \"BEP20: burn from the zero address\");",
     "startLine": 37,
-    "endLine": 37
+    "endLine": 37,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -172,7 +195,8 @@
   {
     "code": "_beforeTokenTransfer(account, address(0), amount);",
     "startLine": 39,
-    "endLine": 39
+    "endLine": 39,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -182,22 +206,26 @@
   {
     "code": "uint256 accountBalance = balances[account];",
     "startLine": 41,
-    "endLine": 41
+    "endLine": 41,
+    "event": "add"
   },
   {
     "code": "require(accountBalance >= amount, \"BEP20: burn amount exceeds balance\");",
     "startLine": 42,
-    "endLine": 42
+    "endLine": 42,
+    "event": "add"
   },
   {
     "code": "balances[account] = accountBalance - amount;",
     "startLine": 43,
-    "endLine": 43
+    "endLine": 43,
+    "event": "add"
   },
   {
     "code": "totalSupply -= amount;",
     "startLine": 44,
-    "endLine": 44
+    "endLine": 44,
+    "event": "add"
   },
   {
     "code": "\n",

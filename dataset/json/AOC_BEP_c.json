@@ -2,32 +2,38 @@
   {
     "code": "contract AOC_BEP {\n}",
     "startLine": 1,
-    "endLine": 2
+    "endLine": 2,
+    "event": "add"
   },
   {
     "code": "struct UserInfo {\n}",
     "startLine": 2,
-    "endLine": 3
+    "endLine": 3,
+    "event": "add"
   },
   {
     "code": "uint256 balance;",
     "startLine": 3,
-    "endLine": 3
+    "endLine": 3,
+    "event": "add"
   },
   {
     "code": "uint256 level;",
     "startLine": 4,
-    "endLine": 4
+    "endLine": 4,
+    "event": "add"
   },
   {
     "code": "uint256 year;",
     "startLine": 5,
-    "endLine": 5
+    "endLine": 5,
+    "event": "add"
   },
   {
     "code": "uint256 month;",
     "startLine": 6,
-    "endLine": 6
+    "endLine": 6,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -37,22 +43,26 @@
   {
     "code": "struct Level {\n}",
     "startLine": 9,
-    "endLine": 10
+    "endLine": 10,
+    "event": "add"
   },
   {
     "code": "uint256 start;",
     "startLine": 10,
-    "endLine": 10
+    "endLine": 10,
+    "event": "add"
   },
   {
     "code": "uint256 end;",
     "startLine": 11,
-    "endLine": 11
+    "endLine": 11,
+    "event": "add"
   },
   {
     "code": "uint256 percentage;",
     "startLine": 12,
-    "endLine": 12
+    "endLine": 12,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -62,12 +72,14 @@
   {
     "code": "mapping(address => UserInfo) public userInfo;",
     "startLine": 15,
-    "endLine": 15
+    "endLine": 15,
+    "event": "add"
   },
   {
     "code": "mapping(uint256 => Level) public levels;",
     "startLine": 16,
-    "endLine": 16
+    "endLine": 16,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -77,7 +89,8 @@
   {
     "code": "uint256 private _totalSupply;",
     "startLine": 18,
-    "endLine": 18
+    "endLine": 18,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -87,57 +100,68 @@
   {
     "code": "function updateUserInfo(address account, uint256 year, uint256 month) internal {\n}",
     "startLine": 20,
-    "endLine": 21
+    "endLine": 21,
+    "event": "add"
   },
   {
     "code": "userInfo[account].balance = _balances[account];",
     "startLine": 21,
-    "endLine": 21
+    "endLine": 21,
+    "event": "add"
   },
   {
     "code": "userInfo[account].year = year;",
     "startLine": 22,
-    "endLine": 22
+    "endLine": 22,
+    "event": "add"
   },
   {
     "code": "userInfo[account].month = month;",
     "startLine": 23,
-    "endLine": 23
+    "endLine": 23,
+    "event": "add"
   },
   {
     "code": "for(uint256 i = 1; i <= 4; i++) {\n}",
     "startLine": 24,
-    "endLine": 25
+    "endLine": 25,
+    "event": "add"
   },
   {
     "code": "if(i == 4) {\n}",
     "startLine": 25,
-    "endLine": 26
+    "endLine": 26,
+    "event": "add"
   },
   {
     "code": "userInfo[account].level = i;",
     "startLine": 26,
-    "endLine": 26
+    "endLine": 26,
+    "event": "add"
   },
   {
     "code": "break;",
     "startLine": 27,
-    "endLine": 27
+    "endLine": 27,
+    "event": "add"
   },
   {
     "code": "if(block.timestamp >= levels[i].start && block.timestamp <= levels[i].end) {\n}",
     "startLine": 29,
-    "endLine": 30
+    "endLine": 30,
+    "event": "add"
   },
   {
     "code": "userInfo[account].level = i;",
     "startLine": 30,
-    "endLine": 30
+    "endLine": 30,
+    "event": "add"
   },
   {
     "code": "break;",
     "startLine": 31,
-    "endLine": 31
+    "endLine": 31,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -147,22 +171,26 @@
   {
     "code": "function _mint(address account, uint256 amount) internal virtual {\n}",
     "startLine": 36,
-    "endLine": 37
+    "endLine": 37,
+    "event": "add"
   },
   {
     "code": "require(account != address(0), \"BEP20: mint to the zero address\");",
     "startLine": 37,
-    "endLine": 37
+    "endLine": 37,
+    "event": "add"
   },
   {
     "code": "_totalSupply += amount;",
     "startLine": 38,
-    "endLine": 38
+    "endLine": 38,
+    "event": "add"
   },
   {
     "code": "_balances[account] += amount;",
     "startLine": 39,
-    "endLine": 39
+    "endLine": 39,
+    "event": "add"
   },
   {
     "code": "\n",
@@ -172,31 +200,37 @@
   {
     "code": "function _burn(address account, uint256 amount) internal virtual {\n}",
     "startLine": 42,
-    "endLine": 43
+    "endLine": 43,
+    "event": "add"
   },
   {
     "code": "require(account != address(0), \"BEP20: burn from the zero address\");",
     "startLine": 43,
-    "endLine": 43
+    "endLine": 43,
+    "event": "add"
   },
   {
     "code": "uint256 accountBalance = _balances[account];",
     "startLine": 44,
-    "endLine": 44
+    "endLine": 44,
+    "event": "add"
   },
   {
     "code": "require(accountBalance >= amount, \"BEP20: burn amount exceeds balance\");",
     "startLine": 45,
-    "endLine": 45
+    "endLine": 45,
+    "event": "add"
   },
   {
     "code": "_balances[account] = accountBalance - amount;",
     "startLine": 46,
-    "endLine": 46
+    "endLine": 46,
+    "event": "add"
   },
   {
     "code": "_totalSupply -= amount;",
     "startLine": 47,
-    "endLine": 47
+    "endLine": 47,
+    "event": "add"
   }
 ]
