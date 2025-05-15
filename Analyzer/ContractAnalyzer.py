@@ -1918,9 +1918,20 @@ class ContractAnalyzer:
 
         # 2. 현재 블록 가져오기
         current_block = self.get_current_block()
-        current_block.add_unchecked_block()
+        unchecked_block = CFGNode(name=f"unchecked_{self.current_start_line}",
+                                  unchecked_block=True)
+        unchecked_block.variables = self.copy_variables(current_block.variables)
 
-        self.brace_count[self.current_start_line] = {"open": 1, "close": 0, "cfg_node": current_block}
+        g = self.current_target_function_cfg.graph
+        for succ in list(g.successors(current_block)):
+            g.remove_edge(current_block, succ)
+            g.add_edge(unchecked_block, succ)
+
+        # ── 7 current_block → 조건노드
+        g.add_node(unchecked_block)
+        g.add_edge(current_block, unchecked_block)
+
+        self.brace_count.setdefault(self.current_start_line, {})["cfg_node"] = unchecked_block
 
         # ====================================================================
 
@@ -2725,8 +2736,6 @@ class ContractAnalyzer:
             return self.interpret_return_statement(stmt, current_variables)
         elif stmt.statement_type == 'revert':
             return self.interpret_revert_statement(stmt, current_variables)
-        elif stmt.statement_type == 'unchecked' :
-            return current_variables
         else:
             raise ValueError(f"Statement '{stmt.statement_type}' is not implemented.")
 
@@ -2802,14 +2811,18 @@ class ContractAnalyzer:
 
                 # 1-c) '}' 발견 → close 큐에 push
                 if brace_info["open"] == 0 and brace_info["close"] == 1 and brace_info["cfg_node"] is None:
-                    close_brace_queue.append(line)
+                    open_brace_info = self.find_corresponding_open_brace(line)
+                    if open_brace_info['cfg_node'].unchecked_block:  # unchecked indicator or general curly brace
+                        continue
+                    else :
+                        close_brace_queue.append(line)
 
             # ────────── CASE 2. close_brace_queue가 이미 존재 ──────────
             else:
                 # 연속 '}' 누적
                 if brace_info["open"] == 0 and brace_info["close"] == 1 and brace_info["cfg_node"] is None:
                     open_brace_info = self.find_corresponding_open_brace(line)
-                    if not open_brace_info['cfg_node'].condition_node : # unchecked indicator or general curly brace
+                    if open_brace_info['cfg_node'].unchecked_block : # unchecked indicator or general curly brace
                         continue
                     else :
                         close_brace_queue.append(line)
@@ -3059,8 +3072,9 @@ class ContractAnalyzer:
 
             if contextDiff == 0 and brace_info['open'] > 0:
                 cfg_node = brace_info['cfg_node']
-                if cfg_node == 'unchecked' :
-                    return 'unchecked'
+
+                if cfg_node.unchecked_block == True :
+                    return brace_info
 
                 if cfg_node and cfg_node.condition_node_type in ["while", "if"]:
                     return brace_info

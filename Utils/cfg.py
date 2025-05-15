@@ -7,7 +7,8 @@ class CFGNode:
                  condition_node=False,
                  condition_node_type=None,
                  fixpoint_evaluation_node=False,
-                 loop_exit_node=False):
+                 loop_exit_node=False,
+                 unchecked_block=False):
         self.name = name
 
         self.condition_node = condition_node
@@ -19,6 +20,8 @@ class CFGNode:
         self.loop_exit_node = loop_exit_node
         self.is_loop_body = False
         self.fixpoint_evaluation_node_vars = {} # 고정점 분석을 위한 while문 진입 전에 var 상태, join 하면서 변하는 변수의 상태
+
+        self.unchecked_block = unchecked_block
 
         self.statements = []  # 기본 블록 내의 명령어 리스트
         self.variables = {}  # var_name -> Variables 객체
@@ -90,10 +93,6 @@ class CFGNode:
             arguments=call_argument_list
         )
         self.statements.append(revert_statement)
-
-    def add_unchecked_block(self):
-        unchecked_block = Statement(statement_type='unchecked')
-        self.statements.append(unchecked_block)
 
     def get_variable(self, var_name: str) -> Variables:
         """

@@ -1619,11 +1619,14 @@ class EnhancedSolidityVisitor(SolidityVisitor):
     def visitLiteralSubDenomination(self, ctx:SolidityParser.LiteralSubDenominationContext):
         return self.visitChildren(ctx)
 
-    # Visit a parse tree produced by SolidityParser#TupleExp.
-    # (1)  (expr1, expr2, …)   ← SolidityParser.TupleExpressionContext
-    def visitTupleExpression(self, ctx: SolidityParser.TupleExpressionContext):
-        elems = [self.visit(e) for e in ctx.expression()]
-        return Expression(context="TupleExpressionContext", elements=elems)
+    def visitTupleExp(self,
+                      ctx: SolidityParser.TupleExpContext):
+        inner = ctx.tupleExpression()  # ← 먼저 꺼냄
+        elems = [self.visit(e) for e in inner.expression()]
+        return Expression(
+            context="TupleExpressionContext",
+            elements=elems
+        )
 
     # Visit a parse tree produced by SolidityParser#Assignment.
     def visitAssignment(self, ctx:SolidityParser.AssignmentContext):
@@ -1940,10 +1943,6 @@ class EnhancedSolidityVisitor(SolidityVisitor):
 
     # Visit a parse tree produced by SolidityParser#literalWithSubDenomination.
     def visitLiteralWithSubDenomination(self, ctx:SolidityParser.LiteralWithSubDenominationContext):
-        return self.visitChildren(ctx)
-
-    # Visit a parse tree produced by SolidityParser#tupleExpression.
-    def visitTupleExpression(self, ctx:SolidityParser.TupleExpressionContext):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by SolidityParser#numberLiteral.
