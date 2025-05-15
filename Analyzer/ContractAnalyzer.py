@@ -1,10 +1,14 @@
 # SolidityGuardian/Analyzers/ContractAnalyzer.py
 from Utils.cfg import *
 from Utils.util import *
-from solcx import compile_source, install_solc
-from solcx.exceptions import SolcError                  # 예외는 따로!
 from collections import deque
-import solcx
+from solcx import (
+    install_solc,
+    set_solc_version,
+    compile_source,
+    get_installed_solc_versions
+)
+from solcx.exceptions import SolcError
 import copy
 from typing import Dict, cast, Tuple
 from collections import defaultdict
@@ -87,14 +91,25 @@ class ContractAnalyzer:
 
         self.compile_check()
 
-    def compile_check(self):
+    def compile_check(self) -> None:
+        wanted = '0.8.0'
+
+        # ① 아직 안 깔려 있으면 다운로드
+        if wanted not in get_installed_solc_versions():
+            print(f"[info] installing solc {wanted} …")
+            install_solc(wanted)  # 네트워크·권한 오류나면 여기서 예외 발생
+
+        # ② 방금(또는 이전에) 받은 버전을 active 로 지정
+        set_solc_version(wanted)
+
+        # ③ 실제 컴파일
         try:
-            install_solc('0.8.0')  # 필요한 Solidity 컴파일러 버전을 설치합니다.
             compile_source(self.full_code)
-        except solcx.exceptions.SolcError as e:
-            print("Solidity 컴파일 오류: ", e)
+            print("[ok] solidity compiled successfully")
+        except SolcError as e:
+            print("[err] Solidity compiler reported:\n", e)
         except Exception as e:
-            print("예상치 못한 오류: ", e)
+            print("[err] unexpected:", e)
 
     def update_brace_count(self, line_number, code):
         open_braces = code.count('{')
@@ -1905,7 +1920,8 @@ class ContractAnalyzer:
         current_block = self.get_current_block()
         current_block.add_unchecked_block()
 
-        self.brace_count.setdefault(self.current_start_line, {})["cfg_node"] = current_block
+        self.brace_count[self.current_start_line] = {"open": 1, "close": 0, "cfg_node": current_block}
+
         # ====================================================================
 
         # ── 10 CFG / contract 갱신
@@ -2792,9 +2808,12 @@ class ContractAnalyzer:
             else:
                 # 연속 '}' 누적
                 if brace_info["open"] == 0 and brace_info["close"] == 1 and brace_info["cfg_node"] is None:
-                    close_brace_queue.append(line)
-                    continue
-
+                    open_brace_info = self.find_corresponding_open_brace(line)
+                    if not open_brace_info['cfg_node'].condition_node : # unchecked indicator or general curly brace
+                        continue
+                    else :
+                        close_brace_queue.append(line)
+                        continue
                 # 블록 아웃 탐색 종료 조건
                 break
 
@@ -3040,6 +3059,9 @@ class ContractAnalyzer:
 
             if contextDiff == 0 and brace_info['open'] > 0:
                 cfg_node = brace_info['cfg_node']
+                if cfg_node == 'unchecked' :
+                    return 'unchecked'
+
                 if cfg_node and cfg_node.condition_node_type in ["while", "if"]:
                     return brace_info
                 elif cfg_node and cfg_node.condition_node_type in ["else if", "else"] :
@@ -3421,29 +3443,45 @@ class ContractAnalyzer:
         return None
 
     def compound_assignment(self, left_interval, right_interval, operator):
-        if operator == '=' :
+        """
+        +=, -=, <<= … 등 복합 대입 연산자의 interval 계산.
+        한쪽이 ⊥(bottom) 이면 결과도 ⊥ 로 전파한다.
+        """
+
+        # 0) 단순 대입인 '='
+        if operator == '=':
             return right_interval
-        elif operator == '+=':
-            return left_interval.add(right_interval)
-        elif operator == '-=':
-            return left_interval.subtract(right_interval)
-        elif operator == '*=':
-            return left_interval.multiply(right_interval)
-        elif operator == '/=':
-            return left_interval.divide(right_interval)
-        elif operator == '%=':
-            return left_interval.modulo(right_interval)
-        elif operator == '|=':
-            return left_interval.bitwise_or(right_interval)
-        elif operator == '^=':
-            return left_interval.bitwise_xor(right_interval)
-        elif operator == '&=':
-            return left_interval.bitwise_and(right_interval)
-        elif operator in ['<<=', '>>=', '>>>=']:
-            # '<<=', '>>=' 등에서 '=' 제거 후 처리
-            return left_interval.shift(right_interval, operator[:-1])
-        else:
-            raise ValueError(f"Unsupported operator '{operator}' in compound assignment")
+
+        # 1) ⊥-전파용 로컬 헬퍼 ――――――――――――――――――――――――――――
+        def _arith_safe(l, r, fn):
+            """
+            l·r 중 하나라도 bottom ⇒ bottom 그대로 반환
+            아니면 fn(l, r) 실행
+            """
+            if l.is_bottom() or r.is_bottom():
+                return l.bottom(getattr(l, "type_length", 256))
+            return fn(l, r)
+
+        # 2) 연산자 → 동작 매핑 ―――――――――――――――――――――――――――――――
+        mapping = {
+            '+=': lambda l, r: _arith_safe(l, r, lambda a, b: a.add(b)),
+            '-=': lambda l, r: _arith_safe(l, r, lambda a, b: a.subtract(b)),
+            '*=': lambda l, r: _arith_safe(l, r, lambda a, b: a.multiply(b)),
+            '/=': lambda l, r: _arith_safe(l, r, lambda a, b: a.divide(b)),
+            '%=': lambda l, r: _arith_safe(l, r, lambda a, b: a.modulo(b)),
+            '|=': lambda l, r: _arith_safe(l, r, lambda a, b: a.bitwise('|', b)),
+            '^=': lambda l, r: _arith_safe(l, r, lambda a, b: a.bitwise('^', b)),
+            '&=': lambda l, r: _arith_safe(l, r, lambda a, b: a.bitwise('&', b)),
+            '<<=': lambda l, r: _arith_safe(l, r, lambda a, b: a.shift(b, '<<')),
+            '>>=': lambda l, r: _arith_safe(l, r, lambda a, b: a.shift(b, '>>')),
+            '>>>=': lambda l, r: _arith_safe(l, r, lambda a, b: a.shift(b, '>>>')),
+        }
+
+        # 3) 실행
+        try:
+            return mapping[operator](left_interval, right_interval)
+        except KeyError:
+            raise ValueError(f"Unsupported compound-assignment operator: {operator}")
 
     def update_left_var_of_index_access_context(self, expr, rVal, operator, variables,
                                                 callerObject=None, callerContext=None):
@@ -4147,13 +4185,25 @@ class ContractAnalyzer:
 
         result = None
 
+        def _bottom(interval) -> "Interval":
+            """
+            interval 과 동일한 클래스·bit-width로 ⊥(bottom) 을 만들어 준다.
+            (IntegerInterval.bottom(bits) 같은 헬퍼 통일)
+            """
+            if isinstance(interval, IntegerInterval):
+                return IntegerInterval.bottom(interval.type_length)
+            if isinstance(interval, UnsignedIntegerInterval):
+                return UnsignedIntegerInterval.bottom(interval.type_length)
+            if isinstance(interval, BoolInterval):
+                return BoolInterval.bottom()
+            return Interval(None, None)  # fallback – 거의 안 옴
+
         if (isinstance(leftInterval, Interval) and leftInterval.is_bottom()) or \
                 (isinstance(rightInterval, Interval) and rightInterval.is_bottom()):
             # 산술/비트/시프트 → ⊥,  비교/논리 → BoolInterval ⊤(= [0,1])
             if operator in ['==', '!=', '<', '>', '<=', '>=', '&&', '||']:
                 return BoolInterval.top()
-            return _bottom(leftInterval if not leftInterval.is_bottom()
-                           else rightInterval)
+            return _bottom(leftInterval if not leftInterval.is_bottom()else rightInterval)
 
         if operator == '+':
             result = leftInterval.add(rightInterval)
@@ -5238,18 +5288,7 @@ class ContractAnalyzer:
 
         return BoolInterval(is_true, is_false)
 
-    def _bottom(interval) -> "Interval":
-        """
-        interval 과 동일한 클래스·bit-width로 ⊥(bottom) 을 만들어 준다.
-        (IntegerInterval.bottom(bits) 같은 헬퍼 통일)
-        """
-        if isinstance(interval, IntegerInterval):
-            return IntegerInterval.bottom(interval.type_length)
-        if isinstance(interval, UnsignedIntegerInterval):
-            return UnsignedIntegerInterval.bottom(interval.type_length)
-        if isinstance(interval, BoolInterval):
-            return BoolInterval.bottom()
-        return Interval(None, None)  # fallback – 거의 안 옴
+
 
     def _expr_to_str(self, e: Expression) -> str:
         """Expression AST → Solidity 소스 형태 문자열"""
