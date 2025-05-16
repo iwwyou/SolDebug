@@ -334,18 +334,48 @@ class SolidityVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by SolidityParser#StateLocalArrayIndex.
-    def visitStateLocalArrayIndex(self, ctx:SolidityParser.StateLocalArrayIndexContext):
-        return self.visitChildren(ctx)
-
-
     # Visit a parse tree produced by SolidityParser#StateLocalByteValue.
     def visitStateLocalByteValue(self, ctx:SolidityParser.StateLocalByteValueContext):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by SolidityParser#StateLocalStringValue.
+    def visitStateLocalStringValue(self, ctx:SolidityParser.StateLocalStringValueContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by SolidityParser#StateLocalBoolValue.
     def visitStateLocalBoolValue(self, ctx:SolidityParser.StateLocalBoolValueContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by SolidityParser#StateLocalEnumValue.
+    def visitStateLocalEnumValue(self, ctx:SolidityParser.StateLocalEnumValueContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by SolidityParser#StateLocalInlineValue.
+    def visitStateLocalInlineValue(self, ctx:SolidityParser.StateLocalInlineValueContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by SolidityParser#inlineArrayAnnotation.
+    def visitInlineArrayAnnotation(self, ctx:SolidityParser.InlineArrayAnnotationContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by SolidityParser#InlineIntElement.
+    def visitInlineIntElement(self, ctx:SolidityParser.InlineIntElementContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by SolidityParser#NestedArrayElement.
+    def visitNestedArrayElement(self, ctx:SolidityParser.NestedArrayElementContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by SolidityParser#AddrArrayElement.
+    def visitAddrArrayElement(self, ctx:SolidityParser.AddrArrayElementContext):
         return self.visitChildren(ctx)
 
 

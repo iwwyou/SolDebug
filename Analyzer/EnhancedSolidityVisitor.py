@@ -599,46 +599,57 @@ class EnhancedSolidityVisitor(SolidityVisitor):
     # ──────────────────────────────────────────────────────────────
     def _parse_state_local_value(self, sv_ctx):
         """
-        grammar  stateLocalValue
-          • '[' -? numberLiteral ',' -? numberLiteral ']'       (int / uint Interval)
-          • symbolicAddress  numberLiteral
-          • symbolicArrayIndex '[' numberLiteral ',' numberLiteral ']'
-          • symbolicBytes    numberLiteral
-          • 'true' | 'false' | 'any'
-        반환 : IntegerInterval / UnsignedIntegerInterval / BoolInterval /
-              UnsignedIntegerInterval(160-bit) / str
+        stateLocalValue →
+          • Integer / UnsignedInteger Interval
+          • BoolInterval
+          • UnsignedIntegerInterval(160-bit) for address
+          • bytes / string literal 그대로
+          • Enum 멤버 이름 (str)
+          • Inline 배열 -> (nested) list
         """
-        tok0 = sv_ctx.getChild(0).getText()
+        first = sv_ctx.getChild(0).getText()
 
-        # 1. 정수 Interval  [min,max]
-        if tok0 == '[':
+        # ── ①  [min,max]  --------------------------------------------------
+        if first == '[':
             lo = int(sv_ctx.numberLiteral(0).getText(), 0)
             hi = int(sv_ctx.numberLiteral(1).getText(), 0)
-            interval_cls = IntegerInterval if lo < 0 else UnsignedIntegerInterval
-            return interval_cls(lo, hi, 256)
+            cls = IntegerInterval if lo < 0 else UnsignedIntegerInterval
+            return cls(lo, hi, 256)
 
-        # 2. symbolicAddress N  →  160-bit Interval [N,N]
-        if tok0 == 'symbolicAddress':
+        # ── ②  symbolicAddress N  → 160-bit interval [N,N] -----------------
+        if first == 'symbolicAddress':
             nid = int(sv_ctx.numberLiteral().getText(), 0)
             sm = self.contract_analyzer.sm
-            sm.register_fixed_id(nid)  # 중복 시 NOP
-            return sm.get_interval(nid)  # UnsignedIntegerInterval([nid,nid])
+            sm.register_fixed_id(nid)
+            return sm.get_interval(nid)
 
-        # 3. symbolicArrayIndex … / symbolicBytes …  (여기선 문자열 보존)
-        if tok0 == 'symbolicArrayIndex':
-            a = int(sv_ctx.numberLiteral(0).getText(), 0)
-            b = int(sv_ctx.numberLiteral(1).getText(), 0)
-            return f"symbolicArrayIndex[{a},{b}]"
+        # ── ③  symbolicBytes / symbolicString  -----------------------------
+        if first in ('symbolicBytes', 'symbolicString'):
+            # hexStringLiteral 은 따옴표 포함 → getText() 로 그대로
+            return f"{first} {sv_ctx.hexStringLiteral().getText()}"
 
-        if tok0 == 'symbolicBytes':
-            return f"symbolicBytes {sv_ctx.numberLiteral().getText()}"
+        # ── ④  boolean  ----------------------------------------------------
+        if first in ('true', 'false', 'any'):
+            return {
+                'true': BoolInterval(1, 1),
+                'false': BoolInterval(0, 0),
+                'any': BoolInterval(0, 1)
+            }[first]
 
-        # 4. bool  true / false / any
-        return {
-            "true": BoolInterval(1, 1),
-            "false": BoolInterval(0, 0),
-            "any": BoolInterval(0, 1)
-        }[tok0]
+        # ── ⑤  enum  (identifier [. identifier])  -------------------------
+        if isinstance(sv_ctx, SolidityParser.StateLocalEnumValueContext):
+            if sv_ctx.identifier(1):  # enumName.member
+                enum_name, member = sv_ctx.identifier(0).getText(), sv_ctx.identifier(1).getText()
+                return f"{enum_name}.{member}"
+            else:  # member  (단일)
+                return sv_ctx.identifier(0).getText()
+
+        # ── ⑥  inlineArrayAnnotation  -------------------------------------
+        if isinstance(sv_ctx, SolidityParser.StateLocalInlineValueContext):
+            return self._parse_inline_array(sv_ctx.inlineArrayAnnotation())
+
+        # ── 디폴트 ---------------------------------------------------------
+        raise ValueError("Unsupported stateLocalValue format")
 
     # ──────────────────────────────────────────────────────────────
     #  State-level 주석  (@StateVar …)
@@ -735,8 +746,68 @@ class EnhancedSolidityVisitor(SolidityVisitor):
     def visitStateLocalAddressValue(self, ctx: SolidityParser.StateLocalAddressValueContext):
         return self.visitChildren(ctx)
 
+    # Visit a parse tree produced by SolidityParser#StateLocalByteValue.
+    def visitStateLocalByteValue(self, ctx: SolidityParser.StateLocalByteValueContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by SolidityParser#StateLocalStringValue.
+    def visitStateLocalStringValue(self, ctx: SolidityParser.StateLocalStringValueContext):
+        return self.visitChildren(ctx)
+
     # Visit a parse tree produced by SolidityParser#StateLocalBooleanValue.
     def visitStateLocalBoolValue(self, ctx: SolidityParser.StateLocalBoolValueContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by SolidityParser#StateLocalEnumValue.
+    def visitStateLocalEnumValue(self, ctx: SolidityParser.StateLocalEnumValueContext):
+        return self.visitChildren(ctx)
+
+    def _parse_inline_array(self, ia_ctx):
+        """
+        inlineArrayAnnotation → python list (재귀)
+        - 숫자   →  int  / IntegerInterval([lo,lo])
+        - array  →  nested list
+        - arrayAddress → list[UnsignedIntegerInterval([id,id])]
+        """
+
+        def _ctx_label(ctx):
+            "ANTLR alt-label 헬퍼"
+            return type(ctx).__name__.removesuffix('Context')
+
+        elems = []
+        for el in ia_ctx.inlineElement():
+            lbl = _ctx_label(el)
+            if lbl == 'InlineIntElement':
+                elems.append(int(el.getText(), 0))
+            elif lbl == 'NestedArrayElement':
+                elems.append(self._parse_inline_array(el.inlineArrayAnnotation()))
+            elif lbl == 'AddrArrayElement':
+                ids = [int(n.getText(), 0) for n in el.numberLiteral()]
+                sm = self.contract_analyzer.sm
+                elems.append(
+                    [sm.get_interval(i) for i in ids]
+                )
+        return elems
+
+
+    # Visit a parse tree produced by SolidityParser#StateLocalInlineValue.
+    def visitStateLocalInlineValue(self, ctx: SolidityParser.StateLocalInlineValueContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by SolidityParser#inlineArrayAnnotation.
+    def visitInlineArrayAnnotation(self, ctx: SolidityParser.InlineArrayAnnotationContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by SolidityParser#InlineIntElement.
+    def visitInlineIntElement(self, ctx: SolidityParser.InlineIntElementContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by SolidityParser#NestedArrayElement.
+    def visitNestedArrayElement(self, ctx: SolidityParser.NestedArrayElementContext):
+        return self.visitChildren(ctx)
+
+    # Visit a parse tree produced by SolidityParser#AddrArrayElement.
+    def visitAddrArrayElement(self, ctx: SolidityParser.AddrArrayElementContext):
         return self.visitChildren(ctx)
 
     # Visit a parse tree produced by SolidityParser#interactiveSimpleStatement.
