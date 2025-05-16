@@ -286,9 +286,21 @@ subAccess
 stateLocalValue
   : '[' '-'? numberLiteral ',' '-'? numberLiteral ']' #StateLocalIntValue
   | 'symbolicAddress' numberLiteral # StateLocalAddressValue
-  | 'symbolicArrayIndex'  '[' numberLiteral ',' numberLiteral ']' # StateLocalArrayIndex
-  | 'symbolicBytes' numberLiteral # StateLocalByteValue
+  | 'symbolicBytes'  hexStringLiteral # StateLocalByteValue
+  | 'symbolicString' hexStringLiteral # StateLocalStringValue
   | ('true' | 'false' | 'any') # StateLocalBoolValue
+  | identifier ('.' identifier)? #StateLocalEnumValue
+  | inlineArrayAnnotation # StateLocalInlineValue
+  ;
+
+inlineArrayAnnotation
+  : 'array'
+    '[' ( inlineElement (',' inlineElement)* )? ']'
+  ;
+inlineElement
+  : '-'? numberLiteral                         # InlineIntElement
+  | 'array' inlineArrayAnnotation              # NestedArrayElement
+  | 'arrayAddress' '[' numberLiteral (',' numberLiteral)* ']' # AddrArrayElement
   ;
 
 interactiveSimpleStatement
