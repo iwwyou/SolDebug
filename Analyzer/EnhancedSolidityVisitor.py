@@ -1,11 +1,13 @@
-from collections import defaultdict, deque
 from Parser.SolidityParser import SolidityParser
 from Parser.SolidityVisitor import SolidityVisitor
-from Utils.Interval import IntegerInterval
-from Utils.cfg import *
+# 맨 위 import 부분
+from antlr4.tree.Tree import TerminalNodeImpl
 from Utils.util import * # Expression, Variables class
-from Analyzer import ContractAnalyzer
-import re
+
+
+KEYWORD_IDENTIFIERS = {
+    "from", "to", "payable", "returns",      # 필요 시 계속 추가
+}
 
 class EnhancedSolidityVisitor(SolidityVisitor):
 
@@ -330,16 +332,23 @@ class EnhancedSolidityVisitor(SolidityVisitor):
             params.append(self._param_from_group(cur))
         return params
 
-    def _param_from_group(self, group: list
-                          ) -> tuple[SolType, str | None]:
-        t = SolType()
-        name: str | None = None
+    def _param_from_group(self, group):
+        sol_type = SolType()
+        name = None
+
         for el in group:
             if isinstance(el, SolidityParser.TypeNameContext):
-                t = self.visitTypeName(el, t)
+                sol_type = self.visitTypeName(el, sol_type)
+
             elif isinstance(el, SolidityParser.IdentifierContext):
                 name = el.getText()
-        return t, name
+
+            elif isinstance(el, TerminalNodeImpl):
+                txt = el.getText()
+                if txt in KEYWORD_IDENTIFIERS:  # ← 소문자 문자열 비교
+                    name = txt
+
+        return sol_type, name
 
     # Visit a parse tree produced by SolidityParser#eventParameter.
     def visitEventParameter(self, ctx:SolidityParser.EventParameterContext):
@@ -368,7 +377,11 @@ class EnhancedSolidityVisitor(SolidityVisitor):
             return self.visitArrayType(ctx, type_obj)
 
     # Visit a parse tree produced by SolidityParser#ArrayType.
-    def visitArrayType(self, ctx: SolidityParser.TypeNameContext, type_obj):
+    def visitArrayType(
+            self,
+            ctx: SolidityParser.ArrayTypeContext,  # ← 변경
+            type_obj: SolType
+    ) -> SolType:
         # 배열의 기본 타입 처리
         base_type_ctx = ctx.typeName()
         base_type_obj = SolType()
@@ -460,7 +473,12 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         return type_obj
 
     # Visit a parse tree produced by SolidityParser#MapType.
-    def visitMapType(self, ctx: SolidityParser.MappingContext, type_obj):
+    def visitMapType(
+            self,
+            ctx: SolidityParser.MapTypeContext,  # ✔ MapTypeContext!
+            type_obj: SolType
+    ) -> SolType:
+        # ctx.mapping() 는 이제 정적으로도 인식된다
         return self.visitMapping(ctx.mapping(), type_obj)
 
     # Visit a parse tree produced by SolidityParser#mapping.

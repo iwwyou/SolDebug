@@ -4405,9 +4405,16 @@ class ContractAnalyzer:
 
     def evaluate_tuple_expression_context(self, expr, variables,
                                           callerObject=None, callerContext=None):
-        values = [self.evaluate_expression(e, variables, None, "TupleElem")
-                  for e in expr.elements]
-        return values  # list 그대로 돌려줌
+        # 각 요소 평가
+        elems = [self.evaluate_expression(e, variables, None, "TupleElem")
+                 for e in expr.elements]
+
+        # (a) 요소가 1개뿐 ⇒ 괄호식이거나 return (X) 같은 형태
+        if len(elems) == 1:
+            return elems[0]  # <- Interval · 값 그대로 반환
+
+        # (b) 진짜 튜플 (a,b,...) ⇒ 리스트 유지
+        return elems  # [v1, v2, ...]
 
     def evaluate_unary_operator(self, expr, variables, callerObject=None, callerContext=None):
         operand_interval = self.evaluate_expression(expr.expression, variables, None, "Unary")

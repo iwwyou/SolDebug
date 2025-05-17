@@ -207,33 +207,6 @@ class IntegerInterval(Interval):
             return self.bottom(self.type_length)
         return IntegerInterval(new_min, self.max_value, self.type_length)
 
-    # ---------- 계산 메인 ----------
-    def calculate_interval(self, right_interval, operator):
-        if self.is_bottom() or right_interval.is_bottom():
-            # bottom과의 연산은 bottom으로 둘 수도 있고,
-            # 나중에 top으로 할 수도 있음(분석 정책에 따라).
-            return self.bottom(self.type_length)
-
-        if operator == '+':
-            return self.add(right_interval)
-        elif operator == '-':
-            return self.subtract(right_interval)
-        elif operator == '*':
-            return self.multiply(right_interval)
-        elif operator == '/':
-            return self.divide(right_interval)
-        elif operator == '%':
-            return self.modulo(right_interval)
-        elif operator in ('<<', '>>', '>>>'):
-            return self.shift(right_interval, operator)
-        elif operator in ('&', '|', '^'):
-            return self.bitwise(operator, right_interval)
-        elif operator in ('&&', '||'):
-            # 논리 연산 → BoolInterval
-            return BoolInterval(0,1)  # 굉장히 보수적으로 [False, True]
-        else:
-            raise ValueError(f"Unsupported operator: {operator}")
-
     # ---------- 산술 연산 ----------
     def add(self, other):
         min_sum = self.min_value + other.min_value
@@ -287,6 +260,59 @@ class IntegerInterval(Interval):
         new_min = min(candidates)
         new_max = max(candidates)
         return IntegerInterval(new_min, new_max, self.type_length)
+
+    # ---------- 산술 연산 ----------
+    def exponentiate(self, other):
+        """
+        a ** b  (b ≥ 0 를 전제로 한다)
+        - 지수 범위가 0 미만이면 ⊥
+        - 가능한 모든 끝점(a.min/max, b.min/max) 조합을 계산해서
+          [min, max] 보수적 범위 반환
+        - 오버플로는 signed int bit-width에 맞춰 클램프
+        """
+
+        # ─── 공통: 내부에서 사용할 상한 계산 헬퍼 ──────────────────────────
+        def _clamp(value, type_bits, signed=False):
+            if signed:
+                lo, hi = -2 ** (type_bits - 1), 2 ** (type_bits - 1) - 1
+            else:
+                lo, hi = 0, 2 ** type_bits - 1
+            if value < lo:  return lo
+            if value > hi:  return hi
+            return value
+
+        if self.is_bottom() or other.is_bottom():
+            return self.bottom(self.type_length)
+
+        # 음수 지수 → 지원 안 함 ⇒ bottom
+        if other.min_value < 0:
+            return self.bottom(self.type_length)
+
+        # 후보 값 계산 (큰 지수에서 pow overflow 가능 → try/except)
+        base_candidates   = [self.min_value, self.max_value]
+        exp_candidates    = [other.min_value, other.max_value]
+        results = []
+        for a in base_candidates:
+            for b in exp_candidates:
+                try:
+                    results.append(pow(a, b))
+                except OverflowError:
+                    # overflow → 최고값으로 보수
+                    if a >= 0:
+                        results.append(INFINITY)
+                    else:
+                        # 부호가 바뀔 수 있어 –∞, +∞ 둘 다 고려
+                        results.extend([NEG_INFINITY, INFINITY])
+
+        new_min = min(results)
+        new_max = max(results)
+
+        # type-width 클램프
+        new_min = _clamp(new_min, self.type_length, signed=True)
+        new_max = _clamp(new_max, self.type_length, signed=True)
+
+        return IntegerInterval(new_min, new_max, self.type_length)
+
 
     def modulo(self, other):
         """
@@ -498,31 +524,6 @@ class UnsignedIntegerInterval(Interval):
                                        min(cur_max, new_interval.max_value),
                                        self.type_length)
 
-    # ---------- 계산 메인 ----------
-    def calculate_interval(self, right_interval, operator):
-        if self.is_bottom() or right_interval.is_bottom():
-            return self.bottom(self.type_length)
-
-        if operator == '+':
-            return self.add(right_interval)
-        elif operator == '-':
-            # 산술 빼기
-            return self.subtract(right_interval)
-        elif operator == '*':
-            return self.multiply(right_interval)
-        elif operator == '/':
-            return self.divide(right_interval)
-        elif operator == '%':
-            return self.modulo(right_interval)
-        elif operator in ('<<', '>>', '>>>'):
-            return self.shift(right_interval, operator)
-        elif operator in ('&', '|', '^'):
-            return self.bitwise(operator, right_interval)
-        elif operator in ('&&', '||'):
-            return BoolInterval(0,1)
-        else:
-            raise ValueError(f"Unsupported operator: {operator}")
-
     # ---------- 산술 연산 (실제 빼기) ----------
     def subtract(self, other):
         """
@@ -626,6 +627,34 @@ class UnsignedIntegerInterval(Interval):
         new_min = min(candidates)
         new_max = max(candidates)
         return UnsignedIntegerInterval(new_min, new_max, self.type_length)
+
+    # ---------- 산술 연산 ----------
+    def exponentiate(self, other):
+        """
+        unsigned a ** b  (b ≥ 0)
+        overflow 시 type 최댓값으로 클램프
+        """
+
+        if self.is_bottom() or other.is_bottom():
+            return self.bottom(self.type_length)
+
+        if other.min_value < 0:
+            return self.bottom(self.type_length)
+
+        base_candidates = [self.min_value, self.max_value]
+        exp_candidates  = [other.min_value, other.max_value]
+        results = []
+        for a in base_candidates:
+            for b in exp_candidates:
+                try:
+                    results.append(pow(a, b))
+                except OverflowError:
+                    results.append(INFINITY)
+
+        new_min = max(0, min(results))
+        new_max = min(max(results), 2 ** self.type_length - 1)
+        return UnsignedIntegerInterval(new_min, new_max, self.type_length)
+
 
     def modulo(self, other):
         # 제수가 0을 포함? → ⊥

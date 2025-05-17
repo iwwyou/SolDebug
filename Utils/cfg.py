@@ -164,7 +164,7 @@ class ContractCFG(CFG):
 
     # Enum 정의 추가
     def define_enum(self, enum_name, enum_def):
-        if enum_name not in enum_def:
+        if enum_name not in self.enumDefs:
             self.enumDefs[enum_name] = enum_def
         else:
             raise ValueError(f"Enum {enum_name} is already defined.")

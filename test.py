@@ -14,7 +14,7 @@ def map_context_type(context_type):
         'interface': 'interactiveSourceUnit',
         'enum': 'interactiveSourceUnit',
         'struct': 'interactiveSourceUnit',
-        'function': 'interactiveSourceUnit',
+        'functionDefinition': 'interactiveSourceUnit',
         'constructor': 'interactiveSourceUnit',
         'fallback': 'interactiveSourceUnit',
         'receive': 'interactiveSourceUnit',
@@ -110,13 +110,13 @@ def simulate_inputs(test_inputs: list[dict], *, silent: bool = False) -> None:
 
 test_inputs = [
     {
-        "code": "contract AloeBlend {\n}",
+        "code": "contract Amoss {\n}",
         "startLine": 1,
         "endLine": 2,
         "event": "add"
     },
     {
-        "code": "uint8 public constant MAINTENANCE_FEE = 10;",
+        "code": "uint256 private _totalSupply = 1*10**(9+18);",
         "startLine": 2,
         "endLine": 2,
         "event": "add"
@@ -128,7 +128,7 @@ test_inputs = [
         "event": "add"
     },
     {
-        "code": "uint256 public maintenanceBudget0;",
+        "code": "mapping(address => uint256) private _balances;",
         "startLine": 4,
         "endLine": 4,
         "event": "add"
@@ -140,7 +140,7 @@ test_inputs = [
         "event": "add"
     },
     {
-        "code": "uint256 public maintenanceBudget1;",
+        "code": "mapping(address => mapping(address => uint256)) private _allowances;",
         "startLine": 6,
         "endLine": 6,
         "event": "add"
@@ -152,32 +152,20 @@ test_inputs = [
         "event": "add"
     },
     {
-        "code": "uint224[10] public rewardPerGas0Array;",
+        "code": "function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual {\n}",
         "startLine": 8,
-        "endLine": 8,
-        "event": "add"
-    },
-    {
-        "code": "\n",
-        "startLine": 9,
         "endLine": 9,
         "event": "add"
     },
     {
-        "code": "uint224 public rewardPerGas0Accumulator;",
+        "code": "\n",
         "startLine": 10,
         "endLine": 10,
         "event": "add"
     },
     {
-        "code": "\n",
+        "code": "function _afterTokenTransfer(address from, address to, uint256 amount) internal virtual {\n}",
         "startLine": 11,
-        "endLine": 11,
-        "event": "add"
-    },
-    {
-        "code": "uint64 public rebalanceCount;",
-        "startLine": 12,
         "endLine": 12,
         "event": "add"
     },
@@ -188,13 +176,13 @@ test_inputs = [
         "event": "add"
     },
     {
-        "code": "function _earmarkSomeForMaintenance(uint256 earned0, uint256 earned1) private returns (uint256, uint256) {\n}",
+        "code": "function _burn(address account, uint256 amount) internal virtual {\n}",
         "startLine": 14,
         "endLine": 15,
         "event": "add"
     },
     {
-        "code": "uint256 toMaintenance;",
+        "code": "require(account != address(0), \"ERC20: burn from the zero address\");",
         "startLine": 15,
         "endLine": 15,
         "event": "add"
@@ -206,45 +194,45 @@ test_inputs = [
         "event": "add"
     },
     {
-        "code": "unchecked {\n}",
+        "code": "_beforeTokenTransfer(account, address(0), amount);",
         "startLine": 17,
-        "endLine": 18,
+        "endLine": 17,
         "event": "add"
     },
     {
-        "code": "toMaintenance = earned0 / MAINTENANCE_FEE;",
+        "code": "\n",
         "startLine": 18,
         "endLine": 18,
         "event": "add"
     },
     {
-        "code": "earned0 -= toMaintenance;",
+        "code": "uint256 accountBalance = _balances[account];",
         "startLine": 19,
         "endLine": 19,
         "event": "add"
     },
     {
-        "code": "maintenanceBudget0 += toMaintenance;",
+        "code": "require(accountBalance >= amount, \"ERC20: burn amount exceeds balance\");",
         "startLine": 20,
         "endLine": 20,
         "event": "add"
     },
     {
-        "code": "toMaintenance = earned1 / MAINTENANCE_FEE;",
+        "code": "unchecked {\n}",
         "startLine": 21,
-        "endLine": 21,
+        "endLine": 22,
         "event": "add"
     },
     {
-        "code": "earned1 -= toMaintenance;",
+        "code": "_balances[account] = accountBalance - amount;",
         "startLine": 22,
         "endLine": 22,
         "event": "add"
     },
     {
-        "code": "maintenanceBudget1 += toMaintenance;",
-        "startLine": 23,
-        "endLine": 23,
+        "code": "_totalSupply -= amount;",
+        "startLine": 24,
+        "endLine": 24,
         "event": "add"
     },
     {
@@ -254,69 +242,9 @@ test_inputs = [
         "event": "add"
     },
     {
-        "code": "return (earned0, earned1);",
+        "code": "_afterTokenTransfer(account, address(0), amount);",
         "startLine": 26,
         "endLine": 26,
-        "event": "add"
-    },
-    {
-        "code": "\n",
-        "startLine": 28,
-        "endLine": 28,
-        "event": "add"
-    },
-    {
-        "code": "function pushRewardPerGas0(uint224 rewardPerGas0) private {\n}",
-        "startLine": 29,
-        "endLine": 30,
-        "event": "add"
-    },
-    {
-        "code": "unchecked {\n}",
-        "startLine": 30,
-        "endLine": 31,
-        "event": "add"
-    },
-    {
-        "code": "rewardPerGas0 /= 10;",
-        "startLine": 31,
-        "endLine": 31,
-        "event": "add"
-    },
-    {
-        "code": "rewardPerGas0Accumulator = rewardPerGas0Accumulator + rewardPerGas0 - rewardPerGas0Array[rebalanceCount % 10];",
-        "startLine": 32,
-        "endLine": 32,
-        "event": "add"
-    },
-    {
-        "code": "rewardPerGas0Array[rebalanceCount % 10] = rewardPerGas0;",
-        "startLine": 33,
-        "endLine": 33,
-        "event": "add"
-    },
-    {
-        "code": "// @LocalVar rewardPerGas0 = [100,100]",
-        "startLine": 30,
-        "endLine": 30,
-        "event": "add"
-    },
-    {
-        "code": "// @StateVar rebalanceCount = [1,1]",
-        "startLine": 31,
-        "endLine": 31,
-        "event": "add"
-    },
-    {
-        "code": "// @StateVar rewardPerGas0Accumulator = [10,20]",
-        "startLine": 32,
-        "endLine": 32,
-        "event": "add"
-    },
-    {
-        "code": "// @StateVar rewardPerGas0Array = array[1,2,3,4,5,6,7,8,9,10]",
-        "startLine": 33,
-        "endLine": 33,
         "event": "add"
     }
 ]
