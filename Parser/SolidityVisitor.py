@@ -809,6 +809,11 @@ class SolidityVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by SolidityParser#MetaType.
+    def visitMetaType(self, ctx:SolidityParser.MetaTypeContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by SolidityParser#InlineArrayExp.
     def visitInlineArrayExp(self, ctx:SolidityParser.InlineArrayExpContext):
         return self.visitChildren(ctx)

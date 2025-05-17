@@ -565,7 +565,8 @@ expression
   | expression '{' (identifier ':' expression (',' identifier ':' expression)*)? '}'  # FunctionCallOptions
   | expression callArgumentList                           # FunctionCall
   | PayableKeyword callArgumentList                       # PayableFunctionCall
-  | elementaryTypeName '(' identifier ')'                 # TypeConversion
+  | elementaryTypeName '(' expression ')'                 # TypeConversion
+  | 'type' '(' typeName ')'                               # MetaType
   | ('++'|'--'|'!'|'~'|'delete'|'-') expression           # UnaryPrefixOp
   | expression ('++'|'--')                                # UnarySuffixOp
   | expression '**' expression                            # Exponentiation
@@ -606,7 +607,13 @@ numberLiteral
 // for example, "revert" is a keyword but it can also be a function name
 
 identifier
-  : Identifier ;
+  : Identifier
+  | FromKeyword
+  | ToKeyword
+  | OverrideKeyword
+  | GlobalKeyword
+  | PayableKeyword           // 이미 정의돼 있으므로 그대로 재사용
+  ;
 
 userDefinedValueTypeDefinition
   : 'type' identifier 'is' elementaryTypeName ';' ;
@@ -681,6 +688,9 @@ PureKeyword : 'pure' ;
 TypeKeyword : 'type' ;
 ViewKeyword : 'view' ;
 GlobalKeyword : 'global' ;
+FromKeyword   : 'from' ;
+ToKeyword     : 'to' ;
+OverrideKeyword : 'override' ;
 
 ConstructorKeyword : 'constructor' ;
 FallbackKeyword : 'fallback' ;

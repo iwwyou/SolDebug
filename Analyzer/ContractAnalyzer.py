@@ -1885,11 +1885,13 @@ class ContractAnalyzer:
         # ──────────────────────────────
         # ✨  B) True-블록 시작 시 분기 후 환경 스냅샷
         # ──────────────────────────────
+        """
         self._record_analysis(
             line_no=self.current_start_line + 0.1,  # ‘가상’ 라인 – IDE 에선 동일 라인에 묶여보임
             stmt_type="require-true",
             env=true_blk.variables
         )
+        """
 
         # ── 6 CFG 재배선 (successor edge 이동)
         for succ in successors:
@@ -1956,6 +1958,7 @@ class ContractAnalyzer:
                                              condition_expr,
                                              is_true_branch=True)
 
+        """
         # ➋ ====== true 분기 스냅샷 저장 =====================================
         self._record_analysis(
             line_no=self.current_start_line + 0.1,  # 같은 코드 라인에 묶어서 표시
@@ -1963,6 +1966,7 @@ class ContractAnalyzer:
             env=true_blk.variables
         )
         # ====================================================================
+        """
 
         # ── 6 successors edge 이동
         g = self.current_target_function_cfg.graph
@@ -2041,7 +2045,6 @@ class ContractAnalyzer:
         contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
         self.contract_cfgs[self.current_target_contract] = contract_cfg
         self.current_target_function_cfg = None
-
 
 
     # ContractAnalyzer.py ──────────────────────────────────────────────

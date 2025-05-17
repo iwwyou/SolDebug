@@ -1448,6 +1448,15 @@ class SolidityListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by SolidityParser#MetaType.
+    def enterMetaType(self, ctx:SolidityParser.MetaTypeContext):
+        pass
+
+    # Exit a parse tree produced by SolidityParser#MetaType.
+    def exitMetaType(self, ctx:SolidityParser.MetaTypeContext):
+        pass
+
+
     # Enter a parse tree produced by SolidityParser#InlineArrayExp.
     def enterInlineArrayExp(self, ctx:SolidityParser.InlineArrayExpContext):
         pass
