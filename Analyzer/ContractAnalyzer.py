@@ -1095,7 +1095,7 @@ class ContractAnalyzer:
         # ── 1) LHS 갱신  (++/--  ==  ±= 1 )
         one_lit = Expression(literal="1", context="LiteralExpContext")
         self.update_left_var(expr, 1, op_sign, cur_blk.variables, None, None)
-        cur_blk.add_assign_statement(expr, op_sign, one_lit)
+        cur_blk.add_assign_statement(expr, op_sign, one_lit, self.current_start_line)
 
         # ── 2) constructor 였으면 state-variables overwrite
         if fcfg.function_type == "constructor":
@@ -1608,20 +1608,20 @@ class ContractAnalyzer:
                                      1, "+=",
                                      incr_node.variables,
                                      None, None)
-                incr_node.add_assign_statement(increment_expr.expression, "+=", lit_one)
+                incr_node.add_assign_statement(increment_expr.expression, "+=", lit_one, self.current_start_line)
             elif op == "--":
                 self.update_left_var(increment_expr.expression,
                                      1, "-=",
                                      incr_node.variables,
                                      None, None)
-                incr_node.add_assign_statement(increment_expr.expression, "-=", lit_one)
+                incr_node.add_assign_statement(increment_expr.expression, "-=", lit_one, self.current_start_line)
             elif op in {"+=", "-="}:
                 self.update_left_var(increment_expr.left,
                                      increment_expr.right,
                                      op,
                                      incr_node.variables,
                                      None, None)
-                incr_node.add_assign_statement(increment_expr.left, op, increment_expr.right)
+                incr_node.add_assign_statement(increment_expr.left, op, increment_expr.right, self.current_start_line)
             else:
                 raise ValueError(f"[for] unexpected increment operator '{op}'")
 
@@ -2325,9 +2325,9 @@ class ContractAnalyzer:
         if id(var_obj) not in self.snapman._store:
             self.snapman.register(var_obj, self._ser)
 
-        if ev in ("add", "modify"):  # 값 덮어쓰기
-            var_obj.value = value
-        elif ev == "delete":  # 롤백
+        if ev in ("add", "modify"):
+            self._patch_var_with_new_value(var_obj, value)
+        elif ev == "delete":
             self.snapman.restore(var_obj, self._de)
         else:
             raise ValueError(f"unknown event {ev!r}")
@@ -2510,6 +2510,57 @@ class ContractAnalyzer:
         child = Variables(identifier=eid, value=val, scope="mapping_value", typeInfo=val_type)
         return child
 
+    # ContractAnalyzer.py ───────────────────────────────────────────
+    def _fill_array(self, arr: ArrayVariable, py_val: list):
+        """
+        arr.elements 를 py_val(list) 내용으로 완전히 교체
+        – 1-D · multi-D 모두 재귀로 채움
+        – 숫자   → Integer / UnsignedInteger Interval( [n,n] )
+        – Bool   → BoolInterval
+        – str(‘symbolicAddress …’) → 160-bit interval
+        – list   → nested ArrayVariable
+        """
+        arr.elements.clear()  # 새로 만들기
+        baseT = arr.typeInfo.arrayBaseType
+
+        def _make_elem(eid: str, raw):
+            # list  →  하위 ArrayVariable 재귀
+            if isinstance(raw, list):
+                sub = ArrayVariable(
+                    identifier=eid, base_type=baseT,
+                    array_length=len(raw), is_dynamic=True,
+                    scope=arr.scope
+                )
+                self._fill_array(sub, raw)
+                return sub
+
+            # symbolicAddress …
+            if isinstance(raw, str) and raw.startswith("symbolicAddress"):
+                nid = int(raw.split()[1])
+                self.sm.register_fixed_id(nid)
+                iv = self.sm.get_interval(nid)
+                self.sm.bind_var(eid, nid)
+                return Variables(eid, iv, scope=arr.scope, typeInfo=baseT)
+
+            # 숫자  /  Bool  → Interval
+            if isinstance(raw, (int, bool)):
+                if baseT.elementaryTypeName.startswith("uint"):
+                    bits = getattr(baseT, "intTypeLength", 256)
+                    val = UnsignedIntegerInterval(raw, raw, bits)
+                elif baseT.elementaryTypeName.startswith("int"):
+                    bits = getattr(baseT, "intTypeLength", 256)
+                    val = IntegerInterval(raw, raw, bits)
+                else:  # bool
+                    val = BoolInterval(int(raw), int(raw))
+                return Variables(eid, val, scope=arr.scope, typeInfo=baseT)
+
+            # bytes / string 심볼
+            return Variables(eid, f"symbol_{eid}", scope=arr.scope, typeInfo=baseT)
+
+        for i, raw in enumerate(py_val):
+            elem_id = f"{arr.identifier}[{i}]"
+            arr.elements.append(_make_elem(elem_id, raw))
+
     # ───────── 값 덮어쓰기 (debug 주석용) ────────────────────────────────────
     def _apply_new_value_to_variable(self, var_obj: Variables, new_value):
         """
@@ -2580,6 +2631,16 @@ class ContractAnalyzer:
             print(f"[Warning] _apply_new_value_to_variable: unhandled type '{etype}'")
             var_obj.value = new_value
 
+    def _patch_var_with_new_value(self, var_obj, new_val):
+        """
+        • ArrayVariable 인 경우 list 가 오면 _fill_array 로 교체
+        • 그 외는 _apply_new_value_to_variable 로 기존 처리
+        """
+        if isinstance(var_obj, ArrayVariable) and isinstance(new_val, list):
+            self._fill_array(var_obj, new_val)
+        else:
+            self._apply_new_value_to_variable(var_obj, new_val)
+
     # ───────── debug LHS 해석 (member / index 접근) ────────────────────────
     def _resolve_and_update_expr(self, expr: Expression,
                                  var_env: dict[str, Variables],  # ← 새로 넣었는지?
@@ -2592,13 +2653,13 @@ class ContractAnalyzer:
             if expr.identifier in var_env:
                 v = var_env[expr.identifier]
                 if new_value is not None:
-                    self._apply_new_value_to_variable(v, new_value)
+                    self._patch_var_with_new_value(v, new_value)
                 return v
 
             # 1-b. 없으면 함수-관련(초기) 테이블에서
             v = fcfg.get_related_variable(expr.identifier)
             if v and new_value is not None:
-                self._apply_new_value_to_variable(v, new_value)
+                self._patch_var_with_new_value(v, new_value)
             return v
 
         # 2) base  먼저 해석
@@ -2617,7 +2678,7 @@ class ContractAnalyzer:
                 print(f"[Warn] struct '{base_obj.identifier}' has no member '{expr.member}'")
                 return None
             if new_value is not None:
-                self._apply_new_value_to_variable(m, new_value)
+                self._patch_var_with_new_value(m, new_value)
             return m
 
         # ─ index access (array / mapping) ─────────────────────────────────
@@ -2635,7 +2696,7 @@ class ContractAnalyzer:
                                                               len(base_obj.elements))
                 elem = base_obj.elements[idx_val]
                 if new_value is not None:
-                    self._apply_new_value_to_variable(elem, new_value)
+                    self._patch_var_with_new_value(elem, new_value)
                 return elem
 
             # ▸ 매핑
@@ -2645,7 +2706,7 @@ class ContractAnalyzer:
                     base_obj.mapping[key] = self._create_new_mapping_value(base_obj, key)
                 tgt = base_obj.mapping[key]
                 if new_value is not None:
-                    self._apply_new_value_to_variable(tgt, new_value)
+                    self._patch_var_with_new_value(tgt, new_value)
                 return tgt
 
             print(f"[Warn] index access on non-array/mapping '{base_obj.identifier}'")
@@ -3546,7 +3607,11 @@ class ContractAnalyzer:
                                                               callerObject, callerContext)
         elif expr.context == "LiteralExpContext" :
             return self.update_left_var_of_literal_context(expr, rVal, operator, variables,
-                                                                callerObject)
+                                                                callerObject, callerContext)
+        elif expr.left is not None and expr.right is not None :
+            return self.update_left_var_of_binary_exp_context(expr, rVal, operator, variables,
+                                                                callerObject, callerContext)
+
         return None
 
     def compound_assignment(self, left_interval, right_interval, operator):
@@ -3589,6 +3654,77 @@ class ContractAnalyzer:
             return mapping[operator](left_interval, right_interval)
         except KeyError:
             raise ValueError(f"Unsupported compound-assignment operator: {operator}")
+
+    def update_left_var_of_binary_exp_context(
+            self, expr, rVal, operator, variables,
+            callerObject=None, callerContext=None):
+        """
+        rebalanceCount % 10 과 같이 BinaryExp(%) 가
+        IndexAccess 의 인덱스로 쓰일 때 호출된다.
+        """
+
+        # (1) IndexAccess 의 인덱스로 불린 경우만 의미 있음
+        if callerObject is None or callerContext != "IndexAccessContext":
+            return None
+
+        # (2) 인덱스 식 abstract-eval → int or Interval
+        idx_val = self.evaluate_expression(expr, variables, None, None)
+
+        # ────────────────────────────────────────────────────────────────────
+        # ① singleton [n,n]  → n 로 확정
+        # ────────────────────────────────────────────────────────────────────
+        if isinstance(idx_val, (IntegerInterval, UnsignedIntegerInterval)):
+            if idx_val.min_value == idx_val.max_value:
+                idx_val = idx_val.min_value  # 확정 int
+            else:
+                # 범위 [l,r]  → 아래의 “구간 처리” 로 넘어감
+                pass
+
+        # ────────────────────────────────────────────────────────────────────
+        # ② 확정 int 인 경우
+        # ────────────────────────────────────────────────────────────────────
+        if isinstance(idx_val, int):
+            target = self._touch_index_entry(callerObject, idx_val)
+            new_val = self.compound_assignment(target.value, rVal, operator)
+            self._patch_var_with_new_value(target, new_val)
+            return target  # logging 용으로 돌려줌
+
+        # ────────────────────────────────────────────────────────────────────
+        # ③ 범위 interval  (l < r)  보수 처리
+        #     ‣ 배열  : l‥r 전체 patch
+        #     ‣ 매핑  : l‥r 중 ‘이미 존재하는 엔트리’만 patch
+        #               (미정의 키는 <unk>로 남김)
+        # ────────────────────────────────────────────────────────────────────
+        if isinstance(idx_val, (IntegerInterval, UnsignedIntegerInterval)):
+            l, r = idx_val.min_value, idx_val.max_value
+            if isinstance(callerObject, ArrayVariable):
+                # 배열 길이 확장
+                while r >= len(callerObject.elements):
+                    callerObject.elements.append(
+                        self._create_new_array_element(callerObject,
+                                                       len(callerObject.elements))
+                    )
+                # l‥r 모두 갱신
+                for i in range(l, r + 1):
+                    elem = callerObject.elements[i]
+                    nv = self.compound_assignment(elem.value, rVal, operator)
+                    self._patch_var_with_new_value(elem, nv)
+
+            elif isinstance(callerObject, MappingVariable):
+                for i in range(l, r + 1):
+                    k = str(i)
+                    if k in callerObject.mapping:  # 존재할 때만
+                        entry = callerObject.mapping[k]
+                        nv = self.compound_assignment(entry.value, rVal, operator)
+                        self._patch_var_with_new_value(entry, nv)
+                    # 없으면 unknown 으로 남겨 둠
+
+            # logging 은 상위 interpret_assignment_statement 가
+            # `<unk>` 플래그를 붙여 기록하므로 여기서는 None 반환
+            return None
+
+        # (idx_val 이 Interval 도 int 도 아니면 – 아직 완전 심볼릭) → 상위에서 <unk> 처리
+        return None
 
     def update_left_var_of_index_access_context(self, expr, rVal, operator, variables,
                                                 callerObject=None, callerContext=None):
@@ -4345,6 +4481,21 @@ class ContractAnalyzer:
             return self.evaluate_binary_operator_of_index(result, callerObject)
         else :
             return result
+
+    def _touch_index_entry(self, container, idx: int):
+        """배열/매핑에서 idx 번째 엔트리를 가져오거나 필요 시 생성"""
+        if isinstance(container, ArrayVariable):
+            while idx >= len(container.elements):
+                container.elements.append(
+                    self._create_new_array_element(container, len(container.elements))
+                )
+            return container.elements[idx]
+
+        if isinstance(container, MappingVariable):
+            k = str(idx)
+            if k not in container.mapping:
+                container.mapping[k] = self._create_new_mapping_value(container, k)
+            return container.mapping[k]
 
     def convert_to_uint(self, sub_val, bits):
         """
@@ -5329,6 +5480,55 @@ class ContractAnalyzer:
                                                 variables,
                                                 self.current_target_function_cfg,
                                                 None)
+
+            if tgt is None and lexp.index is not None:
+                base_obj = self._resolve_and_update_expr(
+                    lexp.base, variables,
+                    self.current_target_function_cfg,
+                    None
+                )
+                if isinstance(base_obj, ArrayVariable):
+                    self._record_analysis(
+                        line_no=stmt.src_line,
+                        stmt_type=stmt.statement_type,  # "assignment"
+                        expr=lexp.base,  # key = 배열 식별자
+                        var_obj=base_obj  # flatten-array
+                    )
+                    return variables  # 이미 기록했으므로 종료
+                elif isinstance(base_obj, MappingVariable):
+                    concrete = self._try_concrete_key(lexp.index, variables)
+
+                    if concrete is not None:
+                        # ── 단일 엔트리 로깅 ───────────────────────
+                        entry = base_obj.mapping.get(concrete)
+                        if entry is None:
+                            entry = self._create_new_mapping_value(base_obj, concrete)
+                            base_obj.mapping[concrete] = entry
+
+                        if self._record_enabled:
+                            self._record_analysis(
+                                line_no=stmt.src_line,
+                                stmt_type=stmt.statement_type,
+                                expr=lexp,  # balances[msg.sender]
+                                var_obj=entry  # 그 엔트리만!
+                            )
+
+
+                    else:
+
+                        # ── 키/인덱스가 불명 ────────────────────────────────
+
+                        # ① 배열 전체를 inline-array 로 직렬화
+                        whole = self._serialize_val(base_obj)  # ← array[…]
+                        idx_s = self._expr_to_str(lexp.index)  # rebalanceCount % 10
+                        self.analysis_per_line[stmt.src_line].append({
+                            "kind": stmt.statement_type,
+                            "vars": {
+                                base_obj.identifier: whole,  # 전체 스냅샷
+                                f"{base_obj.identifier}[{idx_s}]": "<unk>"  # 이번에 바뀐 위치
+                            }
+                        })
+
             if tgt:
                 self._record_analysis(
                     line_no=stmt.src_line,
@@ -5380,6 +5580,25 @@ class ContractAnalyzer:
 
     def interpret_revert_statement(self, stmt, variables):
         return variables
+
+    def _try_concrete_key(self, idx_expr, var_env) -> str | None:
+        """
+        idx_expr 를 evaluate 해 보아 단일값인지 판단.
+        반환:
+          • "123"       ← 확정된 숫자/주소
+          • None        ← 여러 값 가능 → 불확정
+        """
+        val = self.evaluate_expression(idx_expr, var_env, None, None)
+
+        # 정수 Interval 이고 한 점만?  ⇒ 확정
+        if self._is_interval(val) and val.min_value == val.max_value:
+            return str(val.min_value)
+
+        # 문자열(주소 literal)처럼 이미 하나인 경우
+        if isinstance(val, (int, str)):
+            return str(val)
+
+        return None
 
     def compare_intervals(self, left_interval, right_interval, operator):
         """
@@ -5462,42 +5681,62 @@ class ContractAnalyzer:
         return "<expr>"
 
     def _flatten_var(self, var_obj, prefix: str, out: dict):
-        """Variables / ArrayVariable / StructVariable / MappingVariable 재귀 flatten"""
-        """line_no 에서 stmt_type 수행 직후/직전에 var_env 를 직렬화하여 저장"""
+        """
+        Variables / ArrayVariable / StructVariable / MappingVariable 재귀 flatten
+        """
 
-        def _serialize_val(v):
-            if hasattr(v, 'min_value'):  # Interval · BoolInterval
-                return f"[{v.min_value},{v.max_value}]"
-            return str(v)
-
-        val = getattr(var_obj, "value", None)
-
-        # elementary / enum / address
-        if isinstance(var_obj, Variables) or isinstance(var_obj, EnumVariable):
-            out[prefix] = _serialize_val(val)
-            return
-
-        # array
+        # ────────────────── ① ArrayVariable ──────────────────
         if isinstance(var_obj, ArrayVariable):
             for idx, elem in enumerate(var_obj.elements):
+                # element 가 다시 Array/Struct 일 수도 있으므로 재귀
                 self._flatten_var(elem, f"{prefix}[{idx}]", out)
-            return
+            return  # ← 끝
 
-        # struct
+        # ────────────────── ② StructVariable ─────────────────
         if isinstance(var_obj, StructVariable):
             for m, mem_var in var_obj.members.items():
                 self._flatten_var(mem_var, f"{prefix}.{m}", out)
             return
 
-        # mapping
+        # ────────────────── ③ MappingVariable ────────────────
         if isinstance(var_obj, MappingVariable):
             for k, mv in var_obj.mapping.items():
                 self._flatten_var(mv, f"{prefix}[{k}]", out)
             return
 
+        # ────────────────── ④ 단일-값 (Variables / Enum) ─────
+        val = getattr(var_obj, "value", None)
+        out[prefix] = self._serialize_val(val)
+
     def _serialize_val(self, v):
+        # ---- Interval / BoolInterval ------------------------------------
         if hasattr(v, 'min_value'):
             return f"[{v.min_value},{v.max_value}]"
+
+        # ---- ArrayVariable  → array[a,b,c] ------------------------------
+        if isinstance(v, ArrayVariable):
+            elems_repr = []
+            for elem in v.elements:
+                # elem 이 Variables 면 elem.value,  ArrayVariable이면 재귀
+                target = getattr(elem, "value", elem)
+                elems_repr.append(self._serialize_val(target))
+            return f"array[{','.join(elems_repr)}]"
+
+        # ---- StructVariable  → {a:…,b:…}  (선택) ------------------------
+        if isinstance(v, StructVariable):
+            parts = []
+            for m, mv in v.members.items():
+                parts.append(f"{m}:{self._serialize_val(getattr(mv, 'value', mv))}")
+            return "{" + ",".join(parts) + "}"
+
+        # ---- MappingVariable  → mapping{k1:…,k2:…} (선택) --------------
+        if isinstance(v, MappingVariable):
+            parts = []
+            for k, mv in v.mapping.items():
+                parts.append(f"{k}:{self._serialize_val(getattr(mv, 'value', mv))}")
+            return "mapping{" + ",".join(parts) + "}"
+
+        # ---- 기본 fallback ----------------------------------------------
         return str(v)
 
     def _record_analysis(
@@ -5523,15 +5762,23 @@ class ContractAnalyzer:
         if expr is not None and var_obj is not None:
             key = self._expr_to_str(expr)
 
-            # ── (a) 단일 값(e.g., uint, bool, enum, address …)
-            if isinstance(var_obj, (Variables, EnumVariable)):
-                line_info["vars"] = {key: self._serialize_val(getattr(var_obj, "value", None))}
+            # A) 특정 식 하나만 기록
+            if expr is not None and var_obj is not None:
+                key = self._expr_to_str(expr)
 
-            # ── (b) 배열 / 구조체 / 매핑 → 재귀로 평탄화
-            else:  # ArrayVariable | StructVariable | MappingVariable
-                flat = {}
-                self._flatten_var(var_obj, key, flat)  # key 가 루트 prefix 가 됨
-                line_info["vars"] = flat
+                # ── (b) 먼저! 배열 / 구조체 / 매핑 → 재귀 평탄화
+                if isinstance(var_obj, (ArrayVariable,
+                                        StructVariable,
+                                        MappingVariable)):
+                    flat = {}
+                    self._flatten_var(var_obj, key, flat)  # key가 루트 prefix
+                    line_info["vars"] = flat
+
+                # ── (a) 그 밖엔 단일 값 (uint·bool·enum·address 등)
+                else:  # Variables · EnumVariable (※ Array 등은 이미 위에서 처리)
+                    line_info["vars"] = {
+                        key: self._serialize_val(getattr(var_obj, "value", None))
+                    }
 
         # B) 환경 전체(flatten)
         elif env is not None:

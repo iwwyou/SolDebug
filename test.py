@@ -164,7 +164,7 @@ test_inputs = [
         "event": "add"
     },
     {
-        "code": "uint224[10] public rewardPerGas1Array;",
+        "code": "uint224 public rewardPerGas0Accumulator;",
         "startLine": 10,
         "endLine": 10,
         "event": "add"
@@ -176,7 +176,7 @@ test_inputs = [
         "event": "add"
     },
     {
-        "code": "uint224 public rewardPerGas0Accumulator;",
+        "code": "uint64 public rebalanceCount;",
         "startLine": 12,
         "endLine": 12,
         "event": "add"
@@ -188,143 +188,137 @@ test_inputs = [
         "event": "add"
     },
     {
-        "code": "uint224 public rewardPerGas1Accumulator;",
+        "code": "function _earmarkSomeForMaintenance(uint256 earned0, uint256 earned1) private returns (uint256, uint256) {\n}",
         "startLine": 14,
-        "endLine": 14,
+        "endLine": 15,
         "event": "add"
     },
     {
-        "code": "\n",
+        "code": "uint256 toMaintenance;",
         "startLine": 15,
         "endLine": 15,
         "event": "add"
     },
     {
-        "code": "uint64 public rebalanceCount;",
+        "code": "\n",
         "startLine": 16,
         "endLine": 16,
         "event": "add"
     },
     {
-        "code": "\n",
+        "code": "unchecked {\n}",
         "startLine": 17,
-        "endLine": 17,
+        "endLine": 18,
         "event": "add"
     },
     {
-        "code": "function _earmarkSomeForMaintenance(uint256 earned0, uint256 earned1) private returns (uint256, uint256) {\n}",
+        "code": "toMaintenance = earned0 / MAINTENANCE_FEE;",
         "startLine": 18,
-        "endLine": 19,
+        "endLine": 18,
         "event": "add"
     },
     {
-        "code": "uint256 toMaintenance;",
+        "code": "earned0 -= toMaintenance;",
         "startLine": 19,
         "endLine": 19,
         "event": "add"
     },
     {
-        "code": "\n",
+        "code": "maintenanceBudget0 += toMaintenance;",
         "startLine": 20,
         "endLine": 20,
         "event": "add"
     },
     {
-        "code": "unchecked {\n}",
+        "code": "toMaintenance = earned1 / MAINTENANCE_FEE;",
         "startLine": 21,
-        "endLine": 22,
+        "endLine": 21,
         "event": "add"
     },
     {
-        "code": "toMaintenance = earned0 / MAINTENANCE_FEE;",
+        "code": "earned1 -= toMaintenance;",
         "startLine": 22,
         "endLine": 22,
         "event": "add"
     },
     {
-        "code": "earned0 -= toMaintenance;",
+        "code": "maintenanceBudget1 += toMaintenance;",
         "startLine": 23,
         "endLine": 23,
         "event": "add"
     },
     {
-        "code": "maintenanceBudget0 += toMaintenance;",
-        "startLine": 24,
-        "endLine": 24,
-        "event": "add"
-    },
-    {
-        "code": "toMaintenance = earned1 / MAINTENANCE_FEE;",
+        "code": "\n",
         "startLine": 25,
         "endLine": 25,
         "event": "add"
     },
     {
-        "code": "earned1 -= toMaintenance;",
+        "code": "return (earned0, earned1);",
         "startLine": 26,
         "endLine": 26,
         "event": "add"
     },
     {
-        "code": "maintenanceBudget1 += toMaintenance;",
-        "startLine": 27,
-        "endLine": 27,
-        "event": "add"
-    },
-    {
         "code": "\n",
-        "startLine": 29,
-        "endLine": 29,
+        "startLine": 28,
+        "endLine": 28,
         "event": "add"
     },
     {
-        "code": "return (earned0, earned1);",
-        "startLine": 30,
+        "code": "function pushRewardPerGas0(uint224 rewardPerGas0) private {\n}",
+        "startLine": 29,
         "endLine": 30,
         "event": "add"
     },
     {
-        "code": "\n",
+        "code": "unchecked {\n}",
+        "startLine": 30,
+        "endLine": 31,
+        "event": "add"
+    },
+    {
+        "code": "rewardPerGas0 /= 10;",
+        "startLine": 31,
+        "endLine": 31,
+        "event": "add"
+    },
+    {
+        "code": "rewardPerGas0Accumulator = rewardPerGas0Accumulator + rewardPerGas0 - rewardPerGas0Array[rebalanceCount % 10];",
         "startLine": 32,
         "endLine": 32,
         "event": "add"
     },
     {
-        "code": "function pushRewardPerGas0(uint224 rewardPerGas0) private {\n}",
+        "code": "rewardPerGas0Array[rebalanceCount % 10] = rewardPerGas0;",
         "startLine": 33,
-        "endLine": 34,
+        "endLine": 33,
         "event": "add"
     },
     {
-        "code": "unchecked {\n}",
-        "startLine": 34,
-        "endLine": 35,
+        "code": "// @LocalVar rewardPerGas0 = [100,100]",
+        "startLine": 30,
+        "endLine": 30,
         "event": "add"
     },
     {
-        "code": "rewardPerGas0 /= 10;",
-        "startLine": 35,
-        "endLine": 35,
+        "code": "// @StateVar rebalanceCount = [1,1]",
+        "startLine": 31,
+        "endLine": 31,
         "event": "add"
     },
     {
-        "code": "rewardPerGas0Accumulator = rewardPerGas0Accumulator + rewardPerGas0 - rewardPerGas0Array[rebalanceCount % 10];",
-        "startLine": 36,
-        "endLine": 36,
+        "code": "// @StateVar rewardPerGas0Accumulator = [10,20]",
+        "startLine": 32,
+        "endLine": 32,
         "event": "add"
     },
     {
-        "code": "rewardPerGas0Array[rebalanceCount % 10] = rewardPerGas0;",
-        "startLine": 37,
-        "endLine": 37,
+        "code": "// @StateVar rewardPerGas0Array = array[1,2,3,4,5,6,7,8,9,10]",
+        "startLine": 33,
+        "endLine": 33,
         "event": "add"
-    },
-    {
-        "code": "rewardPerGas0Array[rebalanceCount % 10] = rewardPerGas0;",
-        "startLine": 37,
-        "endLine": 37,
-        "event": "add"
-    },
+    }
 ]
 
 

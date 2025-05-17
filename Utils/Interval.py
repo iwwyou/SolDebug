@@ -628,15 +628,28 @@ class UnsignedIntegerInterval(Interval):
         return UnsignedIntegerInterval(new_min, new_max, self.type_length)
 
     def modulo(self, other):
-        if other.min_value == 0 or other.max_value == 0:
+        # 제수가 0을 포함? → ⊥
+        if other.min_value <= 0 <= other.max_value:
             return self.bottom(self.type_length)
 
-        # 결과는 [0, max_divisor-1]
-        max_div = other.max_value
-        if max_div <= 0:
-            return self.bottom(self.type_length)
+        # 제수 singleton 인 양수 d
+        if other.min_value == other.max_value and other.min_value > 0:
+            d = other.min_value
+            # 피제수 singleton   ↦ 정확한 값
+            if self.min_value == self.max_value:
+                v = self.min_value % d
+                return UnsignedIntegerInterval(v, v, self.type_length)
+            # 피제수 범위가 d 보다 좁다 ↦ 그대로
+            if self.max_value < d:
+                return UnsignedIntegerInterval(self.min_value,
+                                               self.max_value,
+                                               self.type_length)
+            # 그 외는 0..d-1 (보수)
+            return UnsignedIntegerInterval(0, d - 1, self.type_length)
 
-        return UnsignedIntegerInterval(0, max_div - 1, self.type_length)
+        # 제수가 구간이지만 전부 양수일 때 → 가장 보수적인 0..(max_d-1)
+        max_d = other.max_value
+        return UnsignedIntegerInterval(0, max_d - 1, self.type_length)
 
     def shift(self, shift_interval, operator):
         if shift_interval.is_bottom():
