@@ -111,7 +111,7 @@ class Expression:
     def __init__(self, left=None, operator=None, right=None, identifier=None, literal=None, var_type=None,
                  function=None, arguments=None, named_arguments=None, base=None, access=None,
                  index=None, start_index=None, end_index=None, member=None, options=None,
-                 type_name=None, expression=None, condition=None, true_expr=None, false_expr=None,
+                 typeName=None, expression=None, condition=None, true_expr=None, false_expr=None,
                  is_postfix=None, elements=None, expr_type=None, type_length=256, context=None):
         self.left = left                # 좌측 피연산자 (Expression)
         self.operator = operator        # 연산자 (문자열)
@@ -129,7 +129,7 @@ class Expression:
         self.end_index = end_index      # 슬라이싱의 끝 인덱스 (Expression)
         self.member = member            # 멤버 이름 (문자열)
         self.options = options          # 함수 호출 옵션 (딕셔너리)
-        self.type_name = type_name      # 타입 변환의 대상 타입 이름 (문자열)
+        self.typeName = typeName        # 타입 변환의 대상 타입 이름 (문자열)
         self.expression = expression    # 변환될 표현식 또는 단일 표현식 (Expression)
         self.condition = condition      # 조건식 (삼항 연산자용) (Expression)
         self.true_expr = true_expr      # 조건식이 참일 때의 표현식 (Expression)
@@ -208,6 +208,10 @@ class AddressSymbolicManager:
         self._next_id: int = 1                    # fresh ID counter
         self._id_to_iv: dict[int, UnsignedIntegerInterval] = {}
         self._id_to_vars: dict[int, set[str]] = {}  # 해당 ID를 쓰는 변수명 모음
+
+    @staticmethod
+    def top_interval() -> UnsignedIntegerInterval:
+        return UnsignedIntegerInterval(0, 2 ** 160 - 1, type_length=160)
 
     # ───────────────────────────────── fresh / fixed  ID 발급
     def fresh_id(self) -> int:

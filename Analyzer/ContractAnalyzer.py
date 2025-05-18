@@ -986,7 +986,7 @@ class ContractAnalyzer:
                 elif et == "bool":
                     v.value = BoolInterval.bottom()
                 elif et == "address":
-                    v.value = AddressSymbolicManager.TOP_INTERVAL.clone()
+                    v.value = AddressSymbolicManager.top_interval()
                 else:  # bytes/string
                     v.value = f"symbol_{var_name}"
 
@@ -1147,8 +1147,10 @@ class ContractAnalyzer:
         if not self.current_target_function_cfg:
             raise ValueError("No active function to add variables to.")
 
-        current_block = self.get_current_block()
+        saved_cfg = self.current_target_function_cfg  # ⭐ CFG 백업
+        saved_fn = self.current_target_function  # ⭐ 함수 이름 백업
 
+        current_block = self.get_current_block()
         # 3. 함수 표현식 가져오기
         function_expr = expr.function
 
@@ -1157,17 +1159,16 @@ class ContractAnalyzer:
         current_block.add_function_call_statement(function_expr, self.current_start_line)
 
         # 10. current_block을 function CFG에 반영
-        self.current_target_function_cfg.update_block(current_block)  # 변경된 블록을 반영
+        self.current_target_function_cfg = saved_cfg
+        self.current_target_function = saved_fn
+        self.current_target_function_cfg.update_block(current_block)
 
-        # 11. function_cfg 결과를 contract_cfg에 반영
+        # 6) 상위 구조로 반영
         contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
-
-        # 12. contract_cfg를 contract_cfgs에 반영
         self.contract_cfgs[self.current_target_contract] = contract_cfg
-
-        # 12. brace_count에 CFG 노드 정보 업데이트 (함수의 시작 라인 정보 사용)
         self.brace_count[self.current_start_line]['cfg_node'] = current_block
 
+        # 7) 컨텍스트 정리 (설계에 따라 유지/제거)
         self.current_target_function_cfg = None
 
     def process_payable_function_call(self, expr):
@@ -1871,10 +1872,11 @@ class ContractAnalyzer:
             condition_node_type="require"
         )
         req_cond.condition_expr = condition_expr
+        req_cond.variables = self.copy_variables(current_block.variables)
 
         # ── 5 True-블록
         true_blk = CFGNode(name=f"require_true_{self.current_start_line + 1}")
-        true_blk.variables = self.copy_variables(current_block.variables)
+        true_blk.variables = self.copy_variables(req_cond.variables)
         self.update_variables_with_condition(true_blk.variables,
                                              condition_expr,
                                              is_true_branch=True)
@@ -2127,7 +2129,7 @@ class ContractAnalyzer:
             elif et == "bool":
                 v.value = BoolInterval.bottom()
             elif et == "address":
-                v.value = AddressSymbolicManager.TOP_INTERVAL.clone()
+                v.value = AddressSymbolicManager.top_interval()
             else:  # bytes / string …
                 v.value = f"symbol_{ident}"
 
@@ -2431,7 +2433,7 @@ class ContractAnalyzer:
                 val = BoolInterval.bottom()
 
             elif et == "address":
-                val = AddressSymbolicManager.TOP_INTERVAL.clone()
+                val = AddressSymbolicManager.top_interval()
 
             else:  # string / bytes …
                 val = f"symbol_{eid}"
@@ -2485,7 +2487,7 @@ class ContractAnalyzer:
                 val = BoolInterval.bottom()
 
             elif et == "address":
-                val = AddressSymbolicManager.TOP_INTERVAL.clone()
+                val = AddressSymbolicManager.top_interval()
 
             else:  # bytes, string …
                 val = f"symbol_{eid}"
@@ -2601,7 +2603,7 @@ class ContractAnalyzer:
         # ---- address ------------------------------------------------------
         elif etype == "address":
             if isinstance(new_value, UnsignedIntegerInterval):
-                var_obj.value = AddressSymbolicManager.TOP_INTERVAL.clone()
+                var_obj.value = AddressSymbolicManager.top_interval()
 
             elif isinstance(new_value, str) and new_value.startswith("symbolicAddress"):
                 nid = int(new_value.split()[1])
@@ -3006,7 +3008,7 @@ class ContractAnalyzer:
                     # 조건-노드의 서브블록 결정
                     if cfg_node.condition_node:
                         ctype = cfg_node.condition_node_type
-                        if ctype in ("if", "else if"):
+                        if ctype in ("if", "else if", "require", "assert"):
                             return self.get_true_block(cfg_node)
                         if ctype in ("while", "for", "doWhile"):
                             return self.get_true_block(cfg_node)
@@ -4173,7 +4175,7 @@ class ContractAnalyzer:
                             elemType.typeCategory == "elementary" and
                             elemType.elementaryTypeName == "address"):
 
-                        iv = AddressSymbolicManager.TOP_INTERVAL.clone()
+                        iv = AddressSymbolicManager.top_interval()
                         new_var = Variables(new_elem_id, iv, scope=baseVal.scope,
                                             typeInfo=elemType)
                     else:
@@ -4279,7 +4281,7 @@ class ContractAnalyzer:
         3) 반환
         """
 
-        type_name = expr.type_name  # 예: "uint256", "int8", "bool", "address"
+        type_name = expr.typeName  # 예: "uint256", "int8", "bool", "address"
         sub_val = self.evaluate_expression(expr.expression, variables, None, "TypeConversion")
 
         # 1) 우선 sub_val이 Interval(혹은 BoolInterval), str, etc. 중 어느 것인가 확인
@@ -4314,7 +4316,7 @@ class ContractAnalyzer:
         elif type_name == "address":
             # sub_val이 Interval이면 "address( interval )" → symbolic?
             # sub_val이 string "0x..." -> parse or symbolic
-            return self.convert_to_address(sub_val)
+            return sub_val
 
         else:
             # 그 외( bytesNN, string, etc. ) => 필요 시 구현
@@ -5200,8 +5202,8 @@ class ContractAnalyzer:
         if expr.context == "MemberAccessContext" : # dynamic array에 대한 push, pop
             return self.evaluate_expression(expr, variables, None, "functionCallContext")
 
-        if expr.function.identifier:
-            function_name = expr.function.identifier
+        if expr.context == "IdentifierExpContext":
+            function_name = expr.identifier
         else:
             raise ValueError (f"There is no function name in function call context")
 

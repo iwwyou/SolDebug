@@ -1742,11 +1742,11 @@ class EnhancedSolidityVisitor(SolidityVisitor):
     # Visit a parse tree produced by SolidityParser#TypeConversion.
     def visitTypeConversion(self, ctx: SolidityParser.TypeConversionContext):
         ty = ctx.elementaryTypeName().getText()  # 'address', 'uint256', …
-        arg = self.visitExpression(ctx.expression())
+        expr = self.visitExpression(ctx.expression())
 
         return Expression(
-            function=ty,
-            arguments=[arg],
+            typeName=ty,
+            expression=expr,
             operator='typecast',
             context='TypeConversion'
         )
