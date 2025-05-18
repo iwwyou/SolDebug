@@ -19,6 +19,7 @@ class ContractAnalyzer:
     def __init__(self):
         self.sm = AddressSymbolicManager()
         self.snapman = SnapshotManager()
+        self._batch_targets: set[FunctionCFG] = set()  # 🔹추가
 
         self.full_code = None
         self.full_code_lines = {} # 라인별 코드를 저장하는 딕셔너리
@@ -215,8 +216,6 @@ class ContractAnalyzer:
         if stripped_code.startswith('// @'):
             self.current_context_type = "debugUnit"
             self.current_target_contract = self.find_contract_context(start_line)
-            if 'GlobalVar' in stripped_code :
-                return
             self.current_target_function = self.find_function_context(start_line)
             return  # 이 함수 종료
 
@@ -2265,6 +2264,7 @@ class ContractAnalyzer:
         """
         ev = self.current_edit_event
         cfg = self.contract_cfgs[self.current_target_contract]
+        self.current_target_function_cfg = cfg.get_function_cfg(self.current_target_function)
 
         # ── 등록이 처음이면 snapshot ⬇︎
         if gv_obj.identifier not in cfg.globals:
@@ -2295,15 +2295,9 @@ class ContractAnalyzer:
                 self.sm.register_fixed_id(nid, iv)
                 self.sm.bind_var(g.identifier, nid)
 
-        # 3) 모든 FunctionCFG 의 related_variables 동기화
-        for fc in cfg.functions.values():
-            if gv_obj.identifier in fc.related_variables:
-                fc.related_variables[gv_obj.identifier].value = gv_obj.value
+        self.register_reinterpret_target(self.current_target_function_cfg)
 
-        # 4) 영향을 받는 함수만 재해석
-        for func_name in g.usage_sites:
-            if func_name in cfg.functions:
-                self.interpret_function_cfg(cfg.functions[func_name])
+        self.current_target_function_cfg = None
 
     # ─────────────────────────────────────────────────────────────
     def process_state_var_for_debug(self, lhs_expr: Expression, value):
@@ -2344,8 +2338,7 @@ class ContractAnalyzer:
                 self.sm.register_fixed_id(nid, iv)
                 self.sm.bind_var(var_obj.identifier, nid)
 
-        # 3) 해당 함수만 다시 해석
-        self.interpret_function_cfg(self.current_target_function_cfg)
+        self.register_reinterpret_target(self.current_target_function_cfg)
 
         self.current_target_function_cfg = None
 
@@ -5814,3 +5807,12 @@ class ContractAnalyzer:
             if ln in self.analysis_per_line
         }
 
+    def register_reinterpret_target(self, fc: FunctionCFG) -> None:
+        """디버그 주석 처리 중 ‘나중에 다시 돌릴 함수’ 등록"""
+        self._batch_targets.add(fc)
+
+    def flush_reinterpret_targets(self) -> None:
+        """DebugBatchManager 가 호출 : 모아둔 함수만 재-해석"""
+        for fc in self._batch_targets:
+            self.interpret_function_cfg(fc)
+        self._batch_targets.clear()

@@ -1,111 +1,58 @@
 import json
 from Analyzer.EnhancedSolidityVisitor import EnhancedSolidityVisitor
 from Analyzer.ContractAnalyzer import ContractAnalyzer
-from antlr4 import *
-from Parser.SolidityLexer import SolidityLexer
-from Parser.SolidityParser import SolidityParser
+from Analyzer.DebugUnitAnalyzer import DebugBatchManager
+from Utils.util                        import ParserHelpers     # ★ here
+
 
 contract_analyzer = ContractAnalyzer()
+snapman           = contract_analyzer.snapman
+batch_mgr         = DebugBatchManager(contract_analyzer, snapman)
 
-def map_context_type(context_type):
-    context_mapping = {
-        'contract': 'interactiveSourceUnit',
-        'library': 'interactiveSourceUnit',
-        'interface': 'interactiveSourceUnit',
-        'enum': 'interactiveSourceUnit',
-        'struct': 'interactiveSourceUnit',
-        'functionDefinition': 'interactiveSourceUnit',
-        'constructor': 'interactiveSourceUnit',
-        'fallback': 'interactiveSourceUnit',
-        'receive': 'interactiveSourceUnit',
-        'event': 'interactiveSourceUnit',
-        'error': 'interactiveSourceUnit',
-        'modifier': 'interactiveSourceUnit',
-        'stateVariableDeclaration': 'interactiveSourceUnit',
-        'enumMember': 'interactiveEnumUnit',
-        'structMember': 'interactiveStructUnit',
-        'simpleStatement': 'interactiveBlockUnit',
-        'if': 'interactiveBlockUnit',
-        'for': 'interactiveBlockUnit',
-        'while': 'interactiveBlockUnit',
-        'do': 'interactiveBlockUnit',
-        'try': 'interactiveBlockUnit',
-        'return': 'interactiveBlockUnit',
-        'break': 'interactiveBlockUnit',
-        'continue': 'interactiveBlockUnit',
-        'emit': 'interactiveBlockUnit',
-        'unchecked': 'interactiveBlockUnit',
-        'doWhileWhile': 'interactiveDoWhileUnit',
-        'catch': 'interactiveCatchClauseUnit',
-        'else_if': 'interactiveIfElseUnit',
-        'else': 'interactiveIfElseUnit',
-        'debugUnit' : 'debugUnit'
-    }
 
-    try:
-        return context_mapping[context_type]
-    except KeyError:
-        print(f"Warning: No mapping found for context_type '{context_type}'. Returning None.")
-        return None
+def simulate_inputs(records):
 
-def generate_parse_tree(input_stream, context_type):
-    input_stream = InputStream(input_stream)
-    lexer = SolidityLexer(input_stream)
-    token_stream = CommonTokenStream(lexer)
-    parser = SolidityParser(token_stream)
+    in_testcase = False          # ── 현재 @TestCase 블록 안인지
 
-    context_rule = map_context_type(context_type)
+    for rec in records:
+        code, s, e, ev = rec["code"], rec["startLine"], rec["endLine"], rec["event"]
+        contract_analyzer.update_code(s, e, code, ev)
 
-    if context_rule == 'interactiveStructUnit':
-        tree = parser.interactiveStructUnit()
-    elif context_rule == 'interactiveEnumUnit':
-        tree = parser.interactiveEnumUnit()
-    elif context_rule == 'interactiveBlockUnit':
-        tree = parser.interactiveBlockUnit()
-    elif context_rule == 'interactiveDoWhileUnit':
-        tree = parser.interactiveDoWhileUnit()
-    elif context_rule == 'interactiveIfElseUnit':
-        tree = parser.interactiveIfElseUnit()
-    elif context_rule == 'interactiveCatchClauseUnit':
-        tree = parser.interactiveCatchClauseUnit()
-    elif context_rule == 'debugUnit' :
-        tree = parser.debugUnit()
-    else:
-        tree = parser.interactiveSourceUnit()
+        stripped = code.lstrip()
 
-    return tree
+        # ─────────────────────────────────────────────
+        # ①  BEGIN / END 마커
+        # ─────────────────────────────────────────────
+        if stripped.startswith("// @TestCase BEGIN"):
+            # 이전 덩어리 남아 있으면 먼저 flush
+            batch_mgr.flush()
+            in_testcase = True
+            continue
 
-def simulate_inputs(test_inputs: list[dict], *, silent: bool = False) -> None:
-    """
-    `test_inputs`  ─ split_solidity_to_inputs 가 뱉은 dict 리스트
-    """
-    for rec in test_inputs:
-        code       = rec["code"]
-        start_line = rec["startLine"]
-        end_line   = rec["endLine"]
-        ev         = rec["event"]
+        if stripped.startswith("// @TestCase END"):
+            batch_mgr.flush()     # ← 지금까지 모은 거 처리
+            in_testcase = False
+            continue
 
-        # 1) source‑buffer 업데이트
-        contract_analyzer.update_code(start_line, end_line, code, ev)
+        # ─────────────────────────────────────────────
+        # ②  디버그 주석 (@StateVar 등)
+        # ─────────────────────────────────────────────
+        if in_testcase and stripped.startswith("// @"):
+            # 배치에 축적
+            batch_mgr.add_line(code, s, e)
+            continue
 
-        # 2) 완전한 공백 라인은 skip  (brace 카운트만 반영)
+        # ─────────────────────────────────────────────
+        # ③  일반 Solidity 코드
+        # ─────────────────────────────────────────────
         if code.strip() == "":
             continue
 
-        # 3) 현재 컨텍스트 규칙 추론 → 파싱
-        ctx_type = contract_analyzer.get_current_context_type()
-        tree     = generate_parse_tree(code, ctx_type)
-
-        # 4) 방문 & 분석
+        ctx  = contract_analyzer.get_current_context_type()
+        tree = ParserHelpers.generate_parse_tree(code, ctx)
         EnhancedSolidityVisitor(contract_analyzer).visit(tree)
 
-        # 5) (옵션)  중간 결과 로그
-        if not silent:
-            for ln, infos in contract_analyzer.analysis_per_line.items():
-                for info in infos:
-                    print(f"[line {ln}] {json.dumps(info, ensure_ascii=False)}")
-
-            print("--------------------------------------------------------")
+        print("--------------------------------------------------------")
 
 
 test_inputs = [
