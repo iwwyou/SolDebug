@@ -19,16 +19,16 @@ class DebugBatchManager:
 
         snap = self.snapman.snapshot()
         try:
-            # 1) 모든 줄 방문 (interpret 지연)
+            # (1) 주석 라인 방문
             for code, s, e in self._lines:
                 tree = ParserHelpers.generate_parse_tree(code, "debugUnit")
                 EnhancedSolidityVisitor(self.analyzer).visit(tree)
 
-            # 2) ‘현재 함수 하나’만 재-해석
+            # (2) 함수 한 개 재-해석
             self.analyzer.flush_reinterpret_target()
 
-            # 3) 결과 → 프런트
-            self.analyzer.send_report_to_front(self._lines)
+            # (3) 보고서 – 주석 라인 그대로 넘겨주기
+            self.analyzer.send_report_to_front(None)  # ★ 여기 수정
         finally:
             self.snapman.restore_from_snap(snap)
             self._lines.clear()

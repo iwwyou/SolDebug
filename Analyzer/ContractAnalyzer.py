@@ -12,6 +12,10 @@ from solcx.exceptions import SolcError
 import copy
 from typing import Dict, cast
 from collections import defaultdict
+import json
+from pathlib import Path
+from datetime import datetime
+from tabulate import tabulate
 
 
 class ContractAnalyzer:
@@ -5837,57 +5841,47 @@ class ContractAnalyzer:
         }
 
     def add_batch_target(self, fc: FunctionCFG) -> None:
-        """
-        Debug 주석으로 인해 값이 바뀐 ‘현재 함수’만 기억.
-        만약 다른 함수가 또 들어오면 즉시 ValueError.
-        """
-        if hasattr(self, "_batch_target") and self._batch_target is not None:
-            if self._batch_target is not fc:
-                raise ValueError(
-                    "하나의 @TestCase 블록에 두 개 이상의 함수가 포함됐습니다 "
-                    f"({self._batch_target.name} vs {fc.name})"
-                )
-        else:
-            self._batch_target = fc
+        self._batch_targets.add(fc)
 
-    # ────────────────────────────────────────────
-    def flush_reinterpret_target(self) -> None:
-        """저장된 함수 하나만 재-해석"""
-        if getattr(self, "_batch_target", None):
-            self.interpret_function_cfg(self._batch_target)
-        self._batch_target = None
+    def send_report_to_front(
+            self,
+            patched_lines: list[tuple[str, int, int]] | None = None
+    ) -> None:
 
-    # ContractAnalyzer.py (클래스 내부)
-
-    import json  # 파일 상단 import 구역에 없으면 추가
-
-    def send_report_to_front(self, patched_lines: list[tuple[str, int, int]]) -> None:
-        """
-        DebugBatchManager.flush() 가 호출.
-        patched_lines: [(code, startLn, endLn), …]  ─ 방금 배치에 포함된 라인
-        여기서 ‘방금 바뀐 구간’의 분석 결과만 모아 프런트로 전달한다.
-        실제 서비스에선 websocket / REST 로 바꿔주면 되고,
-        샘플에선 print(JSON) 로 남겨 둔다.
-        """
-        if not patched_lines:
-            return
-
-        # 1) 이번 배치에 포함된 라인 집합 계산
+        # 0) ‘어떤 라인을 보여줄지’ 결정 ---------------------------
         touched: set[int] = set()
-        for _code, s, e in patched_lines:
+
+        # (A) 호출 측에서 주석 라인을 넘겨준 경우
+        if patched_lines:
+            for _code, s, e in patched_lines:
+                touched.update(range(s, e + 1))
+
+        # (B) 주석 라인을 안 받았거나, 비어 있다면
+        #     ⇢ 방금 재-해석한 함수 전체 라인 사용
+        if not touched and getattr(self, "_last_func_lines", None):
+            s, e = self._last_func_lines
             touched.update(range(s, e + 1))
 
         if not touched:
+            print("※ send_report_to_front : 보여줄 라인이 없습니다.")
             return
 
-        # 2) 최소~최대 범위에 대해 get_line_analysis 호출
+        # 1) 라인별 분석 결과 수집 -------------------------------
         lmin, lmax = min(touched), max(touched)
         payload = self.get_line_analysis(lmin, lmax)
 
-        # 3) (데모) stdout 으로 JSON 출력
-        print("─── ANALYSIS REPORT ─────────────────────────")
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
-        print("──────────────────────────────────────────────")
+        # 이하 콘솔/파일 덤프 부분은 그대로 …
 
-        # 실제 프런트 전송 예시 (WebSocket 사용 시)
-        # await websocket.send(json.dumps(payload, ensure_ascii=False))
+    # ContractAnalyzer.py  (클래스 내부)
+
+    def flush_reinterpret_target(self) -> None:
+        if not self._batch_targets:
+            return
+        fcfg = self._batch_targets.pop()
+        self.interpret_function_cfg(fcfg)
+
+        ln_set = {st.src_line
+                  for blk in fcfg.graph.nodes
+                  for st in blk.statements
+                  if getattr(st, "src_line", None)}
+        self._last_func_lines = (min(ln_set), max(ln_set)) if ln_set else None
