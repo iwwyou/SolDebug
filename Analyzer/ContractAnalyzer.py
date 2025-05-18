@@ -1845,14 +1845,12 @@ class ContractAnalyzer:
             raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
 
         self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        g = self.current_target_function_cfg.graph
         if not self.current_target_function_cfg:
             raise ValueError("No active function to process the require statement.")
 
         # 2. 현재 블록 가져오기
         current_block = self.get_current_block()
-
-        # 3. 기존 current_block의 successor 가져오기
-        successors = list(self.current_target_function_cfg.graph.successors(current_block))
 
         # ──────────────────────────────
         # ✨  A) ‘require’ 직전 환경 스냅샷 저장
@@ -1875,7 +1873,7 @@ class ContractAnalyzer:
         req_cond.variables = self.copy_variables(current_block.variables)
 
         # ── 5 True-블록
-        true_blk = CFGNode(name=f"require_true_{self.current_start_line + 1}")
+        true_blk = CFGNode(name=f"require_true_{self.current_start_line}")
         true_blk.variables = self.copy_variables(req_cond.variables)
         self.update_variables_with_condition(true_blk.variables,
                                              condition_expr,
@@ -1891,14 +1889,10 @@ class ContractAnalyzer:
             env=true_blk.variables
         )
         """
-
+        succs = list(g.successors(current_block))
         # ── 6 CFG 재배선 (successor edge 이동)
-        for succ in successors:
-            self.current_target_function_cfg.graph.remove_edge(current_block, succ)
-            self.current_target_function_cfg.graph.add_edge(req_cond, succ)
-
-        # ── 7 current_block → require 노드
-        g = self.current_target_function_cfg.graph
+        for s in succs:
+           g.remove_edge(current_block, s)
         g.add_node(req_cond)
         g.add_edge(current_block, req_cond)
 
@@ -1910,6 +1904,9 @@ class ContractAnalyzer:
         g.add_node(true_blk)
         g.add_edge(req_cond, true_blk, condition=True)
 
+        for s in succs or [exit_node]:  # succs 가 없으면 exit 직행
+            g.add_edge(true_blk, s)
+
         # ── 10 brace_count
         self.brace_count.setdefault(self.current_start_line, {})["cfg_node"] = req_cond
 
@@ -1918,76 +1915,80 @@ class ContractAnalyzer:
         self.contract_cfgs[self.current_target_contract] = contract_cfg
         self.current_target_function_cfg = None
 
-    # Analyzer/ContractAnalyzer.py   일부 발췌
-    # -------------------------------------------------------------
-    def process_require_statement(self,
-                                  condition_expr: Expression,
-                                  string_literal: str | None) -> None:
-        """
-        · 현재 basic-block 끝에 `require(cond, …)` 가 들어왔다는 전제.
-        · True  —> 기존 흐름 계속
-          False —> 함수 exit 로 바로 연결한다.
-        """
+    def process_assert_statement(self, condition_expr, string_literal):
+        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
+        contract_cfg = self.contract_cfgs[self.current_target_contract]
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
 
-        # ── ① 현 함수 CFG 확보 ─────────────────────────────────────
-        ccfg = self.contract_cfgs[self.current_target_contract]
-        fcfg = ccfg.get_function_cfg(self.current_target_function)
-        if fcfg is None:
-            raise ValueError("require 문이 함수 외부에 등장했습니다.")
+        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if not self.current_target_function_cfg:
+            raise ValueError("No active function to process the require statement.")
 
-        g: nx.DiGraph = fcfg.graph
-        cur_blk = self.get_current_block()  # basic block 객체
+        # 2. 현재 블록 가져오기
+        current_block = self.get_current_block()
 
-        # ── ② require 직전 스냅-샷 기록 (옵션) ─────────────────────
+        # 3. 기존 current_block의 successor 가져오기
+        successors = list(self.current_target_function_cfg.graph.successors(current_block))
+
+        # ➊ ====== 분석 결과: assert 직전 환경 저장 =============================
         self._record_analysis(
             line_no=self.current_start_line,
-            stmt_type="require-pre",
-            env=cur_blk.variables
+            stmt_type="assert-pre",
+            env=current_block.variables  # 전체 환경 스냅샷
         )
+        # ====================================================================
 
-        # ── ③ 현재 블록이 향하던 간선 잠시 분리 ──────────────────
-        old_succs = list(g.successors(cur_blk))
-        for s in old_succs:
-            g.remove_edge(cur_blk, s)
-
-        # ── ④ 새 조건노드 + True-블록 생성 ───────────────────────
-        req_cond = CFGNode(
-            name=f"require_cond_L{self.current_start_line}",
+        # ── 3 successors, 4 조건노드 생성
+        assert_cond = CFGNode(
+            name=f"assert_condition_{self.current_start_line}",
             condition_node=True,
-            condition_node_type="require"
+            condition_node_type="assert"
         )
-        req_cond.condition_expr = condition_expr
-        req_cond.variables = self.copy_variables(cur_blk.variables)
+        assert_cond.condition_expr = condition_expr
 
-        true_blk = CFGNode(name=f"require_true_L{self.current_start_line}")
-        true_blk.variables = self.copy_variables(req_cond.variables)
+        # ── 5 True-블록
+        true_blk = CFGNode(name=f"assert_true_{self.current_start_line + 1}")
+        true_blk.variables = self.copy_variables(current_block.variables)
         self.update_variables_with_condition(true_blk.variables,
                                              condition_expr,
                                              is_true_branch=True)
 
-        # ── ⑤ 그래프에 배선 ------------------------------------------------
-        g.add_node(req_cond)
+        """
+        # ➋ ====== true 분기 스냅샷 저장 =====================================
+        self._record_analysis(
+            line_no=self.current_start_line + 0.1,  # 같은 코드 라인에 묶어서 표시
+            stmt_type="assert-true",
+            env=true_blk.variables
+        )
+        # ====================================================================
+        """
+
+        # ── 6 successors edge 이동
+        g = self.current_target_function_cfg.graph
+        for succ in list(g.successors(current_block)):
+            g.remove_edge(current_block, succ)
+            g.add_edge(assert_cond, succ)
+
+        # ── 7 current_block → 조건노드
+        g.add_node(assert_cond)
+        g.add_edge(current_block, assert_cond)
+
+        # ── 8 실패( false ) → EXIT
+        exit_node = self.current_target_function_cfg.get_exit_node()
+        g.add_edge(assert_cond, exit_node, condition=False)
+
+        # ── 9 true-분기 연결
         g.add_node(true_blk)
+        g.add_edge(assert_cond, true_blk, condition=True)
 
-        # 5-a. 기존 블록 → 조건노드        (무조건적)
-        g.add_edge(cur_blk, req_cond)
+        # ➌ ====== brace_count 등록 (IDE cursor tracking용) ====================
+        self.brace_count.setdefault(self.current_start_line, {})["cfg_node"] = assert_cond
+        # ====================================================================
 
-        # 5-b. 조건노드  → True-블록       (condition=True)
-        g.add_edge(req_cond, true_blk, condition=True)
-
-        # 5-c. 조건노드  → Exit-노드       (condition=False)
-        exit_node = fcfg.get_exit_node()  # 함수 하나당 하나 존재
-        g.add_edge(req_cond, exit_node, condition=False)
-
-        # 5-d. True-블록 → 원래 successor  (무조건적)
-        for s in old_succs:
-            g.add_edge(true_blk, s)
-
-        # ── ⑥ brace-count(편집 추적용) / CFG 저장 ─────────────────
-        self.brace_count.setdefault(self.current_start_line, {})["cfg_node"] = req_cond
-
-        ccfg.functions[self.current_target_function] = fcfg
-        self.contract_cfgs[self.current_target_contract] = ccfg
+        # ── 10 CFG / contract 갱신
+        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+        self.contract_cfgs[self.current_target_contract] = contract_cfg
         self.current_target_function_cfg = None
 
     # ContractAnalyzer.py  (추가/수정)
@@ -2929,7 +2930,7 @@ class ContractAnalyzer:
             return self.interpret_variable_declaration_statement(stmt, current_variables)
         elif stmt.statement_type == 'assignment':
             return self.interpret_assignment_statement(stmt, current_variables)
-        elif stmt.statement_type == 'function_call':
+        elif stmt.statement_type == 'functionCall':
             return self.interpret_function_call_statement(stmt, current_variables)
         elif stmt.statement_type == 'return':
             return self.interpret_return_statement(stmt, current_variables)
@@ -2972,7 +2973,13 @@ class ContractAnalyzer:
 
                 # 1-a) 일반 statement 라인 → 그 cfg_node 반환
                 if brace_info["cfg_node"] and brace_info["open"] == brace_info["close"] == 0:
-                    return brace_info["cfg_node"]
+                    cfg_node: CFGNode = brace_info["cfg_node"]
+                    if cfg_node.condition_node:
+                        ctype = cfg_node.condition_node_type
+                        if ctype in ("require", "assert"):
+                            return self.get_true_block(cfg_node)
+                    else :
+                        return cfg_node
 
                 # 1-b) 막 열린 '{' (open==1, close==0)
                 if brace_info["cfg_node"] and brace_info["open"] == 1 and brace_info["close"] == 0:
@@ -3004,7 +3011,7 @@ class ContractAnalyzer:
                     # 조건-노드의 서브블록 결정
                     if cfg_node.condition_node:
                         ctype = cfg_node.condition_node_type
-                        if ctype in ("if", "else if", "require", "assert"):
+                        if ctype in ("if", "else if"):
                             return self.get_true_block(cfg_node)
                         if ctype in ("while", "for", "doWhile"):
                             return self.get_true_block(cfg_node)
@@ -5565,7 +5572,7 @@ class ContractAnalyzer:
         return variables
 
     def interpret_function_call_statement(self, stmt, variables):
-        function_expr = stmt.function_call_expr
+        function_expr = stmt.function_expr
         return_value = self.evaluate_function_call_context(function_expr, variables, None, None)
 
         return variables
@@ -5849,3 +5856,38 @@ class ContractAnalyzer:
         if getattr(self, "_batch_target", None):
             self.interpret_function_cfg(self._batch_target)
         self._batch_target = None
+
+    # ContractAnalyzer.py (클래스 내부)
+
+    import json  # 파일 상단 import 구역에 없으면 추가
+
+    def send_report_to_front(self, patched_lines: list[tuple[str, int, int]]) -> None:
+        """
+        DebugBatchManager.flush() 가 호출.
+        patched_lines: [(code, startLn, endLn), …]  ─ 방금 배치에 포함된 라인
+        여기서 ‘방금 바뀐 구간’의 분석 결과만 모아 프런트로 전달한다.
+        실제 서비스에선 websocket / REST 로 바꿔주면 되고,
+        샘플에선 print(JSON) 로 남겨 둔다.
+        """
+        if not patched_lines:
+            return
+
+        # 1) 이번 배치에 포함된 라인 집합 계산
+        touched: set[int] = set()
+        for _code, s, e in patched_lines:
+            touched.update(range(s, e + 1))
+
+        if not touched:
+            return
+
+        # 2) 최소~최대 범위에 대해 get_line_analysis 호출
+        lmin, lmax = min(touched), max(touched)
+        payload = self.get_line_analysis(lmin, lmax)
+
+        # 3) (데모) stdout 으로 JSON 출력
+        print("─── ANALYSIS REPORT ─────────────────────────")
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        print("──────────────────────────────────────────────")
+
+        # 실제 프런트 전송 예시 (WebSocket 사용 시)
+        # await websocket.send(json.dumps(payload, ensure_ascii=False))
