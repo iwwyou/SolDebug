@@ -3976,7 +3976,7 @@ class ContractAnalyzer:
             return self.evaluate_member_access_context(expr, variables, callerObject, callerContext)
         elif expr.context == "IndexAccessContext" :
             return self.evaluate_index_access_context(expr, variables, callerObject, callerContext)
-        elif expr.context == "TypeConversionContext" :
+        elif expr.context == "TypeConversion" :
             return self.evaluate_type_conversion_context(expr, variables, callerObject, callerContext)
         elif expr.context == "ConditionalExpContext" :
             return self.evaluate_conditional_expression_context(expr, variables, callerObject, callerContext)

@@ -1740,30 +1740,16 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         return result_expr
 
     # Visit a parse tree produced by SolidityParser#TypeConversion.
-    def visitTypeConversion(self, ctx:SolidityParser.TypeConversionContext):
-        # 1. 타입 이름 추출
-        type_name = ctx.elementaryTypeName().getText()
+    def visitTypeConversion(self, ctx: SolidityParser.TypeConversionContext):
+        ty = ctx.elementaryTypeName().getText()  # 'address', 'uint256', …
+        arg = self.visitExpression(ctx.expression())
 
-        # 2. 식별자 또는 표현식 추출
-        if ctx.expression():
-            # 표현식인 경우
-            expr = self.visitExpression(ctx.expression())
-        elif ctx.identifier():
-            # 식별자인 경우
-            identifier = ctx.identifier().getText()
-            expr = Expression(identifier=identifier)
-        else:
-            raise SyntaxError("Expected expression or identifier in type conversion.")
-
-        # 3. 타입 변환 Expression 객체 생성
-        result_expr = Expression(
-            type_name=type_name,
-            expression=expr,
-            operator='type_conversion',
-            context='TypeConversionContext'
+        return Expression(
+            function=ty,
+            arguments=[arg],
+            operator='typecast',
+            context='TypeConversion'
         )
-
-        return result_expr
 
     # Visit a parse tree produced by SolidityParser#UnaryPrefixOp.
     def visitUnaryPrefixOp(self, ctx:SolidityParser.UnaryPrefixOpContext):
