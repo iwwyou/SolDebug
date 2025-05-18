@@ -986,9 +986,7 @@ class ContractAnalyzer:
                 elif et == "bool":
                     v.value = BoolInterval.bottom()
                 elif et == "address":
-                    iv = self.sm.alloc_fresh_interval()
-                    v.value = iv
-                    self.sm.bind_var(var_name, iv.min_value)
+                    v.value = AddressSymbolicManager.TOP_INTERVAL.clone()
                 else:  # bytes/string
                     v.value = f"symbol_{var_name}"
 
@@ -2129,9 +2127,7 @@ class ContractAnalyzer:
             elif et == "bool":
                 v.value = BoolInterval.bottom()
             elif et == "address":
-                iv = self.sm.alloc_fresh_interval()
-                v.value = iv
-                self.sm.bind_var(ident, iv.min_value)
+                v.value = AddressSymbolicManager.TOP_INTERVAL.clone()
             else:  # bytes / string …
                 v.value = f"symbol_{ident}"
 
@@ -2435,9 +2431,7 @@ class ContractAnalyzer:
                 val = BoolInterval.bottom()
 
             elif et == "address":
-                iv = self.sm.alloc_fresh_interval()
-                self.sm.bind_var(eid, iv.min_value)
-                val = iv
+                val = AddressSymbolicManager.TOP_INTERVAL.clone()
 
             else:  # string / bytes …
                 val = f"symbol_{eid}"
@@ -2491,9 +2485,7 @@ class ContractAnalyzer:
                 val = BoolInterval.bottom()
 
             elif et == "address":
-                iv = self.sm.alloc_fresh_interval()
-                self.sm.bind_var(eid, iv.min_value)
-                val = iv
+                val = AddressSymbolicManager.TOP_INTERVAL.clone()
 
             else:  # bytes, string …
                 val = f"symbol_{eid}"
@@ -2609,8 +2601,7 @@ class ContractAnalyzer:
         # ---- address ------------------------------------------------------
         elif etype == "address":
             if isinstance(new_value, UnsignedIntegerInterval):
-                var_obj.value = new_value
-                self.sm.bind_var(var_obj.identifier, new_value.min_value)
+                var_obj.value = AddressSymbolicManager.TOP_INTERVAL.clone()
 
             elif isinstance(new_value, str) and new_value.startswith("symbolicAddress"):
                 nid = int(new_value.split()[1])
@@ -4182,8 +4173,7 @@ class ContractAnalyzer:
                             elemType.typeCategory == "elementary" and
                             elemType.elementaryTypeName == "address"):
 
-                        iv = sm.alloc_fresh_interval()
-                        sm.bind_var(new_elem_id, iv.min_value)
+                        iv = AddressSymbolicManager.TOP_INTERVAL.clone()
                         new_var = Variables(new_elem_id, iv, scope=baseVal.scope,
                                             typeInfo=elemType)
                     else:

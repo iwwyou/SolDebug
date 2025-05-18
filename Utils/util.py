@@ -198,6 +198,8 @@ class AddressSymbolicManager:
     160-bit 주소 공간의 심볼릭 ID ↔ Interval ↔ 변수 alias 를 한 곳에서 관리
     """
     ADDR_BITS = 160
+    MAX_ADDR = (1 << ADDR_BITS) - 1
+    TOP_INTERVAL = UnsignedIntegerInterval(0, MAX_ADDR, ADDR_BITS)
     _typeinfo = SolType()                 # 빈 객체 먼저 만들고
     _typeinfo.typeCategory = "elementary" # 필드 수동 설정
     _typeinfo.elementaryTypeName = "address"
@@ -294,12 +296,9 @@ class ArrayVariable(Variables):
 
         def builder(eid, et):
             # address
-            if (isinstance(et, SolType) and et.elementaryTypeName == "address") \
-                    or et == "address":
-                iv = sm.alloc_fresh_interval() if sm else UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
-                if sm:
-                    sm.bind_var(eid, iv.min_value)
-                return Variables(eid, iv, scope=self.scope, typeInfo=et)
+            if (isinstance(et, SolType) and et.elementaryTypeName == "address") or et == "address":
+                top = UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
+                return Variables(eid, top, scope=self.scope, typeInfo=et)
             # 그 외 string/bytes … → 심볼
             return Variables(eid, f"symbol_{eid}", scope=self.scope, typeInfo=et)
 
@@ -526,14 +525,7 @@ class StructVariable(Variables):
             elif et == "bool":
                 v.value = BoolInterval.bottom()
             elif et == "address":
-                iv = (
-                    sm.alloc_fresh_interval()
-                    if sm
-                    else UnsignedIntegerInterval(0, 2**160 - 1, 160)
-                )
-                v.value = iv
-                if sm:
-                    sm.bind_var(var_id, iv.min_value)
+                v.value = UnsignedIntegerInterval(0, 2**160 - 1, 160)
             else:
                 # string / bytes / 기타
                 v.value = f"symbol_{var_id}"
@@ -593,11 +585,3 @@ class EnumVariable(Variables):
         :return: 현재 설정된 멤버의 이름
         """
         return self.current_value
-
-
-
-
-
-        # 기타 필요한 속성 추가 가능
-
-
