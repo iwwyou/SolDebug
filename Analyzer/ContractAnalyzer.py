@@ -1918,80 +1918,76 @@ class ContractAnalyzer:
         self.contract_cfgs[self.current_target_contract] = contract_cfg
         self.current_target_function_cfg = None
 
-    def process_assert_statement(self, condition_expr, string_literal):
-        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
-        contract_cfg = self.contract_cfgs[self.current_target_contract]
-        if not contract_cfg:
-            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+    # Analyzer/ContractAnalyzer.py   일부 발췌
+    # -------------------------------------------------------------
+    def process_require_statement(self,
+                                  condition_expr: Expression,
+                                  string_literal: str | None) -> None:
+        """
+        · 현재 basic-block 끝에 `require(cond, …)` 가 들어왔다는 전제.
+        · True  —> 기존 흐름 계속
+          False —> 함수 exit 로 바로 연결한다.
+        """
 
-        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
-        if not self.current_target_function_cfg:
-            raise ValueError("No active function to process the require statement.")
+        # ── ① 현 함수 CFG 확보 ─────────────────────────────────────
+        ccfg = self.contract_cfgs[self.current_target_contract]
+        fcfg = ccfg.get_function_cfg(self.current_target_function)
+        if fcfg is None:
+            raise ValueError("require 문이 함수 외부에 등장했습니다.")
 
-        # 2. 현재 블록 가져오기
-        current_block = self.get_current_block()
+        g: nx.DiGraph = fcfg.graph
+        cur_blk = self.get_current_block()  # basic block 객체
 
-        # 3. 기존 current_block의 successor 가져오기
-        successors = list(self.current_target_function_cfg.graph.successors(current_block))
-
-        # ➊ ====== 분석 결과: assert 직전 환경 저장 =============================
+        # ── ② require 직전 스냅-샷 기록 (옵션) ─────────────────────
         self._record_analysis(
             line_no=self.current_start_line,
-            stmt_type="assert-pre",
-            env=current_block.variables  # 전체 환경 스냅샷
+            stmt_type="require-pre",
+            env=cur_blk.variables
         )
-        # ====================================================================
 
-        # ── 3 successors, 4 조건노드 생성
-        assert_cond = CFGNode(
-            name=f"assert_condition_{self.current_start_line}",
+        # ── ③ 현재 블록이 향하던 간선 잠시 분리 ──────────────────
+        old_succs = list(g.successors(cur_blk))
+        for s in old_succs:
+            g.remove_edge(cur_blk, s)
+
+        # ── ④ 새 조건노드 + True-블록 생성 ───────────────────────
+        req_cond = CFGNode(
+            name=f"require_cond_L{self.current_start_line}",
             condition_node=True,
-            condition_node_type="assert"
+            condition_node_type="require"
         )
-        assert_cond.condition_expr = condition_expr
+        req_cond.condition_expr = condition_expr
+        req_cond.variables = self.copy_variables(cur_blk.variables)
 
-        # ── 5 True-블록
-        true_blk = CFGNode(name=f"assert_true_{self.current_start_line + 1}")
-        true_blk.variables = self.copy_variables(current_block.variables)
+        true_blk = CFGNode(name=f"require_true_L{self.current_start_line}")
+        true_blk.variables = self.copy_variables(req_cond.variables)
         self.update_variables_with_condition(true_blk.variables,
                                              condition_expr,
                                              is_true_branch=True)
 
-        """
-        # ➋ ====== true 분기 스냅샷 저장 =====================================
-        self._record_analysis(
-            line_no=self.current_start_line + 0.1,  # 같은 코드 라인에 묶어서 표시
-            stmt_type="assert-true",
-            env=true_blk.variables
-        )
-        # ====================================================================
-        """
-
-        # ── 6 successors edge 이동
-        g = self.current_target_function_cfg.graph
-        for succ in list(g.successors(current_block)):
-            g.remove_edge(current_block, succ)
-            g.add_edge(assert_cond, succ)
-
-        # ── 7 current_block → 조건노드
-        g.add_node(assert_cond)
-        g.add_edge(current_block, assert_cond)
-
-        # ── 8 실패( false ) → EXIT
-        exit_node = self.current_target_function_cfg.get_exit_node()
-        g.add_edge(assert_cond, exit_node, condition=False)
-
-        # ── 9 true-분기 연결
+        # ── ⑤ 그래프에 배선 ------------------------------------------------
+        g.add_node(req_cond)
         g.add_node(true_blk)
-        g.add_edge(assert_cond, true_blk, condition=True)
 
-        # ➌ ====== brace_count 등록 (IDE cursor tracking용) ====================
-        self.brace_count.setdefault(self.current_start_line, {})["cfg_node"] = assert_cond
-        # ====================================================================
+        # 5-a. 기존 블록 → 조건노드        (무조건적)
+        g.add_edge(cur_blk, req_cond)
 
-        # ── 10 CFG / contract 갱신
-        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
-        self.contract_cfgs[self.current_target_contract] = contract_cfg
+        # 5-b. 조건노드  → True-블록       (condition=True)
+        g.add_edge(req_cond, true_blk, condition=True)
+
+        # 5-c. 조건노드  → Exit-노드       (condition=False)
+        exit_node = fcfg.get_exit_node()  # 함수 하나당 하나 존재
+        g.add_edge(req_cond, exit_node, condition=False)
+
+        # 5-d. True-블록 → 원래 successor  (무조건적)
+        for s in old_succs:
+            g.add_edge(true_blk, s)
+
+        # ── ⑥ brace-count(편집 추적용) / CFG 저장 ─────────────────
+        self.brace_count.setdefault(self.current_start_line, {})["cfg_node"] = req_cond
+
+        ccfg.functions[self.current_target_function] = fcfg
+        self.contract_cfgs[self.current_target_contract] = ccfg
         self.current_target_function_cfg = None
 
     # ContractAnalyzer.py  (추가/수정)
@@ -2293,7 +2289,7 @@ class ContractAnalyzer:
                 self.sm.register_fixed_id(nid, iv)
                 self.sm.bind_var(g.identifier, nid)
 
-        self.register_reinterpret_target(self.current_target_function_cfg)
+        self.add_batch_target(self.current_target_function_cfg)
 
         self.current_target_function_cfg = None
 
@@ -2336,7 +2332,7 @@ class ContractAnalyzer:
                 self.sm.register_fixed_id(nid, iv)
                 self.sm.bind_var(var_obj.identifier, nid)
 
-        self.register_reinterpret_target(self.current_target_function_cfg)
+        self.add_batch_target(self.current_target_function_cfg)
 
         self.current_target_function_cfg = None
 
@@ -2377,7 +2373,7 @@ class ContractAnalyzer:
                 self.sm.bind_var(var_obj.identifier, nid)
 
         # 함수 재해석
-        self.interpret_function_cfg(self.current_target_function_cfg)
+        self.add_batch_target(self.current_target_function_cfg)
 
         self.current_target_function_cfg = None
 
@@ -4098,6 +4094,40 @@ class ContractAnalyzer:
                     if ident_str == callerObject.members[enumMemberIndex] :
                         return enumMemberIndex
 
+            elif isinstance(callerObject, MappingVariable):
+                # ① 키값 확정 -----------------------------
+                if ident_str in variables:  # ident_str == 변수 이름
+                    key_var = variables[ident_str]
+                    val = getattr(key_var, "value", key_var)
+                    # ── (a) interval & concrete? ────────
+                    if hasattr(val, "min_value"):
+                        if val.min_value == val.max_value:
+                            key_val = val.min_value  # 이미 구체적
+                        else:
+                            # ── (b) TOP 주소 → fresh ID ─
+                            if self.sm is None:
+                                raise ValueError("mapping key must be concrete")
+                            nid = self.sm.fresh_id()
+                            iv = UnsignedIntegerInterval(nid, nid, 160)
+                            key_var.value = iv
+                            self.sm.bind_var(key_var.identifier, nid)
+                            key_val = nid
+                    else:
+                        key_val = val  # bool / string 등
+                else:
+                    # 리터럴 키
+                    try:
+                        key_val = int(ident_str, 0)
+                    except ValueError:
+                        key_val = ident_str
+                # ② 매핑 접근 -----------------------------
+                result = callerObject.get_or_create(key_val)
+                if isinstance(result, Variables) :
+                    return result.value
+                else :
+                    return result
+
+            else :
                 raise ValueError(f"This '{ident_str}' may not be included in enum def '{callerObject.enum_name}'")
 
         # callerObject가 없고 callerContext는 있는 경우
@@ -5799,12 +5829,23 @@ class ContractAnalyzer:
             if ln in self.analysis_per_line
         }
 
-    def register_reinterpret_target(self, fc: FunctionCFG) -> None:
-        """디버그 주석 처리 중 ‘나중에 다시 돌릴 함수’ 등록"""
-        self._batch_targets.add(fc)
+    def add_batch_target(self, fc: FunctionCFG) -> None:
+        """
+        Debug 주석으로 인해 값이 바뀐 ‘현재 함수’만 기억.
+        만약 다른 함수가 또 들어오면 즉시 ValueError.
+        """
+        if hasattr(self, "_batch_target") and self._batch_target is not None:
+            if self._batch_target is not fc:
+                raise ValueError(
+                    "하나의 @TestCase 블록에 두 개 이상의 함수가 포함됐습니다 "
+                    f"({self._batch_target.name} vs {fc.name})"
+                )
+        else:
+            self._batch_target = fc
 
-    def flush_reinterpret_targets(self) -> None:
-        """DebugBatchManager 가 호출 : 모아둔 함수만 재-해석"""
-        for fc in self._batch_targets:
-            self.interpret_function_cfg(fc)
-        self._batch_targets.clear()
+    # ────────────────────────────────────────────
+    def flush_reinterpret_target(self) -> None:
+        """저장된 함수 하나만 재-해석"""
+        if getattr(self, "_batch_target", None):
+            self.interpret_function_cfg(self._batch_target)
+        self._batch_target = None

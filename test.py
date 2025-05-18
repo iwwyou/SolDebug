@@ -165,7 +165,7 @@ test_inputs = [
         "event": "add"
     },
     {
-        "code": "// @LocalVar _amount = [10,200]",
+        "code": "// @LocalVar amount = [10,200]",
         "startLine": 14,
         "endLine": 14,
         "event": "add"

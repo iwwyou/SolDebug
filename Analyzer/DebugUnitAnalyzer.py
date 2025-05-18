@@ -18,18 +18,17 @@ class DebugBatchManager:
             return
 
         snap = self.snapman.snapshot()
-
         try:
-            # (1) 전체 라인 방문 (interpret 지연)
+            # 1) 모든 줄 방문 (interpret 지연)
             for code, s, e in self._lines:
                 tree = ParserHelpers.generate_parse_tree(code, "debugUnit")
                 EnhancedSolidityVisitor(self.analyzer).visit(tree)
 
-            # (2) 모아둔 함수만 재-해석
-            self.analyzer.flush_reinterpret_targets()
+            # 2) ‘현재 함수 하나’만 재-해석
+            self.analyzer.flush_reinterpret_target()
 
-            # (3) 결과 → 프런트
+            # 3) 결과 → 프런트
             self.analyzer.send_report_to_front(self._lines)
         finally:
-            self.snapman.restore(snap)
+            self.snapman.restore_from_snap(snap)
             self._lines.clear()

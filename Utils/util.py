@@ -60,19 +60,70 @@ class ParserHelpers:
             case 'debugUnit':                 return parser.debugUnit()
             case _:                           return parser.interactiveSourceUnit()
 
+# Utils/snapshot_manager.py  (혹은 기존 SnapshotManager 정의 위치)
+import copy
+from collections.abc import Callable
+
 class SnapshotManager:
-    def __init__(self):
-        self._store = {}          # id(obj) → dict-snapshot
+    """
+    * register(obj, serializer)              : 객체별 최초 스냅
+    * restore(obj, deserializer)             : 단일 객체 롤백   (기존 인터페이스)
+    * snapshot() -> dict                     : 전체 스냅          (새로 추가)
+    * restore(snap_dict)                     : 전체 롤백          (새로 추가, 오버로드)
+    """
 
-    def register(self, obj, serializer):
-        """(add/modify) 처음 보이는 변수는 snapshot 저장"""
-        self._store[id(obj)] = copy.deepcopy(serializer(obj))
+    def __init__(self) -> None:
+        # id(obj) -> { "__dict__": deep-copied dict, "serializer": fn }
+        self._store: dict[int, dict] = {}
+        # id(obj) -> 실객체 참조 (전역 롤백 시 필요)
+        self._ref:   dict[int, object] = {}
 
-    def restore(self, obj, deserializer):
-        """(delete) 초기 snapshot 으로 복원"""
-        snap = self._store.get(id(obj))
-        if snap is not None:
-            deserializer(obj, copy.deepcopy(snap))
+    # ───────────────────────────────────────── register
+    def register(self, obj: object, serializer: Callable[[object], dict]) -> None:
+        """
+        처음 보는 변수라면 serializer(obj) 결과를 깊은 복사로 저장
+        (이미 등록돼 있으면 재등록하지 않음)
+        """
+        oid = id(obj)
+        if oid not in self._store:
+            self._store[oid] = {
+                "snap": copy.deepcopy(serializer(obj)),
+                "serializer": serializer,
+            }
+            self._ref[oid] = obj
+
+    # ───────────────────────────────────────── 단일 객체 롤백 (기존용)
+    def restore(self, target, deserializer: Callable[[object, dict], None] | None = None):
+        """
+        ‣ (a) 인자가 2개   → 단일 객체 롤백   : restore(obj, deser)
+        ‣ (b) 인자가 1개   → 전역 롤백       : restore(snap_dict)
+        """
+        # -------- (a) 단일 객체
+        if deserializer is not None:
+            snap_info = self._store.get(id(target))
+            if snap_info is not None:
+                deserializer(target, copy.deepcopy(snap_info["snap"]))
+            return
+
+        # -------- (b) 전역 롤백 (target == snap_dict)
+        snap_dict: dict[int, dict] = target       # type: ignore
+        for oid, saved_state in snap_dict.items():
+            obj = self._ref.get(oid)
+            if obj is None:           # 아직 register 안 된 객체일 수 있음
+                continue
+            # 객체 내부 상태를 원본으로 되돌림
+            obj.__dict__.clear()
+            obj.__dict__.update(copy.deepcopy(saved_state))
+
+    # ───────────────────────────────────────── 전체 스냅
+    # 전체 스냅-샷을 반환
+    def snapshot(self):
+        return copy.deepcopy(self._store)
+
+    # 외부에서 받은 snap(dict) 전체를 되돌린다
+    def restore_from_snap(self, snap):
+        self._store = snap
+
 
 class Statement:
     def __init__(self, statement_type, **kwargs):
@@ -362,51 +413,75 @@ class MappingVariable(Variables):
         self.typeInfo.mappingValueType = value_type # SolType 객체
         self.mapping = {}
 
-    def add_mapping(self, key_str, value_var):
+
+    # ────────────────────────────────────────────────
+    # 값-생성 전용 private 헬퍼
+    # ────────────────────────────────────────────────
+    def _make_value(self, sub_id: str, sol_t: SolType) :
         """
-        매핑에 새로운 키-값 쌍을 추가합니다.
-        key_str: 문자열 형태의 키 (identifier)
-        value_var: Variables 객체 (값)
+        mappingValueType(SolType) 을 보고 알맞은 객체를 만들어 준다.
+        숫자/불린 ⇒ ⊥ interval, 주소 ⇒ TOP interval, 복합 타입 ⇒ 재귀 생성
         """
+        # 1) 배열 --------------------------------------------------------
+        if sol_t.typeCategory == "array":
+            arr = ArrayVariable(
+                identifier   = sub_id,
+                base_type    = sol_t.arrayBaseType,
+                array_length = sol_t.arrayLength,
+                is_dynamic   = sol_t.isDynamicArray,
+                scope        = self.scope,
+            )
+            arr.initialize_not_abstracted_type()   # 내부까지 재귀 초기화
+            return arr
 
-        if not isinstance(value_var, Variables):
-            raise ValueError(f"Invalid value type for mapping: {value_var} is not a Variables object.")
+        # 2) 매핑 --------------------------------------------------------
+        if sol_t.typeCategory == "mapping":
+            return MappingVariable(
+                identifier  = sub_id,
+                key_type    = sol_t.mappingKeyType,
+                value_type  = sol_t.mappingValueType,
+                scope       = self.scope,
+            )
 
-        # 타입 검증 로직 (필요하다면 여기서 더 정교하게 할 수 있음)
-        # 여기서는 기본 타입 checking만 간단히 예시로 유지
-        expected_type = self.typeInfo.mappingValueType.elementaryTypeName
-        actual_type = value_var.typeInfo.elementaryTypeName if value_var.typeInfo else None
+        # 3) 구조체 ------------------------------------------------------
+        if sol_t.typeCategory == "struct":
+            sv = StructVariable(identifier=sub_id,
+                                struct_type=sol_t.structTypeName,
+                                scope=self.scope)
+            # 필요하다면 여기서 멤버 재귀 초기화
+            return sv
 
-        # 만약 elementary type인 경우 타입 이름이 맞는지 확인
-        if self.typeInfo.mappingValueType.typeCategory == 'elementary':
-            if actual_type != expected_type:
-                raise TypeError(f"Value type mismatch: Expected {expected_type}, got {actual_type}")
+        # 4) elementary -------------------------------------------------
+        v = Variables(identifier=sub_id, scope=self.scope)
+        v.typeInfo = sol_t
+        et = sol_t.elementaryTypeName
 
-        self.mapping[key_str] = value_var
+        if et.startswith("int"):
+            bits = sol_t.intTypeLength or 256
+            v.value = IntegerInterval.bottom(bits)           # ⊥ interval
+        elif et.startswith("uint"):
+            bits = sol_t.intTypeLength or 256
+            v.value = UnsignedIntegerInterval.bottom(bits)   # 0 ~ 2ᵇⁱᵗˢ-1
+        elif et == "bool":
+            v.value = BoolInterval.bottom()
+        elif et == "address":
+            v.value = UnsignedIntegerInterval(0, 2**160 - 1, 160)   # TOP 주소
+        else:                               # string / bytes 등
+            v.value = f"symbol_{sub_id}"
+        return v
 
-    def get_mapping(self, key_str):
+    # ────────────────────────────────────────────────
+    # public API : get_or_create(key_val)  (기존 get_mapping 대체)
+    # ────────────────────────────────────────────────
+    def get_or_create(self, key_val) -> Variables:
         """
-        주어진 문자열 키에 해당하는 Variables 객체를 반환합니다.
-        키가 없으면 기본값(Interval bottom 등)을 가진 Variables를 생성해서 반환할 수도 있음.
+        키가 없으면 value_type 에 맞춰 **자동 생성** 후 반환
         """
-        if key_str in self.mapping:
-            return self.mapping[key_str]
-        else:
-            # 키가 없는 경우 새로운 Variables 생성 (기본 Interval)
-            # 여기서 기본 interval을 만드는 헬퍼 함수가 있다고 가정 (예: get_default_interval)
-            default_interval = self.get_default_interval_for_type(self.typeInfo.mappingValueType)
-            new_var = Variables(identifier=f"{self.identifier}[{key_str}]",
-                                value=default_interval,
-                                scope=self.scope,
-                                typeInfo=self.typeInfo.mappingValueType)
-            self.mapping[key_str] = new_var
-            return new_var
-
-    def remove_mapping(self, key_str):
-        if key_str in self.mapping:
-            del self.mapping[key_str]
-        else:
-            raise KeyError(f"Key '{key_str}' not found in the mapping.")
+        if key_val not in self.mapping:
+            sub_id = f"{self.identifier}[{key_val}]"
+            new_var = self._make_value(sub_id, self.typeInfo.mappingValueType)
+            self.mapping[key_val] = new_var
+        return self.mapping[key_val]
 
     def get_default_interval_for_type(self, sol_type):
         # 예시 구현: elementary int/uint/bool만 처리
