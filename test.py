@@ -69,26 +69,20 @@ test_inputs = [
         "event": "add"
     },
     {
-        "code": "\n",
+        "code": "mapping(address => uint256) private _balances;",
         "startLine": 3,
         "endLine": 3,
         "event": "add"
     },
     {
-        "code": "mapping(address => uint256) private _balances;",
+        "code": "\n",
         "startLine": 4,
         "endLine": 4,
         "event": "add"
     },
     {
-        "code": "\n",
+        "code": "function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual {\n}",
         "startLine": 5,
-        "endLine": 5,
-        "event": "add"
-    },
-    {
-        "code": "mapping(address => mapping(address => uint256)) private _allowances;",
-        "startLine": 6,
         "endLine": 6,
         "event": "add"
     },
@@ -99,7 +93,7 @@ test_inputs = [
         "event": "add"
     },
     {
-        "code": "function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual {\n}",
+        "code": "function _afterTokenTransfer(address from, address to, uint256 amount) internal virtual {\n}",
         "startLine": 8,
         "endLine": 9,
         "event": "add"
@@ -111,87 +105,81 @@ test_inputs = [
         "event": "add"
     },
     {
-        "code": "function _afterTokenTransfer(address from, address to, uint256 amount) internal virtual {\n}",
+        "code": "function _burn(address account, uint256 amount) internal virtual {\n}",
         "startLine": 11,
         "endLine": 12,
         "event": "add"
     },
     {
-        "code": "\n",
+        "code": "require(account != address(0), \"ERC20: burn from the zero address\");",
+        "startLine": 12,
+        "endLine": 12,
+        "event": "add"
+    },
+    {
+        "code": "_beforeTokenTransfer(account, address(0), amount);",
         "startLine": 13,
         "endLine": 13,
         "event": "add"
     },
     {
-        "code": "function _burn(address account, uint256 amount) internal virtual {\n}",
+        "code": "uint256 accountBalance = _balances[account];",
         "startLine": 14,
-        "endLine": 15,
+        "endLine": 14,
         "event": "add"
     },
     {
-        "code": "require(account != address(0), \"ERC20: burn from the zero address\");",
+        "code": "require(accountBalance >= amount, \"ERC20: burn amount exceeds balance\");",
         "startLine": 15,
         "endLine": 15,
         "event": "add"
     },
     {
-        "code": "\n",
+        "code": "unchecked {\n}",
         "startLine": 16,
-        "endLine": 16,
+        "endLine": 17,
         "event": "add"
     },
     {
-        "code": "_beforeTokenTransfer(account, address(0), amount);",
+        "code": "_balances[account] = accountBalance - amount;",
         "startLine": 17,
         "endLine": 17,
         "event": "add"
     },
     {
-        "code": "\n",
-        "startLine": 18,
-        "endLine": 18,
-        "event": "add"
-    },
-    {
-        "code": "uint256 accountBalance = _balances[account];",
+        "code": "_totalSupply -= amount;",
         "startLine": 19,
         "endLine": 19,
         "event": "add"
     },
     {
-        "code": "require(accountBalance >= amount, \"ERC20: burn amount exceeds balance\");",
-        "startLine": 20,
-        "endLine": 20,
+        "code": "// @TestCase BEGIN",
+        "startLine": 12,
+        "endLine": 12,
         "event": "add"
     },
     {
-        "code": "unchecked {\n}",
-        "startLine": 21,
-        "endLine": 22,
+        "code": "// @StateVar _balances[account] = [100,1000]",
+        "startLine": 13,
+        "endLine": 13,
         "event": "add"
     },
     {
-        "code": "_balances[account] = accountBalance - amount;",
-        "startLine": 22,
-        "endLine": 22,
+        "code": "// @LocalVar _amount = [10,200]",
+        "startLine": 14,
+        "endLine": 14,
         "event": "add"
     },
     {
-        "code": "_totalSupply -= amount;",
-        "startLine": 24,
-        "endLine": 24,
-        "event": "add"
-    },
-    {
-        "code": "\n",
-        "startLine": 25,
-        "endLine": 25,
+        "code": "// @TestCase END",
+        "startLine": 14,
+        "endLine": 14,
         "event": "add"
     },
     {
         "code": "_afterTokenTransfer(account, address(0), amount);",
-        "startLine": 26,
-        "endLine": 26,
+        "startLine": 20,
+        "endLine": 20,
         "event": "add"
     }
 ]
