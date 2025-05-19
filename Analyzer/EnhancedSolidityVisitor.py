@@ -459,11 +459,11 @@ class EnhancedSolidityVisitor(SolidityVisitor):
             raise ValueError(f"Contract '{contract_name}' not found in contract configurations.")
 
         # 타입이 enum인지 struct인지 확인
-        if type_name in contract_cfg.enums:
+        if type_name in contract_cfg.enumDefs:
             # Enum 타입인 경우
             type_obj.typeCategory = "enum"
             type_obj.enumTypeName = type_name
-        elif type_name in contract_cfg.structs:
+        elif type_name in contract_cfg.structDefs:
             # Struct 타입인 경우
             type_obj.typeCategory = "struct"
             type_obj.structTypeName = type_name

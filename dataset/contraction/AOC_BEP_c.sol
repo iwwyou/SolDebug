@@ -14,8 +14,7 @@ contract AOC_BEP {
 
     mapping(address => UserInfo) public userInfo;
     mapping(uint256 => Level) public levels;
-
-    uint256 private _totalSupply;
+    mapping(address => uint256) private _balances;
 
     function updateUserInfo(address account, uint256 year, uint256 month) internal {
         userInfo[account].balance = _balances[account];
@@ -31,19 +30,5 @@ contract AOC_BEP {
                 break;
             }
         }
-    }
-
-    function _mint(address account, uint256 amount) internal virtual {
-        require(account != address(0), "BEP20: mint to the zero address");
-        _totalSupply += amount;
-        _balances[account] += amount;        
-    }
-
-    function _burn(address account, uint256 amount) internal virtual {
-        require(account != address(0), "BEP20: burn from the zero address");
-        uint256 accountBalance = _balances[account];
-        require(accountBalance >= amount, "BEP20: burn amount exceeds balance");
-        _balances[account] = accountBalance - amount;
-        _totalSupply -= amount;        
     }
 }

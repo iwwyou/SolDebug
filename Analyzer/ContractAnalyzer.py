@@ -552,7 +552,7 @@ class ContractAnalyzer:
         self.contract_cfgs[self.current_target_contract] = contract_cfg
 
         # brace_count 업데이트
-        self.brace_count[self.current_start_line]['structs'] = contract_cfg.structs
+        self.brace_count[self.current_start_line]['cfg_node'] = contract_cfg.structDefs
 
     def process_struct_member(self, var_name, type_obj):
         # 1. 현재 타겟 컨트랙트의 CFG를 가져옴

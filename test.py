@@ -56,132 +56,168 @@ def simulate_inputs(records):
 
 
 test_inputs = [
-    {
-        "code": "contract Amoss {\n}",
-        "startLine": 1,
-        "endLine": 2,
-        "event": "add"
-    },
-    {
-        "code": "uint256 private _totalSupply = 1*10**(9+18);",
-        "startLine": 2,
-        "endLine": 2,
-        "event": "add"
-    },
-    {
-        "code": "mapping(address => uint256) private _balances;",
-        "startLine": 3,
-        "endLine": 3,
-        "event": "add"
-    },
-    {
-        "code": "\n",
-        "startLine": 4,
-        "endLine": 4,
-        "event": "add"
-    },
-    {
-        "code": "function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual {\n}",
-        "startLine": 5,
-        "endLine": 6,
-        "event": "add"
-    },
-    {
-        "code": "\n",
-        "startLine": 7,
-        "endLine": 7,
-        "event": "add"
-    },
-    {
-        "code": "function _afterTokenTransfer(address from, address to, uint256 amount) internal virtual {\n}",
-        "startLine": 8,
-        "endLine": 9,
-        "event": "add"
-    },
-    {
-        "code": "\n",
-        "startLine": 10,
-        "endLine": 10,
-        "event": "add"
-    },
-    {
-        "code": "function _burn(address account, uint256 amount) internal virtual {\n}",
-        "startLine": 11,
-        "endLine": 12,
-        "event": "add"
-    },
-    {
-        "code": "require(account != address(0), \"ERC20: burn from the zero address\");",
-        "startLine": 12,
-        "endLine": 12,
-        "event": "add"
-    },
-    {
-        "code": "_beforeTokenTransfer(account, address(0), amount);",
-        "startLine": 13,
-        "endLine": 13,
-        "event": "add"
-    },
-    {
-        "code": "uint256 accountBalance = _balances[account];",
-        "startLine": 14,
-        "endLine": 14,
-        "event": "add"
-    },
-    {
-        "code": "require(accountBalance >= amount, \"ERC20: burn amount exceeds balance\");",
-        "startLine": 15,
-        "endLine": 15,
-        "event": "add"
-    },
-    {
-        "code": "unchecked {\n}",
-        "startLine": 16,
-        "endLine": 17,
-        "event": "add"
-    },
-    {
-        "code": "_balances[account] = accountBalance - amount;",
-        "startLine": 17,
-        "endLine": 17,
-        "event": "add"
-    },
-    {
-        "code": "_totalSupply -= amount;",
-        "startLine": 19,
-        "endLine": 19,
-        "event": "add"
-    },
-    {
-        "code": "// @TestCase BEGIN",
-        "startLine": 12,
-        "endLine": 12,
-        "event": "add"
-    },
-    {
-        "code": "// @StateVar _balances[account] = [100,1000]",
-        "startLine": 13,
-        "endLine": 13,
-        "event": "add"
-    },
-    {
-        "code": "// @LocalVar amount = [10,200]",
-        "startLine": 14,
-        "endLine": 14,
-        "event": "add"
-    },
-    {
-        "code": "// @TestCase END",
-        "startLine": 14,
-        "endLine": 14,
-        "event": "add"
-    },
-    {
-        "code": "_afterTokenTransfer(account, address(0), amount);",
-        "startLine": 20,
-        "endLine": 20,
-        "event": "add"
-    }
+  {
+    "code": "contract AOC_BEP {\n}",
+    "startLine": 1,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "struct UserInfo {\n}",
+    "startLine": 2,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "uint256 balance;",
+    "startLine": 3,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "uint256 level;",
+    "startLine": 4,
+    "endLine": 4,
+    "event": "add"
+  },
+  {
+    "code": "uint256 year;",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "uint256 month;",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "struct Level {\n}",
+    "startLine": 9,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "uint256 start;",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "uint256 end;",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "uint256 percentage;",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "mapping(address => UserInfo) public userInfo;",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "mapping(uint256 => Level) public levels;",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  },
+  {
+    "code": "mapping(address => uint256) private _balances;",
+    "startLine": 17,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 18,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "function updateUserInfo(address account, uint256 year, uint256 month) internal {\n}",
+    "startLine": 19,
+    "endLine": 20,
+    "event": "add"
+  },
+  {
+    "code": "userInfo[account].balance = _balances[account];",
+    "startLine": 20,
+    "endLine": 20,
+    "event": "add"
+  },
+  {
+    "code": "userInfo[account].year = year;",
+    "startLine": 21,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "userInfo[account].month = month;",
+    "startLine": 22,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "for(uint256 i = 1; i <= 4; i++) {\n}",
+    "startLine": 23,
+    "endLine": 24,
+    "event": "add"
+  },
+  {
+    "code": "if(i == 4) {\n}",
+    "startLine": 24,
+    "endLine": 25,
+    "event": "add"
+  },
+  {
+    "code": "userInfo[account].level = i;",
+    "startLine": 25,
+    "endLine": 25,
+    "event": "add"
+  },
+  {
+    "code": "break;",
+    "startLine": 26,
+    "endLine": 26,
+    "event": "add"
+  },
+  {
+    "code": "if(block.timestamp >= levels[i].start && block.timestamp <= levels[i].end) {\n}",
+    "startLine": 28,
+    "endLine": 29,
+    "event": "add"
+  },
+  {
+    "code": "userInfo[account].level = i;",
+    "startLine": 29,
+    "endLine": 29,
+    "event": "add"
+  },
+  {
+    "code": "break;",
+    "startLine": 30,
+    "endLine": 30,
+    "event": "add"
+  }
 ]
 
 
