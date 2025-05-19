@@ -1204,22 +1204,26 @@ class ContractAnalyzer:
         # 7. True 분기에서 변수 상태 복사 및 업데이트
         condition_block.variables = self.copy_variables(current_block.variables)
 
-        pre_env = self._clone_env(current_block.variables)
-
         # 4. brace_count 업데이트 - 존재하지 않으면 초기화
         if self.current_start_line not in self.brace_count:
             self.brace_count[self.current_start_line] = {}
         self.brace_count[self.current_start_line]['cfg_node'] = condition_block
 
         # 5. True 분기 블록 생성
-        true_block = CFGNode(name=f"if_true_{self.current_start_line}")
-
+        true_block = CFGNode(name=f"if_true_{self.current_start_line+1}")
+        true_block.variables = self.copy_variables(current_block.variables)
         # 7. True 분기에서 변수 상태 복사 및 업데이트
-        true_env  = self._clone_env(condition_block.variables)
-
-        self.update_variables_with_condition(true_env, condition_expr, is_true_branch=True)
+        self.update_variables_with_condition(true_block.variables, condition_expr, is_true_branch=True)
 
         false_block = CFGNode(name=f"if_false_{self.current_start_line}")
+        false_block.variables = self.copy_variables(current_block.variables)
+        self.update_variables_with_condition(false_block.variables, condition_expr, is_true_branch=False)
+
+        # 기록용
+        # 7. True 분기에서 변수 상태 복사 및 업데이트
+        pre_env = self._clone_env(current_block.variables)
+        true_env = self._clone_env(condition_block.variables)
+        self.update_variables_with_condition(true_env, condition_expr, is_true_branch=True)
         false_env = self._clone_env(condition_block.variables)
         self.update_variables_with_condition(false_env, condition_expr, is_true_branch=False)
 
@@ -1303,13 +1307,12 @@ class ContractAnalyzer:
         self.update_variables_with_condition(temp_variables, previous_condition_node.condition_expr,
                                              is_true_branch=False)
 
-        base_env = self._clone_env(temp_variables)
-
         # 4. else if 조건식 블록 생성
         condition_block = CFGNode(name=f"else_if_condition_{self.current_start_line}",
                                   condition_node=True,
                                   condition_node_type="else if")
         condition_block.condition_expr = condition_expr
+        condition_block.variables = self.copy_variables(temp_variables)
 
         # 5. brace_count 업데이트 - 존재하지 않으면 초기화
         if self.current_start_line not in self.brace_count:
@@ -1317,15 +1320,22 @@ class ContractAnalyzer:
         self.brace_count[self.current_start_line]['cfg_node'] = condition_block
 
         # 6. True 분기 블록 생성
-        true_block = CFGNode(name=f"else_if_true_{self.current_start_line + 1}")
+        true_block = CFGNode(name=f"else_if_true_{self.current_start_line}")
+        true_block.variables = self.copy_variables(condition_block.variables)
 
-        # 7. True 분기에서 변수 상태 복사 및 업데이트
-        true_env   = self._clone_env(temp_variables)
-        self.update_variables_with_condition(true_env, condition_expr, is_true_branch=True)
+        self.update_variables_with_condition(true_block.variables, condition_expr, is_true_branch=True)
 
         # 5. False 분기 블록 생성
         false_block = CFGNode(name=f"else_if_false_{self.current_start_line}")
 
+        false_block.variables = self.copy_variables(condition_block.variables)
+        self.update_variables_with_condition(false_block.variables, condition_expr,
+                                             is_true_branch=False)
+
+        # 기록용
+        base_env = self._clone_env(temp_variables)
+        true_env = self._clone_env(temp_variables)
+        self.update_variables_with_condition(true_env, condition_expr, is_true_branch=True)
         false_env = self._clone_env(temp_variables)
         self.update_variables_with_condition(false_env, condition_expr,
                                              is_true_branch=False)
@@ -1598,7 +1608,8 @@ class ContractAnalyzer:
         # ------------------------------------------------------------------#
         # 7) increment_node
         # ------------------------------------------------------------------#
-        incr_node = CFGNode(f"for_increment_{self.current_start_line}")
+        incr_node = CFGNode(f"for_increment_{self.current_start_line}",
+                            is_for_increment=True)
         incr_node.variables = self.copy_variables(body_node.variables)
 
         # ───────────────────────── for-increment helper ──────────────────────────
@@ -1636,14 +1647,6 @@ class ContractAnalyzer:
             if op in {"++", "--"}:
                 one_iv = _make_one_interval(increment_expr.expression,
                                             incr_node.variables)
-
-                self.update_left_var(
-                    increment_expr.expression,
-                    one_iv,
-                    "+=" if op == "++" else "-=",
-                    incr_node.variables,
-                    None, None
-                )
                 incr_node.add_assign_statement(
                     increment_expr.expression,
                     "+=" if op == "++" else "-=",
@@ -1661,13 +1664,6 @@ class ContractAnalyzer:
                              and str(increment_expr.right.literal) == "1"
                           else increment_expr.right)
 
-                self.update_left_var(
-                    increment_expr.left,
-                    rhs_iv,
-                    op,
-                    incr_node.variables,
-                    None, None
-                )
                 incr_node.add_assign_statement(
                     increment_expr.left,
                     op,
@@ -1761,45 +1757,59 @@ class ContractAnalyzer:
         self.current_target_function_cfg = None
 
     def process_break_statement(self):
-        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
+        """
+        `break` 가 등장했을 때 CFG 를 올바르게 재-배선한다.
+
+        ①  break 가 위치한 블록(current_block) → loop-exit-node 로 edge 추가
+        ②  condition-node → “루프 안쪽으로 들어가는 유일 진입점”
+            ( - for : incr_node,  while : join_node ) 으로 향하는 edge 제거
+        ③  이미 만들어져 있던 pred → incr|join edge 들도 끊어서
+            true-branch 가 leaf 판정에 잡히지 않도록 만든다.
+        """
+        # ────────────────────────────────────────────────────────────
+        # 1) 준비 – CFG 컨텍스트
+        # ────────────────────────────────────────────────────────────
         contract_cfg = self.contract_cfgs.get(self.current_target_contract)
         if not contract_cfg:
-            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+            raise ValueError(f"[break] contract CFG '{self.current_target_contract}' not found")
 
         self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
         if not self.current_target_function_cfg:
-            raise ValueError("No active function to process the break statement.")
+            raise ValueError("[break] active function CFG 없음")
 
-        # 2. 현재 블록 가져오기 (break가 발생한 블록)
-        current_block = self.get_current_block()
+        g = self.current_target_function_cfg.graph
+        cur_blk = self.get_current_block()
 
-        # 3. 현재 블록에 break statement 추가 (Statement 객체로 추가)
-        current_block.add_break_statement(self.current_start_line)
+        # ────────────────────────────────────────────────────────────
+        # 2) break 구문 statement 추가
+        # ────────────────────────────────────────────────────────────
+        cur_blk.add_break_statement(self.current_start_line)
 
-        # 4. 재귀적으로 위로 타고 올라가서 while문 조건 노드를 찾기
-        condition_node = self.find_loop_condition_node(current_block)
-        if not condition_node:
-            raise ValueError("No corresponding while condition node found for break statement.")
+        # ────────────────────────────────────────────────────────────
+        # 3) “현재 루프”의 구성요소 찾기
+        #    ▸ condition_node              ▸ loop_exit_node(false-branch)
+        # ────────────────────────────────────────────────────────────
+        cond_node = self.find_loop_condition_node(cur_blk)
+        if cond_node is None:
+            raise ValueError("[break] surrounding loop condition-node not found")
 
-        # 5. 해당 조건 노드의 false branch를 통해 loop_exit_node 찾기
-        loop_exit_node = self.current_target_function_cfg.get_false_block(condition_node)  # 수정된 부분
-        if not loop_exit_node or not loop_exit_node.loop_exit_node:
-            raise ValueError("No valid loop exit node found for break statement.")
+        exit_node = self.current_target_function_cfg.get_false_block(cond_node)  # while / for 공통
+        if exit_node is None or not exit_node.loop_exit_node:
+            raise ValueError("[break] loop-exit-node 찾기 실패")
 
-        # 6. 현재 블록의 모든 successor와의 edge 제거
-        successors = list(self.current_target_function_cfg.graph.successors(current_block))
-        for successor in successors:
-            self.current_target_function_cfg.graph.remove_edge(current_block, successor)
+        # ────────────────────────────────────────────────────────────
+        # 4) 기존 cur_blk → successors edge 제거,
+        #    cur_blk → exit_node 로 연결
+        # ────────────────────────────────────────────────────────────
+        for succ in list(g.successors(cur_blk)):
+            g.remove_edge(cur_blk, succ)
+        g.add_edge(cur_blk, exit_node)
 
-        # 7. 현재 블록을 loop_exit_node로 연결 (루프에서 빠져나감)
-        self.current_target_function_cfg.graph.add_edge(current_block, loop_exit_node)
+        # ────────────────────────────────────────────────────────────
+        # 6) bookkeeping – brace_count & CFG 저장
+        # ────────────────────────────────────────────────────────────
+        self.brace_count.setdefault(self.current_start_line, {})["cfg_node"] = cur_blk
 
-        # 8. Return 노드에 대한 brace_count 업데이트
-        if self.current_start_line not in self.brace_count:
-            self.brace_count[self.current_start_line] = {}
-        self.brace_count[self.current_start_line]['cfg_node'] = current_block
-
-        # 8. CFG 업데이트
         contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
         self.contract_cfgs[self.current_target_contract] = contract_cfg
 
@@ -3571,30 +3581,59 @@ class ContractAnalyzer:
 
         return new_block
 
-    def collect_leaf_nodes(self, node):
+    def collect_leaf_nodes(self, root_if: CFGNode) -> list[CFGNode]:
         """
-        주어진 노드의 하위 그래프를 탐색하여 리프 노드들을 수집합니다.
-        :param node: 시작 노드
-        :return: 리프 노드들의 리스트
+        if / else-if / else 체인의 “로컬 리프”만 수집한다.
+
+        · root_if ─ 가장 바깥쪽 if-조건 노드
+        · return  ─ join 대상으로 사용할 leaf 노드들의 리스트
         """
-        leaf_nodes = []
-        visited = set()
-        stack = [node]
+        G = self.current_target_function_cfg.graph
+
+        # ──────────────────────────────────────────────────────────────
+        # ①  root_if 로부터 DFS -> ‘if-체인 sub-graph’ 구성
+        # ──────────────────────────────────────────────────────────────
+        subgraph: set[CFGNode] = set()
+        stack = [root_if]
 
         while stack:
-            current_node = stack.pop()
-            if current_node in visited:
+            n = stack.pop()
+            if n in subgraph:
                 continue
-            visited.add(current_node)
+            subgraph.add(n)
 
-            successors = list(self.current_target_function_cfg.graph.successors(current_node))
-            if not successors:
-                # 자식이 없는 노드 (리프 노드)
-                leaf_nodes.append(current_node)
-            else:
-                # 자식 노드가 있는 경우 스택에 추가
-                for successor in successors:
-                    stack.append(successor)
+            for succ in G.successors(n):
+                # 1) succ 자체가 루프-메타블록이면 if 바깥으로 나가는 길 ▶ skip
+                if succ.loop_exit_node or succ.fixpoint_evaluation_node \
+                        or getattr(succ, "is_for_increment", False):
+                    continue
+
+                # 2) succ 의 succ 이 exit / fixpoint 면   ──┐
+                succ_succs = list(G.successors(succ))  # │
+                if any(x.loop_exit_node or x.fixpoint_evaluation_node  # │
+                       for x in succ_succs):  # │
+                    #   └── succ 은 ‘관문’ → 탐색 중단          ┘
+                    continue
+
+                # 3) 외부에서 succ 으로 “직결”되는 edge 가 있으면
+                #    succ 은 if-체인 밖 블록이므로 탐색하지 않는다.
+                preds = list(G.predecessors(succ))
+                outside_pred = any(p not in subgraph and p is not n for p in preds)
+                if outside_pred:
+                    continue
+
+                stack.append(succ)
+
+        # ──────────────────────────────────────────────────────────────
+        # ② subgraph 내부에서 “밖으로 나가는 edge”를 갖는 노드가 leaf
+        # ──────────────────────────────────────────────────────────────
+        leaf_nodes: list[CFGNode] = []
+        for n in subgraph:
+            succs = list(G.successors(n))
+            # succ 이 없거나, succ 중 하나라도 subgraph 밖이면 leaf
+            if ((not succs) or all(s not in subgraph for s in succs)) \
+                    and not n.condition_node:  # ← 조건 노드 제외
+                leaf_nodes.append(n)
 
         return leaf_nodes
 
@@ -4364,11 +4403,17 @@ class ContractAnalyzer:
                     except ValueError:
                         key_val = ident_str
                 # ② 매핑 접근 -----------------------------
-                result = callerObject.get_or_create(key_val)
-                if isinstance(result, Variables) :
-                    return result.value
-                else :
-                    return result
+
+                if str(key_val) not in callerObject.mapping:
+                    child = self._create_new_mapping_value(callerObject, key_val)
+                    callerObject.mapping[str(key_val)] = child
+                else:
+                    child = callerObject.mapping[str(key_val)]
+
+                    # child 반환 규칙
+                return child if isinstance(child, (StructVariable,
+                                                   MappingVariable,
+                                                   ArrayVariable)) else child.value
 
             else :
                 raise ValueError(f"This '{ident_str}' may not be included in enum def '{callerObject.enum_name}'")
@@ -4479,9 +4524,22 @@ class ContractAnalyzer:
         if isinstance(baseVal, StructVariable):
             if member not in baseVal.members:
                 raise ValueError(f"'{member}' not in struct '{baseVal.identifier}'")
+
             nested = baseVal.members[member]
-            # elementary / enum → 값, 복합 → 객체 반환
-            return nested.value if isinstance(nested, (Variables, EnumVariable)) else nested
+
+            # ① enum (저장형 uint) -----------------------------------------
+            if isinstance(nested, EnumVariable):
+                return nested.value  # Enum 은 값만 필요
+
+            # ② leaf-variable ---------------------------------------------
+            if (isinstance(nested, Variables) and
+                    not isinstance(nested, (ArrayVariable,
+                                            StructVariable,
+                                            MappingVariable))):
+                return nested.value  # int / uint / bool / address …
+
+            # ③ 배열·구조체·매핑 ------------------------------------------
+            return nested  # 객체 그대로 넘김
 
         # ──────────────────────────────────────────────────────────────
         # 4. EnumDefinition  (EnumType.RED)

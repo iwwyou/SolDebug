@@ -8,6 +8,7 @@ class CFGNode:
                  condition_node_type=None,
                  fixpoint_evaluation_node=False,
                  loop_exit_node=False,
+                 is_for_increment=False,
                  unchecked_block=False):
         self.name = name
 
@@ -17,6 +18,7 @@ class CFGNode:
 
         self.join_point_node = False
         self.fixpoint_evaluation_node = fixpoint_evaluation_node
+        self.is_for_increment = is_for_increment
         self.loop_exit_node = loop_exit_node
         self.is_loop_body = False
         self.fixpoint_evaluation_node_vars = {} # 고정점 분석을 위한 while문 진입 전에 var 상태, join 하면서 변하는 변수의 상태
