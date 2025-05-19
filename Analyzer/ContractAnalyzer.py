@@ -1601,29 +1601,80 @@ class ContractAnalyzer:
         incr_node = CFGNode(f"for_increment_{self.current_start_line}")
         incr_node.variables = self.copy_variables(body_node.variables)
 
-        if increment_expr is not None:
-            lit_one = Expression(literal=1, context="LiteralExpContext")
+        # ───────────────────────── for-increment helper ──────────────────────────
+        def _make_one_interval(var_expr: Expression, cur_vars: dict[str, Variables]):
+            """
+            var_expr 로 가리키는 변수의 타입(uint / int)에 맞춰
+            숫자 1을 UnsignedIntegerInterval 또는 IntegerInterval 로 래핑해 준다.
+            """
+            # var_expr 가 가리키는 실제 변수 객체 확보
+            v_obj = self._resolve_and_update_expr(var_expr,
+                                                  cur_vars,
+                                                  self.current_target_function_cfg,
+                                                  None)
+            if v_obj is None or v_obj.typeInfo is None:
+                # fallback – 그냥 리터럴 1 (실패해도 compound_assignment 쪽에서 처리는 됨)
+                return 1
 
+            et = v_obj.typeInfo.elementaryTypeName
+            bits = v_obj.typeInfo.intTypeLength or 256
+
+            if et.startswith("uint"):
+                return UnsignedIntegerInterval(1, 1, bits)
+            elif et.startswith("int"):
+                return IntegerInterval(1, 1, bits)
+            else:
+                # bool 이나 기타가 for-counter 로 쓰이는 경우는 거의 없지만 안전장치
+                return 1
+
+        # ──────────────────────────────────────────────────────────────────────────
+
+        if increment_expr is not None:
             op = increment_expr.operator
-            if op == "++":
-                self.update_left_var(increment_expr.expression,
-                                     1, "+=",
-                                     incr_node.variables,
-                                     None, None)
-                incr_node.add_assign_statement(increment_expr.expression, "+=", lit_one, self.current_start_line)
-            elif op == "--":
-                self.update_left_var(increment_expr.expression,
-                                     1, "-=",
-                                     incr_node.variables,
-                                     None, None)
-                incr_node.add_assign_statement(increment_expr.expression, "-=", lit_one, self.current_start_line)
+
+            # ① ++ / -- -----------------------------------------------------------
+            if op in {"++", "--"}:
+                one_iv = _make_one_interval(increment_expr.expression,
+                                            incr_node.variables)
+
+                self.update_left_var(
+                    increment_expr.expression,
+                    one_iv,
+                    "+=" if op == "++" else "-=",
+                    incr_node.variables,
+                    None, None
+                )
+                incr_node.add_assign_statement(
+                    increment_expr.expression,
+                    "+=" if op == "++" else "-=",
+                    # Statement 에도 Interval 을 넘겨둔다 (직렬화용)
+                    one_iv,
+                    self.current_start_line
+                )
+
+            # ② += / -= -----------------------------------------------------------
             elif op in {"+=", "-="}:
-                self.update_left_var(increment_expr.left,
-                                     increment_expr.right,
-                                     op,
-                                     incr_node.variables,
-                                     None, None)
-                incr_node.add_assign_statement(increment_expr.left, op, increment_expr.right, self.current_start_line)
+                # RHS 가 리터럴이면 타입에 맞춰 Interval 로 변환
+                rhs_iv = (_make_one_interval(increment_expr.left,
+                                             incr_node.variables)
+                          if increment_expr.right.context == "LiteralExpContext"
+                             and str(increment_expr.right.literal) == "1"
+                          else increment_expr.right)
+
+                self.update_left_var(
+                    increment_expr.left,
+                    rhs_iv,
+                    op,
+                    incr_node.variables,
+                    None, None
+                )
+                incr_node.add_assign_statement(
+                    increment_expr.left,
+                    op,
+                    rhs_iv,
+                    self.current_start_line
+                )
+
             else:
                 raise ValueError(f"[for] unexpected increment operator '{op}'")
 
@@ -3940,7 +3991,7 @@ class ContractAnalyzer:
 
     def update_left_var_of_literal_context(
             self, expr, rVal, operator, variables,
-            callerObject: Variables | ArrayVariable | MappingVariable | None = None):
+            callerObject: Variables | ArrayVariable | MappingVariable | None = None, callerContext=None):
 
         # ───────────────────────── 0. 준비 ─────────────────────────
         lit = expr.literal  # 예: "123", "0x1a", "true"
@@ -5107,45 +5158,47 @@ class ContractAnalyzer:
             variables: dict[str, Variables],
             cond_expr: Expression,
             is_true_branch: bool) -> None:
-        """
-        cond_expr.operator ∈ {'<','>','<=','>=','==','!='}
-        is_true_branch :
-            · True  ⇒ op 그대로
-            · False ⇒ negate_operator(op) 적용
-        """
 
+        # ───── 헬퍼 ──────────────────────────────────────────────
+        def _is_literal_expr(e: Expression) -> bool:
+            return getattr(e, "context", "") == "LiteralExpContext"
+
+        def _maybe_update(expr, new_iv):
+            # 좌측식이 리터럴이면 L-value 가 없으므로 무시
+            if not _is_literal_expr(expr):
+                self.update_left_var(expr, new_iv, '=', variables)
+
+        # ───── 준비 ─────────────────────────────────────────────
         op = cond_expr.operator
         actual_op = op if is_true_branch else self.negate_operator(op)
-
         left_expr = cond_expr.left
         right_expr = cond_expr.right
 
-        # ───────── 1. 값 평가 ─────────
         left_val = self.evaluate_expression(left_expr, variables, None, None)
         right_val = self.evaluate_expression(right_expr, variables, None, None)
 
-        # ---------------- CASE 1 : 둘 다 Interval ----------------
+        # ───────── CASE 1 : 둘 다 Interval ─────────────────────
         if self._is_interval(left_val) and self._is_interval(right_val):
             new_l, new_r = self.refine_intervals_for_comparison(left_val, right_val, actual_op)
-            self.update_left_var(left_expr, new_l, '=', variables)
-            self.update_left_var(right_expr, new_r, '=', variables)
+            _maybe_update(left_expr, new_l)
+            _maybe_update(right_expr, new_r)
             return
 
-        # ---------------- CASE 2-A : Interval  vs  스칼라/리터럴 ----------------
+        # ───────── CASE 2-A : Interval vs literal ──────────────
         if self._is_interval(left_val) and not self._is_interval(right_val):
             coerced_r = self._coerce_literal_to_interval(right_val, left_val.type_length)
-            new_l, _ = self.refine_intervals_for_comparison(left_val, coerced_r, actual_op)
-            self.update_left_var(left_expr, new_l, '=', variables)
+            new_l, _dummy = self.refine_intervals_for_comparison(left_val, coerced_r, actual_op)
+            _maybe_update(left_expr, new_l)  # ★ 변경
             return
 
-        # ---------------- CASE 2-B : 리터럴  vs  Interval ----------------
+        # ───────── CASE 2-B : literal vs Interval ──────────────
         if self._is_interval(right_val) and not self._is_interval(left_val):
             coerced_l = self._coerce_literal_to_interval(left_val, right_val.type_length)
-            _, new_r = self.refine_intervals_for_comparison(coerced_l, right_val, actual_op)
-            self.update_left_var(right_expr, new_r, '=', variables)
+            _dummy, new_r = self.refine_intervals_for_comparison(coerced_l, right_val, actual_op)
+            _maybe_update(right_expr, new_r)  # ★ 변경
             return
 
-        # ---------------- CASE 3 : BoolInterval 비교 ----------------
+        # ───────── CASE 3 : BoolInterval 비교 ──────────────────
         if isinstance(left_val, BoolInterval) or isinstance(right_val, BoolInterval):
             self._update_bool_comparison(
                 variables,
@@ -5154,22 +5207,19 @@ class ContractAnalyzer:
                 actual_op)
             return
 
-        # ---------------- CASE 4 : 주소 Interval(address) 비교 ▲ ----------------
-        # (주소 literal ‘0x…’ → UnsignedIntegerInterval(…,160) 로 강제 변환)
+        # ───────── CASE 4 : address Interval 비교 ───────────────
         if (self._is_interval(left_val) and left_val.type_length == 160) or \
                 (self._is_interval(right_val) and right_val.type_length == 160):
 
-            # 좌·우 모두 Interval 로 맞추기
             if not self._is_interval(left_val):
                 left_val = self._coerce_literal_to_interval(left_val, 160)
             if not self._is_interval(right_val):
                 right_val = self._coerce_literal_to_interval(right_val, 160)
 
             new_l, new_r = self.refine_intervals_for_comparison(left_val, right_val, actual_op)
-            self.update_left_var(left_expr, new_l, '=', variables)
-            self.update_left_var(right_expr, new_r, '=', variables)
+            _maybe_update(left_expr, new_l)  # ★ 변경
+            _maybe_update(right_expr, new_r)  # ★ 변경
             return
-
 
     def refine_intervals_for_comparison(
             self,

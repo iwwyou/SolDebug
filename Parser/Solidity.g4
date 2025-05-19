@@ -496,7 +496,7 @@ assertStatement
   : 'assert' '(' expression ')' ';' ;
 
 variableDeclarationStatement
-  : (variableDeclaration ('=' expression)?) | (variableDeclarationTuple '=' expression) ';' ;
+  : (variableDeclaration ('=' expression)?) ';' | (variableDeclarationTuple '=' expression) ';' ;
 
 interactiveStatement
   : interactiveSimpleStatement
@@ -522,10 +522,12 @@ interactiveElseStatement
   : 'else' (interactiveIfStatement | '{' '}') ;
 
 interactiveForStatement
-  : 'for' '(' ( simpleStatement | ';' )   // init
-              expression? ';'             // condition
-              expression?                 // increment
-            ')' '{' '}'                   // body(빈 블록)
+  : 'for' '('
+        ( simpleStatement | ';' )   // init
+        expression?                 // condition (   ← 세미콜론을 사용자가 직접 입력)
+        ';'
+        expression?                 // increment
+    ')' '{' '}'                    // 본문(BlockStatement 등)
   ;
 
 interactiveWhileStatement
