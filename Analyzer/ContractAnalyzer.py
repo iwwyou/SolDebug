@@ -1766,6 +1766,26 @@ class ContractAnalyzer:
         ③  이미 만들어져 있던 pred → incr|join edge 들도 끊어서
             true-branch 가 leaf 판정에 잡히지 않도록 만든다.
         """
+
+        def debug_path_to_header(cur_blk, g):
+            """cur_blk → … → loop header 로 가는 모든 선행-경로를 출력"""
+            from collections import deque
+            Q = deque([(cur_blk, [cur_blk.name])])
+            seen = set()
+            while Q:
+                n, path = Q.popleft()
+                if n in seen:  # 사이클 방지
+                    continue
+                seen.add(n)
+
+                if n.condition_node and n.condition_node_type in ("for", "while", "doWhile"):
+                    print("FOUND!", " → ".join(path))
+                    return n
+                for p in g.predecessors(n):
+                    Q.append((p, path + [p.name]))
+            print("❌ header 미발견")
+            return None
+
         # ────────────────────────────────────────────────────────────
         # 1) 준비 – CFG 컨텍스트
         # ────────────────────────────────────────────────────────────
@@ -1779,6 +1799,7 @@ class ContractAnalyzer:
 
         g = self.current_target_function_cfg.graph
         cur_blk = self.get_current_block()
+        debug_path_to_header(cur_blk, g)
 
         # ────────────────────────────────────────────────────────────
         # 2) break 구문 statement 추가
@@ -2269,25 +2290,25 @@ class ContractAnalyzer:
         # fixpoint_evaluation_node를 찾지 못하면 None 반환
         return None
 
-    def find_loop_condition_node(self, current_node):
-        """
-                재귀적으로 predecessor를 탐색하여 fixpoint_evaluation_node를 찾는 함수
-                """
-        # 현재 노드가 fixpoint_evaluation_node라면 반환
-        if current_node.condition_node and current_node.condition_node_type in["while", "for"] :
-            return current_node
+    # ---------------------------------------------------------------------
+    # 3.  find_loop_condition_node  – 방문 집합 추가
+    # ---------------------------------------------------------------------
+    def find_loop_condition_node(self, node: CFGNode, visited=None) -> CFGNode | None:
+        if visited is None:
+            visited = set()
+        if node in visited:
+            return None
+        visited.add(node)
 
-        # 직접적인 predecessor를 탐색
-        predecessors = list(self.current_target_function_cfg.graph.predecessors(current_node))
-        for pred in predecessors:
-            # 재귀적으로 predecessor를 탐색하여 fixpoint_evaluation_node를 찾음
-            loop_condition_node = self.find_loop_condition_node(pred)
-            if loop_condition_node:
-                return loop_condition_node
+        if node.condition_node and node.condition_node_type in ("while", "for", "doWhile"):
+            return node
 
-        # fixpoint_evaluation_node를 찾지 못하면 None 반환
+        preds = list(self.current_target_function_cfg.graph.predecessors(node))
+        for p in preds:
+            found = self.find_loop_condition_node(p, visited)
+            if found:
+                return found
         return None
-
 
     # --------------------------------------------------
     def _create_modifier_placeholder_node(self, fcfg: FunctionCFG):
@@ -3323,25 +3344,7 @@ class ContractAnalyzer:
 
         # ─────────── if-join 처리 ───────────
         if has_if and outside_if_node is not None:
-            new_block = self.join_leaf_nodes(outside_if_node)
-
-            g = self.current_target_function_cfg.graph
-            succs = list(g.successors(outside_if_node))
-
-            # succ ↦ new_block 으로 재연결 (중복/self-loop 방지)
-            for s in succs:
-                if s in (new_block, outside_if_node):
-                    continue
-                g.remove_edge(outside_if_node, s)
-                if not g.has_edge(new_block, s):
-                    g.add_edge(new_block, s)
-
-            if not g.has_edge(outside_if_node, new_block):
-                g.add_edge(outside_if_node, new_block)
-
-            # brace_count 에도 등록
-            self.brace_count[self.current_start_line] = {"open": 0, "close": 0, "cfg_node": new_block}
-            return new_block
+            return self.join_leaf_nodes(outside_if_node)
 
         # 특별히 처리할 노드가 없으면 None – 상위 루틴에서 다시 판단
         return new_block
@@ -3563,21 +3566,12 @@ class ContractAnalyzer:
         # 새로운 블록 생성 및 변수 정보 저장
         new_block = CFGNode(name=f"JoinBlock_{self.current_start_line}")
         new_block.variables = joined_variables
+        g = self.current_target_function_cfg.graph
+        g.add_node(new_block)
 
-        # **CFG 그래프에 새로운 블록 추가**
-        self.current_target_function_cfg.graph.add_node(new_block)
-
-        # **리프 노드들과 새로운 블록을 에지로 연결**
-        for node in leaf_nodes:
-            # 기존의 successor가 없으므로, 리프 노드에서 new_block으로 에지를 연결
-            self.current_target_function_cfg.graph.add_edge(node, new_block)
-
-        # **조건 노드의 successor를 새로운 블록으로 연결**
-        successors = list(self.current_target_function_cfg.graph.successors(condition_node))
-        for succ in successors:
-            # 조건 노드와 successor 간의 에지를 제거하고, 새로운 블록과 successor를 연결
-            self.current_target_function_cfg.graph.remove_edge(condition_node, succ)
-            self.current_target_function_cfg.graph.add_edge(new_block, succ)
+        # leaf 가 ‘정말’ successor 가 0 개인 경우에만 ↦ JoinBlock
+        for n in leaf_nodes:
+            g.add_edge(n, new_block)
 
         return new_block
 
