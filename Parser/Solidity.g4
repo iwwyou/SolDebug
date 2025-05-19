@@ -522,7 +522,11 @@ interactiveElseStatement
   : 'else' (interactiveIfStatement | '{' '}') ;
 
 interactiveForStatement
-  : 'for' '(' ( simpleStatement | ';' ) ( expressionStatement | ';' ) expression? ')' '{' '}' ;
+  : 'for' '(' ( simpleStatement | ';' )   // init
+              expression? ';'             // condition
+              expression?                 // increment
+            ')' '{' '}'                   // body(빈 블록)
+  ;
 
 interactiveWhileStatement
   : 'while' '(' expression ')' '{' '}' ;

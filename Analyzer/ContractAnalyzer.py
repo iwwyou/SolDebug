@@ -2461,27 +2461,30 @@ class ContractAnalyzer:
             self,
             map_var: MappingVariable,
             key: str | int,
-    ) -> Variables:
+    ) -> Variables | ArrayVariable | StructVariable | MappingVariable | EnumVariable:
         """
-        새 key 접근 시, 기본 값을 가진 child Variables 생성.
+        새 key 접근 시, value-type 에 맞는 child 변수를 정확히 생성해 돌려준다.
 
-        * address value 인 경우 AddressSymbolicManager 로 fresh interval 지급.
-        * 그 밖의 elementary → bottom interval.
-        * 배열/구조체/매핑 등의 value 타입은 보수적으로 symbol 로 둠.
+        elementary → Variables            (기존 로직 유지)
+        array      → ArrayVariable
+        struct     → StructVariable       (멤버까지 lazy-init)
+        mapping    → MappingVariable      (중첩 매핑)
+        enum       → EnumVariable
+        그 밖      → 심볼릭 문자열
         """
         eid = f"{map_var.identifier}[{key}]"
-        val_type: SolType = map_var.typeInfo.mappingValueType
+        vtype: SolType = map_var.typeInfo.mappingValueType
 
-        # elementary --------------------------------------------------------
-        if val_type.typeCategory == "elementary":
-            et = val_type.elementaryTypeName
+        # ───────────────────────── elementary ──────────────────────────
+        if vtype.typeCategory == "elementary":
+            et = vtype.elementaryTypeName
 
             if et.startswith("uint"):
-                bits = val_type.intTypeLength or 256
+                bits = vtype.intTypeLength or 256
                 val = UnsignedIntegerInterval.bottom(bits)
 
             elif et.startswith("int"):
-                bits = val_type.intTypeLength or 256
+                bits = vtype.intTypeLength or 256
                 val = IntegerInterval.bottom(bits)
 
             elif et == "bool":
@@ -2490,16 +2493,187 @@ class ContractAnalyzer:
             elif et == "address":
                 val = AddressSymbolicManager.top_interval()
 
-            else:  # bytes, string …
+            else:  # bytes / string …
                 val = f"symbol_{eid}"
 
-        # non-elementary ----------------------------------------------------
-        else:
-            # (array / struct / mapping 등은 본 연구 범위 밖 → symbol 처리)
-            val = f"symbol_{eid}"
+            return Variables(identifier=eid, value=val,
+                             scope="mapping_value", typeInfo=vtype)
 
-        child = Variables(identifier=eid, value=val, scope="mapping_value", typeInfo=val_type)
-        return child
+        # ───────────────────────── array  ──────────────────────────────
+        # ───────────────────────── array  ──────────────────────────────
+        if vtype.typeCategory == "array":
+            arr = ArrayVariable(
+                identifier=eid,
+                base_type=vtype.arrayBaseType,
+                array_length=vtype.arrayLength,
+                is_dynamic=vtype.isDynamicArray,
+                scope="mapping_value",
+            )
+
+            # ▸ 동적 배열 → 빈 상태로 놔둔 뒤 push() 때 확장
+            if vtype.isDynamicArray:
+                return arr
+
+            baseT = vtype.arrayBaseType
+
+            # ─ elementary 원소라면 bottom interval 로 일괄 초기화 ──
+            if isinstance(baseT, SolType) and baseT.typeCategory == "elementary":
+                et = baseT.elementaryTypeName
+
+                if et.startswith("uint"):
+                    bits = baseT.intTypeLength or 256
+                    arr.initialize_elements(UnsignedIntegerInterval.bottom(bits))
+
+                elif et.startswith("int"):
+                    bits = baseT.intTypeLength or 256
+                    arr.initialize_elements(IntegerInterval.bottom(bits))
+
+                elif et == "bool":
+                    arr.initialize_elements(BoolInterval.bottom())
+
+                elif et == "address":
+                    # address / bytes / string → 심볼릭 or top-interval
+                    arr.initialize_not_abstracted_type(self.sm)
+
+                else:  # bytes, string …
+                    arr.initialize_not_abstracted_type()
+
+            # ─ 원소가 address·bytes·string 같은 non-abstractable 타입 ─
+            elif (isinstance(baseT, SolType) and baseT.typeCategory == "elementary"):
+                arr.initialize_not_abstracted_type(self.sm)
+
+            # ─ 그밖(중첩 배열·struct 등) 은 lazy – 원소 접근 시 생성 ─
+            return arr
+
+        # ───────────────────────── struct ─────────────────────────────
+        # ───────────────────────── struct  ─────────────────────────────
+        if vtype.typeCategory == "struct":
+            # ① StructVariable 껍데기 생성
+            st = StructVariable(
+                identifier=eid,
+                struct_type=vtype.structTypeName,  # ex) "UserInfo"
+                scope="mapping_value"
+            )
+
+            # ② 구조체 정의 검색
+            c_cfg = self.contract_cfgs[self.current_target_contract]
+            s_def: StructDefinition | None = c_cfg.structDefs.get(vtype.structTypeName)
+            if s_def is None:
+                # 정의를 못 찾으면 심볼릭으로 남김
+                return st  # <empty>, lazy-loading
+
+            # ③ 각 멤버를 ‘기본(bottom) 값’으로 채움
+            for mem in s_def.members:  # [{'member_name': ..., 'member_type': ...}, ...]
+                m_name = mem['member_name']
+                m_type: SolType | str = mem['member_type']
+
+                # elementary ------------------------------------------------------------------
+                if isinstance(m_type, SolType) and m_type.typeCategory == "elementary":
+                    et = m_type.elementaryTypeName
+
+                    if et.startswith("uint"):
+                        bits = m_type.intTypeLength or 256
+                        st.members[m_name] = Variables(
+                            identifier=f"{eid}.{m_name}",
+                            value=UnsignedIntegerInterval.bottom(bits),
+                            scope="struct_member",
+                            typeInfo=m_type
+                        )
+
+                    elif et.startswith("int"):
+                        bits = m_type.intTypeLength or 256
+                        st.members[m_name] = Variables(
+                            f"{eid}.{m_name}",
+                            IntegerInterval.bottom(bits),
+                            scope="struct_member",
+                            typeInfo=m_type
+                        )
+
+                    elif et == "bool":
+                        st.members[m_name] = Variables(
+                            f"{eid}.{m_name}",
+                            BoolInterval.bottom(),
+                            scope="struct_member",
+                            typeInfo=m_type
+                        )
+
+                    elif et == "address":
+                        st.members[m_name] = Variables(
+                            f"{eid}.{m_name}",
+                            AddressSymbolicManager.top_interval(),
+                            scope="struct_member",
+                            typeInfo=m_type
+                        )
+
+                    else:  # bytes / string
+                        st.members[m_name] = Variables(
+                            f"{eid}.{m_name}",
+                            f"symbol_{eid}.{m_name}",
+                            scope="struct_member",
+                            typeInfo=m_type
+                        )
+
+                # 배열 ------------------------------------------------------------------------
+                elif isinstance(m_type, SolType) and m_type.typeCategory == "array":
+                    arr = ArrayVariable(
+                        identifier=f"{eid}.{m_name}",
+                        base_type=m_type.arrayBaseType,
+                        array_length=m_type.arrayLength,
+                        is_dynamic=m_type.isDynamicArray,
+                        scope="struct_member",
+                    )
+                    # 정적 & elementary 원소라면 bottom 값으로 미리 채움
+                    if not m_type.isDynamicArray:
+                        baseT = m_type.arrayBaseType
+                        if isinstance(baseT, SolType) and baseT.typeCategory == "elementary":
+                            if baseT.elementaryTypeName.startswith("uint"):
+                                bits = baseT.intTypeLength or 256
+                                arr.initialize_elements(UnsignedIntegerInterval.bottom(bits))
+                            elif baseT.elementaryTypeName.startswith("int"):
+                                bits = baseT.intTypeLength or 256
+                                arr.initialize_elements(IntegerInterval.bottom(bits))
+                            elif baseT.elementaryTypeName == "bool":
+                                arr.initialize_elements(BoolInterval.bottom())
+                            else:
+                                arr.initialize_not_abstracted_type(self.sm)
+                        else:
+                            arr.initialize_not_abstracted_type(self.sm)
+                    st.members[m_name] = arr
+
+                # 중첩 struct / mapping 등 -----------------------------------------------------
+                else:
+                    # 필요할 때 lazy-load 되도록 심볼릭 placeholder 만 두기
+                    st.members[m_name] = Variables(
+                        f"{eid}.{m_name}",
+                        f"symbol_{eid}.{m_name}",
+                        scope="struct_member",
+                        typeInfo=m_type
+                    )
+
+            return st
+
+        # ───────────────────────── mapping (중첩) ──────────────────────
+        if vtype.typeCategory == "mapping":
+            return MappingVariable(
+                identifier=eid,
+                key_type=vtype.mappingKeyType,
+                value_type=vtype.mappingValueType,
+                scope="mapping_value"
+            )
+
+        # ───────────────────────── enum  ──────────────────────────────
+        if vtype.typeCategory == "enum":
+            # enum 은 실제 값이 uint256 으로 저장됨 → 기본 0
+            val = UnsignedIntegerInterval(0, 0, 256)
+            return EnumVariable(identifier=eid, value=val,
+                                enum_name=vtype.enumTypeName,
+                                scope="mapping_value")
+
+        # ───────────────────────── fallback ───────────────────────────
+        return Variables(identifier=eid,
+                         value=f"symbol_{eid}",
+                         scope="mapping_value",
+                         typeInfo=vtype)
 
     # ContractAnalyzer.py ───────────────────────────────────────────
     def _fill_array(self, arr: ArrayVariable, py_val: list):
@@ -3728,7 +3902,7 @@ class ContractAnalyzer:
         base_obj = self.update_left_var(expr.base, rVal, operator, variables, None, "IndexAccessContext")
 
         # index expression에 대한 재귀
-        self.update_left_var(expr.index, rVal, operator, variables, base_obj, "IndexAccessContext")
+        return self.update_left_var(expr.index, rVal, operator, variables, base_obj, "IndexAccessContext")
 
     def update_left_var_of_member_access_context(
             self, expr, rVal, operator, variables,
@@ -3749,15 +3923,17 @@ class ContractAnalyzer:
 
         nested = base_obj.members[member]
 
+        if isinstance(nested, (StructVariable, ArrayVariable, MappingVariable)):
+            # 더 깊은 member access가 이어질 수 있으므로 그대로 반환
+            return nested
+
         # ── elementary / enum ──────────────────────────────
         if isinstance(nested, (Variables, EnumVariable)):
             nested.value = self.compound_assignment(nested.value, rVal, operator)
             return nested  # ← 작업 완료
 
         # ── 배열 / 중첩 구조체 ──────────────────────────────
-        if isinstance(nested, (StructVariable, ArrayVariable, MappingVariable)):
-            # 더 깊은 member access가 이어질 수 있으므로 그대로 반환
-            return nested
+
 
         # ── 예외 처리 ──────────────────────────────────────
         raise ValueError(f"Unexpected member-type '{type(nested).__name__}'")
@@ -3894,12 +4070,6 @@ class ContractAnalyzer:
         # ─────────────────────── 1. 상위 객체 존재 ──────────────────
         if callerObject is not None:
 
-            # 1-A) 단순 변수/enum → 그대로 leaf 갱신
-            if isinstance(callerObject, (Variables, EnumVariable)):
-                _apply_to_leaf(callerObject)
-                return None
-
-            # 1-B) ArrayVariable  (ident 는 index 변수명)
             if isinstance(callerObject, ArrayVariable):
                 if ident not in variables:
                     raise ValueError(f"Index identifier '{ident}' not found.")
@@ -3935,10 +4105,21 @@ class ContractAnalyzer:
                 if ident not in callerObject.mapping:
                     callerObject.mapping[ident] = self._create_new_mapping_value(callerObject, ident)
                 mvar = callerObject.mapping[ident]
-                if isinstance(mvar, (Variables, EnumVariable)):
-                    _apply_to_leaf(mvar)
-                    return None
-                return mvar
+                # ① 복합 타입(Struct / Array / Mapping) ⇒ 더 내려가도록 반환
+                if isinstance(mvar, (StructVariable, ArrayVariable, MappingVariable)):
+                    return mvar
+
+                # ② 그 밖의 스칼라-leaf(Variables, EnumVariable)만 여기에 걸림
+                _apply_to_leaf(mvar)
+                return None
+
+            # 1-A) 단순 변수/enum → 그대로 leaf 갱신
+            if isinstance(callerObject, (Variables, EnumVariable)):
+                _apply_to_leaf(callerObject)
+                return None
+
+            # 1-B) ArrayVariable  (ident 는 index 변수명)
+
 
             # 예기치 못한 상위 타입
             raise ValueError(f"Unhandled callerObject type: {type(callerObject).__name__}")

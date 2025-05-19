@@ -1178,53 +1178,37 @@ class EnhancedSolidityVisitor(SolidityVisitor):
             self.contract_analyzer.process_else_statement()
 
     # Visit a parse tree produced by SolidityParser#interactiveForStatement.
-    def visitInteractiveForStatement(self, ctx: SolidityParser.InteractiveForStatementContext):
+    def visitInteractiveForStatement(
+            self, ctx: SolidityParser.InteractiveForStatementContext):
 
-        # (1) 초기문(Initial Statement) 파싱
-        init_stmt_ctx = ctx.getChild(2)  # 대략 'for' '(' 뒤 첫 번째 ( ... ) 안의 문법
-        # 만약 단순 ';' 인 경우 초기문이 없는 것
-        initial_statement = {}
-        if not init_stmt_ctx.getText() == ';':
-            if isinstance(init_stmt_ctx, SolidityParser.VDContextContext) :
-                initVarType, initVarName, initValExpr = self.visitVDContext(init_stmt_ctx)
-                initial_statement = {
-                    'initVarType' : initVarType,
-                    'initVarName' : initVarName,
-                    'initValExpr' : initValExpr,
-                    'context' : 'VariableDeclaration'
-                }
-            elif isinstance(init_stmt_ctx, SolidityParser.EContextContext) :
-                initExpr = self.visitEContext(init_stmt_ctx)
-                initial_statement = {
-                    'initExpr' : initExpr,
-                    'context' : 'Expression'
-                }
+        # init ----------------------------------------------------------------
+        init_stmt = {}
+        init_ctx = ctx.simpleStatement()
+        if init_ctx:  # simpleStatement 존재
+            if isinstance(init_ctx, SolidityParser.VDContextContext):
+                t, n, v = self.visitVDContext(init_ctx)
+                init_stmt = {'context': 'VariableDeclaration',
+                             'initVarType': t, 'initVarName': n, 'initValExpr': v}
+            else:  # expressionStatement
+                init_stmt = {'context': 'Expression',
+                             'initExpr': self.visitExpression(init_ctx.expression())}
 
-        # (2) 조건식(Cond) or expressionStatement or ';'
-        cond_stmt_ctx = ctx.getChild(3)
-        condition_expr = None
-        if not cond_stmt_ctx.getText() == ';':
-            # expressionStatement 인지 체크
-            # 실제 grammar상: ( expressionStatement | ';' )
-            # expressionStatement => expression ';'
-            # => self.visitExpression()으로 expression만 추출 가능
-            expr_ctx = cond_stmt_ctx.expression()
-            if expr_ctx is not None:
-                condition_expr = self.visitExpression(expr_ctx)
-            # 만약 expressionStatement 자체가 아닌 경우, 에러 or None
-            # (사용자 문법에 따라 다를 수 있음)
+        # condition -----------------------------------------------------------
+        cond_expr = None
+        exprs = ctx.expression()  # 최대 두 개
+        if len(exprs) >= 1:
+            cond_expr = self.visitExpression(exprs[0])
 
-        # (3) 증분문 increment (expression?) → ctx.expression()? (네 번째/다섯 번째 child)
-        increment_expr = None
-        if ctx.expression():
-            increment_expr = self.visitExpression(ctx.expression())
+        # increment -----------------------------------------------------------
+        inc_expr = None
+        if len(exprs) == 2:
+            inc_expr = self.visitExpression(exprs[1])
 
-        # (5) ContractAnalyzer로 전달
-        # 실제론 process_for_statement( initial_statement, condition_expr, increment_expr_ctx, ... )
+        # ContractAnalyzer 로 전달 -------------------------------------------
         self.contract_analyzer.process_for_statement(
-            initial_statement=initial_statement,
-            condition_expr=condition_expr,
-            increment_expr=increment_expr
+            initial_statement=init_stmt,
+            condition_expr=cond_expr,
+            increment_expr=inc_expr
         )
 
     # Visit a parse tree produced by SolidityParser#interactiveWhileStatement.
