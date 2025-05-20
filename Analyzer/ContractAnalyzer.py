@@ -1057,16 +1057,16 @@ class ContractAnalyzer:
             self._overwrite_state_vars_from_block(contract_cfg, current_block.variables)
 
         # 2) 방금 변경된 변수 객체 다시 가져오기 (new_value=None ⇒ 탐색만)
-        target_var = self._resolve_and_update_expr(expr.left, current_block.variables,
-                                                   self.current_target_function_cfg, None)
+        #target_var = self._resolve_and_update_expr(expr.left, rExpVal, '=', current_block.variables,
+        #                                           self.current_target_function_cfg)
 
         # 3) analysis 기록
-        self._record_analysis(
-            line_no=self.current_start_line,
-            stmt_type="assignment",
-            expr=expr.left,
-            var_obj=target_var
-        )
+        #self._record_analysis(
+        #    line_no=self.current_start_line,
+        #    stmt_type="assignment",
+        #    expr=expr.left,
+        #    var_obj=target_var
+        #)
 
         # 9. current_block을 function CFG에 반영
         self.current_target_function_cfg.update_block(current_block)  # 변경된 블록을 반영
@@ -1102,14 +1102,17 @@ class ContractAnalyzer:
         if fcfg.function_type == "constructor":
             self._overwrite_state_vars_from_block(ccf, cur_blk.variables)
 
+        """
         # ── 3) 갱신된 변수 객체 얻어서 analysis 기록
-        target_var = self._resolve_and_update_expr(expr, cur_blk.variables, fcfg, None)
+        target_var = self._resolve_and_update_expr(expr.left, one_lit, '=', cur_blk.variables,
+                                      self.current_target_function_cfg)
         self._record_analysis(
             line_no=self.current_start_line,
             stmt_type=stmt_kind,
             expr=expr,
             var_obj=target_var
         )
+        """
 
         # ── 4) CFG 저장
         fcfg.update_block(cur_blk)
@@ -1621,10 +1624,8 @@ class ContractAnalyzer:
             숫자 1을 UnsignedIntegerInterval 또는 IntegerInterval 로 래핑해 준다.
             """
             # var_expr 가 가리키는 실제 변수 객체 확보
-            v_obj = self._resolve_and_update_expr(var_expr,
-                                                  cur_vars,
-                                                  self.current_target_function_cfg,
-                                                  None)
+            v_obj = self._resolve_and_update_expr(var_expr, 1, '=', cur_vars,
+                                                   self.current_target_function_cfg)
             if v_obj is None or v_obj.typeInfo is None:
                 # fallback – 그냥 리터럴 1 (실패해도 compound_assignment 쪽에서 처리는 됨)
                 return 1
@@ -1641,7 +1642,6 @@ class ContractAnalyzer:
                 return 1
 
         # ──────────────────────────────────────────────────────────────────────────
-
         if increment_expr is not None:
             op = increment_expr.operator
 
@@ -2396,8 +2396,8 @@ class ContractAnalyzer:
             raise ValueError("@StateVar debug must appear inside a function body.")
 
         # 1) 변수 객체 위치 탐색 + 값 대입
-        var_obj = self._resolve_and_update_expr(lhs_expr, self.current_target_function_cfg.related_variables,
-                                                self.current_target_function_cfg, value)
+        var_obj = self._resolve_and_update_expr(lhs_expr, value, '=', self.current_target_function_cfg.related_variables,
+                                                   self.current_target_function_cfg)
         if var_obj is None:
             raise ValueError("LHS cannot be resolved to a state variable.")
 
@@ -2436,8 +2436,8 @@ class ContractAnalyzer:
         if self.current_target_function_cfg is None:
             raise ValueError("@LocalVar debug must appear inside a function body.")
 
-        var_obj = self._resolve_and_update_expr(lhs_expr, self.current_target_function_cfg.related_variables,
-                                                self.current_target_function_cfg, value)
+        var_obj = self._resolve_and_update_expr(lhs_expr, value, '=', self.current_target_function_cfg.related_variables,
+                                                   self.current_target_function_cfg)
 
         if var_obj is None:
             raise ValueError("LHS cannot be resolved to a local variable.")
@@ -2891,76 +2891,322 @@ class ContractAnalyzer:
 
     # ───────── debug LHS 해석 (member / index 접근) ────────────────────────
     def _resolve_and_update_expr(self, expr: Expression,
-                                 var_env: dict[str, Variables],  # ← 새로 넣었는지?
+                                 rVal,
+                                 operator,
+                                 variables: dict[str, Variables],  # ← 새로 넣었는지?
                                  fcfg: FunctionCFG,
-                                 new_value):
-
-        # 1) 루트 식별자
-        if expr.base is None:
-            # 1-a. 먼저 현재 블록 / 현재 env 에서 찾기
-            if expr.identifier in var_env:
-                v = var_env[expr.identifier]
-                if new_value is not None:
-                    self._patch_var_with_new_value(v, new_value)
-                return v
-
-            # 1-b. 없으면 함수-관련(초기) 테이블에서
-            v = fcfg.get_related_variable(expr.identifier)
-            if v and new_value is not None:
-                self._patch_var_with_new_value(v, new_value)
-            return v
-
-        # 2) base  먼저 해석
-        base_obj = self._resolve_and_update_expr(expr.base, var_env, fcfg, None)
-
-        if base_obj is None:
+                                 callerObject=None, callerContext=None):
+        if self._is_global_expr(expr):
             return None
 
-        # ─ member access (struct) ─────────────────────────────────────────
-        if expr.member is not None:
-            if not isinstance(base_obj, StructVariable):
-                print(f"[Warn] member access on non-struct '{base_obj.identifier}'")
-                return None
-            m = base_obj.members.get(expr.member)
-            if m is None:
-                print(f"[Warn] struct '{base_obj.identifier}' has no member '{expr.member}'")
-                return None
-            if new_value is not None:
-                self._patch_var_with_new_value(m, new_value)
-            return m
+        if expr.context == "IndexAccessContext":
+            return self._resolve_and_update_expr_of_index_access_context(expr, rVal, operator, variables, fcfg,
+                                                                callerObject, callerContext)
+        elif expr.context == "MemberAccessContext":
+            return self._resolve_and_update_expr_of_member_access_context(expr, rVal, operator, variables, fcfg,
+                                                                 callerObject, callerContext)
 
-        # ─ index access (array / mapping) ─────────────────────────────────
-        if expr.index is not None:
-            idx_val = self._extract_index_val(expr.index)
+        elif expr.context == "IdentifierExpContext":
+            return self._resolve_and_update_expr_of_identifier_context(expr, rVal, operator, variables, fcfg,
+                                                              callerObject, callerContext)
+        elif expr.context == "LiteralExpContext":
+            return self._resolve_and_update_expr_of_literal_context(expr, rVal, operator, variables, fcfg,
+                                                           callerObject, callerContext)
 
-            # ▸ 배열
-            if isinstance(base_obj, ArrayVariable):
-                if not isinstance(idx_val, int) or idx_val < 0:
-                    print("[Warn] array index must be non-negative literal")
-                    return None
-                while idx_val >= len(base_obj.elements):
-                    # address/bytes 등 실제 타입 고려
-                    new_elem = self._create_new_array_element(base_obj,
-                                                              len(base_obj.elements))
-                elem = base_obj.elements[idx_val]
-                if new_value is not None:
-                    self._patch_var_with_new_value(elem, new_value)
-                return elem
+        elif expr.context =="TestingIndexAccess" :
+            return self._resolve_and_update_expr_of_testing_index_access_context(expr, rVal, operator, variables, fcfg,
+                                                           callerObject, callerContext)
+        elif expr.context == "TestingMemberAccess" :
+            return self._resolve_and_update_expr_of_testing_member_access_context(expr, rVal, operator, variables, fcfg,
+                                                           callerObject, callerContext)
 
-            # ▸ 매핑
-            if isinstance(base_obj, MappingVariable):
-                key = str(idx_val)
-                if key not in base_obj.mapping:
-                    base_obj.mapping[key] = self._create_new_mapping_value(base_obj, key)
-                tgt = base_obj.mapping[key]
-                if new_value is not None:
-                    self._patch_var_with_new_value(tgt, new_value)
-                return tgt
-
-            print(f"[Warn] index access on non-array/mapping '{base_obj.identifier}'")
-            return None
+        elif expr.left is not None and expr.right is not None:
+            return self._resolve_and_update_expr_of_binary_exp_context(expr, rVal, operator, variables, fcfg,
+                                                              callerObject, callerContext)
 
         return None
+
+    def _resolve_and_update_expr_of_testing_index_access_context(self, expr: Expression,
+                                 rVal,
+                                 operator,
+                                 variables: dict[str, Variables],  # ← 새로 넣었는지?
+                                 fcfg: FunctionCFG,
+                                 callerObject=None, callerContext=None):
+        # base
+        base_obj = self._resolve_and_update_expr(
+            expr.base, rVal, operator, variables,  # ← ❌  인수순서/개수 모두 틀림
+            None, "TestingIndexAccess"
+        )
+        # index
+        return self._resolve_and_update_expr(
+            expr.index, rVal, operator, variables,
+            base_obj, "TestingIndexAccess"
+        )
+
+    def _resolve_and_update_expr_of_testing_member_access_context(self, expr: Expression,
+                                 rVal,
+                                 operator,
+                                 variables: dict[str, Variables],  # ← 새로 넣었는지?
+                                 fcfg: FunctionCFG,
+                                 callerObject=None, callerContext=None):
+
+        # ① 먼저 base 부분을 재귀-업데이트
+        base_obj = self._resolve_and_update_expr(expr.base, rVal, operator,
+                                        variables, fcfg, None, "TestingMemberAccess")
+        member = expr.member
+
+        if member is not None:
+            if not isinstance(base_obj, StructVariable):
+                raise ValueError(f"[Warn] member access on non-struct '{base_obj.identifier}'")
+            m = base_obj.members.get(member)
+            if m is None:
+                raise ValueError(f"[Warn] struct '{base_obj.identifier}' has no member '{member}'")
+
+            nested = base_obj.members[member]
+
+            if isinstance(nested, (StructVariable, ArrayVariable, MappingVariable)):
+                # 더 깊은 member access가 이어질 수 있으므로 그대로 반환
+                return nested
+            elif isinstance(nested, (Variables, EnumVariable)):
+                if rVal is not None:
+                    self._patch_var_with_new_value(m, rVal)
+                return m
+
+        raise ValueError(f"Unexpected member-type '{nested}'")
+
+    def _resolve_and_update_expr_of_index_access_context(self, expr: Expression,
+                                 rVal,
+                                 operator,
+                                 variables: dict[str, Variables],  # ← 새로 넣었는지?
+                                 fcfg: FunctionCFG,
+                                 callerObject=None, callerContext=None):
+        # base
+        base_obj = self._resolve_and_update_expr(
+            expr.base, rVal, operator, variables,  # ← ❌  인수순서/개수 모두 틀림
+            None, "IndexAccessContext"
+        )
+        # index
+        return self._resolve_and_update_expr(
+            expr.index, rVal, operator, variables,
+            base_obj, "IndexAccessContext"
+        )
+
+
+    def _resolve_and_update_expr_of_member_access_context(self, expr: Expression,
+                                 rVal,
+                                 operator,
+                                 variables: dict[str, Variables],  # ← 새로 넣었는지?
+                                 fcfg: FunctionCFG,
+                                 callerObject=None, callerContext=None):
+
+        # ① 먼저 base 부분을 재귀-업데이트
+        base_obj = self._resolve_and_update_expr(expr.base, rVal, operator,
+                                        variables, fcfg, None, "MemberAccessContext")
+        member = expr.member
+
+        if member is not None:
+            if not isinstance(base_obj, StructVariable):
+                raise ValueError(f"[Warn] member access on non-struct '{base_obj.identifier}'")
+            m = base_obj.members.get(member)
+            if m is None:
+                raise ValueError(f"[Warn] struct '{base_obj.identifier}' has no member '{member}'")
+
+            nested = base_obj.members[member]
+
+            if isinstance(nested, (StructVariable, ArrayVariable, MappingVariable)):
+                # 더 깊은 member access가 이어질 수 있으므로 그대로 반환
+                return nested
+            elif isinstance(nested, (Variables, EnumVariable)):
+                if rVal is not None:
+                    self._patch_var_with_new_value(m, rVal)
+                return m
+
+        raise ValueError(f"Unexpected member-type '{nested}'")
+
+    def _resolve_and_update_expr_of_identifier_context(self, expr: Expression,
+                                 rVal,
+                                 operator,
+                                 variables: dict[str, Variables],  # ← 새로 넣었는지?
+                                 fcfg: FunctionCFG,
+                                 callerObject=None, callerContext=None):
+        ident = expr.identifier
+
+        if callerObject is not None:
+
+            if isinstance(callerObject, ArrayVariable):
+                if ident not in variables:
+                    raise ValueError(f"Index identifier '{ident}' not found.")
+                idx_var = variables[ident]
+
+                # 스칼라인지 보장
+                if not self._is_interval(idx_var.value) or \
+                        idx_var.value.min_value != idx_var.value.max_value:
+                    raise ValueError(f"Array index '{ident}' must resolve to single constant.")
+
+                idx = idx_var.value.min_value
+                if idx < 0 or idx >= len(callerObject.elements):
+                    raise IndexError(f"Index {idx} out of range for array '{callerObject.identifier}'")
+
+                elem = callerObject.elements[idx]
+                if isinstance(elem, (StructVariable, MappingVariable, ArrayVariable)) :
+                    return elem
+                elif isinstance(elem, (Variables, EnumVariable)):
+                    self._patch_var_with_new_value(elem, rVal)
+                    return elem
+
+            if isinstance(callerObject, StructVariable):
+                if ident not in callerObject.members:
+                    raise ValueError(f"Struct '{callerObject.identifier}' has no member '{ident}'")
+                mem = callerObject.members[ident]
+                if isinstance(mem, (StructVariable, MappingVariable, ArrayVariable)) :
+                    return mem
+                elif isinstance(mem, (Variables, EnumVariable)):
+                    self._patch_var_with_new_value(mem, rVal)
+                    return mem
+
+            if isinstance(callerObject, MappingVariable):
+                if ident not in callerObject.mapping:
+                    callerObject.mapping[ident] = self._create_new_mapping_value(callerObject, ident)
+                mvar = callerObject.mapping[ident]
+                # ① 복합 타입(Struct / Array / Mapping) ⇒ 더 내려가도록 반환
+                if isinstance(mvar, (StructVariable, ArrayVariable, MappingVariable)):
+                    return mvar
+                elif isinstance(mvar, (Variables, EnumVariable)):
+                    self._patch_var_with_new_value(mvar, rVal)
+                    return mvar
+
+            if isinstance(callerObject, (Variables, EnumVariable)):
+                self._patch_var_with_new_value(callerObject, rVal)
+                return callerObject
+
+        # (IndexAccess / MemberAccess 의 base 식별자를 해결하기 위한 분기)
+        if callerContext in ("IndexAccessContext", "MemberAccessContext", "TestingIndexAccess",
+                             "TestingMemberAccess"):
+            return variables.get(ident)  # 상위에서 None 체크
+
+        if ident not in variables:
+            raise ValueError(f"Variable '{ident}' not declared in current scope.")
+
+        target_var = variables[ident]
+        if isinstance(target_var, (Variables, EnumVariable)):
+            self._patch_var_with_new_value(target_var, rVal)
+            return target_var
+
+        raise ValueError(f"Unhandled callerObject type: {type(callerObject).__name__}")
+
+    def _resolve_and_update_expr_of_literal_context(self, expr: Expression,
+                                 rVal,
+                                 operator,
+                                 variables: dict[str, Variables],  # ← 새로 넣었는지?
+                                 fcfg: FunctionCFG,
+                                 callerObject=None, callerContext=None):
+        lit = expr.literal  # 예: "123", "0x1a", "true"
+        lit_str = str(lit)
+        lit_iv = None  # 필요 시 Interval 변환 결과
+        if callerObject is None:
+            raise ValueError(f"Literal '{lit_str}' cannot appear standalone on LHS")
+
+        if isinstance(callerObject, ArrayVariable):
+            if not lit_str.isdigit():
+                return None  # 비정수 인덱스 → 상위에서 오류/다른 케이스 처리
+
+            idx = int(lit_str)
+            if idx < 0:
+                raise IndexError(f"Negative index {idx} for array '{callerObject.identifier}'")
+
+            # 💡 동적 배열이라면 빈 element 채워넣기
+            while idx >= len(callerObject.elements):
+                # address/bytes 등은 symbolic 으로
+                callerObject.elements.append(
+                    Variables(f"{callerObject.identifier}[{len(callerObject.elements)}]",
+                              f"symbol_{callerObject.identifier}_{len(callerObject.elements)}",
+                              scope=callerObject.scope,
+                              typeInfo=callerObject.typeInfo.arrayBaseType)
+                )
+
+            elem = callerObject.elements[idx]
+
+            # 중첩 array/struct → 계속 내려감
+            if isinstance(elem, (ArrayVariable, StructVariable, MappingVariable)):
+                return elem
+            # leaf (elementary or enum)
+            elif isinstance(elem, (Variables, EnumVariable)):
+                elem.value = rVal
+                return elem
+
+        if isinstance(callerObject, MappingVariable):
+            key = lit_str  # mapping key 는 문자열 그대로 보존
+            if key not in callerObject.mapping:  # 없으면 새 child 생성
+                callerObject.mapping[key] = self._create_new_mapping_value(callerObject, key)
+            mvar = callerObject.mapping[key]
+
+            if isinstance(mvar, (ArrayVariable, StructVariable, MappingVariable)):
+                return mvar
+
+            if isinstance(mvar, (Variables, EnumVariable)):
+                mvar.value = rVal
+                return mvar
+
+        raise ValueError(f"Literal context '{lit_str}' not handled for '{type(callerObject).__name__}'")
+
+    def _resolve_and_update_expr_of_binary_exp_context(self, expr: Expression,
+                                 rVal,
+                                 operator,
+                                 variables: dict[str, Variables],  # ← 새로 넣었는지?
+                                 fcfg: FunctionCFG,
+                                 callerObject=None, callerContext=None):
+        """
+                rebalanceCount % 10 과 같이 BinaryExp(%) 가
+                IndexAccess 의 인덱스로 쓰일 때 호출된다.
+                """
+        # (1) IndexAccess 의 인덱스로 불린 경우만 의미 있음
+        if callerObject is None or callerContext in ["IndexAccessContext", "TestingIndexAccessContext"]:
+            return None
+
+        # (2) 인덱스 식 abstract-eval → int or Interval
+        idx_val = self.evaluate_expression(expr, variables, None, None)
+
+        if isinstance(idx_val, (IntegerInterval, UnsignedIntegerInterval)):
+            if idx_val.min_value == idx_val.max_value:
+                idx_val = idx_val.min_value  # 확정 int
+            else:
+                # 범위 [l,r]  → 아래의 “구간 처리” 로 넘어감
+                pass
+
+            # ────────────────────────────────────────────────────────────────────
+            # ② 확정 int 인 경우
+            # ────────────────────────────────────────────────────────────────────
+        if isinstance(idx_val, int):
+            target = self._touch_index_entry(callerObject, idx_val)
+            self._patch_var_with_new_value(target, rVal)
+            return target  # logging 용으로 돌려줌
+
+        if isinstance(idx_val, (IntegerInterval, UnsignedIntegerInterval)):
+            l, r = idx_val.min_value, idx_val.max_value
+            if isinstance(callerObject, ArrayVariable):
+                # 배열 길이 확장
+                while r >= len(callerObject.elements):
+                    callerObject.elements.append(
+                        self._create_new_array_element(callerObject,
+                                                       len(callerObject.elements))
+                    )
+                # l‥r 모두 갱신
+                for i in range(l, r + 1):
+                    elem = callerObject.elements[i]
+                    self._patch_var_with_new_value(elem, rVal)
+
+                return callerObject
+
+            elif isinstance(callerObject, MappingVariable):
+                for i in range(l, r + 1):
+                    k = str(i)
+                    if k in callerObject.mapping:  # 존재할 때만
+                        entry = callerObject.mapping[k]
+                        self._patch_var_with_new_value(entry, rVal)
+                return callerObject
+        raise ValueError (f"Unexpected variable of binary_exp_context")
+
+
 
     def copy_variables(self, src: Dict[str, Variables]) -> Dict[str, Variables]:
         """
@@ -4261,20 +4507,22 @@ class ContractAnalyzer:
                     raise IndexError(f"Index {idx} out of range for array '{callerObject.identifier}'")
 
                 elem = callerObject.elements[idx]
-                if isinstance(elem, (Variables, EnumVariable)):
+                if isinstance(elem, (StructVariable, ArrayVariable, MappingVariable)) :
+                    return elem
+                elif isinstance(elem, (Variables, EnumVariable)):
                     _apply_to_leaf(elem)
                     return None
-                return elem  # nested array / struct / mapping
 
             # 1-C) StructVariable  → 멤버 접근
             if isinstance(callerObject, StructVariable):
                 if ident not in callerObject.members:
                     raise ValueError(f"Struct '{callerObject.identifier}' has no member '{ident}'")
                 mem = callerObject.members[ident]
-                if isinstance(mem, (Variables, EnumVariable)):
+                if isinstance(mem, (StructVariable, ArrayVariable, MappingVariable)) :
+                    return mem
+                elif isinstance(mem, (Variables, EnumVariable)):
                     _apply_to_leaf(mem)
                     return None
-                return mem
 
             # 1-D) MappingVariable → key 가 식별자인 케이스
             if isinstance(callerObject, MappingVariable):
