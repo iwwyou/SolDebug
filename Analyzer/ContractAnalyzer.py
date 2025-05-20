@@ -4462,45 +4462,41 @@ class ContractAnalyzer:
                     if ident_str == callerObject.members[enumMemberIndex] :
                         return enumMemberIndex
 
+            # ContractAnalyzer.evaluate_identifier_context 내부
+
             elif isinstance(callerObject, MappingVariable):
-                # ① 키값 확정 -----------------------------
-                if ident_str in variables:  # ident_str == 변수 이름
+                # ── ① key 결정 ─────────────────────────────
+                if ident_str in variables:  # ident_str == 변수명
                     key_var = variables[ident_str]
                     val = getattr(key_var, "value", key_var)
-                    # ── (a) interval & concrete? ────────
-                    if hasattr(val, "min_value"):
-                        if val.min_value == val.max_value:
-                            key_val = val.min_value  # 이미 구체적
-                        else:
-                            # ── (b) TOP 주소 → fresh ID ─
-                            if self.sm is None:
-                                raise ValueError("mapping key must be concrete")
-                            nid = self.sm.fresh_id()
-                            iv = UnsignedIntegerInterval(nid, nid, 160)
-                            key_var.value = iv
-                            self.sm.bind_var(key_var.identifier, nid)
-                            key_val = nid
+                    if hasattr(val, "min_value"):  # Interval 계열
+                        if val.min_value == val.max_value:  # (a) concrete
+                            key_val = str(val.min_value)
+                        else:  # (b) 여전히 TOP
+                            key_val = f"${key_var.identifier}"  # 변수경로 그대로
                     else:
-                        key_val = val  # bool / string 등
+                        # bool / string 등 ▶ 그대로 변수경로 사용
+                        key_val = f"${key_var.identifier}"
+
                 else:
-                    # 리터럴 키
+                    # ── ② 리터럴 키 ────────────────────────
+                    #    0x… / 10진수 → int 변환, 그 외는 문자열 그대로
                     try:
-                        key_val = int(ident_str, 0)
+                        key_val = str(int(ident_str, 0))
                     except ValueError:
                         key_val = ident_str
-                # ② 매핑 접근 -----------------------------
 
-                if str(key_val) not in callerObject.mapping:
-                    child = self._create_new_mapping_value(callerObject, key_val)
-                    callerObject.mapping[str(key_val)] = child
-                else:
-                    child = callerObject.mapping[str(key_val)]
-
-                    # child 반환 규칙
-                return child if isinstance(child, (StructVariable,
-                                                   MappingVariable,
-                                                   ArrayVariable)) else child.value
-
+                # ── ③ 매핑 엔트리 가져오거나 생성 ─────────────
+                if key_val not in callerObject.mapping:
+                    callerObject.mapping[key_val] = self._create_new_mapping_value(
+                        callerObject, key_val
+                    )
+                mvar = callerObject.mapping[key_val]
+                # ── ④ 반환 규칙 ────────────────────────────
+                if isinstance(mvar, (StructVariable, ArrayVariable, MappingVariable)):
+                    return mvar
+                else :
+                    return mvar.value
             else :
                 raise ValueError(f"This '{ident_str}' may not be included in enum def '{callerObject.enum_name}'")
 
@@ -4532,7 +4528,6 @@ class ContractAnalyzer:
             callerObject: Variables | None = None,
             callerContext: str | None = None):
 
-        sm = self.sm  # AddressSymbolicManager ─ 주소 심볼릭 ID 관리
         baseVal = self.evaluate_expression(expr.base, variables, None,
                                            "MemberAccessContext")
         member = expr.member
