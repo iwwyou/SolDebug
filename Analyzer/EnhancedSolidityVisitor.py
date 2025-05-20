@@ -590,13 +590,15 @@ class EnhancedSolidityVisitor(SolidityVisitor):
             raise ValueError("[DebugGlobalVar] unsupported value format")
 
         # ─────────────────── 4) GlobalVariable 객체 구성 ─────
+        st = SolType()  # 빈 객체 하나 만들고
+        st.typeCategory = "elementary"
+        st.elementaryTypeName = "address" if is_addr else "uint"
+        st.intTypeLength = bit_len  # 선택: 160 또는 256
+
         gv_obj = GlobalVariable(
             identifier=global_name,
             value=value,
-            typeInfo=SolType(
-                elementaryTypeName="address" if is_addr else "uint",
-                typeCategory="elementary"
-            )
+            typeInfo=st  # ← 완성된 SolType 주입
         )
 
         # ─────────────────── 5) ContractAnalyzer 에 전달 ─────

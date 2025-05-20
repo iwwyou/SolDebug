@@ -217,6 +217,30 @@ test_inputs = [
     "startLine": 30,
     "endLine": 30,
     "event": "add"
+  },
+  {
+    "code": "// @TestCase BEGIN;",
+    "startLine": 20,
+    "endLine": 20,
+    "event": "add"
+  },
+  {
+    "code": "// @GlobalVar block.timestamp = [10,20];",
+    "startLine": 21,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar _balances[account] = [100,200];",
+    "startLine": 22,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "// @TestCase END;",
+    "startLine": 23,
+    "endLine": 23,
+    "event": "add"
   }
 ]
 

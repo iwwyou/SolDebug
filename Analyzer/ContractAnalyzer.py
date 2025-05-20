@@ -1221,20 +1221,20 @@ class ContractAnalyzer:
 
         # 기록용
         # 7. True 분기에서 변수 상태 복사 및 업데이트
-        pre_env = self._clone_env(current_block.variables)
-        true_env = self._clone_env(condition_block.variables)
-        self.update_variables_with_condition(true_env, condition_expr, is_true_branch=True)
-        false_env = self._clone_env(condition_block.variables)
-        self.update_variables_with_condition(false_env, condition_expr, is_true_branch=False)
+        #pre_env = self._clone_env(current_block.variables)
+        #true_env = self._clone_env(condition_block.variables)
+        #self.update_variables_with_condition(true_env, condition_expr, is_true_branch=True)
+        #false_env = self._clone_env(condition_block.variables)
+        #self.update_variables_with_condition(false_env, condition_expr, is_true_branch=False)
 
         # analysis 기록
-        self._add_branch_analysis(
-            cond_line=self.current_start_line,
-            cond_expr=condition_expr,
-            base_env=pre_env,
-            true_env=true_env,
-            false_env=false_env
-        )
+        #self._add_branch_analysis(
+        #    cond_line=self.current_start_line,
+        #    cond_expr=condition_expr,
+        #    base_env=pre_env,
+        #    true_env=true_env,
+        #    false_env=false_env
+        #)
 
         # 8. 현재 블록의 후속 노드 처리 (기존 current_block의 successors를 가져옴)
         successors = list(self.current_target_function_cfg.graph.successors(current_block))
@@ -1333,8 +1333,9 @@ class ContractAnalyzer:
                                              is_true_branch=False)
 
         # 기록용
-        base_env = self._clone_env(temp_variables)
-        true_env = self._clone_env(temp_variables)
+        """
+        #base_env = self._clone_env(temp_variables)
+        #true_env = self._clone_env(temp_variables)
         self.update_variables_with_condition(true_env, condition_expr, is_true_branch=True)
         false_env = self._clone_env(temp_variables)
         self.update_variables_with_condition(false_env, condition_expr,
@@ -1347,6 +1348,7 @@ class ContractAnalyzer:
             true_env=true_env,
             false_env=false_env
         )
+        """
 
         # 8. 이전 조건 블록과 새로운 else_if_condition 블록 연결
         self.current_target_function_cfg.graph.add_edge(previous_condition_node, condition_block, condition=False)
@@ -3548,32 +3550,43 @@ class ContractAnalyzer:
         :return: 조인된 변수 정보를 가진 새로운 블록
         """
         # 리프 노드 수집
+        G = self.current_target_function_cfg.graph
+
+        # ① leaf 수집 ------------------------------------------------
         leaf_nodes = self.collect_leaf_nodes(condition_node)
 
-        # 리프 노드들의 변수 정보를 조인
-        joined_variables = {}
-        for node in leaf_nodes:
-            if node.function_exit_node:
+        # ② 값 join --------------------------------------------------
+        joined = {}
+        for n in leaf_nodes:
+            if n.function_exit_node:
                 continue
-            for var_name, var_value in node.variables.items():
-                if var_name in joined_variables:
-                    # 기존 변수와 조인
-                    joined_variables[var_name] = self.join_variable_values(joined_variables[var_name], var_value)
-                else:
-                    # 새로운 변수 추가
-                    joined_variables[var_name] = var_value
+            for k, v in n.variables.items():
+                joined[k] = self.join_variable_values(joined.get(k, v), v)
 
         # 새로운 블록 생성 및 변수 정보 저장
-        new_block = CFGNode(name=f"JoinBlock_{self.current_start_line}")
-        new_block.variables = joined_variables
-        g = self.current_target_function_cfg.graph
-        g.add_node(new_block)
+        new_blk = CFGNode(f"JoinBlock_{self.current_start_line}")
+        new_blk.variables = joined
+        new_blk.join_point_node = True  # ★ join-블록 표식
+        G.add_node(new_blk)
 
-        # leaf 가 ‘정말’ successor 가 0 개인 경우에만 ↦ JoinBlock
-        for n in leaf_nodes:
-            g.add_edge(n, new_block)
+        # ④ leaf-succ 재배선 ----------------------------------------
+        for leaf in leaf_nodes:
+            succs = list(G.successors(leaf))
+            # leaf 자체는 조건 블록이 아님(collect 단계에서 필터링)
+            if not succs:
+                G.add_edge(leaf, new_blk)
+                continue
 
-        return new_block
+            for s in succs:
+                # succ 이 ‘메타’(join, for-incr, loop-exit, fixpoint) 면 edge 교체
+                if s.join_point_node or s.is_for_increment :
+                    G.remove_edge(leaf, s)
+                    G.add_edge(leaf, new_blk)
+                    G.add_edge(new_blk, s)
+                else:
+                    raise ValueError(f"This should never happen")
+
+        return new_blk
 
     def collect_leaf_nodes(self, root_if: CFGNode) -> list[CFGNode]:
         """
@@ -3599,7 +3612,7 @@ class ContractAnalyzer:
             for succ in G.successors(n):
                 # 1) succ 자체가 루프-메타블록이면 if 바깥으로 나가는 길 ▶ skip
                 if succ.loop_exit_node or succ.fixpoint_evaluation_node \
-                        or getattr(succ, "is_for_increment", False):
+                        or getattr(succ, "is_for_increment", False) or succ.join_point_node:
                     continue
 
                 # 2) succ 의 succ 이 exit / fixpoint 면   ──┐
@@ -3631,117 +3644,196 @@ class ContractAnalyzer:
 
         return leaf_nodes
 
-    def join_variable_values(self, val1, val2):
+    def join_variable_values(self, v1, v2):
         """
-        elementary Interval 간의 join
-        - 둘 다 Interval이면 val1.join(val2)
-        - boolInterval이면 val1.join(val2)
-        - 그 외 => symbolic or val1?
+        · Interval / BoolInterval              → 기존 join 유지
+        · Variables (elementary wrapper)       → value 를 join
+        · ArrayVariable                        → 길이·원소별 join
+        · StructVariable                       → member 별 join
+        · MappingVariable                      → 공통 key 만 join, 나머진 보존
+        · EnumVariable                         → value 를 join (실제론 uint)
+        · 타입 안 맞으면 symbolicJoin()
         """
-        if hasattr(val1, 'join') and hasattr(val2, 'join') and type(val1) == type(val2):
-            return val1.join(val2)
-        else:
-            # 타입 다르거나 join 불가 => symbolic
-            return f"symbolicJoin({val1},{val2})"
 
-    # ――― widening-join (⊔ω) ――――――――――――――――――――――――――――――――――
-    def join_variables_with_widening(
-            self,
-            left_vars: dict[str, Variables] | None,
-            right_vars: dict[str, Variables] | None
-    ) -> dict[str, Variables]:
+        def _join_atomic(v1, v2):
+            "두 primitive value(Interval / BoolInterval / literal)를 join"
+            if hasattr(v1, "join") and type(v1) is type(v2):
+                return v1.join(v2)  # Interval·BoolInterval
+            if v1 == v2:
+                return v1  # 동일 리터럴
+            else :
+                raise ValueError(f"Cannot join")# 타입 다르거나 불가
+
+        def _clone(obj):
+            "Variables 류 객체를 얕은 copy – identifier / scope 등은 그대로"
+            return copy.copy(obj)
+
+        # ───── ① atomic (Interval / BoolInterval / 리터럴) ─────
+        if not isinstance(v1, (Variables, ArrayVariable,
+                               StructVariable, MappingVariable, EnumVariable)):
+            return _join_atomic(v1, v2)
+
+        # 두 객체의 타입이 다르면 → symbolic
+        if type(v1) is not type(v2):
+            raise ValueError(f"{v1}, {v2} is not same type")
+
+        # ───── ② Variables (elementary) ─────
+        if isinstance(v1, Variables) and not isinstance(v1, (ArrayVariable, StructVariable, MappingVariable)):
+            new = _clone(v1)
+            new.value = _join_atomic(v1.value, v2.value)
+            return new
+
+        # ───── ③ EnumVariable ─────
+        if isinstance(v1, EnumVariable):
+            new = _clone(v1)
+            new.value = _join_atomic(v1.value, v2.value)
+            return new
+
+        # ───── ④ ArrayVariable ─────
+        if isinstance(v1, ArrayVariable):
+            # 길이 불일치 → 보수적으로 심볼릭
+            if len(v1.elements) != len(v2.elements):
+                raise ValueError (f"The length of element of Array Variable {v1}, {v2} is not same")
+            new_arr = _clone(v1)
+            new_arr.elements = [
+                self.join_variable_values(a, b) for a, b in zip(v1.elements, v2.elements)
+            ]
+            return new_arr
+
+        # ───── ⑤ StructVariable ─────
+        if isinstance(v1, StructVariable):
+            new_st = _clone(v1)
+            new_st.members = {}
+            for m in v1.members.keys() | v2.members.keys():  # 합집합
+                if m in v1.members and m in v2.members:
+                    new_st.members[m] = self.join_variable_values(v1.members[m], v2.members[m])
+                else:
+                    # 한쪽에만 있으면 그대로 유지
+                    new_st.members[m] = _clone(v1.members.get(m, v2.members.get(m)))
+            return new_st
+
+        # ───── ⑥ MappingVariable ─────
+        if isinstance(v1, MappingVariable):
+            new_map = _clone(v1)
+            new_map.mapping = {}
+            all_keys = v1.mapping.keys() | v2.mapping.keys()
+            for k in all_keys:
+                if k in v1.mapping and k in v2.mapping:
+                    new_map.mapping[k] = self.join_variable_values(v1.mapping[k], v2.mapping[k])
+                else:
+                    new_map.mapping[k] = _clone(v1.mapping.get(k, v2.mapping.get(k)))
+            return new_map
+
+        # ───── ⑦ fallback ─────
+        raise ValueError (f"Cannot Join Fallback")
+
+    # ContractAnalyzer (또는 utils 모듈 내부에)
+
+    def _merge_values(self, v1, v2,
+                      mode: str = "join"):  # "join" | "widen" | "narrow"
         """
-        • left_vars ⨆ right_vars  +  widening
-        • 값(Interval-계열)에 widen() 이 있으면 사용,
-          그렇지 않으면 보통 join_variable_values() 로 합집합.
+        • Interval / BoolInterval      → 해당 메서드(join/widen/narrow) 사용
+        • 래퍼(Variables / StructVariable / ArrayVariable / MappingVariable /
+               EnumVariable)           → 내부 값 재귀적으로 merge
+        • 타입 안 맞거나 merge 불가   → symbolicJoin / symbolicWiden / symbolicNarrow
         """
+        # ---- ① primitive -----------------------------------------------
+        if not isinstance(v1, (Variables, ArrayVariable,
+                               StructVariable, MappingVariable, EnumVariable)):
+            # Interval 인데 원하는 op 를 제공?
+            if hasattr(v1, mode):
+                return getattr(v1, mode)(v2)
+            # literal 이나 타입 불일치 → symbolic*
+            return f"symbolic{mode.capitalize()}({v1},{v2})"
+
+        # ---- ② 래퍼 객체 : 타입 불일치 → symbolic*
+        if type(v1) is not type(v2):
+            return f"symbolic{mode.capitalize()}({v1},{v2})"
+
+        # ---- ③ Variables / EnumVariable -------------------------------
+        if isinstance(v1, Variables) and not isinstance(v1, (ArrayVariable,
+                                                             StructVariable,
+                                                             MappingVariable)):
+            new = copy.copy(v1)
+            new.value = self._merge_values(v1.value, v2.value, mode)
+            return new
+
+        if isinstance(v1, EnumVariable):
+            new = copy.copy(v1)
+            new.value = self._merge_values(v1.value, v2.value, mode)
+            return new
+
+        # ---- ④ ArrayVariable ------------------------------------------
+        if isinstance(v1, ArrayVariable):
+            if len(v1.elements) != len(v2.elements):
+                return f"symbolic{mode.capitalize()}({v1.identifier},{v2.identifier})"
+            new_arr = copy.copy(v1)
+            new_arr.elements = [
+                self._merge_values(a, b, mode) for a, b in zip(v1.elements, v2.elements)
+            ]
+            return new_arr
+
+        # ---- ⑤ StructVariable -----------------------------------------
+        if isinstance(v1, StructVariable):
+            new_st = copy.copy(v1)
+            new_st.members = {}
+            for m in v1.members.keys() | v2.members.keys():
+                if m in v1.members and m in v2.members:
+                    new_st.members[m] = self._merge_values(v1.members[m],
+                                                           v2.members[m], mode)
+                else:
+                    new_st.members[m] = copy.copy(v1.members.get(m,
+                                                                 v2.members.get(m)))
+            return new_st
+
+        # ---- ⑥ MappingVariable ----------------------------------------
+        if isinstance(v1, MappingVariable):
+            new_map = copy.copy(v1)
+            new_map.mapping = {}
+            for k in v1.mapping.keys() | v2.mapping.keys():
+                if k in v1.mapping and k in v2.mapping:
+                    new_map.mapping[k] = self._merge_values(v1.mapping[k],
+                                                            v2.mapping[k], mode)
+                else:
+                    new_map.mapping[k] = copy.copy(v1.mapping.get(k,
+                                                                  v2.mapping.get(k)))
+            return new_map
+
+        # ---- fallback --------------------------------------------------
+        return f"symbolic{mode.capitalize()}({v1},{v2})"
+
+    # ─────────────────────────────────────────────────────────────
+    # 1) 공통 로직:  _merge_by_mode
+    #    mode ∈ {"join", "widen", "narrow"}
+    # ─────────────────────────────────────────────────────────────
+    def _merge_by_mode(self, left_vars, right_vars, mode):
         if left_vars is None:
             return self.copy_variables(right_vars or {})
 
         res = self.copy_variables(left_vars)
 
         for name, r_var in (right_vars or {}).items():
-
-            # 이미 존재하는 변수라면 widen / join
             if name in res:
-                l_var = res[name]
-
-                # 두 변수 모두 elementary / enum / address 같은 '값'을 가진 경우
-                if hasattr(l_var.value, "widen"):
-                    l_var.value = l_var.value.widen(r_var.value)  # ★ 여기서 value.widen
-                else:
-                    l_var.value = self.join_variable_values(l_var.value,
-                                                            r_var.value)
+                # ① 기존 l_var 와 r_var 를 **전체** merge
+                merged = self._merge_values(res[name], r_var, mode)
+                # ② 결과를 그대로 덮어쓴다   ←  .value 만 건드리면 안 됨!
+                res[name] = merged
             else:
-                # 새로 등장한 변수 → deep-copy 하여 추가
+                # 새로 등장한 변수는 deep-copy 해서 추가
                 res[name] = self.copy_variables({name: r_var})[name]
-
         return res
 
-    # ――― simple join (⊔)  – narrowing 단계용 ――――――――――――――――――――――
-    def join_variables_simple(
-            self,
-            left_vars: dict[str, Variables] | None,
-            right_vars: dict[str, Variables] | None
-    ) -> dict[str, Variables]:
-        """
-        값(Interval-계열)에 join() 이 있으면 그것을 쓰고,
-        없으면  join_variable_values() 로 보수적 합집합을 만든다.
-        """
-        if left_vars is None:
-            return self.copy_variables(right_vars or {})
+    # widening-join (⊔ω)
+    def join_variables_with_widening(self, left_vars, right_vars):
+        return self._merge_by_mode(left_vars, right_vars, "widen")
 
-        res = self.copy_variables(left_vars)
+    # 단순 join (⊔) – narrowing 1차 패스
+    def join_variables_simple(self, left_vars, right_vars):
+        return self._merge_by_mode(left_vars, right_vars, "join")
 
-        for name, r_var in (right_vars or {}).items():
-
-            if name in res:
-                l_var = res[name]
-
-                # ─ elementary / enum / address ───────────────────────────
-                if hasattr(l_var.value, "join"):
-                    l_var.value = l_var.value.join(r_var.value)
-                else:
-                    # Interval 이 아니거나 join() 없음 → 보수적 합집합
-                    l_var.value = self.join_variable_values(l_var.value,
-                                                            r_var.value)
-
-            else:
-                # 새 변수 → deep-copy
-                res[name] = self.copy_variables({name: r_var})[name]
-
-        return res
-
-    # ――― narrow – old ⊓ new  ―――――――――――――――――――――――――――――――――――
-    def narrow_variables(
-            self,
-            old_vars: dict[str, Variables],
-            new_vars: dict[str, Variables]
-    ) -> dict[str, Variables]:
-        """
-        각 변수의 value 가 지원하면  value.narrow(new_value)  를 적용한다.
-        지원하지 않는 타입은  new_value 로 덮어쓴다.
-        """
-        res = self.copy_variables(old_vars)
-
-        for name, n_var in new_vars.items():
-
-            if name in res:
-                o_var = res[name]
-
-                # Interval / BoolInterval 같이 narrow() 를 제공하는 타입
-                if hasattr(o_var.value, "narrow"):
-                    o_var.value = o_var.value.narrow(n_var.value)
-                else:
-                    # 좁히기 연산 불가 → 보수적으로 새 값으로 교체
-                    o_var.value = self.join_variable_values(o_var.value,
-                                                            n_var.value)
-
-            else:
-                # old_env 에 없던 새 변수 → deep-copy 후 추가
-                res[name] = self.copy_variables({name: n_var})[name]
-
-        return res
+    # narrow (⊓) – narrowing 2차 패스
+    def narrow_variables(self, old_vars, new_vars):
+        return self._merge_by_mode(old_vars, new_vars, "narrow")
 
     def get_true_block(self, condition_node):
         contract_cfg = self.contract_cfgs[self.current_target_contract]
@@ -4926,36 +5018,6 @@ class ContractAnalyzer:
 
         # fallback
         return BoolInterval(0, 1)
-
-    def convert_to_address(self, sub_val):
-        """
-        address(...) 변환 예시:
-        - int interval => symbolic address, 단일값 => 'address(0x..)'?
-        - string => if startswith("0x") => parse? else symbolic
-        """
-        # 실무에선 address는 160bit => [0..2^160-1]
-        # 여기선 간단히 symbolic
-        if isinstance(sub_val, IntegerInterval) or isinstance(sub_val, UnsignedIntegerInterval):
-            if sub_val.min_value == sub_val.max_value:
-                # 단일 값 => e.g. 'address(12345)'
-                return f"address({sub_val.min_value})"
-            else:
-                # symbolic
-                return f"symbolicAddressInterval([{sub_val.min_value}, {sub_val.max_value}])"
-
-        elif isinstance(sub_val, str):
-            # 간단히 '0x'로 시작하면 주소로 간주?
-            if sub_val.startswith("0x"):
-                return sub_val  # already address string
-            else:
-                return f"symbolicAddress({sub_val})"
-
-        elif isinstance(sub_val, BoolInterval):
-            # bool -> address => symbolic
-            return f"symbolicAddressFromBool({sub_val})"
-
-        else:
-            return f"symbolicAddress({sub_val})"
 
     def evaluate_binary_operator_of_index(self, result, callerObject):
         # 2) callerObject가 ArrayVariable이면 => 인덱스 접근 결과로 해석
