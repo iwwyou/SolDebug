@@ -142,6 +142,10 @@ class IntegerInterval(Interval):
         widen: 만약 현재 min/max가 더 작거나 큰 경우 무한대로 확장
         여기선 실제론 비트 범위가 있으므로 'theoretical_top' 사용 여부는 정책 선택.
         """
+        # (1) 오른쪽이 bottom 이면 self 그대로
+        if current_interval is None or current_interval.is_bottom():
+            return self.copy()
+
         if self.is_bottom():
             return current_interval
 
@@ -502,6 +506,10 @@ class UnsignedIntegerInterval(Interval):
         """
         간단히 min은 0, max는 ∞(또는 2^bits-1)로 확장
         """
+        # (1) 오른쪽이 bottom 이면 self 그대로
+        if current_interval is None or current_interval.is_bottom():
+            return self.copy()
+
         if self.is_bottom():
             return current_interval
 

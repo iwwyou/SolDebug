@@ -1057,16 +1057,16 @@ class ContractAnalyzer:
             self._overwrite_state_vars_from_block(contract_cfg, current_block.variables)
 
         # 2) 방금 변경된 변수 객체 다시 가져오기 (new_value=None ⇒ 탐색만)
-        #target_var = self._resolve_and_update_expr(expr.left, rExpVal, '=', current_block.variables,
-        #                                           self.current_target_function_cfg)
+        target_var = self._resolve_and_update_expr(expr.left, None, '=', current_block.variables,
+                                                   self.current_target_function_cfg)
 
         # 3) analysis 기록
-        #self._record_analysis(
-        #    line_no=self.current_start_line,
-        #    stmt_type="assignment",
-        #    expr=expr.left,
-        #    var_obj=target_var
-        #)
+        self._record_analysis(
+            line_no=self.current_start_line,
+            stmt_type="assignment",
+            expr=expr.left,
+            var_obj=target_var
+        )
 
         # 9. current_block을 function CFG에 반영
         self.current_target_function_cfg.update_block(current_block)  # 변경된 블록을 반영
@@ -1102,9 +1102,9 @@ class ContractAnalyzer:
         if fcfg.function_type == "constructor":
             self._overwrite_state_vars_from_block(ccf, cur_blk.variables)
 
-        """
+
         # ── 3) 갱신된 변수 객체 얻어서 analysis 기록
-        target_var = self._resolve_and_update_expr(expr.left, one_lit, '=', cur_blk.variables,
+        target_var = self._resolve_and_update_expr(expr.left, None, '=', cur_blk.variables,
                                       self.current_target_function_cfg)
         self._record_analysis(
             line_no=self.current_start_line,
@@ -1112,7 +1112,7 @@ class ContractAnalyzer:
             expr=expr,
             var_obj=target_var
         )
-        """
+
 
         # ── 4) CFG 저장
         fcfg.update_block(cur_blk)
@@ -1213,12 +1213,16 @@ class ContractAnalyzer:
         self.brace_count[self.current_start_line]['cfg_node'] = condition_block
 
         # 5. True 분기 블록 생성
-        true_block = CFGNode(name=f"if_true_{self.current_start_line+1}")
+        true_block = CFGNode(name=f"if_true_{self.current_start_line+1}",
+                             branch_node=True,
+                             is_true_branch=True)
         true_block.variables = self.copy_variables(current_block.variables)
         # 7. True 분기에서 변수 상태 복사 및 업데이트
         self.update_variables_with_condition(true_block.variables, condition_expr, is_true_branch=True)
 
-        false_block = CFGNode(name=f"if_false_{self.current_start_line}")
+        false_block = CFGNode(name=f"if_false_{self.current_start_line}",
+                              branch_node=True,
+                              is_true_branch=False)
         false_block.variables = self.copy_variables(current_block.variables)
         self.update_variables_with_condition(false_block.variables, condition_expr, is_true_branch=False)
 
@@ -1312,6 +1316,8 @@ class ContractAnalyzer:
 
         # 4. else if 조건식 블록 생성
         condition_block = CFGNode(name=f"else_if_condition_{self.current_start_line}",
+                                  branch_node=True,
+                                  is_true_branch=False,
                                   condition_node=True,
                                   condition_node_type="else if")
         condition_block.condition_expr = condition_expr
@@ -1323,13 +1329,17 @@ class ContractAnalyzer:
         self.brace_count[self.current_start_line]['cfg_node'] = condition_block
 
         # 6. True 분기 블록 생성
-        true_block = CFGNode(name=f"else_if_true_{self.current_start_line}")
+        true_block = CFGNode(name=f"else_if_true_{self.current_start_line}",
+                             branch_node=True,
+                             is_true_branch=True)
         true_block.variables = self.copy_variables(condition_block.variables)
 
         self.update_variables_with_condition(true_block.variables, condition_expr, is_true_branch=True)
 
         # 5. False 분기 블록 생성
-        false_block = CFGNode(name=f"else_if_false_{self.current_start_line}")
+        false_block = CFGNode(name=f"else_if_false_{self.current_start_line}",
+                              branch_node=True,
+                              is_true_branch=False)
 
         false_block.variables = self.copy_variables(condition_block.variables)
         self.update_variables_with_condition(false_block.variables, condition_expr,
@@ -1408,7 +1418,9 @@ class ContractAnalyzer:
         ]
 
         # ───────────────────────── 3. else 블록 생성 ──────────────────────
-        else_blk = CFGNode(f"else_block_{self.current_start_line}")
+        else_blk = CFGNode(f"else_block_{self.current_start_line}",
+                           branch_node=True,
+                           is_true_branch=False)
 
         # (1) 변수환경 = cond_node 변수 deep-copy
         else_blk.variables = self.copy_variables(cond_node.variables)
@@ -2935,11 +2947,11 @@ class ContractAnalyzer:
         # base
         base_obj = self._resolve_and_update_expr(
             expr.base, rVal, operator, variables,  # ← ❌  인수순서/개수 모두 틀림
-            None, "TestingIndexAccess"
+        fcfg, None, "TestingIndexAccess"
         )
         # index
         return self._resolve_and_update_expr(
-            expr.index, rVal, operator, variables,
+            expr.index, rVal, operator, variables, fcfg,
             base_obj, "TestingIndexAccess"
         )
 
@@ -2983,11 +2995,11 @@ class ContractAnalyzer:
         # base
         base_obj = self._resolve_and_update_expr(
             expr.base, rVal, operator, variables,  # ← ❌  인수순서/개수 모두 틀림
-            None, "IndexAccessContext"
+            None, None, "IndexAccessContext"
         )
         # index
         return self._resolve_and_update_expr(
-            expr.index, rVal, operator, variables,
+            expr.index, rVal, operator, variables, fcfg,
             base_obj, "IndexAccessContext"
         )
 
@@ -3088,6 +3100,8 @@ class ContractAnalyzer:
             raise ValueError(f"Variable '{ident}' not declared in current scope.")
 
         target_var = variables[ident]
+        if rVal is None :
+            return target_var
         if isinstance(target_var, (Variables, EnumVariable)):
             self._patch_var_with_new_value(target_var, rVal)
             return target_var
@@ -3206,8 +3220,6 @@ class ContractAnalyzer:
                 return callerObject
         raise ValueError (f"Unexpected variable of binary_exp_context")
 
-
-
     def copy_variables(self, src: Dict[str, Variables]) -> Dict[str, Variables]:
         """
         변수 env 를 **deep copy** 하되, 원본의 서브-클래스를 그대로 보존한다.
@@ -3261,25 +3273,19 @@ class ContractAnalyzer:
         return dst
 
     def traverse_loop_nodes(self, loop_node):
-        """
-        루프 내의 모든 노드를 수집합니다.
-        :param loop_node: 루프의 시작 노드 (fixpoint_evaluation_node)
-        :return: 루프 내의 노드 집합 (set)
-        """
         visited = set()
         stack = [loop_node]
+
         while stack:
-            current_node = stack.pop()
-            if current_node in visited:
+            cur = stack.pop()
+            if cur in visited:
                 continue
-            visited.add(current_node)
-            successors = list(self.current_target_function_cfg.graph.successors(current_node))
-            for succ in successors:
-                # 루프 종료 노드로의 에지는 제외
-                if current_node.condition_node and \
-                        current_node.condition_node_type in ['while', 'for', 'do'] :
-                    if succ.loop_exit_node:
-                        continue
+            visited.add(cur)
+
+            for succ in self.current_target_function_cfg.graph.successors(cur):
+                # **모든** loop-exit 노드는 무조건 제외
+                if succ.loop_exit_node:
+                    continue
                 stack.append(succ)
         return visited
 
@@ -3361,6 +3367,10 @@ class ContractAnalyzer:
         두 variable-env 가 완전히 동일한지 비교.
         구조 동일 + 값(equals) 동일해야 True
         """
+        if vars1 is None or vars2 is None:
+            # 둘 다 None 이면 True, 한쪽만 None 이면 False
+            return vars1 is vars2
+
         if vars1.keys() != vars2.keys():
             return False
 
@@ -3414,24 +3424,57 @@ class ContractAnalyzer:
                         return False
         return True
 
-    def transfer_function(self, node, in_vars):
-        """
-        노드의 transfer function을 적용하여 out_vars를 계산합니다.
-        :param node: 현재 노드
-        :param in_vars: 노드의 입력 변수 상태 (var_name -> Variables 객체)
-        :return: 노드의 출력 변수 상태 (var_name -> Variables 객체)
-        """
+    def _val_or_self(self, var_obj):
+        """elem이면 .value, 복합이면 객체 자체를 serialize"""
+        return getattr(var_obj, "value", var_obj)
+
+    def serialize_env(self, env: dict[str, Variables]) -> str:
+        parts = []
+        for name, var in sorted(env.items()):  # key 정렬 → 안정적인 비교
+            parts.append(f"{name}:{self._serialize_val(self._val_or_self(var))}")
+        return "|".join(parts)
+
+    def transfer_function(self, node: CFGNode,
+                          in_vars: dict[str, Variables]) -> dict[str, Variables]:
+
         out_vars = self.copy_variables(in_vars)
+        changed = False
+
+        # ─ 1) 조건 노드 ───────────────────────────────────────
         if node.condition_node:
-            # 조건 노드 처리
-            self.update_variables_with_condition(out_vars, node.condition_expr, is_true_branch=True)
-        elif node.fixpoint_evaluation_node:
-            return out_vars
-        else:
-            # 일반 노드 처리: 노드의 모든 statement 평가
-            for statement in node.statements:
-                self.update_statement_with_variables(statement, out_vars)
-        return out_vars
+            if node.branch_node and not node.is_true_branch :
+                preds = list(self.current_target_function_cfg.graph.predecessors(node))
+
+                cond_node = next(
+                    (p for p in preds if getattr(p, "condition_node", False)),
+                    None  # ← 조건-노드가 없을 때는 None
+                )
+                self.update_variables_with_condition(out_vars,
+                                                     cond_node.condition_expr,
+                                                     node.is_true_branch)
+            else :
+                return out_vars
+
+        # ─ 2) 일반/바디/증감 노드 ────────────────────────────
+        elif not node.fixpoint_evaluation_node:
+            if node.branch_node :
+                preds = list(self.current_target_function_cfg.graph.predecessors(node))
+
+                cond_node = next(
+                    (p for p in preds if getattr(p, "condition_node", False)),
+                    None  # ← 조건-노드가 없을 때는 None
+                )
+                self.update_variables_with_condition(out_vars,
+                                                     cond_node.condition_expr,
+                                                     node.is_true_branch)
+
+            for stmt in node.statements:
+                before = self.serialize_env(out_vars)
+                self.update_statement_with_variables(stmt, out_vars)
+                if before != self.serialize_env(out_vars):
+                    changed = True
+        # ─ 4) 결과 반환 ──────────────────────────────────────
+        return out_vars if changed else self.copy_variables(in_vars)
 
     def update_statement_with_variables(self, stmt, current_variables):
         if stmt.statement_type == 'variableDeclaration':
@@ -3444,6 +3487,10 @@ class ContractAnalyzer:
             return self.interpret_return_statement(stmt, current_variables)
         elif stmt.statement_type == 'revert':
             return self.interpret_revert_statement(stmt, current_variables)
+        elif stmt.statement_type == 'break' :
+            return self.interpret_break_statement(stmt, current_variables)
+        elif stmt.statement_type == 'continue' :
+            return self.interpret_continue_statement(stmt, current_variables)
         else:
             raise ValueError(f"Statement '{stmt.statement_type}' is not implemented.")
 
@@ -3607,106 +3654,105 @@ class ContractAnalyzer:
     # ───────────────────────────────────────────────────────────
     def fixpoint(self, loop_condition_node: CFGNode) -> CFGNode:
         """
-        loop_condition_node : while / for / doWhile 의 condition CFGNode
-        return              : loop 의 exit-node  (CFGNode)
+        loop_condition_node : while / for / do-while 의 condition CFGNode
+        return              : 루프의 exit-node
         """
-        def _src_line_from_name(node: CFGNode) -> int | None:
-            # 끝에 _숫자 패턴이면 추출
-            try:
-                return int(node.name.rsplit('_', 1)[-1])
-            except ValueError:
-                return None
 
-        # ── 0. exit-node 찾기 ────────────────────────
+        # ──────────────────────────────────────────────────────────────
+        def _need_widen(n: CFGNode, vc: dict[CFGNode, int]) -> bool:
+            """φ-node 이고 두 번째 방문부터 widen."""
+            return n.fixpoint_evaluation_node and vc[n] >= 2
+
+        # ──────────────────────────────────────────────────────────────
+
+        # 0) exit-node
         exit_nodes = self.find_loop_exit_nodes(loop_condition_node)
         if not exit_nodes:
             raise ValueError("Loop without exit-node")
         if len(exit_nodes) > 1:
-            # for + break 같은 특수 케이스 대비. 우선 첫 번째만.
             print("[Warn] multiple exit-nodes – using the first one")
         exit_node = exit_nodes[0]
 
-        # ── 1. 루프 내 노드 수집 ─────────────────────
+        # 1) 루프 내부 노드 집합
         loop_nodes: set[CFGNode] = self.traverse_loop_nodes(loop_condition_node)
-        #   condition-node 도 포함돼 있음
 
-        # ── 2. 자료구조 초기화 ───────────────────────
-        in_vars: dict[CFGNode, dict] = {n: {} for n in loop_nodes}
-        out_vars: dict[CFGNode, dict] = {n: {} for n in loop_nodes}
+        # 2) 자료구조
+        visit_cnt: defaultdict[CFGNode, int] = defaultdict(int)
+        in_vars: dict[CFGNode, dict | None] = {n: None for n in loop_nodes}
+        out_vars: dict[CFGNode, dict | None] = {n: None for n in loop_nodes}
 
-        # 조건 노드 진입 시점 변수 = predecessor(join or 외부)의 값
-        preds = list(self.current_target_function_cfg.graph.predecessors(loop_condition_node))
+        # ───── 초기 in (헤드의 in = 외부 predecessor join) ─────
         start_env = None
-        for p in preds:
-            env = p.variables
-            start_env = self.join_variables_with_widening(start_env, env) if start_env else self.copy_variables(env)
-        in_vars[loop_condition_node] = self.copy_variables(start_env)
+        for p in self.current_target_function_cfg.graph.predecessors(loop_condition_node):
+            start_env = (self.join_variables_simple(start_env, p.variables)
+                         if start_env else self.copy_variables(p.variables))
+        in_vars[loop_condition_node] = start_env
 
-        # ── 3-A. 1차 패스 – widening ────────────────
-        WL = deque([loop_condition_node])
-        W_MAX = 30  # 안전 장치
-        iter_cnt = 0
-        while WL and iter_cnt < W_MAX:
-            iter_cnt += 1
+        # ───────────────── 3-A. widening 패스 ─────────────────
+        WL, W_MAX = deque([loop_condition_node]), 30
+        while WL and (w_iter := visit_cnt[loop_condition_node]) < W_MAX:
             node = WL.popleft()
+            visit_cnt[node] += 1
 
-            # 3-A-1. transfer
             out_old = out_vars[node]
             out_new = self.transfer_function(node, in_vars[node])
 
-            # 3-A-2. widening (첫 방문이면 그냥 대입)
-            widened = self.join_variables_with_widening(out_old, out_new)
+            # φ-node + 2회차 이상이면 widen, 그 외엔 join
+            if _need_widen(node, visit_cnt):
+                new_out = self.join_variables_with_widening(out_old, out_new)
+            else:
+                new_out = self.join_variables_simple(out_old, out_new)
 
-            if not self.variables_equal(out_old, widened):
-                out_vars[node] = widened
+            if self.variables_equal(out_old, new_out):
+                continue
+            out_vars[node] = new_out
 
-                # succ 의 in 변수 갱신 + WL push
-                for succ in self.current_target_function_cfg.graph.successors(node):
-                    if succ not in loop_nodes:  # 루프 밖 → exit-node 이거나 더 바깥
-                        continue
-                    in_old = in_vars[succ]
-                    in_new = self.join_variables_with_widening(in_old, widened)
-                    if not self.variables_equal(in_old, in_new):
-                        in_vars[succ] = in_new
-                        WL.append(succ)
+            # 후속 노드 갱신
+            for succ in self.current_target_function_cfg.graph.successors(node):
+                if succ not in loop_nodes:
+                    continue
 
-        if iter_cnt == W_MAX:
-            print("[Warn] widening phase hit max-iteration")
+                if _need_widen(succ, visit_cnt):
+                    in_new = self.join_variables_with_widening(in_vars[succ], new_out)
+                else:
+                    in_new = self.join_variables_simple(in_vars[succ], new_out)
+
+                if not self.variables_equal(in_vars[succ], in_new):
+                    in_vars[succ] = in_new
+                    WL.append(succ)
 
         # ── 3-B. 2차 패스 – narrowing ───────────────
         #     • 위에서 얻은 out_vars 를 starting point 로 재사용
+        # ── 3-B. narrowing 패스 ─────────────────────────────
         WL = deque(loop_nodes)
         N_MAX = 15
-        n_iter = 0
-        while WL and n_iter < N_MAX:
-            n_iter += 1
+        while WL and N_MAX:
+            N_MAX -= 1
             node = WL.popleft()
 
-            # predecessors 의 out 을 meet → in'
-            preds = list(self.current_target_function_cfg.graph.predecessors(node))
+            # 1) predecessor 의 out 들 join → in'
             new_in = None
-            for p in preds:
+            for p in self.current_target_function_cfg.graph.predecessors(node):
                 src = out_vars[p] if p in loop_nodes else p.variables
-                new_in = self.join_variables_simple(new_in, src) if new_in else self.copy_variables(src)
+                new_in = (self.join_variables_simple(new_in, src)
+                          if new_in else self.copy_variables(src))
 
-            if new_in is None:
-                continue
             if self.variables_equal(new_in, in_vars[node]):
                 continue
             in_vars[node] = new_in
 
-            # transfer
-            old_out = out_vars[node]
+            # 2) transfer
             tmp_out = self.transfer_function(node, new_in)
-            # narrowing : old_out.narrow(tmp_out)
-            narrowed = self.narrow_variables(old_out, tmp_out)
 
-            if not self.variables_equal(old_out, narrowed):
+            # 3) narrow – 헤드(φ-node)만, 그 외는 그대로 사용
+            if _need_narrow(node):
+                narrowed = self.narrow_variables(out_vars[node], tmp_out)
+            else:  # 비-헤드면 그냥 최신 out 으로 교체
+                narrowed = tmp_out
+
+            if not self.variables_equal(out_vars[node], narrowed):
                 out_vars[node] = narrowed
                 WL.extend(self.current_target_function_cfg.graph.successors(node))
-
-        if n_iter == N_MAX:
-            print("[Warn] narrowing phase hit max-iteration")
 
         # ── 4. exit-node 변수 반영 ───────────────────
         exit_env = None
@@ -3715,7 +3761,7 @@ class ContractAnalyzer:
             exit_env = self.join_variables_simple(exit_env, src) if exit_env else self.copy_variables(src)
         exit_node.variables = exit_env if exit_env else {}
 
-
+        """
         # ───── 분석 스냅샷 ②: loop-fixpoint ──────────
         self._record_analysis(
             line_no=_src_line_from_name(loop_condition_node),  # 같은 라인 그룹에 살짝 뒤에
@@ -3723,37 +3769,29 @@ class ContractAnalyzer:
             env=exit_node.variables
         )
         # ────────────────────────────────────────────
-
+        """
         return exit_node
 
     def find_loop_exit_nodes(self, while_node):
-        """
-        주어진 while 노드의 루프 exit 노드를 찾습니다.
-        :param while_node: while 루프의 조건 노드
-        :return: 루프 exit 노드들의 리스트
-        """
-        exit_nodes = []
+        exit_nodes = set()  # ← 1) set 으로 중복 차단
         visited = set()
         stack = [while_node]
 
         while stack:
-            current_node = stack.pop()
-            if current_node in visited:
+            cur = stack.pop()
+            if cur in visited:
                 continue
-            visited.add(current_node)
+            visited.add(cur)
 
-            successors = list(self.current_target_function_cfg.graph.successors(current_node))
-            for succ in successors:
+            for succ in self.current_target_function_cfg.graph.successors(cur):
                 if succ == while_node:
-                    # 루프 백 엣지이므로 무시
                     continue
                 if not self.is_node_in_loop(succ, while_node):
-                    # 루프 밖의 노드이면 exit 노드로 추가
-                    exit_nodes.append(succ)
+                    exit_nodes.add(succ)  # ← 2) add
                 else:
                     stack.append(succ)
 
-        return exit_nodes
+        return list(exit_nodes)  # ← 3) list 로 변환해 주면 기존 호출부 그대로
 
     def is_node_in_loop(self, node, while_node):
         """
@@ -3763,8 +3801,9 @@ class ContractAnalyzer:
         :return: True 또는 False
         """
         # while_node에서 시작하여 루프 내의 모든 노드를 수집하고, 그 안에 node가 있는지 확인
-        loop_nodes = self.traverse_loop_nodes(while_node)
-        return node in loop_nodes
+        if node.loop_exit_node:  # ← 한 줄로 끝
+            return False
+        return node in self.traverse_loop_nodes(while_node)
 
     def find_corresponding_open_brace(self, close_line):
         """
@@ -3983,17 +4022,32 @@ class ContractAnalyzer:
                EnumVariable)           → 내부 값 재귀적으로 merge
         • 타입 안 맞거나 merge 불가   → symbolicJoin / symbolicWiden / symbolicNarrow
         """
+
+        def _should_widen(val):
+            return isinstance(val, (IntegerInterval, UnsignedIntegerInterval, BoolInterval))
+
         # ---- ① primitive -----------------------------------------------
         if not isinstance(v1, (Variables, ArrayVariable,
                                StructVariable, MappingVariable, EnumVariable)):
             # Interval 인데 원하는 op 를 제공?
+            if mode == "widen" and not _should_widen(v1):
+                # widen 이지만 타입이 Interval 이 아님 → join 과 동일 처리
+                return self._merge_values(v1, v2, "join")
+
             if hasattr(v1, mode):
                 return getattr(v1, mode)(v2)
-            # literal 이나 타입 불일치 → symbolic*
             return f"symbolic{mode.capitalize()}({v1},{v2})"
 
         # ---- ② 래퍼 객체 : 타입 불일치 → symbolic*
+        # ---- ② 래퍼 객체 : 타입 불일치 → symbolic*
         if type(v1) is not type(v2):
+            return f"symbolic{mode.capitalize()}({v1},{v2})"
+
+        if type(v1) is not type(v2):
+            if isinstance(v1, Variables) and isinstance(v2, Variables):
+                new = copy.copy(v1)
+                new.value = self._merge_values(v1.value, v2.value, mode)
+                return new
             return f"symbolic{mode.capitalize()}({v1},{v2})"
 
         # ---- ③ Variables / EnumVariable -------------------------------
@@ -4036,13 +4090,20 @@ class ContractAnalyzer:
         if isinstance(v1, MappingVariable):
             new_map = copy.copy(v1)
             new_map.mapping = {}
+
             for k in v1.mapping.keys() | v2.mapping.keys():
                 if k in v1.mapping and k in v2.mapping:
                     new_map.mapping[k] = self._merge_values(v1.mapping[k],
                                                             v2.mapping[k], mode)
                 else:
-                    new_map.mapping[k] = copy.copy(v1.mapping.get(k,
-                                                                  v2.mapping.get(k)))
+                    # ➤ 한쪽만 있을 때 bottom 이면 다른 쪽 값 채택
+                    src = v1.mapping.get(k) or v2.mapping.get(k)
+                    if (isinstance(src, Variables)
+                            and isinstance(src.value, Interval)
+                            and src.value.is_bottom()):
+                        # 아무 정보가 없는 BOTTOM 이면 skip
+                        continue
+                    new_map.mapping[k] = self.copy_variables({k: src})[k]
             return new_map
 
         # ---- fallback --------------------------------------------------
@@ -4055,6 +4116,8 @@ class ContractAnalyzer:
     def _merge_by_mode(self, left_vars, right_vars, mode):
         if left_vars is None:
             return self.copy_variables(right_vars or {})
+        if not right_vars:  # ← 추가
+            return self.copy_variables(left_vars)
 
         res = self.copy_variables(left_vars)
 
@@ -4721,10 +4784,10 @@ class ContractAnalyzer:
                         if val.min_value == val.max_value:  # (a) concrete
                             key_val = str(val.min_value)
                         else:  # (b) 여전히 TOP
-                            key_val = f"${key_var.identifier}"  # 변수경로 그대로
+                            key_val = f"{key_var.identifier}"  # 변수경로 그대로
                     else:
                         # bool / string 등 ▶ 그대로 변수경로 사용
-                        key_val = f"${key_var.identifier}"
+                        key_val = f"{key_var.identifier}"
 
                 else:
                     # ── ② 리터럴 키 ────────────────────────
@@ -6092,67 +6155,31 @@ class ContractAnalyzer:
         return variables
 
     def interpret_assignment_statement(self, stmt, variables):
+        # 0) RHS 계산 – 기존과 동일
         lexp, rexpr, op = stmt.left, stmt.right, stmt.operator
-        r_val = self.evaluate_expression(rexpr, variables, None, None)
+        if isinstance(rexpr, Expression):
+            r_val = self.evaluate_expression(rexpr, variables, None, None)
+        else:  # 이미 Interval·리터럴 등 평가완료 값
+            r_val = rexpr
+
+        # 1) LHS 에 반영
         self.update_left_var(lexp, r_val, op, variables, None, None)
 
+        # 2) 로그 기록 ────────────────
         stmt_id = id(stmt)
-        # ③ ★ 반드시 로그 기록 – initExpr 유무와 무관 ★
         if self._record_enabled and stmt_id not in self._seen_stmt_ids:
             self._seen_stmt_ids.add(stmt_id)
-            tgt = self._resolve_and_update_expr(lexp,  # 탐색만
-                                                variables,
-                                                self.current_target_function_cfg,
-                                                None)
 
-            if tgt is None and lexp.index is not None:
-                base_obj = self._resolve_and_update_expr(
-                    lexp.base, variables,
-                    self.current_target_function_cfg,
-                    None
-                )
-                if isinstance(base_obj, ArrayVariable):
-                    self._record_analysis(
-                        line_no=stmt.src_line,
-                        stmt_type=stmt.statement_type,  # "assignment"
-                        expr=lexp.base,  # key = 배열 식별자
-                        var_obj=base_obj  # flatten-array
-                    )
-                    return variables  # 이미 기록했으므로 종료
-                elif isinstance(base_obj, MappingVariable):
-                    concrete = self._try_concrete_key(lexp.index, variables)
+            # (A) 이번 대입이 가리키는 **leaf-변수** 탐색 (값은 patch 하지 않음)
+            tgt = self._resolve_and_update_expr(
+                lexp,  # ← expression
+                None,  # rVal (탐색만 하므로 None)
+                '=',  # op   (아무거나 OK)
+                variables,  # 현재 블록 env
+                self.current_target_function_cfg  # fcfg
+            )
 
-                    if concrete is not None:
-                        # ── 단일 엔트리 로깅 ───────────────────────
-                        entry = base_obj.mapping.get(concrete)
-                        if entry is None:
-                            entry = self._create_new_mapping_value(base_obj, concrete)
-                            base_obj.mapping[concrete] = entry
-
-                        if self._record_enabled:
-                            self._record_analysis(
-                                line_no=stmt.src_line,
-                                stmt_type=stmt.statement_type,
-                                expr=lexp,  # balances[msg.sender]
-                                var_obj=entry  # 그 엔트리만!
-                            )
-
-
-                    else:
-
-                        # ── 키/인덱스가 불명 ────────────────────────────────
-
-                        # ① 배열 전체를 inline-array 로 직렬화
-                        whole = self._serialize_val(base_obj)  # ← array[…]
-                        idx_s = self._expr_to_str(lexp.index)  # rebalanceCount % 10
-                        self.analysis_per_line[stmt.src_line].append({
-                            "kind": stmt.statement_type,
-                            "vars": {
-                                base_obj.identifier: whole,  # 전체 스냅샷
-                                f"{base_obj.identifier}[{idx_s}]": "<unk>"  # 이번에 바뀐 위치
-                            }
-                        })
-
+            # ── ① LHS 가 배열/매핑 단일-엔트리였을 경우 ──────────────────
             if tgt:
                 self._record_analysis(
                     line_no=stmt.src_line,
@@ -6160,6 +6187,48 @@ class ContractAnalyzer:
                     expr=lexp,
                     var_obj=tgt
                 )
+                return variables  # 이미 기록했으니 끝
+
+            # ── ② 배열/매핑 “전체” 또는 <unk> 인덱스 로깅 로직 (변경 없음) ──
+            base_obj = self._resolve_and_update_expr(
+                lexp.base, None, '=', variables,
+                self.current_target_function_cfg
+            )
+
+            if isinstance(base_obj, ArrayVariable):
+                self._record_analysis(
+                    line_no=stmt.src_line,
+                    stmt_type=stmt.statement_type,
+                    expr=lexp.base,
+                    var_obj=base_obj  # flatten-array
+                )
+                return variables
+
+            if isinstance(base_obj, MappingVariable):
+                concrete = self._try_concrete_key(lexp.index, variables)
+
+                if concrete is not None:
+                    entry = base_obj.mapping.get(concrete)
+                    if entry is None:
+                        entry = self._create_new_mapping_value(base_obj, concrete)
+                        base_obj.mapping[concrete] = entry
+
+                    self._record_analysis(
+                        line_no=stmt.src_line,
+                        stmt_type=stmt.statement_type,
+                        expr=lexp,
+                        var_obj=entry
+                    )
+                else:
+                    whole = self._serialize_val(base_obj)
+                    idx_s = self._expr_to_str(lexp.index)
+                    self.analysis_per_line[stmt.src_line].append({
+                        "kind": stmt.statement_type,
+                        "vars": {
+                            base_obj.identifier: whole,
+                            f"{base_obj.identifier}[{idx_s}]": "<unk>"
+                        }
+                    })
 
         return variables
 
@@ -6203,6 +6272,12 @@ class ContractAnalyzer:
         return variables
 
     def interpret_revert_statement(self, stmt, variables):
+        return variables
+
+    def interpret_break_statement(self, stmt, variables):
+        return variables
+
+    def interpret_continue_statement(self, stmt, variables):
         return variables
 
     def _try_concrete_key(self, idx_expr, var_env) -> str | None:

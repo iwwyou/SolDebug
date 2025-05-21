@@ -6,6 +6,8 @@ class CFGNode:
     def __init__(self, name,
                  condition_node=False,
                  condition_node_type=None,
+                 branch_node=False,
+                 is_true_branch=False,
                  fixpoint_evaluation_node=False,
                  loop_exit_node=False,
                  is_for_increment=False,
@@ -15,6 +17,9 @@ class CFGNode:
         self.condition_node = condition_node
         self.condition_expr = None
         self.condition_node_type = condition_node_type
+
+        self.branch_node = branch_node
+        self.is_true_branch = is_true_branch
 
         self.join_point_node = False
         self.fixpoint_evaluation_node = fixpoint_evaluation_node
