@@ -1500,14 +1500,18 @@ class ContractAnalyzer:
         self.current_target_function_cfg.graph.add_edge(join_node, condition_node)
 
         # 7. Create the true node (loop body)
-        true_node = CFGNode(name=f"while_body_{self.current_start_line}")
+        true_node = CFGNode(name=f"while_body_{self.current_start_line}",
+                            branch_node=True,
+                            is_true_branch=True)
         true_node.is_loop_body = True
         true_node.variables = self.copy_variables(condition_node.variables)
         self.update_variables_with_condition(true_node.variables, condition_expr, is_true_branch=True)
 
         # 8. Create the false node (exit block)
         false_node = CFGNode(name=f"while_exit_{self.current_start_line}",
-                             loop_exit_node=True)
+                             loop_exit_node=True,
+                             branch_node=True,
+                             is_true_branch=False)
         self.update_variables_with_condition(false_node.variables,
                                              condition_expr,
                                              is_true_branch=False)
@@ -1613,7 +1617,9 @@ class ContractAnalyzer:
         # ------------------------------------------------------------------#
         # 6) body_node
         # ------------------------------------------------------------------#
-        body_node = CFGNode(f"for_body_{self.current_start_line}")
+        body_node = CFGNode(f"for_body_{self.current_start_line}",
+                            branch_node=True,
+                            is_true_branch=True)
         body_node.is_loop_body = True
         body_node.variables = self.copy_variables(cond_node.variables)
 
@@ -1691,7 +1697,9 @@ class ContractAnalyzer:
         # ------------------------------------------------------------------#
         # 8) exit_node  (loop-false 블록)
         # ------------------------------------------------------------------#
-        exit_node = CFGNode(f"for_exit_{self.current_start_line}", loop_exit_node=True)
+        exit_node = CFGNode(f"for_exit_{self.current_start_line}", loop_exit_node=True,
+                            branch_node=True,
+                            is_true_branch=False)
         exit_node.variables = self.copy_variables(join_node.variables)
 
         if condition_expr is not None:  # ★
@@ -1973,7 +1981,9 @@ class ContractAnalyzer:
         req_cond.variables = self.copy_variables(current_block.variables)
 
         # ── 5 True-블록
-        true_blk = CFGNode(name=f"require_true_{self.current_start_line}")
+        true_blk = CFGNode(name=f"require_true_{self.current_start_line}",
+                           branch_node=True,
+                           is_true_branch=True)
         true_blk.variables = self.copy_variables(req_cond.variables)
         self.update_variables_with_condition(true_blk.variables,
                                              condition_expr,
@@ -2048,7 +2058,9 @@ class ContractAnalyzer:
         assert_cond.condition_expr = condition_expr
 
         # ── 5 True-블록
-        true_blk = CFGNode(name=f"assert_true_{self.current_start_line + 1}")
+        true_blk = CFGNode(name=f"assert_true_{self.current_start_line}",
+                           branch_node=True,
+                           is_true_branch=True)
         true_blk.variables = self.copy_variables(current_block.variables)
         self.update_variables_with_condition(true_blk.variables,
                                              condition_expr,
@@ -3428,11 +3440,9 @@ class ContractAnalyzer:
         """elem이면 .value, 복합이면 객체 자체를 serialize"""
         return getattr(var_obj, "value", var_obj)
 
-    def serialize_env(self, env: dict[str, Variables]) -> str:
-        parts = []
-        for name, var in sorted(env.items()):  # key 정렬 → 안정적인 비교
-            parts.append(f"{name}:{self._serialize_val(self._val_or_self(var))}")
-        return "|".join(parts)
+    def _env_equal(self, a: dict[str, Variables] | None,
+                   b: dict[str, Variables] | None) -> bool:
+        return self.variables_equal(a or {}, b or {})
 
     def transfer_function(self, node: CFGNode,
                           in_vars: dict[str, Variables]) -> dict[str, Variables]:
@@ -3469,12 +3479,12 @@ class ContractAnalyzer:
                                                      node.is_true_branch)
 
             for stmt in node.statements:
-                before = self.serialize_env(out_vars)
+                before = self.copy_variables(out_vars)  # 🟢 깊은 사본
                 self.update_statement_with_variables(stmt, out_vars)
-                if before != self.serialize_env(out_vars):
+                if not self._env_equal(before, out_vars):  # 🟢 깊이 비교
                     changed = True
         # ─ 4) 결과 반환 ──────────────────────────────────────
-        return out_vars if changed else self.copy_variables(in_vars)
+        return out_vars if changed else in_vars
 
     def update_statement_with_variables(self, stmt, current_variables):
         if stmt.statement_type == 'variableDeclaration':
@@ -3646,6 +3656,17 @@ class ContractAnalyzer:
 
     # ContractAnalyzer.py (또는 해당 클래스가 정의된 모듈)
 
+    def _dump_loop_edges(self, head: CFGNode):
+        """
+        head : for-/while- 루프의 φ-node (즉 join_node)
+        print  ▶  predecessor 이름  →  head
+        """
+        print(f"\n[CFG-DEBUG] predecessors of  {head.name}")
+        g = self.current_target_function_cfg.graph
+        for pred in g.predecessors(head):
+            cond = g.get_edge_data(pred, head).get("condition")
+            print(f"    {pred.name:25s} --{cond}--> {head.name}")
+
     # ───────────────────────────────────────────────────────────
     # 고정점 계산 : work-list + widening & narrowing
     #   ① 1차 패스 – widening 으로 상향 수렴
@@ -3663,6 +3684,9 @@ class ContractAnalyzer:
             """φ-node 이고 두 번째 방문부터 widen."""
             return n.fixpoint_evaluation_node and vc[n] >= 2
 
+        def _need_narrow(n: CFGNode) -> bool:
+            """φ-node 인가? (헤드만 narrow)"""
+            return n.fixpoint_evaluation_node
         # ──────────────────────────────────────────────────────────────
 
         # 0) exit-node
@@ -3680,6 +3704,10 @@ class ContractAnalyzer:
         visit_cnt: defaultdict[CFGNode, int] = defaultdict(int)
         in_vars: dict[CFGNode, dict | None] = {n: None for n in loop_nodes}
         out_vars: dict[CFGNode, dict | None] = {n: None for n in loop_nodes}
+
+        for n in loop_nodes:
+            if n.fixpoint_evaluation_node and in_vars[n] is None:
+                in_vars[n] = self.copy_variables(n.variables)
 
         # ───── 초기 in (헤드의 in = 외부 predecessor join) ─────
         start_env = None
@@ -3703,6 +3731,9 @@ class ContractAnalyzer:
             else:
                 new_out = self.join_variables_simple(out_old, out_new)
 
+            if node.fixpoint_evaluation_node:
+                node.fixpoint_evaluation_node_vars = copy.deepcopy(new_out)
+
             if self.variables_equal(out_old, new_out):
                 continue
             out_vars[node] = new_out
@@ -3721,55 +3752,56 @@ class ContractAnalyzer:
                     in_vars[succ] = in_new
                     WL.append(succ)
 
-        # ── 3-B. 2차 패스 – narrowing ───────────────
-        #     • 위에서 얻은 out_vars 를 starting point 로 재사용
-        # ── 3-B. narrowing 패스 ─────────────────────────────
-        WL = deque(loop_nodes)
-        N_MAX = 15
+        # ── 3-B. narrowing 패스 ────────────────────────────
+        # ── 3-B. narrowing 패스 ───────────────────────────
+        WL = deque([loop_condition_node])  # (1) seed 전부
+        N_MAX = 30
         while WL and N_MAX:
             N_MAX -= 1
             node = WL.popleft()
 
-            # 1) predecessor 의 out 들 join → in'
+            # 1) 새 in
             new_in = None
             for p in self.current_target_function_cfg.graph.predecessors(node):
                 src = out_vars[p] if p in loop_nodes else p.variables
-                new_in = (self.join_variables_simple(new_in, src)
-                          if new_in else self.copy_variables(src))
+                new_in = self.join_variables_simple(new_in, src) if new_in else self.copy_variables(src)
 
-            if self.variables_equal(new_in, in_vars[node]):
-                continue
-            in_vars[node] = new_in
+            if not self.variables_equal(new_in, in_vars[node]):
+                in_vars[node] = new_in
 
-            # 2) transfer
-            tmp_out = self.transfer_function(node, new_in)
+            # 2) transfer  ─ 항상 실행
+            tmp_out = self.transfer_function(node, in_vars[node])
 
-            # 3) narrow – 헤드(φ-node)만, 그 외는 그대로 사용
-            if _need_narrow(node):
+            if _need_narrow(node) :
                 narrowed = self.narrow_variables(out_vars[node], tmp_out)
-            else:  # 비-헤드면 그냥 최신 out 으로 교체
+                if self.variables_equal(out_vars[node], narrowed):
+                    continue  # 변동 없으면 끝
+            else :
                 narrowed = tmp_out
 
-            if not self.variables_equal(out_vars[node], narrowed):
-                out_vars[node] = narrowed
-                WL.extend(self.current_target_function_cfg.graph.successors(node))
+            out_vars[node] = narrowed  # 갱신
 
-        # ── 4. exit-node 변수 반영 ───────────────────
+            # 4) 후속 노드 enqueue
+            for succ in self.current_target_function_cfg.graph.successors(node):
+                if succ in loop_nodes:
+                    WL.append(succ)
+
+        # ── 4. exit-node 변수 반영 ─────────────────────────
         exit_env = None
         for p in self.current_target_function_cfg.graph.predecessors(exit_node):
+            # 루프 안쪽 pred 는 out_vars 테이블에, 루프 밖 pred 는 CFG 노드에
             src = out_vars[p] if p in out_vars else p.variables
-            exit_env = self.join_variables_simple(exit_env, src) if exit_env else self.copy_variables(src)
-        exit_node.variables = exit_env if exit_env else {}
+            exit_env = (self.join_variables_simple(exit_env, src)
+                        if exit_env else self.copy_variables(src))
 
-        """
-        # ───── 분석 스냅샷 ②: loop-fixpoint ──────────
-        self._record_analysis(
-            line_no=_src_line_from_name(loop_condition_node),  # 같은 라인 그룹에 살짝 뒤에
-            stmt_type="loop-fixpoint",
-            env=exit_node.variables
-        )
-        # ────────────────────────────────────────────
-        """
+        # ① 조건·문장을 반영하기 위해 transfer_function 한 번 호출
+        #    (loop-exit 노드는 branch_node=True, is_true_branch=False 로 지정되어 있으므로
+        #     transfer_function 내부에서 ‘루프 조건의 부정’이 적용됩니다)
+        exit_final = self.transfer_function(exit_node, exit_env or {})
+
+        # ② 노드에 저장
+        exit_node.variables = exit_final
+
         return exit_node
 
     def find_loop_exit_nodes(self, while_node):

@@ -57,189 +57,81 @@ def simulate_inputs(records):
 
 test_inputs = [
   {
-    "code": "contract AOC_BEP {\n}",
+    "code": "contract BEP20 {\n}",
     "startLine": 1,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "struct UserInfo {\n}",
+    "code": "mapping (address=>uint256) balances;",
     "startLine": 2,
-    "endLine": 3,
+    "endLine": 2,
     "event": "add"
   },
   {
-    "code": "uint256 balance;",
+    "code": "\n",
     "startLine": 3,
     "endLine": 3,
     "event": "add"
   },
   {
-    "code": "uint256 level;",
+    "code": "uint256 public totalSupply;",
     "startLine": 4,
     "endLine": 4,
     "event": "add"
   },
   {
-    "code": "uint256 year;",
+    "code": "\n",
     "startLine": 5,
     "endLine": 5,
     "event": "add"
   },
   {
-    "code": "uint256 month;",
+    "code": "mapping (address=>mapping (address=>uint256)) allowed;",
     "startLine": 6,
     "endLine": 6,
     "event": "add"
   },
   {
     "code": "\n",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "function transferFrom(address _from,address _to,uint256 _amount) public returns (bool success) {\n}",
     "startLine": 8,
-    "endLine": 8,
+    "endLine": 9,
     "event": "add"
   },
   {
-    "code": "struct Level {\n}",
+    "code": "require (balances[_from]>=_amount&&allowed[_from][msg.sender]>=_amount&&_amount>0&&balances[_to]+_amount>balances[_to]);",
     "startLine": 9,
-    "endLine": 10,
+    "endLine": 9,
     "event": "add"
   },
   {
-    "code": "uint256 start;",
+    "code": "balances[_from]-=_amount;",
     "startLine": 10,
     "endLine": 10,
     "event": "add"
   },
   {
-    "code": "uint256 end;",
+    "code": "allowed[_from][msg.sender]-=_amount;",
     "startLine": 11,
     "endLine": 11,
     "event": "add"
   },
   {
-    "code": "uint256 percentage;",
+    "code": "balances[_to]+=_amount;",
     "startLine": 12,
     "endLine": 12,
     "event": "add"
   },
   {
-    "code": "\n",
-    "startLine": 14,
-    "endLine": 14,
-    "event": "add"
-  },
-  {
-    "code": "mapping(address => UserInfo) public userInfo;",
-    "startLine": 15,
-    "endLine": 15,
-    "event": "add"
-  },
-  {
-    "code": "mapping(uint256 => Level) public levels;",
-    "startLine": 16,
-    "endLine": 16,
-    "event": "add"
-  },
-  {
-    "code": "mapping(address => uint256) private _balances;",
-    "startLine": 17,
-    "endLine": 17,
-    "event": "add"
-  },
-  {
-    "code": "\n",
-    "startLine": 18,
-    "endLine": 18,
-    "event": "add"
-  },
-  {
-    "code": "function updateUserInfo(address account, uint256 year, uint256 month) internal {\n}",
-    "startLine": 19,
-    "endLine": 20,
-    "event": "add"
-  },
-  {
-    "code": "userInfo[account].balance = _balances[account];",
-    "startLine": 20,
-    "endLine": 20,
-    "event": "add"
-  },
-  {
-    "code": "userInfo[account].year = year;",
-    "startLine": 21,
-    "endLine": 21,
-    "event": "add"
-  },
-  {
-    "code": "userInfo[account].month = month;",
-    "startLine": 22,
-    "endLine": 22,
-    "event": "add"
-  },
-  {
-    "code": "for(uint256 i = 1; i <= 4; i++) {\n}",
-    "startLine": 23,
-    "endLine": 24,
-    "event": "add"
-  },
-  {
-    "code": "if(i == 4) {\n}",
-    "startLine": 24,
-    "endLine": 25,
-    "event": "add"
-  },
-  {
-    "code": "userInfo[account].level = i;",
-    "startLine": 25,
-    "endLine": 25,
-    "event": "add"
-  },
-  {
-    "code": "break;",
-    "startLine": 26,
-    "endLine": 26,
-    "event": "add"
-  },
-  {
-    "code": "if(block.timestamp >= levels[i].start && block.timestamp <= levels[i].end) {\n}",
-    "startLine": 28,
-    "endLine": 29,
-    "event": "add"
-  },
-  {
-    "code": "userInfo[account].level = i;",
-    "startLine": 29,
-    "endLine": 29,
-    "event": "add"
-  },
-  {
-    "code": "break;",
-    "startLine": 30,
-    "endLine": 30,
-    "event": "add"
-  },
-  {
-    "code": "// @TestCase BEGIN;",
-    "startLine": 20,
-    "endLine": 20,
-    "event": "add"
-  },
-  {
-    "code": "// @GlobalVar block.timestamp = [10,20];",
-    "startLine": 21,
-    "endLine": 21,
-    "event": "add"
-  },
-  {
-    "code": "// @StateVar _balances[account] = [100,200];",
-    "startLine": 22,
-    "endLine": 22,
-    "event": "add"
-  },
-  {
-    "code": "// @TestCase END;",
-    "startLine": 23,
-    "endLine": 23,
+    "code": "return true;",
+    "startLine": 13,
+    "endLine": 13,
     "event": "add"
   }
 ]
