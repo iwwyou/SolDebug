@@ -2920,7 +2920,7 @@ class ContractAnalyzer:
                                  variables: dict[str, Variables],  # ← 새로 넣었는지?
                                  fcfg: FunctionCFG,
                                  callerObject=None, callerContext=None):
-        if self._is_global_expr(expr):
+        if callerObject is None and callerContext is None and self._is_global_expr(expr):
             return None
 
         if expr.context == "IndexAccessContext":
@@ -3075,8 +3075,11 @@ class ContractAnalyzer:
                 if isinstance(elem, (StructVariable, MappingVariable, ArrayVariable)) :
                     return elem
                 elif isinstance(elem, (Variables, EnumVariable)):
-                    self._patch_var_with_new_value(elem, rVal)
-                    return elem
+                    if rVal is None:
+                        return elem
+                    else :
+                        self._patch_var_with_new_value(elem, rVal)
+                        return elem
 
             if isinstance(callerObject, StructVariable):
                 if ident not in callerObject.members:
@@ -3085,8 +3088,11 @@ class ContractAnalyzer:
                 if isinstance(mem, (StructVariable, MappingVariable, ArrayVariable)) :
                     return mem
                 elif isinstance(mem, (Variables, EnumVariable)):
-                    self._patch_var_with_new_value(mem, rVal)
-                    return mem
+                    if rVal is None:
+                        return mem
+                    else :
+                        self._patch_var_with_new_value(mem, rVal)
+                        return mem
 
             if isinstance(callerObject, MappingVariable):
                 if ident not in callerObject.mapping:
@@ -3096,12 +3102,19 @@ class ContractAnalyzer:
                 if isinstance(mvar, (StructVariable, ArrayVariable, MappingVariable)):
                     return mvar
                 elif isinstance(mvar, (Variables, EnumVariable)):
-                    self._patch_var_with_new_value(mvar, rVal)
-                    return mvar
+                    if rVal is None:
+                        return mvar
+                    else :
+                        self._patch_var_with_new_value(mvar, rVal)
+                        return mvar
 
             if isinstance(callerObject, (Variables, EnumVariable)):
-                self._patch_var_with_new_value(callerObject, rVal)
-                return callerObject
+                if rVal is None:
+                    return callerObject
+                else :
+                    self._patch_var_with_new_value(callerObject, rVal)
+                    return callerObject
+
 
         # (IndexAccess / MemberAccess 의 base 식별자를 해결하기 위한 분기)
         if callerContext in ("IndexAccessContext", "MemberAccessContext", "TestingIndexAccess",
@@ -3157,8 +3170,11 @@ class ContractAnalyzer:
                 return elem
             # leaf (elementary or enum)
             elif isinstance(elem, (Variables, EnumVariable)):
-                elem.value = rVal
-                return elem
+                if rVal is None :
+                    return elem
+                else :
+                    elem.value = rVal
+                    return elem
 
         if isinstance(callerObject, MappingVariable):
             key = lit_str  # mapping key 는 문자열 그대로 보존
@@ -3170,8 +3186,12 @@ class ContractAnalyzer:
                 return mvar
 
             if isinstance(mvar, (Variables, EnumVariable)):
-                mvar.value = rVal
-                return mvar
+                if rVal is None :
+                    return mvar
+                else :
+                    mvar.value = rVal
+                    return mvar
+
 
         raise ValueError(f"Literal context '{lit_str}' not handled for '{type(callerObject).__name__}'")
 
@@ -4279,7 +4299,7 @@ class ContractAnalyzer:
 
     def update_left_var(self, expr, rVal, operator, variables, callerObject=None, callerContext=None):
         # ── ① 글로벌이면 갱신 금지 ─────────────────────────
-        if self._is_global_expr(expr):
+        if callerObject is None and callerContext is None and self._is_global_expr(expr):
             return None
 
         if expr.context == "IndexAccessContext" :
@@ -4429,6 +4449,8 @@ class ContractAnalyzer:
         base_obj = self.update_left_var(expr.base, rVal, operator,
                                         variables, None, "MemberAccessContext")
         member = expr.member
+
+
 
         # ② base 가 StructVariable 인지 확인
         if not isinstance(base_obj, StructVariable):
@@ -4856,7 +4878,7 @@ class ContractAnalyzer:
                     raise ValueError(f"This '{ident_str}' is may be array or struct but may not be declared")
             elif callerContext == "IndexAccessContext" : # base에 대한 접근
                 if ident_str in variables :
-                    return variables[ident_str] # ArrayVariable 자체를 리턴
+                    return variables[ident_str] # ArrayVariable, MappingVariable 자체를 리턴
 
         # callerContext, callerObject 둘다 없는 경우
         if ident_str in variables: # variables에 있으면

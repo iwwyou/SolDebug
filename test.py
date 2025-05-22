@@ -133,7 +133,43 @@ test_inputs = [
     "startLine": 13,
     "endLine": 13,
     "event": "add"
-  }
+  },
+  {
+    "code": "// @TestCase BEGIN ",
+    "startLine": 9,
+    "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar balances[_from] = [100,200]",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar allowed[_from][msg.sender] = [50,90]",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar balances[_to] = [10,20]",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar _amount = [5,10]",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "// @TestCase END",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
 ]
 
 
