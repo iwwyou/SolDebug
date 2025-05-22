@@ -1049,6 +1049,8 @@ class ContractAnalyzer:
         if not contract_cfg:
             raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
 
+        print(self.current_target_function)
+
         # 2. 현재 타겟 함수의 CFG 가져오기
         self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
         if not self.current_target_function_cfg:
@@ -4048,7 +4050,6 @@ class ContractAnalyzer:
         def _join_atomic(v1, v2):
             "두 primitive value(Interval / BoolInterval / literal)를 join"
             if hasattr(v1, "join") and type(v1) is type(v2):
-                print("v1 : ", v1, " v2 : ", v2)
                 return v1.join(v2)  # Interval·BoolInterval
             if v1 == v2:
                 return v1  # 동일 리터럴
@@ -4519,13 +4520,8 @@ class ContractAnalyzer:
 
             entry = callerObject.mapping[key]
 
-            # (2-A) 더 깊게 들어갈 인덱스가 남아 있을 때
-            #       → 객체 그대로 넘겨 준다
-            if callerContext == "IndexAccessContext":
-                return entry  # allowed[msg.sender] ② 번째 인덱스용
-
             # (2-B) leaf 에 값 대입 중이면 여기서 patch
-            if isinstance(entry, (Variables, EnumVariable)):
+            if hasattr(entry, "value") :
                 entry.value = self.compound_assignment(entry.value, rVal, operator)
             return entry  # logging 용
 
@@ -4995,15 +4991,8 @@ class ContractAnalyzer:
                         callerObject.mapping[full_name] = self._create_new_mapping_value(
                             callerObject, full_name)
                     entry = callerObject.mapping[full_name]
+                    return entry.value if hasattr(entry, "value") else entry
 
-                    if callerContext == "IndexAccessContext":
-                        return entry  # 그대로 넘겨서 두 번째 인덱스 처리
-
-                        # (2-B) leaf(Variables·EnumVariable)까지 도달했으면 값 반환
-                    if isinstance(entry, (Variables, EnumVariable)):
-                        return entry.value
-
-                    return entry
                 else :
                     if full_name in variables:  # ← added
                         return variables[full_name].value  #  (Variables → 값))
@@ -6159,10 +6148,11 @@ class ContractAnalyzer:
         start_block, = fcfg.graph.successors(entry)  # exactly one successor
         start_block.variables = self.copy_variables(fcfg.related_variables)
 
-        # caller_env 에 있는 변수 중 아직 start_block 에 없는 키만 붙여넣기
+        # ① caller_env 의 스냅샷을 그대로 덮어쓴다 (동명 키도 overwrite)
+
         if caller_env is not None:
             for k, v in caller_env.items():
-                start_block.variables.setdefault(k, v)
+                start_block.variables[k] = v
 
         # ────────────────── work-list 초기화 ───────────────────────────────
         work = deque([start_block])
