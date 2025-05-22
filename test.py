@@ -57,13 +57,13 @@ def simulate_inputs(records):
 
 test_inputs = [
   {
-    "code": "contract BEP20 {\n}",
+    "code": "contract Dai {\n}",
     "startLine": 1,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "mapping (address=>uint256) balances;",
+    "code": "mapping (address => uint) public wards;",
     "startLine": 2,
     "endLine": 2,
     "event": "add"
@@ -81,13 +81,13 @@ test_inputs = [
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "mapping (address => uint) public balanceOf;",
     "startLine": 5,
     "endLine": 5,
     "event": "add"
   },
   {
-    "code": "mapping (address=>mapping (address=>uint256)) allowed;",
+    "code": "mapping (address => mapping (address => uint)) public allowance;",
     "startLine": 6,
     "endLine": 6,
     "event": "add"
@@ -99,77 +99,203 @@ test_inputs = [
     "event": "add"
   },
   {
-    "code": "function transferFrom(address _from,address _to,uint256 _amount) public returns (bool success) {\n}",
+    "code": "modifier auth {\n}",
     "startLine": 8,
     "endLine": 9,
     "event": "add"
   },
   {
-    "code": "require (balances[_from]>=_amount&&allowed[_from][msg.sender]>=_amount&&_amount>0&&balances[_to]+_amount>balances[_to]);",
+    "code": "require(wards[msg.sender] == 1, \"Dai/not-authorized\");",
     "startLine": 9,
     "endLine": 9,
     "event": "add"
   },
   {
-    "code": "balances[_from]-=_amount;",
+    "code": "_;",
     "startLine": 10,
     "endLine": 10,
     "event": "add"
   },
   {
-    "code": "allowed[_from][msg.sender]-=_amount;",
-    "startLine": 11,
-    "endLine": 11,
+    "code": "\n",
+    "startLine": 12,
+    "endLine": 12,
     "event": "add"
   },
   {
-    "code": "balances[_to]+=_amount;",
-    "startLine": 12,
-    "endLine": 12,
+    "code": "function add(uint x, uint y) internal pure returns (uint z) {\n}",
+    "startLine": 13,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "require((z = x + y) >= x);",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "function sub(uint x, uint y) internal pure returns (uint z) {\n}",
+    "startLine": 16,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "require((z = x - y) <= x);",
+    "startLine": 17,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 19,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "function transferFrom(address src, address dst, uint wad) public returns (bool) {\n}",
+    "startLine": 20,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "require(balanceOf[src] >= wad, \"Dai/insufficient-balance\");",
+    "startLine": 21,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "if (src != msg.sender && allowance[src][msg.sender] != uint(-1)) {\n}",
+    "startLine": 22,
+    "endLine": 23,
+    "event": "add"
+  },
+  {
+    "code": "require(allowance[src][msg.sender] >= wad, \"Dai/insufficient-allowance\");",
+    "startLine": 23,
+    "endLine": 23,
+    "event": "add"
+  },
+  {
+    "code": "allowance[src][msg.sender] = sub(allowance[src][msg.sender], wad);",
+    "startLine": 24,
+    "endLine": 24,
+    "event": "add"
+  },
+  {
+    "code": "balanceOf[src] = sub(balanceOf[src], wad);",
+    "startLine": 26,
+    "endLine": 26,
+    "event": "add"
+  },
+  {
+    "code": "balanceOf[dst] = add(balanceOf[dst], wad);",
+    "startLine": 27,
+    "endLine": 27,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 28,
+    "endLine": 28,
     "event": "add"
   },
   {
     "code": "return true;",
-    "startLine": 13,
-    "endLine": 13,
+    "startLine": 29,
+    "endLine": 29,
     "event": "add"
   },
   {
-    "code": "// @TestCase BEGIN ",
-    "startLine": 9,
-    "endLine": 9,
+    "code": "\n",
+    "startLine": 31,
+    "endLine": 31,
     "event": "add"
   },
   {
-    "code": "// @StateVar balances[_from] = [100,200]",
-    "startLine": 10,
-    "endLine": 10,
+    "code": "function transfer(address dst, uint wad) external returns (bool) {\n}",
+    "startLine": 32,
+    "endLine": 33,
     "event": "add"
   },
   {
-    "code": "// @StateVar allowed[_from][msg.sender] = [50,90]",
-    "startLine": 11,
-    "endLine": 11,
+    "code": "return transferFrom(msg.sender, dst, wad);",
+    "startLine": 33,
+    "endLine": 33,
     "event": "add"
   },
   {
-    "code": "// @StateVar balances[_to] = [10,20]",
-    "startLine": 12,
-    "endLine": 12,
+    "code": "\n",
+    "startLine": 35,
+    "endLine": 35,
     "event": "add"
   },
   {
-    "code": "// @LocalVar _amount = [5,10]",
-    "startLine": 13,
-    "endLine": 13,
+    "code": "function mint(address usr, uint wad) external auth {\n}",
+    "startLine": 36,
+    "endLine": 37,
     "event": "add"
   },
   {
-    "code": "// @TestCase END",
-    "startLine": 13,
-    "endLine": 13,
+    "code": "balanceOf[usr] = add(balanceOf[usr], wad);",
+    "startLine": 37,
+    "endLine": 37,
     "event": "add"
   },
+  {
+    "code": "totalSupply    = add(totalSupply, wad);",
+    "startLine": 38,
+    "endLine": 38,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 40,
+    "endLine": 40,
+    "event": "add"
+  },
+  {
+    "code": "function burn(address usr, uint wad) external {\n}",
+    "startLine": 41,
+    "endLine": 42,
+    "event": "add"
+  },
+  {
+    "code": "require(balanceOf[usr] >= wad, \"Dai/insufficient-balance\");",
+    "startLine": 42,
+    "endLine": 42,
+    "event": "add"
+  },
+  {
+    "code": "if (usr != msg.sender && allowance[usr][msg.sender] != uint(-1)) {\n}",
+    "startLine": 43,
+    "endLine": 44,
+    "event": "add"
+  },
+  {
+    "code": "require(allowance[usr][msg.sender] >= wad, \"Dai/insufficient-allowance\");",
+    "startLine": 44,
+    "endLine": 44,
+    "event": "add"
+  },
+  {
+    "code": "allowance[usr][msg.sender] = sub(allowance[usr][msg.sender], wad);",
+    "startLine": 45,
+    "endLine": 45,
+    "event": "add"
+  },
+  {
+    "code": "balanceOf[usr] = sub(balanceOf[usr], wad);",
+    "startLine": 47,
+    "endLine": 47,
+    "event": "add"
+  },
+  {
+    "code": "totalSupply    = sub(totalSupply, wad);",
+    "startLine": 48,
+    "endLine": 48,
+    "event": "add"
+  }
 ]
 
 

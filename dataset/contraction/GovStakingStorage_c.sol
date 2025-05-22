@@ -42,20 +42,5 @@ contract GovStakingStorage {
         uint256 toAdd = (((newLockPeriod / 1 weeks) * newRate) * newAmount) / 100000;
         info.rewardMultiplier = info.rewardMultiplier + toAdd - toRemove;
         totalRewardMultiplier = totalRewardMultiplier + toAdd - toRemove;
-    }
-
-    function addRewardMultiplier(address user, uint256 rate, uint256 period, uint256 amount) external isAllowed {
-        UserInfo storage info = userInfo[user];
-        info.rewardMultiplier += ((((rate * period) / 1 weeks) * amount)) / 100000;
-        totalRewardMultiplier += ((((rate * period) / 1 weeks) * amount)) / 100000;
-    }
-
-    function getUserInfoByIndex(uint256 from, uint256 to) external view returns (UserInfo[] memory) {
-        uint256 to_ = to > userList.length ? userList.length : to;
-        UserInfo[] memory result = new UserInfo[](to - from);
-        for (uint256 i = 0; i < to_ - from; i++) {
-            result[i] = userInfo[userList[i + from]];
-        }
-        return result;
-    }
+    } 
 }

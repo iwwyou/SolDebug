@@ -248,6 +248,7 @@ class FunctionCFG(CFG):
         self.function_name = function_name
         self.modifiers = {}
         self.related_variables = {}
+        self.parameters: list[str] = []  # ←★ 추가
         self.return_types: list[SolType] = []   # 이름 없는 리턴
         self.return_vars : list = [] # 이름이 있는 리턴
 

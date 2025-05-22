@@ -724,6 +724,10 @@ class ContractAnalyzer:
             for var in contract_cfg.state_variable_node.variables.values():
                 modifier_cfg.add_related_variable(var)
 
+        for gv in contract_cfg.globals.values():  # ← 새 코드
+            modifier_cfg.add_related_variable(gv)  # (얕은 복사 필요 없고
+            #     원본 객체를 그대로 써도 OK)
+
         # 3) CFG 저장
         contract_cfg.functions[modifier_name] = modifier_cfg
         self.contract_cfgs[self.current_target_contract] = contract_cfg
@@ -852,6 +856,7 @@ class ContractAnalyzer:
             if p_name:  # 이름이 있는 것만 변수화
                 var = self._make_param_variable(p_type, p_name, scope="local")
                 fcfg.add_related_variable(var)
+                fcfg.parameters.append(p_name)
 
         # ───────────────────────────────────────────────────────────────
         # 4. Modifier invocation → CFG 병합
@@ -876,6 +881,11 @@ class ContractAnalyzer:
         if contract_cfg.state_variable_node:
             for var in contract_cfg.state_variable_node.variables.values():
                 fcfg.add_related_variable(var)
+
+        # 6-B. 글로벌 변수(block/msg/tx…) ----------------------------------------------
+        for gv in contract_cfg.globals.values():  # ← 새 코드
+            fcfg.add_related_variable(gv)  # (얕은 복사 필요 없고
+            #     원본 객체를 그대로 써도 OK)
 
         # ───────────────────────────────────────────────────────────────
         # 7. 결과를 ContractCFG 에 반영
@@ -2980,6 +2990,23 @@ class ContractAnalyzer:
         member = expr.member
 
         if member is not None:
+            if self._is_global_expr(expr) and isinstance(callerObject, MappingVariable):
+                key = f"{expr.base.identifier}.{member}"  # "msg.sender"
+
+                # 엔트리가 없으면 새로 만든다
+                if key not in callerObject.mapping:
+                    callerObject.mapping[key] = self._create_new_mapping_value(
+                        callerObject, key)
+
+                entry = callerObject.mapping[key]
+
+                # ① 더 깊은 IndexAccess 가 이어질 때는 객체 그대로 반환
+                if callerContext == "TestingIndexAccess":
+                    return entry  # allowed[msg.sender] 의 결과
+
+                # ② leaf 읽기(Testing이므로 값 패치는 하지 않음)
+                return entry  # Variables / EnumVariable / Array…
+
             if not isinstance(base_obj, StructVariable):
                 raise ValueError(f"[Warn] member access on non-struct '{base_obj.identifier}'")
             m = base_obj.members.get(member)
@@ -3029,6 +3056,25 @@ class ContractAnalyzer:
         member = expr.member
 
         if member is not None:
+            if self._is_global_expr(expr) and isinstance(callerObject, MappingVariable):
+                key = f"{expr.base.identifier}.{member}"  # "msg.sender"
+
+                # 1) 엔트리 확보 (없으면 생성)
+                if key not in callerObject.mapping:
+                    callerObject.mapping[key] = self._create_new_mapping_value(
+                        callerObject, key)
+
+                entry = callerObject.mapping[key]
+
+                # 2) 뒤에 또 인덱스가 붙을 때는 객체 그대로 반환
+                if callerContext == "IndexAccessContext":
+                    return entry
+
+                # 3) leaf-write : rVal 반영
+                if isinstance(entry, (Variables, EnumVariable)) and rVal is not None:
+                    self._patch_var_with_new_value(entry, rVal)
+                return entry  # ← leaf 객체 반환
+
             if not isinstance(base_obj, StructVariable):
                 raise ValueError(f"[Warn] member access on non-struct '{base_obj.identifier}'")
             m = base_obj.members.get(member)
@@ -3119,7 +3165,14 @@ class ContractAnalyzer:
         # (IndexAccess / MemberAccess 의 base 식별자를 해결하기 위한 분기)
         if callerContext in ("IndexAccessContext", "MemberAccessContext", "TestingIndexAccess",
                              "TestingMemberAccess"):
-            return variables.get(ident)  # 상위에서 None 체크
+            if ident in variables:
+                return variables[ident]  # MappingVariable, StructVariable 자체를 리턴
+            elif ident in ["block", "tx", "msg", "address", "code"]:
+                return ident  # block, tx, msg를 리턴
+            elif ident in self.contract_cfgs[self.current_target_contract].enumDefs:  # EnumDef 리턴
+                return self.contract_cfgs[self.current_target_contract].enumDefs[ident]
+            else:
+                raise ValueError(f"This '{ident}' is may be array or struct but may not be declared")
 
         if ident not in variables:
             raise ValueError(f"Variable '{ident}' not declared in current scope.")
@@ -3916,7 +3969,7 @@ class ContractAnalyzer:
 
             for s in succs:
                 # succ 이 ‘메타’(join, for-incr, loop-exit, fixpoint) 면 edge 교체
-                if s.join_point_node or s.is_for_increment :
+                if s.join_point_node or s.is_for_increment or s.name == "EXIT" :
                     G.remove_edge(leaf, s)
                     G.add_edge(leaf, new_blk)
                     G.add_edge(new_blk, s)
@@ -3995,6 +4048,7 @@ class ContractAnalyzer:
         def _join_atomic(v1, v2):
             "두 primitive value(Interval / BoolInterval / literal)를 join"
             if hasattr(v1, "join") and type(v1) is type(v2):
+                print("v1 : ", v1, " v2 : ", v2)
                 return v1.join(v2)  # Interval·BoolInterval
             if v1 == v2:
                 return v1  # 동일 리터럴
@@ -4450,9 +4504,32 @@ class ContractAnalyzer:
                                         variables, None, "MemberAccessContext")
         member = expr.member
 
+        # ────────────────────────────────────────────────
+        # ② 〈글로벌 멤버〉가 매핑의 키로 쓰인 경우
+        #      · balances[msg.sender]         (1-단계)
+        #      · allowed[msg.sender][_from]   (2-단계)
+        # ────────────────────────────────────────────────
+        if self._is_global_expr(expr) and isinstance(callerObject, MappingVariable):
+            key = f"{expr.base.identifier}.{member}"  # "msg.sender"
 
+            # (1) 엔트리 없으면 생성
+            if key not in callerObject.mapping:
+                callerObject.mapping[key] = self._create_new_mapping_value(
+                    callerObject, key)
 
-        # ② base 가 StructVariable 인지 확인
+            entry = callerObject.mapping[key]
+
+            # (2-A) 더 깊게 들어갈 인덱스가 남아 있을 때
+            #       → 객체 그대로 넘겨 준다
+            if callerContext == "IndexAccessContext":
+                return entry  # allowed[msg.sender] ② 번째 인덱스용
+
+            # (2-B) leaf 에 값 대입 중이면 여기서 patch
+            if isinstance(entry, (Variables, EnumVariable)):
+                entry.value = self.compound_assignment(entry.value, rVal, operator)
+            return entry  # logging 용
+
+            # ② base 가 StructVariable 인지 확인
         if not isinstance(base_obj, StructVariable):
             raise ValueError(f"Member access on non-struct '{base_obj.identifier}'")
 
@@ -4668,7 +4745,14 @@ class ContractAnalyzer:
         # ─────────────────────── 2. 상위 객체 없음 ──────────────────
         # (IndexAccess / MemberAccess 의 base 식별자를 해결하기 위한 분기)
         if callerContext in ("IndexAccessContext", "MemberAccessContext"):
-            return variables.get(ident)  # 상위에서 None 체크
+            if ident in variables:
+                return variables[ident]  # MappingVariable, StructVariable 자체를 리턴
+            elif ident in ["block", "tx", "msg", "address", "code"]:
+                return ident  # block, tx, msg를 리턴
+            elif ident in self.contract_cfgs[self.current_target_contract].enumDefs:  # EnumDef 리턴
+                return self.contract_cfgs[self.current_target_contract].enumDefs[ident]
+            else:
+                raise ValueError(f"This '{ident}' is may be array or struct but may not be declared")
 
         # ─────────────────────── 3. 일반 대입식 ─────────────────────
         # 로컬-스코프 or state-scope 변수 직접 갱신
@@ -4701,6 +4785,9 @@ class ContractAnalyzer:
             return self.evaluate_function_call_context(expr, variables, callerObject, callerContext)
         elif expr.context == "TupleExpressionContext":
             return self.evaluate_tuple_expression_context(expr, variables,
+                                                          callerObject, callerContext)
+        elif expr.context == 'AssignmentOpContext' :
+            return self.evaluate_assignment_expression(expr, variables,
                                                           callerObject, callerContext)
 
         # 단항 연산자
@@ -4901,14 +4988,27 @@ class ContractAnalyzer:
         # ──────────────────────────────────────────────────────────────
         if isinstance(baseVal, str):
             if baseVal in {"block", "msg", "tx"}:
+                # 0) 함수-env 에 이미 변수로 들어와 있나?
                 full_name = f"{baseVal}.{member}"
-                contractCfg = self.contract_cfgs[self.current_target_contract]
+                if isinstance(callerObject, MappingVariable) :
+                    if full_name not in callerObject.mapping:
+                        callerObject.mapping[full_name] = self._create_new_mapping_value(
+                            callerObject, full_name)
+                    entry = callerObject.mapping[full_name]
 
-                gv_obj = contractCfg.globals[full_name]
-                funcName = self.current_target_function
-                gv_obj.usage_sites.add(funcName)
+                    if callerContext == "IndexAccessContext":
+                        return entry  # 그대로 넘겨서 두 번째 인덱스 처리
 
-                return gv_obj.current  # Interval or address-interval
+                        # (2-B) leaf(Variables·EnumVariable)까지 도달했으면 값 반환
+                    if isinstance(entry, (Variables, EnumVariable)):
+                        return entry.value
+
+                    return entry
+                else :
+                    if full_name in variables:  # ← added
+                        return variables[full_name].value  #  (Variables → 값))
+                    else :
+                        raise ValueError (f"There is no global variable in function")
 
             # address.code / address.code.length
             if baseVal == "code":
@@ -5167,6 +5267,21 @@ class ContractAnalyzer:
         # 여기서는 단순히 그대로 반환
 
         return results
+
+    def evaluate_assignment_expression(self, expr, variables,
+                                       callerObject=None, callerContext=None):
+        """
+        대입식이 ‘값을 돌려주는 표현식’ 으로 사용될 때 처리.
+          예)  (z = x + y)
+        ①  RHS 값을 계산
+        ②  LHS 변수에 반영(update_left_var)
+        ③  RHS 값을 그대로 반환
+        """
+        r_val = self.evaluate_expression(expr.right, variables, None, None)
+        # LHS 쪽 환경 업데이트
+        self.update_left_var(expr.left, r_val, '=', variables,
+                             callerObject, callerContext)
+        return r_val  # ← ‘값을 돌려주기’ 핵심!
 
     def evaluate_tuple_expression_context(self, expr, variables,
                                           callerObject=None, callerContext=None):
@@ -5948,8 +6063,8 @@ class ContractAnalyzer:
         if expr.context == "MemberAccessContext" : # dynamic array에 대한 push, pop
             return self.evaluate_expression(expr, variables, None, "functionCallContext")
 
-        if expr.context == "IdentifierExpContext":
-            function_name = expr.identifier
+        if expr.function.context == "IdentifierExpContext" :
+            function_name = expr.function.identifier
         else:
             raise ValueError (f"There is no function name in function call context")
 
@@ -5994,7 +6109,6 @@ class ContractAnalyzer:
                 function_cfg.related_variables[param_name].value = arg_val
             else:
                 raise ValueError(f"Parameter '{param_name}' not found in function '{function_name}' variables.")
-
         #    named 인자
         #    (예: foo(a=1,b=2)) => paramName->index 매핑이 필요할 수 있음
         #    여기서는 paramName가 function_cfg.parameters[i]와 동일한지 가정
@@ -6009,15 +6123,21 @@ class ContractAnalyzer:
             else:
                 raise ValueError(f"Parameter '{key}' not found in function '{function_name}' variables.")
 
+        # 5-A) ❶ caller 의 현재 env(variables)를 callee related_variables 로 병합
+        #      ─ 이미 같은 key 가 있으면(상태변수·글로벌) 그대로 두고,
+        #        caller 쪽에만 있던 로컬/임시 변수는 얕은 참조로 추가
+        for k, v in variables.items():
+            function_cfg.related_variables.setdefault(k, v)
+
         # 6) 실제 함수 CFG 해석
-        return_value = self.interpret_function_cfg(function_cfg)
+        return_value = self.interpret_function_cfg(function_cfg, variables)   # ← caller env 전달
 
         # 7) 함수 컨텍스트 복원
         self.current_target_function = saved_function
 
         return return_value
 
-    def interpret_function_cfg(self, fcfg: FunctionCFG):
+    def interpret_function_cfg(self, fcfg: FunctionCFG, caller_env: dict[str, Variables] | None = None):
 
         # ─── ① 호출 이전 컨텍스트 백업 ─────────────────────────
         _old_func = self.current_target_function
@@ -6038,6 +6158,11 @@ class ContractAnalyzer:
         entry = fcfg.get_entry_node()
         start_block, = fcfg.graph.successors(entry)  # exactly one successor
         start_block.variables = self.copy_variables(fcfg.related_variables)
+
+        # caller_env 에 있는 변수 중 아직 start_block 에 없는 키만 붙여넣기
+        if caller_env is not None:
+            for k, v in caller_env.items():
+                start_block.variables.setdefault(k, v)
 
         # ────────────────── work-list 초기화 ───────────────────────────────
         work = deque([start_block])
@@ -6162,6 +6287,19 @@ class ContractAnalyzer:
         self._record_enabled = False
         self.current_target_function = _old_func
         self.current_target_function_cfg = _old_fcfg
+
+        # ⑥  callee 의 최종 변수 집합을 caller_env 로 역-반영
+        if caller_env is not None:
+            exit_env = fcfg.get_exit_node().variables
+            for k, v in exit_env.items():
+                if k in caller_env:  # ① 기존 키만 덮어쓰기
+                    if hasattr(caller_env[k], "value"):
+                        caller_env[k].value = v.value
+                    else:
+                        caller_env[k] = v  # 복합-타입은 객체 공유
+                elif isinstance(v, (MappingVariable, ArrayVariable)):
+                    # ② “스토리지 엔트리 신규 생성”만 선택적으로 반영
+                    caller_env[k] = v  # (필요 시 얕은 복사)
 
         # exit node에 도달했다면 return_values join
         # 모든 return을 모아 exit node에서 join 처리할 수 있으나, 여기서는 단순히 top-level에서 return_values를 join
@@ -6595,7 +6733,7 @@ class ContractAnalyzer:
         if not self._batch_targets:
             return
         fcfg = self._batch_targets.pop()
-        self.interpret_function_cfg(fcfg)
+        self.interpret_function_cfg(fcfg, None)
 
         ln_set = {st.src_line
                   for blk in fcfg.graph.nodes

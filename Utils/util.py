@@ -232,7 +232,7 @@ class GlobalVariable(Variables):
         super().__init__(identifier, value, isConstant, scope)
         self.base = base
         self.member = member
-        self.value = value  #Interval이 될수도 있고 그냥 address 1 이렇게 될수도 있음
+        self.value = value
         self.typeInfo = SolType()
 
         self.default_value: Interval | str | None = None  # 런타임 기본값

@@ -17,10 +17,6 @@ contract Dai {
         require((z = x - y) <= x);
     }
 
-    function transfer(address dst, uint wad) external returns (bool) {
-        return transferFrom(msg.sender, dst, wad);
-    }
-
     function transferFrom(address src, address dst, uint wad) public returns (bool) {
         require(balanceOf[src] >= wad, "Dai/insufficient-balance");
         if (src != msg.sender && allowance[src][msg.sender] != uint(-1)) {
@@ -32,6 +28,10 @@ contract Dai {
        
         return true;
     }
+
+    function transfer(address dst, uint wad) external returns (bool) {
+        return transferFrom(msg.sender, dst, wad);
+    }    
 
     function mint(address usr, uint wad) external auth {
         balanceOf[usr] = add(balanceOf[usr], wad);

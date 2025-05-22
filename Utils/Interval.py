@@ -475,6 +475,29 @@ class UnsignedIntegerInterval(Interval):
         self.min_value = 0
         self.max_value = (1 << bits) - 1  # 2**bits − 1
 
+    def negate(self) -> "UnsignedIntegerInterval":
+        """
+        uintN 범위에서의 단항 `-` (2^N 모듈러 보수).
+        * [a,a]  단일값이면              → [-a mod 2^N , -a mod 2^N]
+        * 구간이 여러 값을 포함하면       → 정보 손실을 피하기 어려우므로 TOP([0,max])
+        """
+        # ⊥ 그대로
+        if self.is_bottom():
+            return self
+
+        bits = self.type_length
+        modulus = 1 << bits  # 2^N
+
+        # ① 싱글톤 [v,v] 만 정확히 처리
+        if self.min_value == self.max_value:
+            v = self.min_value % modulus
+            neg_v = (-v) % modulus  # = 2^N - v, 단 v==0 이면 0
+            return UnsignedIntegerInterval(neg_v, neg_v, bits)
+
+        # ② 구간이 넓으면 정확한 역상(보수)이 '랩(wrap-around) 구간'이 되므로
+        #    분석 단순화를 위해 TOP 으로 보수화
+        return UnsignedIntegerInterval(0, modulus - 1, bits)
+
     # ---------- Lattice 연산 ----------
     def join(self, other):
         if self.is_bottom():
