@@ -22,6 +22,20 @@ TIME_VALUE = {
     "ether":   10 ** 18,
 }
 
+# ContractAnalyzer (or util module) ──────────────────────────
+READONLY_MEMBERS = {
+    # Array / bytes
+    "length", "slot", "offset",
+    # Address
+    "balance", "code", "codehash",
+    # Function
+    "selector",
+    # type(T) meta
+    "max", "min", "size", "name"
+}
+
+READONLY_GLOBAL_BASES = {"block", "msg", "tx"}
+
 
 class EnhancedSolidityVisitor(SolidityVisitor):
 

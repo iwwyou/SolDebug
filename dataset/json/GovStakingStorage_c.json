@@ -108,135 +108,141 @@
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "mapping(address => bool) public allowed;",
     "startLine": 20,
     "endLine": 20,
     "event": "add"
   },
   {
-    "code": "modifier isAllowed() {\n}",
+    "code": "\n",
     "startLine": 21,
-    "endLine": 22,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "modifier isAllowed() {\n}",
+    "startLine": 22,
+    "endLine": 23,
     "event": "add"
   },
   {
     "code": "require(allowed[msg.sender], \"sender is not allowed to write\");",
-    "startLine": 22,
-    "endLine": 22,
-    "event": "add"
-  },
-  {
-    "code": "_;",
     "startLine": 23,
     "endLine": 23,
     "event": "add"
   },
   {
+    "code": "_;",
+    "startLine": 24,
+    "endLine": 24,
+    "event": "add"
+  },
+  {
     "code": "\n",
-    "startLine": 25,
-    "endLine": 25,
+    "startLine": 26,
+    "endLine": 26,
     "event": "add"
   },
   {
     "code": "function removeUser(address user) external isAllowed {\n}",
-    "startLine": 26,
-    "endLine": 27,
+    "startLine": 27,
+    "endLine": 28,
     "event": "add"
   },
   {
     "code": "require(userInfo[user].index != 0, \"user does not exist\");",
-    "startLine": 27,
-    "endLine": 27,
+    "startLine": 28,
+    "endLine": 28,
     "event": "add"
   },
   {
     "code": "if (userList.length > 1) {\n}",
-    "startLine": 28,
-    "endLine": 29,
+    "startLine": 29,
+    "endLine": 30,
     "event": "add"
   },
   {
     "code": "address lastAddress = userList[userList.length - 1];",
-    "startLine": 29,
-    "endLine": 29,
-    "event": "add"
-  },
-  {
-    "code": "uint256 oldIndex = userInfo[user].index;",
     "startLine": 30,
     "endLine": 30,
     "event": "add"
   },
   {
-    "code": "userList[oldIndex] = lastAddress;",
+    "code": "uint256 oldIndex = userInfo[user].index;",
     "startLine": 31,
     "endLine": 31,
     "event": "add"
   },
   {
-    "code": "userInfo[lastAddress].index = oldIndex;",
+    "code": "userList[oldIndex] = lastAddress;",
     "startLine": 32,
     "endLine": 32,
     "event": "add"
   },
   {
-    "code": "userList.pop();",
-    "startLine": 34,
-    "endLine": 34,
+    "code": "userInfo[lastAddress].index = oldIndex;",
+    "startLine": 33,
+    "endLine": 33,
     "event": "add"
   },
   {
-    "code": "totalRewardMultiplier -= userInfo[user].rewardMultiplier;",
+    "code": "userList.pop();",
     "startLine": 35,
     "endLine": 35,
     "event": "add"
   },
   {
-    "code": "delete userInfo[user];",
+    "code": "totalRewardMultiplier -= userInfo[user].rewardMultiplier;",
     "startLine": 36,
     "endLine": 36,
     "event": "add"
   },
   {
+    "code": "delete userInfo[user];",
+    "startLine": 37,
+    "endLine": 37,
+    "event": "add"
+  },
+  {
     "code": "\n",
-    "startLine": 38,
-    "endLine": 38,
+    "startLine": 39,
+    "endLine": 39,
     "event": "add"
   },
   {
     "code": "function updateRewardMultiplier(address user, uint256 oldRate, uint256 newRate, uint256 passedTime, uint256 oldLockPeriod, uint256 newLockPeriod, uint256 oldAmount, uint256 newAmount) external isAllowed {\n}",
-    "startLine": 39,
-    "endLine": 40,
+    "startLine": 40,
+    "endLine": 41,
     "event": "add"
   },
   {
     "code": "UserInfo storage info = userInfo[user];",
-    "startLine": 40,
-    "endLine": 40,
-    "event": "add"
-  },
-  {
-    "code": "uint256 toRemove = ((((oldLockPeriod - passedTime) / 1 weeks) * oldRate) * oldAmount) / 100000;",
     "startLine": 41,
     "endLine": 41,
     "event": "add"
   },
   {
-    "code": "uint256 toAdd = (((newLockPeriod / 1 weeks) * newRate) * newAmount) / 100000;",
+    "code": "uint256 toRemove = ((((oldLockPeriod - passedTime) / 1 weeks) * oldRate) * oldAmount) / 100000;",
     "startLine": 42,
     "endLine": 42,
     "event": "add"
   },
   {
-    "code": "info.rewardMultiplier = info.rewardMultiplier + toAdd - toRemove;",
+    "code": "uint256 toAdd = (((newLockPeriod / 1 weeks) * newRate) * newAmount) / 100000;",
     "startLine": 43,
     "endLine": 43,
     "event": "add"
   },
   {
-    "code": "totalRewardMultiplier = totalRewardMultiplier + toAdd - toRemove;",
+    "code": "info.rewardMultiplier = info.rewardMultiplier + toAdd - toRemove;",
     "startLine": 44,
     "endLine": 44,
+    "event": "add"
+  },
+  {
+    "code": "totalRewardMultiplier = totalRewardMultiplier + toAdd - toRemove;",
+    "startLine": 45,
+    "endLine": 45,
     "event": "add"
   }
 ]

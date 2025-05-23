@@ -17,6 +17,7 @@ contract GovStakingStorage {
 
     mapping(address => UserInfo) public userInfo;
     address[] public userList;
+    mapping(address => bool) public allowed;
 
     modifier isAllowed() {
         require(allowed[msg.sender], "sender is not allowed to write");

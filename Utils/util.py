@@ -352,6 +352,58 @@ class ArrayVariable(Variables):
         self.typeInfo.isDynamicArray = is_dynamic
         self.elements: list[Variables | "ArrayVariable"] = []
 
+    # models.py ― ArrayVariable  내부
+    def _create_default_value(self, eid: str):
+        """
+        base_type 에 맞춰 'TOP' 값을 만들어 준다.
+        """
+        bt = self.typeInfo.arrayBaseType  # SolType | str
+        # ─ address ──────────────────────────────────
+        if (isinstance(bt, SolType) and bt.elementaryTypeName == "address") \
+                or bt == "address":
+            return UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
+
+        # ─ bool ─────────────────────────────────────
+        if (isinstance(bt, SolType) and bt.elementaryTypeName == "bool") \
+                or bt == "bool":
+            return BoolInterval(0, 1)  # TOP of bool
+
+        # ─ int / uint ──────────────────────────────
+        if isinstance(bt, SolType) and bt.elementaryTypeName.startswith("int"):
+            w = bt.intTypeLength or 256
+            return IntegerInterval(-(2 ** (w - 1)), 2 ** (w - 1) - 1, w)
+        if isinstance(bt, SolType) and bt.elementaryTypeName.startswith("uint"):
+            w = bt.intTypeLength or 256
+            return UnsignedIntegerInterval(0, 2 ** w - 1, w)
+
+        # ─ 그 밖의 타입(bytes,string,구조체 등) ───
+        return f"symbol_{eid}"  # 마지막 보루
+
+    # -----------------------------------------------------------------
+    def get_or_create_element(self, idx: int):
+        """
+        동적 배열이면 idx 위치까지 0‥idx 의 모든 요소를 채워 넣으며,
+        정적 배열이면 범위 체크만 수행한다.
+        """
+        if idx < 0:
+            raise IndexError("negative index")
+
+        # 동적 배열 → 필요하면 확장
+        if self.typeInfo.isDynamicArray:
+            while idx >= len(self.elements):  # auto-push
+                eid = f"{self.identifier}[{len(self.elements)}]"
+                new_elem = Variables(eid,
+                                     self._create_default_value(eid),
+                                     scope=self.scope,
+                                     typeInfo=self.typeInfo.arrayBaseType)
+                self.elements.append(new_elem)
+
+        # 정적 배열 → 범위 검사
+        if idx >= len(self.elements):
+            raise IndexError(f"index {idx} out of range ({len(self.elements)})")
+
+        return self.elements[idx]
+
     def _create_new_array_element(self, idx: int):
         """
         배열 push·동적-초기화 시 1칸짜리 child 를 만든다.
