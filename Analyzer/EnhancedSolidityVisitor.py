@@ -10,6 +10,19 @@ KEYWORD_IDENTIFIERS = {
     "from", "to", "payable", "returns",      # 필요 시 계속 추가
 }
 
+TIME_VALUE = {
+    "seconds": 1,
+    "minutes": 60,
+    "hours":   60 * 60,
+    "days":    24 * 60 * 60,
+    "weeks":   7  * 24 * 60 * 60,
+    "years":   365 * 24 * 60 * 60,
+    "wei":     1,
+    "gwei":    10 ** 9,
+    "ether":   10 ** 18,
+}
+
+
 class EnhancedSolidityVisitor(SolidityVisitor):
 
     def __init__(self, contract_analyzer):
@@ -202,9 +215,11 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         # ── ② 변수 object  생성 (array / struct / mapping / enum / elementary) ──
         if type_info.typeCategory == "array":
             var_obj = ArrayVariable(var_name, type_info.arrayBaseType,
-                                    type_info.arrayLength, scope="state")
+                                    type_info.arrayLength, scope="state",
+                                    is_dynamic=type_info.isDynamicArray)
         elif type_info.typeCategory == "struct":
-            var_obj = StructVariable(var_name, type_info.structTypeName, scope="state")
+            var_obj = StructVariable(var_name, type_info.structTypeName, scope="state",
+                                     )
         elif type_info.typeCategory == "mapping":
             var_obj = MappingVariable(var_name,
                                       type_info.mappingKeyType,
@@ -2016,6 +2031,17 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         )
 
         return result_expr
+
+    def visitLiteralWithSubDenomination(self, ctx: SolidityParser.LiteralWithSubDenominationContext):
+        num_txt = ctx.numberLiteral().getText()  # "1"  또는 "0x1a"
+        unit_txt = ctx.SubDenomination().getText()  # "weeks" 등
+        value = int(num_txt, 0)  # auto-base
+
+        expr = Expression(
+            literal=(value, unit_txt),  # 튜플 보관
+            context="LiteralSubDenomination"
+        )
+        return expr
 
     # Visit a parse tree produced by SolidityParser#TypeNameExp.
     def visitTypeNameExp(self, ctx:SolidityParser.TypeNameExpContext):

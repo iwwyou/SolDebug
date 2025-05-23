@@ -12,6 +12,7 @@ from solcx.exceptions import SolcError
 import copy
 from typing import Dict, cast
 from collections import defaultdict
+from EnhancedSolidityVisitor import TIME_VALUE
 import json
 from pathlib import Path
 from datetime import datetime
@@ -140,9 +141,7 @@ class ContractAnalyzer:
 
 
         elif event == "delete":
-
             offset = end_line - start_line + 1
-
             # A.  삭제 전 rollback (종전 그대로)  …
 
             # B-1.  메타데이터 pop
@@ -4805,6 +4804,9 @@ class ContractAnalyzer:
         elif expr.context == 'AssignmentOpContext' :
             return self.evaluate_assignment_expression(expr, variables,
                                                           callerObject, callerContext)
+        elif expr.context == "LiteralSubDenomination":
+            return self.evaluate_literal_with_subdenomination_context(
+                expr, variables, callerObject, callerContext)
 
         # 단항 연산자
         if expr.operator in ['-', '!', '~'] and expr.expression :
@@ -5205,6 +5207,18 @@ class ContractAnalyzer:
             return self.evaluate_expression(expr.index, variables, base_val, "IndexAccessContext")
         else:
             raise ValueError(f"There is no index expression")
+
+    def evaluate_literal_with_subdenomination_context(
+            self, expr: Expression, variables, callerObject=None, callerContext=None):
+
+        value, unit = expr.literal  # (int, "weeks" | "ether" ...)
+        mul = TIME_VALUE.get(unit)
+        if mul is None:
+            raise ValueError(f"Unknown sub-denomination '{unit}'")
+
+        abs_val = value * mul
+        # 시간/가스 단위는 전부 양수 → uint256 으로 귀일
+        return UnsignedIntegerInterval(abs_val, abs_val, 256)
 
     def evaluate_type_conversion_context(self, expr, variables, callerObject=None, callerContext=None):
         """

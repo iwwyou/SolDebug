@@ -58,25 +58,25 @@ def simulate_inputs(records):
 
 test_inputs = [
   {
-    "code": "contract EdenToken {\n}",
+    "code": "contract GovStakingStorage {\n}",
     "startLine": 1,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "uint256 public override totalSupply;",
+    "code": "uint256 totalLockedGogo;",
     "startLine": 2,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "uint256 totalRewardRates;",
     "startLine": 3,
     "endLine": 3,
     "event": "add"
   },
   {
-    "code": "mapping (address => mapping (address => uint256)) public override allowance;",
+    "code": "uint256 totalRewardMultiplier;",
     "startLine": 4,
     "endLine": 4,
     "event": "add"
@@ -88,111 +88,213 @@ test_inputs = [
     "event": "add"
   },
   {
-    "code": "mapping (address => uint256) public override balanceOf;",
+    "code": "struct UserInfo {\n}",
     "startLine": 6,
-    "endLine": 6,
+    "endLine": 7,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "uint256 amount;",
     "startLine": 7,
     "endLine": 7,
     "event": "add"
   },
   {
-    "code": "function _transferTokens(address from, address to, uint256 value) internal {\n}",
+    "code": "uint256 lockStart;",
     "startLine": 8,
-    "endLine": 9,
+    "endLine": 8,
     "event": "add"
   },
   {
-    "code": "require(to != address(0), \"Eden::_transferTokens: cannot transfer to the zero address\");",
+    "code": "uint256 lockPeriod;",
     "startLine": 9,
     "endLine": 9,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "uint256 lastClaimed;",
     "startLine": 10,
     "endLine": 10,
     "event": "add"
   },
   {
-    "code": "balanceOf[from] = balanceOf[from] - value;",
+    "code": "uint256 unclaimedAmount;",
     "startLine": 11,
     "endLine": 11,
     "event": "add"
   },
   {
-    "code": "balanceOf[to] = balanceOf[to] + value;",
+    "code": "uint256 rewardRate;",
     "startLine": 12,
     "endLine": 12,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "uint256 rewardMultiplier;",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "uint256 userRewardPerTokenPaid;",
     "startLine": 14,
     "endLine": 14,
     "event": "add"
   },
   {
-    "code": "function transferFrom(address src, address dst, uint256 amount) external override returns (bool) {\n}",
+    "code": "uint256 index;",
     "startLine": 15,
-    "endLine": 16,
+    "endLine": 15,
     "event": "add"
   },
   {
-    "code": "address spender = msg.sender;",
-    "startLine": 16,
-    "endLine": 16,
-    "event": "add"
-  },
-  {
-    "code": "uint256 spenderAllowance = allowance[src][spender];",
+    "code": "\n",
     "startLine": 17,
     "endLine": 17,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "mapping(address => UserInfo) public userInfo;",
     "startLine": 18,
     "endLine": 18,
     "event": "add"
   },
   {
-    "code": "if (spender != src && spenderAllowance != type(uint256).max) {\n}",
+    "code": "address[] public userList;",
     "startLine": 19,
-    "endLine": 20,
+    "endLine": 19,
     "event": "add"
   },
   {
-    "code": "uint256 newAllowance = spenderAllowance - amount;",
+    "code": "\n",
     "startLine": 20,
     "endLine": 20,
     "event": "add"
   },
   {
-    "code": "allowance[src][spender] = newAllowance;",
+    "code": "modifier isAllowed() {\n}",
     "startLine": 21,
-    "endLine": 21,
+    "endLine": 22,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "require(allowed[msg.sender], \"sender is not allowed to write\");",
+    "startLine": 22,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "_;",
     "startLine": 23,
     "endLine": 23,
     "event": "add"
   },
   {
-    "code": "_transferTokens(src, dst, amount);",
-    "startLine": 24,
-    "endLine": 24,
+    "code": "\n",
+    "startLine": 25,
+    "endLine": 25,
     "event": "add"
   },
   {
-    "code": "return true;",
-    "startLine": 25,
-    "endLine": 25,
+    "code": "function removeUser(address user) external isAllowed {\n}",
+    "startLine": 26,
+    "endLine": 27,
+    "event": "add"
+  },
+  {
+    "code": "require(userInfo[user].index != 0, \"user does not exist\");",
+    "startLine": 27,
+    "endLine": 27,
+    "event": "add"
+  },
+  {
+    "code": "if (userList.length > 1) {\n}",
+    "startLine": 28,
+    "endLine": 29,
+    "event": "add"
+  },
+  {
+    "code": "address lastAddress = userList[userList.length - 1];",
+    "startLine": 29,
+    "endLine": 29,
+    "event": "add"
+  },
+  {
+    "code": "uint256 oldIndex = userInfo[user].index;",
+    "startLine": 30,
+    "endLine": 30,
+    "event": "add"
+  },
+  {
+    "code": "userList[oldIndex] = lastAddress;",
+    "startLine": 31,
+    "endLine": 31,
+    "event": "add"
+  },
+  {
+    "code": "userInfo[lastAddress].index = oldIndex;",
+    "startLine": 32,
+    "endLine": 32,
+    "event": "add"
+  },
+  {
+    "code": "userList.pop();",
+    "startLine": 34,
+    "endLine": 34,
+    "event": "add"
+  },
+  {
+    "code": "totalRewardMultiplier -= userInfo[user].rewardMultiplier;",
+    "startLine": 35,
+    "endLine": 35,
+    "event": "add"
+  },
+  {
+    "code": "delete userInfo[user];",
+    "startLine": 36,
+    "endLine": 36,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 38,
+    "endLine": 38,
+    "event": "add"
+  },
+  {
+    "code": "function updateRewardMultiplier(address user, uint256 oldRate, uint256 newRate, uint256 passedTime, uint256 oldLockPeriod, uint256 newLockPeriod, uint256 oldAmount, uint256 newAmount) external isAllowed {\n}",
+    "startLine": 39,
+    "endLine": 40,
+    "event": "add"
+  },
+  {
+    "code": "UserInfo storage info = userInfo[user];",
+    "startLine": 40,
+    "endLine": 40,
+    "event": "add"
+  },
+  {
+    "code": "uint256 toRemove = ((((oldLockPeriod - passedTime) / 1 weeks) * oldRate) * oldAmount) / 100000;",
+    "startLine": 41,
+    "endLine": 41,
+    "event": "add"
+  },
+  {
+    "code": "uint256 toAdd = (((newLockPeriod / 1 weeks) * newRate) * newAmount) / 100000;",
+    "startLine": 42,
+    "endLine": 42,
+    "event": "add"
+  },
+  {
+    "code": "info.rewardMultiplier = info.rewardMultiplier + toAdd - toRemove;",
+    "startLine": 43,
+    "endLine": 43,
+    "event": "add"
+  },
+  {
+    "code": "totalRewardMultiplier = totalRewardMultiplier + toAdd - toRemove;",
+    "startLine": 44,
+    "endLine": 44,
     "event": "add"
   }
 ]

@@ -340,8 +340,9 @@ class ArrayVariable(Variables):
     """
 
     def __init__(self, identifier=None, base_type=None,
-                 array_length=None, is_dynamic=False,
-                 value=None, isConstant=False, scope=None):
+                 array_length=None,
+                 value=None, isConstant=False, scope=None,
+                 is_dynamic=False):
         super().__init__(identifier, value, isConstant, scope)
 
         self.typeInfo = SolType()
@@ -350,6 +351,7 @@ class ArrayVariable(Variables):
         self.typeInfo.arrayLength = array_length  # None → 동적
         self.typeInfo.isDynamicArray = is_dynamic
         self.elements: list[Variables | "ArrayVariable"] = []
+
 
     # ────────────────────────── public API ──────────────────────────
     def initialize_elements(self, init_iv: Interval):
