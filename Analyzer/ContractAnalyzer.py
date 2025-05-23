@@ -5089,39 +5089,37 @@ class ContractAnalyzer:
         # 2. ArrayVariable  ( .myArray.length  /  .push() / .pop() )
         # ──────────────────────────────────────────────────────────────
         if isinstance(baseVal, ArrayVariable):
+            if member == "length" :
+                ln = (len(baseVal.elements)
+                      if not baseVal.typeInfo.isDynamicArray
+                      else UnsignedIntegerInterval(
+                    len(baseVal.elements),  # 최소 = 현재 확정 길이
+                    2 ** 256 - 1,  # 동적 → 위쪽은 TOP
+                    256))
+                return ln
             # .push() / .pop()  – 동적배열만 허용
             if callerContext == "functionCallContext":
                 if not baseVal.typeInfo.isDynamicArray:
                     raise ValueError("push / pop available only on dynamic arrays")
                 elemType = baseVal.typeInfo.arrayBaseType
 
-                if member == "push":
-                    new_elem_id = f"{baseVal.identifier}[{len(baseVal.elements)}]"
-                    # ▶ 기본-타입 요소 새로 만들어 배열에 append
-                    if (isinstance(elemType, SolType) and
-                            elemType.typeCategory == "elementary" and
-                            elemType.elementaryTypeName == "address"):
+                if expr.member == "push":
+                    if not expr.arguments:  # push()  – 값 없이
+                        elem = baseVal._create_new_array_element(len(baseVal.elements))
+                        baseVal.elements.append(elem)
+                    else:  # push(v)
+                        val = self.evaluate_expression(expr.arguments[0], variables)
+                        elem = baseVal._create_new_array_element(len(baseVal.elements))
+                        elem.value = val
+                        baseVal.elements.append(elem)
+                    return None  # Solidity push 는 값 반환 X
 
-                        iv = AddressSymbolicManager.top_interval()
-                        new_var = Variables(new_elem_id, iv, scope=baseVal.scope,
-                                            typeInfo=elemType)
-                    else:
-                        # 숫자·bool 등
-                        default_iv = self.calculate_default_interval(elemType
-                                                                     if isinstance(elemType, str)
-                                                                     else elemType.elementaryTypeName)
-                        new_var = Variables(new_elem_id, default_iv, scope=baseVal.scope,
-                                            typeInfo=elemType)
-                    baseVal.elements.append(new_var)
-                    baseVal.typeInfo.arrayLength += 1
-                    return None
-
-                if member == "pop":
-                    if not baseVal.elements:
-                        raise IndexError("pop from empty array")
-                    baseVal.elements.pop()
-                    baseVal.typeInfo.arrayLength -= 1
-                    return None
+                    # pop()
+                if expr.member == "pop":
+                    if not baseVal.elements:  # 빈 배열 pop  →  ⊥ 또는 revert
+                        return None  # 보수적으로 ⊥ 처리하려면 Interval.bottom(...) 반환
+                    popped = baseVal.elements.pop()
+                    return getattr(popped, "value", popped)  # 값이 있으면 값, 없으면 객체
 
             if member == "length":
                 ln = len(baseVal.elements)

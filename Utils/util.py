@@ -352,6 +352,65 @@ class ArrayVariable(Variables):
         self.typeInfo.isDynamicArray = is_dynamic
         self.elements: list[Variables | "ArrayVariable"] = []
 
+    def _create_new_array_element(self, idx: int):
+        """
+        배열 push·동적-초기화 시 1칸짜리 child 를 만든다.
+        ▸ base_type 이
+            · elementary / address / bool → Variables
+            · struct                    → StructVariable
+            · 배열                       → (중첩) ArrayVariable
+            · mapping                   → MappingVariable
+            · enum                      → EnumVariable
+        """
+        eid = f"{self.identifier}[{idx}]"
+        btype = self.typeInfo.arrayBaseType  # SolType | str
+
+        # ─ elementary / address / bool ───────────────────────────────
+        if isinstance(btype, SolType) and btype.typeCategory == "elementary":
+            # 주소형
+            if btype.elementaryTypeName == "address":
+                val = UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
+                return Variables(eid, val, scope=self.scope, typeInfo=btype)
+            # uint / int / bool → ⊤ interval
+            if btype.elementaryTypeName.startswith("uint"):
+                bits = int(btype.elementaryTypeName[4:] or 256)
+                val = UnsignedIntegerInterval(0, 2 ** bits - 1, bits)
+                return Variables(eid, val, scope=self.scope, typeInfo=btype)
+            if btype.elementaryTypeName.startswith("int"):
+                bits = int(btype.elementaryTypeName[3:] or 256)
+                val = IntegerInterval(-(2 ** (bits - 1)), 2 ** (bits - 1) - 1, bits)
+                return Variables(eid, val, scope=self.scope, typeInfo=btype)
+            if btype.elementaryTypeName == "bool":
+                return Variables(eid, BoolInterval(0, 1), scope=self.scope, typeInfo=btype)
+            # bytes/string 등
+            return Variables(eid, f"symbol_{eid}", scope=self.scope, typeInfo=btype)
+
+        # ─ struct ───────────────────────────────────────────────────
+        if isinstance(btype, SolType) and btype.typeCategory == "struct":
+            return StructVariable(eid, btype.structTypeName, scope=self.scope)
+
+        # ─ enum ─────────────────────────────────────────────────────
+        if isinstance(btype, SolType) and btype.typeCategory == "enum":
+            return EnumVariable(eid, btype.enumTypeName, scope=self.scope)
+
+        # ─ mapping ──────────────────────────────────────────────────
+        if isinstance(btype, SolType) and btype.typeCategory == "mapping":
+            return MappingVariable(eid,
+                                   btype.mappingKeyType,
+                                   btype.mappingValueType,
+                                   scope=self.scope)
+
+        # ─ 중첩 배열 ────────────────────────────────────────────────
+        if isinstance(btype, SolType) and btype.typeCategory == "array":
+            return ArrayVariable(eid,
+                                 btype.arrayBaseType,
+                                 btype.arrayLength,
+                                 scope=self.scope,
+                                 is_dynamic=btype.isDynamicArray)
+
+        # fallback
+        raise ValueError(f"Unhandled array base-type for {eid!r}")
+
 
     # ────────────────────────── public API ──────────────────────────
     def initialize_elements(self, init_iv: Interval):
