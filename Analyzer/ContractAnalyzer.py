@@ -1129,12 +1129,69 @@ class ContractAnalyzer:
         self.contract_cfgs[self.current_target_contract] = ccf
         self.brace_count[self.current_start_line]["cfg_node"] = cur_blk
 
+    def _handle_delete(self, target_expr: Expression):
+        """
+        Solidity `delete x` :
+            · 스칼라 → 기본값(0 / false / 0x0 …)
+            · 배열   → 동적이면 length 0, 정적이면 요소 0
+            · 매핑   → entry 제거
+            · struct → 각 필드 delete 재귀
+        분석 도메인에서는 “가장 보수적”으로 **bottom** 또는 0-singleton 으로 초기화
+        """
+
+        cur_blk = self.get_current_block()
+        vars_env = cur_blk.variables
+
+        # 1) 대상 변수 객체 찾기 (update 없는 '=' 호출하여 객체만 받아옴)
+        var_obj = self._resolve_and_update_expr(
+            target_expr, rVal=None, operator="=", variables=vars_env,
+            fcfg=self.current_target_function_cfg)
+
+        # 2) 타입별 ‘기본값’ 적용 -----------------------------------------
+        def _wipe(obj):
+            if isinstance(obj, MappingVariable):
+                obj.mapping.clear()
+            elif isinstance(obj, ArrayVariable):
+                obj.elements.clear()
+            elif isinstance(obj, StructVariable):
+                for m in obj.members.values():
+                    _wipe(m)
+            elif isinstance(obj, EnumVariable):
+                obj.value = IntegerInterval(0, 0, 256)
+            elif isinstance(obj, Variables):
+                et = getattr(obj.typeInfo, "elementaryTypeName", "")
+                bit = getattr(obj.typeInfo, "intTypeLength", 256) or 256
+                if et.startswith("uint"):
+                    obj.value = UnsignedIntegerInterval(0, 0, bit)
+                elif et.startswith("int"):
+                    obj.value = IntegerInterval(0, 0, bit)
+                elif et == "bool":
+                    obj.value = BoolInterval(0, 0)
+                elif et == "address":
+                    obj.value = UnsignedIntegerInterval(0, 0, 160)
+                else:  # bytes / string …
+                    obj.value = f"symbolic_zero_{obj.identifier}"
+
+        _wipe(var_obj)
+
+        # 3) 로그 & CFG 저장 (기존 ++/-- 로직과 동일 형태)
+        cur_blk.add_assign_statement(
+            target_expr, "delete", None, self.current_start_line)
+
+        fcfg = self.current_target_function_cfg
+        fcfg.update_block(cur_blk)
+        self.contract_cfgs[self.current_target_contract] \
+            .functions[self.current_target_function] = fcfg
+        self.brace_count[self.current_start_line]["cfg_node"] = cur_blk
+
     # ───────────────────────────────────────────────────────────
     def process_unary_prefix_operation(self, expr: Expression):
         if expr.operator == "++":
             self._handle_unary_incdec(expr.expression, "+=", "unary_prefix")
         elif expr.operator == "--":
             self._handle_unary_incdec(expr.expression, "-=", "unary_prefix")
+        elif expr.operator == "delete":
+            self._handle_delete(expr.expression)
         else:
             raise ValueError(f"Unsupported prefix operator {expr.operator}")
 
@@ -5122,6 +5179,13 @@ class ContractAnalyzer:
                     return getattr(popped, "value", popped)  # 값이 있으면 값, 없으면 객체
 
             if member == "length":
+                # 동적 배열인데 아직 push 로 단 1-개도 추가되지 않음
+                if baseVal.typeInfo.isDynamicArray and not baseVal.elements:
+                    # “얼마든지 될 수 있다”  →  ⊥(bottom) 으로 전파
+                    #   • 이후 비교( >, == 등) 는 항상 불확정 TOP 으로 유지
+                    return UnsignedIntegerInterval(None, None, 256)
+
+                # 그 밖의 경우 → 현재 element 수를 singleton-interval 로
                 ln = len(baseVal.elements)
                 return UnsignedIntegerInterval(ln, ln, 256)
 
@@ -5369,17 +5433,27 @@ class ContractAnalyzer:
         # (b) 진짜 튜플 (a,b,...) ⇒ 리스트 유지
         return elems  # [v1, v2, ...]
 
-    def evaluate_unary_operator(self, expr, variables, callerObject=None, callerContext=None):
-        operand_interval = self.evaluate_expression(expr.expression, variables, None, "Unary")
-        if operand_interval is not None:
-            if expr.operator == '-':
-                return operand_interval.negate()
-            elif expr.operator == '!':
-                return operand_interval.logical_not()
-            elif expr.operator == '~':
-                return operand_interval.bitwise_not()
-        else:
+    def evaluate_unary_operator(self, expr, variables,
+                                callerObject=None, callerContext=None):
+
+        operand_val = self.evaluate_expression(expr.expression, variables, None, "Unary")
+
+        if operand_val is None:
             raise ValueError(f"Unable to evaluate operand in unary expression: {expr}")
+
+        op = expr.operator
+        if op == '-':
+            return operand_val.negate()
+        elif op == '!':
+            return operand_val.logical_not()
+        elif op == '~':
+            return operand_val.bitwise_not()
+        elif op == 'delete':
+            # 분석 단계에서는 “완전 미정” 값으로 — 스칼라는 0-singleton,
+            # Interval 이면 같은 bit-width bottom 으로.
+            if hasattr(operand_val, "bottom"):
+                return operand_val.bottom(getattr(operand_val, "type_length", 256))
+            return 0
 
     def evaluate_binary_operator(self, expr, variables, callerObject=None, callerContext=None):
         leftInterval = self.evaluate_expression(expr.left, variables, None, "Binary")
