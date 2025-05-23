@@ -1049,8 +1049,6 @@ class ContractAnalyzer:
         if not contract_cfg:
             raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
 
-        print(self.current_target_function)
-
         # 2. 현재 타겟 함수의 CFG 가져오기
         self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
         if not self.current_target_function_cfg:
@@ -1173,7 +1171,7 @@ class ContractAnalyzer:
         # 3. 함수 표현식 가져오기
         function_expr = expr.function
 
-        _ = self.evaluate_function_call_context(function_expr, current_block.variables, None, None)
+        _ = self.evaluate_function_call_context(expr, current_block.variables, None, None)
 
         current_block.add_function_call_statement(function_expr, self.current_start_line)
 
@@ -3702,6 +3700,8 @@ class ContractAnalyzer:
         has_if = False
         new_block: CFGNode | None = None
 
+        stop_set = self._build_stop_set(close_brace_queue)
+
         # 가장 안쪽 '}' 부터 순차 처리
         for line in close_brace_queue:
             open_brace_info = self.find_corresponding_open_brace(line)
@@ -3724,30 +3724,87 @@ class ContractAnalyzer:
 
         # ─────────── if-join 처리 ───────────
         if has_if and outside_if_node is not None:
-            return self.join_leaf_nodes(outside_if_node)
+            return self.join_leaf_nodes(outside_if_node, stop_set)
 
         # 특별히 처리할 노드가 없으면 None – 상위 루틴에서 다시 판단
         return new_block
 
     # ContractAnalyzer.py (또는 해당 클래스가 정의된 모듈)
 
-    def _dump_loop_edges(self, head: CFGNode):
+    def _build_stop_set(self, close_brace_queue: list[int]) -> set[CFGNode]:
         """
-        head : for-/while- 루프의 φ-node (즉 join_node)
-        print  ▶  predecessor 이름  →  head
+        queue의 ***바깥쪽*** '}' 에 대응하는 블록을 기준으로
+        DFS 를 끊을 stop-node 집합을 만든다.
         """
-        print(f"\n[CFG-DEBUG] predecessors of  {head.name}")
-        g = self.current_target_function_cfg.graph
-        for pred in g.predecessors(head):
-            cond = g.get_edge_data(pred, head).get("condition")
-            print(f"    {pred.name:25s} --{cond}--> {head.name}")
+        if not close_brace_queue:
+            return set()
 
-    # ───────────────────────────────────────────────────────────
-    # 고정점 계산 : work-list + widening & narrowing
-    #   ① 1차 패스 – widening 으로 상향 수렴
-    #   ② 2차 패스 – narrowing 으로 다시 조정
-    #   • while / for / do-while 의 condition-node 를 인자로 받는다
-    # ───────────────────────────────────────────────────────────
+        outer_close = close_brace_queue[-1]
+        info = self.find_corresponding_open_brace(outer_close)
+        if not info:
+            return set()
+
+        base = info["cfg_node"]  # if  혹은 loop
+        G = self.current_target_function_cfg.graph
+        stop = set()
+
+        # ────── ❶ 이 close-brace 뭉치 안에 “루프 블록”이 있었나? ──────
+        has_inner_loop = False
+        for cl in close_brace_queue:  # 안쪽→바깥쪽 모두 검사
+            inf = self.find_corresponding_open_brace(cl)
+            if not inf:  # 방어
+                continue
+            hd = inf["cfg_node"]
+            if hd.condition_node_type in {"while", "for", "doWhile"}:
+                has_inner_loop = True
+                break
+
+        # “루프 밖”에서 시작한다면 → left_loop = True
+        left_loop = not has_inner_loop
+
+        # ────── ❷ 루트가 loop 인 경우 (기존 로직과 동일) ─────────────
+        if base.condition_node_type in {"while", "for", "doWhile"}:
+            for succ in G.successors(base):
+                # loop-exit ==> 통과
+                if succ.loop_exit_node:
+                    continue
+                # for-increment / fixpoint / join-point ==> stop
+                if (
+                        getattr(succ, "is_for_increment", False)
+                        or succ.fixpoint_evaluation_node
+                        or succ.join_point_node
+                ):
+                    stop.add(succ)
+            return stop
+
+        # ────── ❸ 루트가 if 인 경우 ------------------------------------
+        if base.condition_node_type == "if":
+            q = deque(G.successors(base))
+            visited = set()
+
+            while q:
+                n = q.popleft()
+                if n in visited:
+                    continue
+                visited.add(n)
+
+                # (a) loop-exit 를 처음 만나면 “루프 밖”으로 전환
+                if n.loop_exit_node:
+                    if not left_loop:
+                        left_loop = True
+                        q.extend(G.successors(n))  # 루프 밖 흐름 확장
+                    continue
+
+                # (b) 루프 밖에서 처음 만난 join-point / EXIT  => stop
+                if left_loop and (n.join_point_node or n.function_exit_node):
+                    stop.add(n)
+                    break  # 첫 번째 것만 필요하면 break
+
+                # (c) 일반 블록 계속
+                q.extend(G.successors(n))
+
+        return stop
+
     def fixpoint(self, loop_condition_node: CFGNode) -> CFGNode:
         """
         loop_condition_node : while / for / do-while 의 condition CFGNode
@@ -3935,7 +3992,7 @@ class ContractAnalyzer:
                     continue
         return None
 
-    def join_leaf_nodes(self, condition_node):
+    def join_leaf_nodes(self, condition_node, stop_node_list):
         """
         주어진 조건 노드의 하위 그래프를 탐색하여 리프 노드들을 수집하고 변수 정보를 조인합니다.
         :param condition_node: 최상위 조건 노드 (if 노드)
@@ -3945,7 +4002,7 @@ class ContractAnalyzer:
         G = self.current_target_function_cfg.graph
 
         # ① leaf 수집 ------------------------------------------------
-        leaf_nodes = self.collect_leaf_nodes(condition_node)
+        leaf_nodes = self.collect_leaf_nodes(condition_node, stop_node_list)
 
         # ② 값 join --------------------------------------------------
         joined = {}
@@ -3980,61 +4037,24 @@ class ContractAnalyzer:
 
         return new_blk
 
-    def collect_leaf_nodes(self, root_if: CFGNode) -> list[CFGNode]:
-        """
-        if / else-if / else 체인의 “로컬 리프”만 수집한다.
+    def collect_leaf_nodes(self, root_if: CFGNode,
+                           stop_nodes: set[CFGNode]) -> list[CFGNode]:
 
-        · root_if ─ 가장 바깥쪽 if-조건 노드
-        · return  ─ join 대상으로 사용할 leaf 노드들의 리스트
+        """
+        leaf = stop-node 들의 모든 predecessor 중
+               (a) if-조건 블록이 아니고
+               (b) still-in-if-chain 인 노드
         """
         G = self.current_target_function_cfg.graph
+        leaf = []
 
-        # ──────────────────────────────────────────────────────────────
-        # ①  root_if 로부터 DFS -> ‘if-체인 sub-graph’ 구성
-        # ──────────────────────────────────────────────────────────────
-        subgraph: set[CFGNode] = set()
-        stack = [root_if]
+        for s in stop_nodes:
+            for p in G.predecessors(s):
+                # if-체인에 속하지 않는 블록이면 제외
+                if not p.condition_node:
+                    leaf.append(p)
 
-        while stack:
-            n = stack.pop()
-            if n in subgraph:
-                continue
-            subgraph.add(n)
-
-            for succ in G.successors(n):
-                # 1) succ 자체가 루프-메타블록이면 if 바깥으로 나가는 길 ▶ skip
-                if succ.loop_exit_node or succ.fixpoint_evaluation_node \
-                        or getattr(succ, "is_for_increment", False) or succ.join_point_node:
-                    continue
-
-                # 2) succ 의 succ 이 exit / fixpoint 면   ──┐
-                succ_succs = list(G.successors(succ))  # │
-                if any(x.loop_exit_node or x.fixpoint_evaluation_node  # │
-                       for x in succ_succs):  # │
-                    #   └── succ 은 ‘관문’ → 탐색 중단          ┘
-                    continue
-
-                # 3) 외부에서 succ 으로 “직결”되는 edge 가 있으면
-                #    succ 은 if-체인 밖 블록이므로 탐색하지 않는다.
-                preds = list(G.predecessors(succ))
-                outside_pred = any(p not in subgraph and p is not n for p in preds)
-                if outside_pred:
-                    continue
-
-                stack.append(succ)
-
-        # ──────────────────────────────────────────────────────────────
-        # ② subgraph 내부에서 “밖으로 나가는 edge”를 갖는 노드가 leaf
-        # ──────────────────────────────────────────────────────────────
-        leaf_nodes: list[CFGNode] = []
-        for n in subgraph:
-            succs = list(G.successors(n))
-            # succ 이 없거나, succ 중 하나라도 subgraph 밖이면 leaf
-            if ((not succs) or all(s not in subgraph for s in succs)) \
-                    and not n.condition_node:  # ← 조건 노드 제외
-                leaf_nodes.append(n)
-
-        return leaf_nodes
+        return leaf
 
     def join_variable_values(self, v1, v2):
         """
@@ -5004,6 +5024,53 @@ class ContractAnalyzer:
                     else :
                         raise ValueError (f"There is no global variable in function")
 
+            if baseVal.startswith("type(") and member == "max":
+                inner = baseVal[5:-1].strip()  # "uint256", "int224", "address", "MyERC20", ...
+                m = member  # 읽기 편하게 별도 변수로
+
+                if inner.startswith("uint") or inner.startswith("int"):
+                    signed = inner.startswith("int")
+                    bits_txt = inner.lstrip("uintint")  # '' 면 기본 256
+                    bits = int(bits_txt) if bits_txt else 256
+                    if signed:
+                        i_min = -2 ** (bits - 1)
+                        i_max = 2 ** (bits - 1) - 1
+                        if m == "max":
+                            return IntegerInterval(i_max, i_max, bits)
+                        elif m == "min":
+                            return IntegerInterval(i_min, i_min, bits)
+                    else:
+                        u_min = 0
+                        u_max = 2 ** bits - 1
+                        if m == "max":
+                            return UnsignedIntegerInterval(u_max, u_max, bits)
+                        elif m == "min":
+                            return UnsignedIntegerInterval(u_min, u_min, bits)
+
+                    # ---- address ------------------------------------------------------
+                if inner == "address":
+                    if m == "max":
+                        return UnsignedIntegerInterval(2 ** 160 - 1, 2 ** 160 - 1, 160)
+                    if m == "min":
+                        return UnsignedIntegerInterval(0, 0, 160)
+
+                    # ---- bytes<M>  (고정 길이) ----------------------------------------
+                if inner.startswith("bytes") and inner != "bytes":
+                    # 컴파일 타임 바이트 시퀀스 최대/최소 → 심볼릭 문자열이면 충분
+                    return f"{inner}.{m}"  # 예: "bytes32.max"
+
+                    # ---- 컨트랙트 타입  (MyERC20) --------------------------------------
+                    # creationCode / runtimeCode / interfaceId
+                if m in {"creationCode", "runtimeCode", "interfaceId"}:
+                    return f"symbolic_{inner}_{m}"  # 심볼릭 스트링
+
+                    # ---- type(SomeType).name ------------------------------------------
+                if m == "name":
+                    return inner  # 그냥 타입 이름 문자열
+
+                    # ---- 기타 미지원 멤버 ---------------------------------------------
+                return f"symbolicMeta({inner}.{m})"
+
             # address.code / address.code.length
             if baseVal == "code":
                 if member == "length":
@@ -5380,39 +5447,46 @@ class ContractAnalyzer:
 
     def convert_to_uint(self, sub_val, bits):
         """
-        sub_val을 uintN 범위[0..(2^bits-1)]로 클램핑
+        sub_val을 uintN 범위 [0 .. 2^bits−1] 로 변환/클램프
         """
-        type_max = 2 ** bits - 1
+        type_max = (1 << bits) - 1  # 2**bits - 1 과 동일
 
-        # Interval(UnsignedIntegerInterval or IntegerInterval)인 경우
-        if isinstance(sub_val, UnsignedIntegerInterval) or isinstance(sub_val, IntegerInterval):
-            # min_value < 0 => clamp to 0
+        # ────────────────────────────────────────────────────────
+        # 1) Interval 계열 (Unsigned / Integer)
+        # ────────────────────────────────────────────────────────
+        if isinstance(sub_val, (UnsignedIntegerInterval, IntegerInterval)):
+            if sub_val.is_bottom():  # ★ bottom 우선 검사
+                return UnsignedIntegerInterval(None, None, bits)
+
             new_min = max(0, sub_val.min_value)
             new_max = min(type_max, sub_val.max_value)
-            if new_min > new_max:
-                # 불가능 => bottom
+            if new_min > new_max:  # 교집합이 공집합
                 return UnsignedIntegerInterval(None, None, bits)
 
             return UnsignedIntegerInterval(new_min, new_max, bits)
 
-        elif isinstance(sub_val, BoolInterval):
-            # false => [0,0], true => [1,1], top => [0,1]
-            # clamp to [0..1] (여전히 uintN 범위는 가능하니 문제 없음)
-            if sub_val.min_value == 1 and sub_val.max_value == 1:
-                return UnsignedIntegerInterval(1, 1, bits)
-            elif sub_val.min_value == 0 and sub_val.max_value == 0:
-                return UnsignedIntegerInterval(0, 0, bits)
-            else:
-                # [0,1]
-                return UnsignedIntegerInterval(0, 1, bits)
+        # ────────────────────────────────────────────────────────
+        # 2) BoolInterval  (0 또는 1)
+        # ────────────────────────────────────────────────────────
+        if isinstance(sub_val, BoolInterval):
+            return UnsignedIntegerInterval(
+                sub_val.min_value, sub_val.max_value, bits
+            )  # 이미 0‥1 범위
 
-        elif isinstance(sub_val, str):
-            # string -> parse as decimal? hex?
-            # 간단히 symbolic
+        # ────────────────────────────────────────────────────────
+        # 3) 문자열(리터럴·symbolic) → symbolic 래퍼
+        # ────────────────────────────────────────────────────────
+        if isinstance(sub_val, str):
             return f"symbolicUint{bits}({sub_val})"
 
-        else:
-            # fallback
+        # ────────────────────────────────────────────────────────
+        # 4) 기타(정수 등) → 그대로 Interval 로 래핑
+        # ────────────────────────────────────────────────────────
+        try:
+            v = int(sub_val)
+            v = max(0, min(type_max, v))
+            return UnsignedIntegerInterval(v, v, bits)
+        except (ValueError, TypeError):
             return f"symbolicUint{bits}({sub_val})"
 
     def convert_to_int(self, sub_val, bits):
@@ -6059,8 +6133,9 @@ class ContractAnalyzer:
     def evaluate_function_call_context(self, expr, variables, callerObject=None, callerContext=None):
         if expr.context == "MemberAccessContext" : # dynamic array에 대한 push, pop
             return self.evaluate_expression(expr, variables, None, "functionCallContext")
-
-        if expr.function.context == "IdentifierExpContext" :
+        elif expr.context =="IdentifierExpContext" :
+            function_name = expr.identifier
+        elif expr.function.context == "IdentifierExpContext" :
             function_name = expr.function.identifier
         else:
             raise ValueError (f"There is no function name in function call context")

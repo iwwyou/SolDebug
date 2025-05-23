@@ -5,13 +5,6 @@ contract EdenToken {
     
     mapping (address => uint256) public override balanceOf;
 
-    function burn(uint256 amount) external override returns (bool) {
-        balanceOf[msg.sender] = balanceOf[msg.sender] - amount;
-        totalSupply = totalSupply - amount;        
-        
-        return true;
-    }
-
     function _transferTokens(address from, address to, uint256 value) internal {
         require(to != address(0), "Eden::_transferTokens: cannot transfer to the zero address");
 

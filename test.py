@@ -58,13 +58,13 @@ def simulate_inputs(records):
 
 test_inputs = [
   {
-    "code": "contract DapiServer {\n}",
+    "code": "contract EdenToken {\n}",
     "startLine": 1,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "uint256 public constant override HUNDRED_PERCENT = 1e8;",
+    "code": "uint256 public override totalSupply;",
     "startLine": 2,
     "endLine": 2,
     "event": "add"
@@ -76,51 +76,123 @@ test_inputs = [
     "event": "add"
   },
   {
-    "code": "function calculateUpdateInPercentage(int224 initialValue, int224 updatedValue) private pure returns (uint256 updateInPercentage) {\n}",
+    "code": "mapping (address => mapping (address => uint256)) public override allowance;",
     "startLine": 4,
-    "endLine": 5,
+    "endLine": 4,
     "event": "add"
   },
   {
-    "code": "int256 delta = int256(updatedValue) - int256(initialValue);",
+    "code": "\n",
     "startLine": 5,
     "endLine": 5,
     "event": "add"
   },
   {
-    "code": "uint256 absoluteDelta = delta > 0 ? uint256(delta) : uint256(-delta);",
+    "code": "mapping (address => uint256) public override balanceOf;",
     "startLine": 6,
     "endLine": 6,
     "event": "add"
   },
   {
-    "code": "uint256 absoluteInitialValue = initialValue > 0 ? uint256(int256(initialValue)) : uint256(-int256(initialValue));",
+    "code": "\n",
     "startLine": 7,
     "endLine": 7,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "function _transferTokens(address from, address to, uint256 value) internal {\n}",
     "startLine": 8,
-    "endLine": 8,
+    "endLine": 9,
     "event": "add"
   },
   {
-    "code": "if (absoluteInitialValue == 0) {\n}",
+    "code": "require(to != address(0), \"Eden::_transferTokens: cannot transfer to the zero address\");",
     "startLine": 9,
-    "endLine": 10,
+    "endLine": 9,
     "event": "add"
   },
   {
-    "code": "absoluteInitialValue = 1;",
+    "code": "\n",
     "startLine": 10,
     "endLine": 10,
     "event": "add"
   },
   {
-    "code": "updateInPercentage = (absoluteDelta * HUNDRED_PERCENT) / absoluteInitialValue;",
+    "code": "balanceOf[from] = balanceOf[from] - value;",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "balanceOf[to] = balanceOf[to] + value;",
     "startLine": 12,
     "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "function transferFrom(address src, address dst, uint256 amount) external override returns (bool) {\n}",
+    "startLine": 15,
+    "endLine": 16,
+    "event": "add"
+  },
+  {
+    "code": "address spender = msg.sender;",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  },
+  {
+    "code": "uint256 spenderAllowance = allowance[src][spender];",
+    "startLine": 17,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 18,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "if (spender != src && spenderAllowance != type(uint256).max) {\n}",
+    "startLine": 19,
+    "endLine": 20,
+    "event": "add"
+  },
+  {
+    "code": "uint256 newAllowance = spenderAllowance - amount;",
+    "startLine": 20,
+    "endLine": 20,
+    "event": "add"
+  },
+  {
+    "code": "allowance[src][spender] = newAllowance;",
+    "startLine": 21,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 23,
+    "endLine": 23,
+    "event": "add"
+  },
+  {
+    "code": "_transferTokens(src, dst, amount);",
+    "startLine": 24,
+    "endLine": 24,
+    "event": "add"
+  },
+  {
+    "code": "return true;",
+    "startLine": 25,
+    "endLine": 25,
     "event": "add"
   }
 ]

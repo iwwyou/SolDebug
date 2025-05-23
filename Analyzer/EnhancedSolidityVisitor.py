@@ -296,9 +296,14 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         rets = self.visitParameterList(ctx.parameterList(1)) \
             if ctx.parameterList(1) else []
 
-        mods = [m.identifierPath().getText()
-                for m in ctx.getChildren()
-                if isinstance(m, SolidityParser.ModifierInvocationContext)]
+        # ── ② modifierInvocation 만 수집하되 override/virtual 은 필터링 -----
+        mods: list[str] = []
+        for m in ctx.getChildren():
+            if isinstance(m, SolidityParser.ModifierInvocationContext):
+                name = m.identifierPath().getText()
+                # ※ override / virtual 은 modifier 가 아님
+                if name not in {"override", "virtual"}:
+                    mods.append(name)
 
         self.contract_analyzer.process_function_definition(
             function_name=fname,
@@ -1277,6 +1282,9 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         elif isinstance(ctx, SolidityParser.TypeConversionContext):
             return self.visitTypeConversion(ctx)
 
+        elif isinstance(ctx, SolidityParser.MetaTypeContext):
+            return self.visitMetaType(ctx)
+
         # UnaryPrefixOp (단항 연산자 - 전위)
         elif isinstance(ctx, SolidityParser.UnaryPrefixOpContext):
             return self.visitUnaryPrefixOp(ctx)
@@ -1478,6 +1486,24 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         )
 
         return result_expr
+
+    def visitMetaType(self, ctx: SolidityParser.MetaTypeContext):
+        """
+        grammar:
+            MetaType : 'type' '(' typeName ')'   (#에 해당)
+        반환값은 이후의 MemberAccess(.max / .min 등)를 처리하기 위해
+        base-expression 역할만 하면 되므로 ‘identifier’ 하나만 넣어둔다.
+        """
+        # ① 안쪽 typeName 을 소스 그대로 추출
+        type_name_txt = ctx.typeName().getText()  # 예: 'uint256'
+
+        # ② Expression 생성
+        #    identifier = 'type(uint256)'  로 두고
+        #    context    = 'MetaTypeContext' 로 구분만 해둔다.
+        return Expression(
+            identifier=f"type({type_name_txt})",
+            context="MetaTypeContext"
+        )
 
     def visitFunctionCallOptions(self, ctx):
         # 1. 베이스 표현식 방문
