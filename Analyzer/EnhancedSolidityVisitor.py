@@ -875,6 +875,11 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         type_ctx = ctx.variableDeclaration().typeName()
         var_name = ctx.variableDeclaration().identifier().getText()
 
+        # dataLocation?  (memory / storage / calldata)
+        data_loc = None
+        #if ctx.dataLocation():
+        #    data_loc = ctx.dataLocation().getText()  # 'storage' 등
+
         # 2. 초기화 값이 있는 경우 처리
         init_expr = None
         if ctx.expression():
@@ -885,7 +890,11 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         type_obj = self.visitTypeName(type_ctx, type_obj)  # 타입 정보 분석
 
         # 5. ContractAnalyzer로 Variables 객체 및 lineComment 전달
-        self.contract_analyzer.process_variable_declaration(type_obj, var_name, init_expr)
+        self.contract_analyzer.process_variable_declaration(
+            type_obj=type_obj,
+            var_name=var_name,
+            init_expr=init_expr
+        )
 
     # Visit a parse tree produced by SolidityParser#interactiveExpressionStatement.
     def visitInteractiveExpressionStatement(self, ctx:SolidityParser.InteractiveExpressionStatementContext):
@@ -1746,9 +1755,40 @@ class EnhancedSolidityVisitor(SolidityVisitor):
 
         return result_expr
 
-    # Visit a parse tree produced by SolidityParser#LiteralSubDenomination.
-    def visitLiteralSubDenomination(self, ctx:SolidityParser.LiteralSubDenominationContext):
-        return self.visitChildren(ctx)
+    def visitLiteralSubDenomination(
+            self, ctx: SolidityParser.LiteralSubDenominationContext):
+        """
+        1 weeks  → 604 800
+        5 ether → 5 * 10**18
+        """
+
+        # ── ① wrapper 노드가 있으면 한 번 더 파고들기 ─────────────────
+        if isinstance(ctx.getChild(0), SolidityParser.LiteralWithSubDenominationContext):
+            ctx = ctx.getChild(0)  # 실제 numberLiteral · SubDenomination 가 있는 노드
+
+        # ── ② 토큰 추출 ────────────────────────────────────────────────
+        num_txt = ctx.numberLiteral().getText()  # '1', '0xFF', …
+        denom_tok = ctx.getToken(SolidityParser.SubDenomination, 0)  # 토큰 객체
+        denom_txt = denom_tok.getText()  # 'weeks', 'ether', …
+
+        # ── ③ 숫자 → int 변환 -------------------------------------------------
+        try:
+            base_val = int(num_txt, 0)  # 0x… 형태 지원
+        except ValueError:
+            raise ValueError(f"invalid numeric literal “{num_txt}”")
+
+        # ── ④ 단위 매핑 -------------------------------------------------------
+        if denom_txt not in TIME_VALUE:
+            raise ValueError(f"unknown sub-denomination “{denom_txt}”")
+        final_val = base_val * TIME_VALUE[denom_txt]
+
+        # ── ⑤ uint256 상수 Expression 반환 -----------------------------------
+        return Expression(
+            literal=str(final_val),  # 예: '604800'
+            var_type="uint256",
+            type_length=256,
+            context="LiteralSubDenomination"
+        )
 
     def visitTupleExp(self,
                       ctx: SolidityParser.TupleExpContext):
@@ -2047,15 +2087,7 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         return result_expr
 
     def visitLiteralWithSubDenomination(self, ctx: SolidityParser.LiteralWithSubDenominationContext):
-        num_txt = ctx.numberLiteral().getText()  # "1"  또는 "0x1a"
-        unit_txt = ctx.SubDenomination().getText()  # "weeks" 등
-        value = int(num_txt, 0)  # auto-base
-
-        expr = Expression(
-            literal=(value, unit_txt),  # 튜플 보관
-            context="LiteralSubDenomination"
-        )
-        return expr
+        return self.visitChildren(ctx)
 
     # Visit a parse tree produced by SolidityParser#TypeNameExp.
     def visitTypeNameExp(self, ctx:SolidityParser.TypeNameExpContext):

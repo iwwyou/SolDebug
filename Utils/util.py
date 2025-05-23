@@ -661,6 +661,10 @@ class StructVariable(Variables):
         self.typeInfo.structTypeName = struct_type       # 구조체 이름
         self.members: dict[str, Variables] = {}          # field → variable ­obj
 
+    def copy_from(self, other: 'StructVariable'):
+        for k, member in other.members.items():
+            self.members[k] = member  # 얕은 참조·필요시 deepcopy
+
     # ────────────────────────────────────────────────────────────
     # 초기화
     # ------------------------------------------------------------------
@@ -674,6 +678,7 @@ class StructVariable(Variables):
             [{ "member_name": str, "member_type": SolType }, ... ]
         - sm : AddressSymbolicManager (주소 타입이면 fresh interval 발급용)
         """
+
 
         def _make_var(var_id: str, sol_t: SolType) -> Variables:
             """SolType → 적절한 Variables/ArrayVariable/MappingVariable 생성"""

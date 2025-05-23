@@ -903,7 +903,7 @@ class ContractAnalyzer:
             self,
             type_obj: SolType,
             var_name: str,
-            init_expr: Expression | None = None,
+            init_expr: Expression | None = None
     ):
         # ───────────────────────────────────────────────────────────────
         # 1. CFG 컨텍스트
@@ -1007,15 +1007,41 @@ class ContractAnalyzer:
         # 3-b. 초기화식이 존재하는 경우
         # ----------------------------------------------------------------
         else:
-            if isinstance(v, ArrayVariable):
-                arr_vals = self.evaluate_expression(init_expr, cur_blk.variables, None, None)
-                for e in arr_vals:
-                    v.elements.append(e)
+            resolved = self.evaluate_expression(init_expr,
+                                                cur_blk.variables, None, None)
 
-            elif isinstance(v, Variables):  # elementary / address / bool …
-                v.value = self.evaluate_expression(init_expr, cur_blk.variables, None, None)
+            # ───────────────────── 구조체 / 배열 / 매핑 ─────────────────────
+            if isinstance(resolved, (StructVariable, ArrayVariable, MappingVariable)):
+                v = self._deep_clone_variable(resolved, var_name)  # ★ 새 객체 생성
+                # (별도로 cur_blk.variables 에도 등록해야 함 – 아래 4단계 참고)
 
-            # enum-init, mapping-init 등은 필요시 추가
+            # ───────────────────── enum 초기화 ─────────────────────────────
+            elif isinstance(v, EnumVariable):
+                enum_def = ccf.enumDefs.get(v.typeInfo.enumTypeName)
+                if enum_def is None:
+                    raise ValueError(f"undefined enum {v.typeInfo.enumTypeName}")
+
+                if isinstance(resolved, EnumVariable):
+                    v.valueIndex = resolved.valueIndex
+                    v.value = resolved.value
+                elif isinstance(resolved, str) and not resolved.isdigit():
+                    member = resolved.split('.')[-1]
+                    v.valueIndex = enum_def.members.index(member)
+                    v.value = member
+                else:  # 숫자 또는 digit 문자열
+                    idx = int(resolved, 0)
+                    v.valueIndex = idx
+                    v.value = enum_def.members[idx]
+
+            # ───────────────────── 나머지(기존 로직) ─────────────────────
+            else:
+                if isinstance(v, ArrayVariable):
+                    for e in resolved:
+                        v.elements.append(e)
+                elif isinstance(v, Variables):
+                    v.value = resolved
+                elif isinstance(v, StructVariable) and isinstance(resolved, StructVariable):
+                    v.copy_from(resolved)
 
         # ───────────────────────────────────────────────────────────────
         # 4. CFG 노드 업데이트
@@ -3183,6 +3209,13 @@ class ContractAnalyzer:
                 idx_var = variables[ident]
 
                 # 스칼라인지 보장
+                # ── ① 인덱스가 ⊥(bottom) 이면 “어느 요소인지 모름” → skip
+                if (self._is_interval(idx_var.value) and idx_var.value.is_bottom()) or \
+                        getattr(idx_var.value, "min_value", None) is None:
+                    # record 만 하고 실제 element 확정은 보류
+                    return None  # ← **이 두 줄만 추가**
+
+                # ── ② 스칼라(singleton) 여부 검사
                 if not self._is_interval(idx_var.value) or \
                         idx_var.value.min_value != idx_var.value.max_value:
                     raise ValueError(f"Array index '{ident}' must resolve to single constant.")
@@ -4377,6 +4410,35 @@ class ContractAnalyzer:
                 return successor
         return None  # False 블록을 찾지 못하면 None 반환
 
+    def _deep_clone_variable(self, var_obj, new_name: str):
+        """
+        var_obj   : 복제할 원본 변수 객체
+        new_name  : 로컬 변수로 선언될 새 이름
+
+        반환      : var_obj 와 동일한 타입의 “독립적인” 복사본
+        """
+        import copy
+        new_var = copy.deepcopy(var_obj)  # 깊은 복사
+        new_var.identifier = new_name  # 최상위 이름 교체
+
+        # ── Struct 내부 멤버 식별자 업데이트 ──────────────────────
+        if hasattr(new_var, "members"):  # StructVariable
+            for m in new_var.members.values():
+                tail = m.identifier.split('.', 1)[-1]  # 기존 “a.b.c”
+                m.identifier = f"{new_name}.{tail}"
+
+        # ── 배열 요소 식별자 업데이트 ─────────────────────────────
+        if hasattr(new_var, "elements"):  # ArrayVariable
+            for i, e in enumerate(new_var.elements):
+                e.identifier = f"{new_name}[{i}]"
+
+        # ── 매핑 value 식별자 업데이트 ───────────────────────────
+        if hasattr(new_var, "mapping"):  # MappingVariable
+            for k, v in new_var.mapping.items():
+                v.identifier = f"{new_name}[{k}]"
+
+        return new_var
+
     def find_corresponding_condition_node(self): # else if, else에 대한 처리
         # 현재 라인부터 위로 탐색하면서 대응되는 조건 노드를 찾음
         target_brace = 0
@@ -4834,69 +4896,64 @@ class ContractAnalyzer:
                 _apply_to_leaf(elem)
                 return None
 
-            # 1-C) StructVariable  → 멤버 접근
-            if isinstance(callerObject, StructVariable):
-                if ident not in callerObject.members:
-                    raise ValueError(f"Struct '{callerObject.identifier}' has no member '{ident}'")
-                mem = callerObject.members[ident]
-                if isinstance(mem, (StructVariable, ArrayVariable, MappingVariable)) :
-                    return mem
-                elif isinstance(mem, (Variables, EnumVariable)):
-                    _apply_to_leaf(mem)
-                    return None
+        # 1-C) StructVariable  → 멤버 접근
+        if isinstance(callerObject, StructVariable):
+            if ident not in callerObject.members:
+                raise ValueError(f"Struct '{callerObject.identifier}' has no member '{ident}'")
+            mem = callerObject.members[ident]
+            if isinstance(mem, (StructVariable, ArrayVariable, MappingVariable)) :
+                return mem
+            elif isinstance(mem, (Variables, EnumVariable)):
+                _apply_to_leaf(mem)
+                return None
 
-            # 1-D) MappingVariable → key 가 식별자인 케이스
-            if isinstance(callerObject, MappingVariable):
-                # ── ①  키가 “식별자”인 경우 ─────────────────
-                if ident in variables:
-                    key_var = variables[ident]
+        # 1-D) MappingVariable → key 가 식별자인 케이스
+        if isinstance(callerObject, MappingVariable):
+            # ── ①  키가 “식별자”인 경우 ─────────────────
+            if ident in variables:
+                key_var = variables[ident]
 
-                    # (a) 주소형이면 ⇒ 식별자 그대로 사용  ("user")
-                    is_addr = (
-                            hasattr(key_var, "typeInfo") and
-                            getattr(key_var.typeInfo, "elementaryTypeName", None) == "address"
-                    )
-                    if is_addr:
-                        key_str = ident
+                # (a) 주소형이면 ⇒ 식별자 그대로 사용  ("user")
+                is_addr = (
+                        hasattr(key_var, "typeInfo") and
+                        getattr(key_var.typeInfo, "elementaryTypeName", None) == "address"
+                )
+                if is_addr:
+                    key_str = ident
 
-                    # (b) 숫자/bool Interval
-                    elif self._is_interval(key_var.value):
-                        iv = key_var.value
-                        #    ⊥  또는  [l,r]  (r>l)  ➜ “아직 어떤 키인지 모름”
-                        if iv.is_bottom() or iv.min_value != iv.max_value:
-                            return callerObject  # ★ 그냥 매핑 객체만 넘김
-                        key_str = str(iv.min_value)  # singleton ⇒ 확정 키
+                # (b) 숫자/bool Interval
+                elif self._is_interval(key_var.value):
+                    iv = key_var.value
+                    #    ⊥  또는  [l,r]  (r>l)  ➜ “아직 어떤 키인지 모름”
+                    if iv.is_bottom() or iv.min_value != iv.max_value:
+                        return callerObject  # ★ 그냥 매핑 객체만 넘김
+                    key_str = str(iv.min_value)  # singleton ⇒ 확정 키
 
-                    # (c) 그밖에 심볼릭 값은 전부 식별자 그대로
-                    else:
-                        key_str = ident
-
-                # ── ②  키가 리터럴(‘0x…’ 등) / 선언 안 된 식별자 ──
+                # (c) 그밖에 심볼릭 값은 전부 식별자 그대로
                 else:
-                    key_str = ident  # 그대로 키로 사용
+                    key_str = ident
 
-                # ── ③  엔트리 가져오거나 생성 ──────────────────────
-                if key_str not in callerObject.mapping:
-                    callerObject.mapping[key_str] = self._create_new_mapping_value(
-                        callerObject, key_str
-                    )
-                mvar = callerObject.mapping[key_str]
+            # ── ②  키가 리터럴(‘0x…’ 등) / 선언 안 된 식별자 ──
+            else:
+                key_str = ident  # 그대로 키로 사용
 
-                # ── ④  복합-타입이면 더 내려가고, 스칼라-leaf 면 갱신 ──
-                if isinstance(mvar, (StructVariable, ArrayVariable, MappingVariable)):
-                    return mvar  # 계속 체이닝( userInfo[user] … )
-                _apply_to_leaf(mvar)  # Variables / EnumVariable
-                return None
+            # ── ③  엔트리 가져오거나 생성 ──────────────────────
+            if key_str not in callerObject.mapping:
+                callerObject.mapping[key_str] = self._create_new_mapping_value(
+                    callerObject, key_str
+                )
+            mvar = callerObject.mapping[key_str]
 
-            # 1-A) 단순 변수/enum → 그대로 leaf 갱신
-            if isinstance(callerObject, (Variables, EnumVariable)):
-                _apply_to_leaf(callerObject)
-                return None
+            # ── ④  복합-타입이면 더 내려가고, 스칼라-leaf 면 갱신 ──
+            if isinstance(mvar, (StructVariable, ArrayVariable, MappingVariable)):
+                return mvar  # 계속 체이닝( userInfo[user] … )
+            _apply_to_leaf(mvar)  # Variables / EnumVariable
+            return None
 
-            # 1-B) ArrayVariable  (ident 는 index 변수명)
-
-            # 예기치 못한 상위 타입
-            raise ValueError(f"Unhandled callerObject type: {type(callerObject).__name__}")
+        # 1-A) 단순 변수/enum → 그대로 leaf 갱신
+        if isinstance(callerObject, (Variables, EnumVariable)):
+            _apply_to_leaf(callerObject)
+            return None
 
         # ─────────────────────── 2. 상위 객체 없음 ──────────────────
         # (IndexAccess / MemberAccess 의 base 식별자를 해결하기 위한 분기)
@@ -5356,15 +5413,20 @@ class ContractAnalyzer:
             raise ValueError(f"There is no index expression")
 
     def evaluate_literal_with_subdenomination_context(
-            self, expr: Expression, variables, callerObject=None, callerContext=None):
+            self, expr: Expression, variables,
+            callerObject=None, callerContext=None):
+        """
+        · expr.literal 은 이제 604800 처럼 *이미 환산된* 10진수 문자열이다.
+        · 모든 sub-denom 값은 양수이므로 uint256 TOP 안에 들어간다.
+        """
 
-        value, unit = expr.literal  # (int, "weeks" | "ether" ...)
-        mul = TIME_VALUE.get(unit)
-        if mul is None:
-            raise ValueError(f"Unknown sub-denomination '{unit}'")
+        lit_txt = expr.literal  # e.g. '604800'
+        try:
+            abs_val = int(lit_txt, 10)
+        except ValueError:
+            raise ValueError(f"Invalid pre-evaluated literal '{lit_txt}'")
 
-        abs_val = value * mul
-        # 시간/가스 단위는 전부 양수 → uint256 으로 귀일
+        # uint256 상수 Interval 로 반환
         return UnsignedIntegerInterval(abs_val, abs_val, 256)
 
     def evaluate_type_conversion_context(self, expr, variables, callerObject=None, callerContext=None):
@@ -6312,8 +6374,8 @@ class ContractAnalyzer:
         return neg_map.get(op, op)
 
     def evaluate_function_call_context(self, expr, variables, callerObject=None, callerContext=None):
-        if expr.context == "MemberAccessContext" : # dynamic array에 대한 push, pop
-            return self.evaluate_expression(expr, variables, None, "functionCallContext")
+        if expr.function.context == "MemberAccessContext" : # dynamic array에 대한 push, pop
+            return self.evaluate_expression(expr.function, variables, None, "functionCallContext")
         elif expr.context =="IdentifierExpContext" :
             function_name = expr.identifier
         elif expr.function.context == "IdentifierExpContext" :
