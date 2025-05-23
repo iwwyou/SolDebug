@@ -150,7 +150,7 @@ class ContractCFG(CFG):
         self.fallback = None
         self.receive = None
 
-        self.modifiers = {}  # name -> FunctionCFG
+        #self.modifiers = {}  # name -> FunctionCFG
         self.functions = {}  # name -> FunctionCFG
 
         self.globals: dict[str, GlobalVariable] = {}
@@ -230,9 +230,9 @@ class ContractCFG(CFG):
         # 2. ContractCFG에 생성자 CFG 추가
         self.constructor = constructor_cfg
 
-    def get_modifier_cfg(self, modifier_name):
-        # modifier가 존재하면 해당 CFG를 반환하고, 없으면 None을 반환
-        return self.modifiers.get(modifier_name)
+    #def get_modifier_cfg(self, modifier_name):
+    #    # modifier가 존재하면 해당 CFG를 반환하고, 없으면 None을 반환
+    #    return self.modifiers.get(modifier_name)
 
     def add_function_cfg(self, function_name, function_cfg):
         self.functions[function_name] = function_cfg

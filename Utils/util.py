@@ -1,4 +1,5 @@
 from Utils.Interval import *
+from antlr4.error.ErrorListener import ErrorListener, ConsoleErrorListener
 
 # util.py
 import copy
@@ -42,11 +43,31 @@ class ParserHelpers:
 
     # --------------------------- 파싱
     @staticmethod
-    def generate_parse_tree(src: str, ctx_type: str):
+    def generate_parse_tree(src: str, ctx_type: str, verbose=False):
         input_stream  = InputStream(src)
         lexer         = SolidityLexer(input_stream)
         token_stream  = CommonTokenStream(lexer)
         parser        = SolidityParser(token_stream)
+
+        # ── ① 에러 리스너 부착 ───────────────────────────────
+        if verbose:
+            # 기본 ConsoleErrorListener 제거
+            parser.removeErrorListeners()
+
+            # ▶ 한 줄짜리 익명 ErrorListener
+            parser.addErrorListener(
+                type(
+                    "InlineErr", (ErrorListener,), {
+                        "syntaxError": lambda self, recognizer, offendingSymbol,
+                                              line, column, msg, e:
+                        print(f"[ANTLR] {line}:{column} {msg}")
+                    }
+                )()
+            )
+        else:
+            # 최소한 기본 오류 출력은 유지하고 싶다면
+            parser.removeErrorListeners()
+            parser.addErrorListener(ConsoleErrorListener.INSTANCE)
 
         rule = ParserHelpers.map_context_type(ctx_type)
 

@@ -264,13 +264,13 @@ class ContractAnalyzer:
 
         elif '{' in stripped_code: # definition 및 block 관련
             self.current_context_type = self.determine_top_level_context(new_code)
+            self.current_target_contract = self.find_contract_context(start_line)
 
             if self.current_context_type == "contract" :
                 return
 
-            # 수정 필요할수도 있음
-            self.current_target_contract = self.find_contract_context(start_line)
             self.current_target_function = self.find_function_context(start_line)
+
 
         # 최종적으로 context가 제대로 파악되지 않은 경우 기본값 처리
         if not self.current_target_contract:
@@ -750,10 +750,10 @@ class ContractAnalyzer:
         contract_cfg = self.contract_cfgs[self.current_target_contract]
 
         # ── ① modifier 존재 확인 ──────────────────────────────────
-        if modifier_name not in contract_cfg.modifiers:
+        if modifier_name not in contract_cfg.functions:
             raise ValueError(f"Modifier '{modifier_name}' is not defined.")
 
-        mod_cfg: FunctionCFG = contract_cfg.modifiers[modifier_name]
+        mod_cfg: FunctionCFG = contract_cfg.functions[modifier_name]
 
         # ── ② modifier-CFG 의 노드·엣지를 함수-CFG 로 복사 ───────
         g_fn = fn_cfg.graph
@@ -4913,22 +4913,27 @@ class ContractAnalyzer:
             # ContractAnalyzer.evaluate_identifier_context 내부
 
             elif isinstance(callerObject, MappingVariable):
-                # ── ① key 결정 ─────────────────────────────
+                # ── ① key 결정 ──────────────────────────────────
                 if ident_str in variables:  # ident_str == 변수명
                     key_var = variables[ident_str]
                     val = getattr(key_var, "value", key_var)
-                    if hasattr(val, "min_value"):  # Interval 계열
-                        if val.min_value == val.max_value:  # (a) concrete
-                            key_val = str(val.min_value)
-                        else:  # (b) 여전히 TOP
-                            key_val = f"{key_var.identifier}"  # 변수경로 그대로
-                    else:
-                        # bool / string 등 ▶ 그대로 변수경로 사용
-                        key_val = f"{key_var.identifier}"
+                    # ★ 주소형 판별을 elementaryTypeName 으로
+                    is_address = (
+                            hasattr(key_var, "typeInfo") and
+                            getattr(key_var.typeInfo, "elementaryTypeName", None) == "address"
+                    )
 
+                    if hasattr(val, "min_value"):
+                        if is_address:
+                            key_val = key_var.identifier  # "msg.sender" 그대로
+                        elif val.min_value == val.max_value:  # 숫자·bool 싱글톤
+                            key_val = str(val.min_value)
+                        else:
+                            key_val = key_var.identifier  # 여전히 TOP
+                    else:
+                        key_val = key_var.identifier  # string·bool 등
                 else:
-                    # ── ② 리터럴 키 ────────────────────────
-                    #    0x… / 10진수 → int 변환, 그 외는 문자열 그대로
+                    # ───── 리터럴 키 ────────────────────────────
                     try:
                         key_val = str(int(ident_str, 0))
                     except ValueError:
@@ -6293,12 +6298,24 @@ class ContractAnalyzer:
 
         # exit node에 도달했다면 return_values join
         # 모든 return을 모아 exit node에서 join 처리할 수 있으나, 여기서는 단순히 top-level에서 return_values를 join
+        # ── ⑦  최종 반환값 계산 ────────────────────────────────
         if len(return_values) == 0:
-            return None
+            # (A) 명시적 return 이 없을 때
+            if fcfg.return_vars:  # named returns 존재
+                if len(fcfg.return_vars) == 1:
+                    ret_obj = fcfg.return_vars[0]  # Variables 객체
+                    return ret_obj.value  # Interval / 값 반환
+                else:
+                    # 여러 개면 튜플 형태로 묶어 돌려줌
+                    return [rv.value for rv in fcfg.return_vars]
+            else:
+                # 이름 없는 (unnamed) return 이고 값도 없으면 None
+                return None
+
         elif len(return_values) == 1:
             return return_values[0]
+
         else:
-            # 여러 return 값 join 로직 필요 (정수 interval join 등)
             joined_ret = return_values[0]
             for rv in return_values[1:]:
                 joined_ret = joined_ret.join(rv)

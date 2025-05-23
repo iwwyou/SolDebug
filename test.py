@@ -49,7 +49,8 @@ def simulate_inputs(records):
             continue
 
         ctx  = contract_analyzer.get_current_context_type()
-        tree = ParserHelpers.generate_parse_tree(code, ctx)
+        tree = ParserHelpers.generate_parse_tree(code, ctx, True)
+
         EnhancedSolidityVisitor(contract_analyzer).visit(tree)
 
         print("--------------------------------------------------------")
