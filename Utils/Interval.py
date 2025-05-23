@@ -6,9 +6,10 @@ class Interval:
     모든 Interval의 기본 클래스.
     min_value, max_value가 모두 None이면 bottom(빈 집합)을 의미한다.
     """
-    def __init__(self, min_value=None, max_value=None):
+    def __init__(self, min_value=None, max_value=None, type_length=None):
         self.min_value = min_value
         self.max_value = max_value
+        self.type_length = type_length
 
     def is_bottom(self):
         return self.min_value is None and self.max_value is None
@@ -20,9 +21,21 @@ class Interval:
         """
         return False
 
+    @staticmethod
+    def _bottom_propagate(a, b, fn):
+        """
+        a 또는 b 가 ⊥(bottom) 이면 같은 타입의 bottom 을 반환.
+        아니면 fn(a, b) 실행 결과 반환.
+        """
+        if a.is_bottom() or b.is_bottom():
+            # a, b 두 클래스는 같다고 가정
+            return a.__class__(None, None, a.type_length)
+        return fn(a, b)
+
     def make_bottom(self):
         """bottom(빈 집합)을 만들어 반환"""
         return type(self)(None, None)
+
 
     def encompass(self, intended_interval):
         """
@@ -53,13 +66,18 @@ class Interval:
 
 class IntegerInterval(Interval):
     def __init__(self, min_value=None, max_value=None, type_length=256):
-        super().__init__(min_value, max_value)
-        self.type_length = type_length
+        super().__init__(min_value, max_value, type_length)
 
     # ---------- Top / Bottom ----------
     def is_top(self):
         return (self.min_value == NEG_INFINITY
                 and self.max_value == INFINITY)
+
+
+    def _bottom_propagate(a, b, fn):
+        if a.is_bottom() or b.is_bottom():
+            return a.__class__(None, None, a.type_length)
+        return fn(a, b)
 
     def top(self):
         """
@@ -213,183 +231,145 @@ class IntegerInterval(Interval):
 
     # ---------- 산술 연산 ----------
     def add(self, other):
-        min_sum = self.min_value + other.min_value
-        max_sum = self.max_value + other.max_value
-        # 비트 범위 고려 (optionally clamp)
-        # 여기서는 단순히 그대로
-        return IntegerInterval(min_sum, max_sum, self.type_length)
+        return Interval._bottom_propagate(    # ① 클래스 이름으로
+            self, other,
+            lambda x, y: IntegerInterval(
+                x.min_value + y.min_value,
+                x.max_value + y.max_value,
+                self.type_length)
+        )
 
     def subtract(self, other):
-        """
-        a - b = [ (a.min - b.max), (a.max - b.min) ]
-        """
-        min_diff = self.min_value - other.max_value
-        max_diff = self.max_value - other.min_value
-        return IntegerInterval(min_diff, max_diff, self.type_length)
+        return Interval._bottom_propagate(self, other,
+                                 lambda x, y: IntegerInterval(x.min_value - y.max_value,
+                                                              x.max_value - y.min_value,
+                                                              self.type_length))
 
     def multiply(self, other):
-        # 가능한 조합 중 최소/최대
-        vals = [
-            self.min_value * other.min_value,
-            self.min_value * other.max_value,
-            self.max_value * other.min_value,
-            self.max_value * other.max_value
-        ]
-        min_product = min(vals)
-        max_product = max(vals)
-        return IntegerInterval(min_product, max_product, self.type_length)
+        def _mul(x, y):
+            candidates = [
+                x.min_value * y.min_value,
+                x.min_value * y.max_value,
+                x.max_value * y.min_value,
+                x.max_value * y.max_value,
+            ]
+            return IntegerInterval(min(candidates), max(candidates), self.type_length)
+        return Interval._bottom_propagate(self, other, _mul)
 
-    def divide(self, other):
+    def divide(self, other: "IntegerInterval") -> "IntegerInterval":
         """
-        0이 들어갈 가능성이 있으면 bottom 처리(즉, 실행 불가)
-        그렇지 않다면 단순히 각 끝점끼리 // 연산(부호 주의)
+        self / other
+        · 분모 구간에 0 이 포함되면 ⊥
+        · 아니면 4 개의 끝점 조합을 // 로 계산해 [min, max] 보수적 추정
+          (Python // ≈ Solidity / 과 오차가 조금 있으나 분석용으론 충분)
         """
-        if (other.min_value <= 0 <= other.max_value):
-            # 0 포함
-            return self.bottom(self.type_length)
+        def _impl(x: "IntegerInterval", y: "IntegerInterval") -> "IntegerInterval":
+            # 0 포함 시 실행 불가 → bottom
+            if y.min_value <= 0 <= y.max_value:
+                return x.make_bottom()
 
-        # safe div helper
-        def safe_div(n, d):
-            # Python의 //는 음수에서 floor toward -∞
-            # Solidity는 0 방향 truncation → 약간 다를 수 있음
-            # 여기서는 단순화
-            return n // d
+            def _sdiv(a: int, b: int) -> int:
+                return a // b  # 가장 단순한 floor-연산
 
-        candidates = []
-        candidates.append(safe_div(self.min_value, other.min_value))
-        candidates.append(safe_div(self.min_value, other.max_value))
-        candidates.append(safe_div(self.max_value, other.min_value))
-        candidates.append(safe_div(self.max_value, other.max_value))
+            vals = [
+                _sdiv(x.min_value, y.min_value),
+                _sdiv(x.min_value, y.max_value),
+                _sdiv(x.max_value, y.min_value),
+                _sdiv(x.max_value, y.max_value),
+            ]
+            return IntegerInterval(min(vals), max(vals), x.type_length)
 
-        new_min = min(candidates)
-        new_max = max(candidates)
-        return IntegerInterval(new_min, new_max, self.type_length)
-
+        return Interval._bottom_propagate(self, other, _impl)
     # ---------- 산술 연산 ----------
-    def exponentiate(self, other):
+    def exponentiate(self, other: "IntegerInterval") -> "IntegerInterval":
         """
-        a ** b  (b ≥ 0 를 전제로 한다)
-        - 지수 범위가 0 미만이면 ⊥
-        - 가능한 모든 끝점(a.min/max, b.min/max) 조합을 계산해서
-          [min, max] 보수적 범위 반환
-        - 오버플로는 signed int bit-width에 맞춰 클램프
+        a ** b  (b ≥ 0 가정).  음수 지수·bottom 전파·오버플로 클램프 포함.
         """
+        def _clamp(v: int, bits: int) -> int:
+            lo, hi = -(1 << (bits - 1)), (1 << (bits - 1)) - 1
+            return max(lo, min(hi, v))
 
-        # ─── 공통: 내부에서 사용할 상한 계산 헬퍼 ──────────────────────────
-        def _clamp(value, type_bits, signed=False):
-            if signed:
-                lo, hi = -2 ** (type_bits - 1), 2 ** (type_bits - 1) - 1
-            else:
-                lo, hi = 0, 2 ** type_bits - 1
-            if value < lo:  return lo
-            if value > hi:  return hi
-            return value
+        def _impl(x: "IntegerInterval", y: "IntegerInterval") -> "IntegerInterval":
+            # 음수 지수 → bottom
+            if y.min_value < 0:
+                return x.make_bottom()
 
-        if self.is_bottom() or other.is_bottom():
-            return self.bottom(self.type_length)
+            base_cand = [x.min_value, x.max_value]
+            exp_cand  = [y.min_value, y.max_value]
+            vals = []
+            for a in base_cand:
+                for b in exp_cand:
+                    try:
+                        vals.append(pow(a, b))
+                    except OverflowError:
+                        # 양·음수에 따라 ±∞ 취급
+                        vals.extend([-(1 << 255), (1 << 255)-1])
+            new_min = _clamp(min(vals), self.type_length)
+            new_max = _clamp(max(vals), self.type_length)
+            return IntegerInterval(new_min, new_max, self.type_length)
 
-        # 음수 지수 → 지원 안 함 ⇒ bottom
-        if other.min_value < 0:
-            return self.bottom(self.type_length)
-
-        # 후보 값 계산 (큰 지수에서 pow overflow 가능 → try/except)
-        base_candidates   = [self.min_value, self.max_value]
-        exp_candidates    = [other.min_value, other.max_value]
-        results = []
-        for a in base_candidates:
-            for b in exp_candidates:
-                try:
-                    results.append(pow(a, b))
-                except OverflowError:
-                    # overflow → 최고값으로 보수
-                    if a >= 0:
-                        results.append(INFINITY)
-                    else:
-                        # 부호가 바뀔 수 있어 –∞, +∞ 둘 다 고려
-                        results.extend([NEG_INFINITY, INFINITY])
-
-        new_min = min(results)
-        new_max = max(results)
-
-        # type-width 클램프
-        new_min = _clamp(new_min, self.type_length, signed=True)
-        new_max = _clamp(new_max, self.type_length, signed=True)
-
-        return IntegerInterval(new_min, new_max, self.type_length)
+        return Interval._bottom_propagate(self, other, _impl)
 
 
-    def modulo(self, other):
+    def modulo(self, other: "IntegerInterval") -> "IntegerInterval":
         """
-        0이 들어갈 가능성이 있으면 bottom
-        그 외엔 결과 범위를 0~(divisor-1) 정도로 보수적 처리
-        음수 처리시 복잡하나, 간단히 최대 절댓값 기준
+        self % other  – 0 포함 / bottom 전파, 보수적 범위 추정.
         """
-        if other.is_bottom():
-            return self.bottom(self.type_length)
+        def _impl(x: "IntegerInterval", y: "IntegerInterval") -> "IntegerInterval":
+            # 분모가 0 범위 포함 → bottom
+            if y.min_value <= 0 <= y.max_value:
+                return x.make_bottom()
+            max_div = max(abs(y.min_value), abs(y.max_value))
+            return IntegerInterval(-max_div + 1, max_div - 1, x.type_length)
 
-        # 0 포함?
-        if other.min_value <= 0 <= other.max_value:
-            return self.bottom(self.type_length)
+        return Interval._bottom_propagate(self, other, _impl)
 
-        # 절댓값이 가장 큰 divisor:
-        abs_divs = [abs(other.min_value), abs(other.max_value)]
-        max_div = max(abs_divs)
+    # ---------- 쉬프트/비트 연산 ----------
+    def shift(self, shift_iv: "IntegerInterval", op: str) -> "IntegerInterval":
+        """
+        op ∈ {'<<', '>>', '>>>'}   (>>> : 양수 논리시프트로 동일 처리)
+        """
+        def _lshift(x: "IntegerInterval", s: "IntegerInterval") -> "IntegerInterval":
+            lo = x.min_value << s.min_value
+            hi = x.max_value << s.max_value
+            return IntegerInterval(lo, hi, x.type_length)
 
-        # 결과는 - (max_div-1) ~ (max_div-1) 가능성이 있지만,
-        # 실제로는 0 ~ max_div-1 (unsigned-like) 혹은 음수 가능
-        # 여기서는 간단히 [-max_div+1, max_div-1]
-        return IntegerInterval(-max_div+1, max_div-1, self.type_length)
+        def _rshift(x: "IntegerInterval", s: "IntegerInterval") -> "IntegerInterval":
+            lo = x.min_value >> s.max_value
+            hi = x.max_value >> s.min_value
+            return IntegerInterval(lo, hi, x.type_length)
 
-    # ---------- 쉬프트/비트연산 ----------
-    def shift(self, shift_interval, operator):
-        if shift_interval.is_bottom():
-            return self.bottom(self.type_length)
+        # 음수 시프트 양 ⇒ bottom
+        if not shift_iv.is_bottom() and shift_iv.min_value < 0:
+            return self.make_bottom()
 
-        # 시프트 양에 0보다 작은 값 포함 → 보수적으로 bottom or top?
-        if shift_interval.min_value < 0:
-            # Solidity에서는 음수 시프트 불가
-            return self.bottom(self.type_length)
-
-        if operator == '<<':
-            return self.left_shift(shift_interval)
+        if op == '<<':
+            return Interval._bottom_propagate(self, shift_iv, _lshift)
+        elif op in ('>>', '>>>'):
+            return Interval._bottom_propagate(self, shift_iv, _rshift)
         else:
-            # '>>' or '>>>'
-            return self.right_shift(shift_interval)
+            raise ValueError(f"Unsupported shift op {op}")
 
-    def left_shift(self, shift_interval):
-        # 단순: [min << maxShift, max << minShift]에서 최소/최대 계산
-        min_val = self.min_value << shift_interval.min_value
-        max_val = self.max_value << shift_interval.max_value
-        return IntegerInterval(min_val, max_val, self.type_length)
-
-    def right_shift(self, shift_interval):
-        # signed >>는 부호비트 유지. 일단 단순히 Python >>와 같다고 가정
-        min_val = self.min_value >> shift_interval.max_value
-        max_val = self.max_value >> shift_interval.min_value
-        return IntegerInterval(min_val, max_val, self.type_length)
-
-    def bitwise(self, op, other):
+    def bitwise(self, op: str, other: "IntegerInterval") -> "IntegerInterval":
         """
-        &, |, ^ 연산 -> 굉장히 보수적 추정
+        &, |, ^ – 매우 보수적: 동일 폭 signed top 으로 환원.
         """
-        if op == '&':
-            # 결과는 0 이상?
-            # 사실 음수가 될 수도 있어서 정확치 않음.
-            # 매우 보수적으로 [-∞, max(...)] 등등
-            # 일단 음수 환경에서 정확 추정은 복잡하므로 bottom 또는 wide
-            return self.theoretical_top()
-        elif op == '|':
-            return self.theoretical_top()
-        elif op == '^':
-            return self.theoretical_top()
+        def _top_like(x: "IntegerInterval", _: "IntegerInterval") -> "IntegerInterval":
+            w = x.type_length
+            lo, hi = -(1 << (w - 1)), (1 << (w - 1)) - 1
+            return IntegerInterval(lo, hi, w)
 
-    def negate(self):
+        if op not in {'&', '|', '^'}:
+            raise ValueError(f"bad bit-op {op}")
+        return Interval._bottom_propagate(self, other, _top_like)
+
+    # ---------- 단항 연산 ----------
+    def negate(self) -> "IntegerInterval":
         """
-        단항 - (음수화)
+        단항 ‘-’  (bottom 전파)
         """
         if self.is_bottom():
             return self
-
         return IntegerInterval(-self.max_value, -self.min_value, self.type_length)
 
     def prefix_increment(self):
@@ -425,8 +405,7 @@ class IntegerInterval(Interval):
 
 class UnsignedIntegerInterval(Interval):
     def __init__(self, min_value=None, max_value=None, type_length=256):
-        super().__init__(min_value, max_value)
-        self.type_length = type_length
+        super().__init__(min_value, max_value, type_length)
 
     # ---------- Top / Bottom ----------
     def is_top(self):
@@ -556,203 +535,132 @@ class UnsignedIntegerInterval(Interval):
                                        self.type_length)
 
     # ---------- 산술 연산 (실제 빼기) ----------
-    def subtract(self, other):
-        """
-        unsigned a - b = [ (a.min - b.max), (a.max - b.min) ]
-        단, 결과가 <0이면 0으로 컷? (Solidity에선 언더플로?)
-        일단 보수적으로 negative 값 나오면 bottom 처리 가능, or clamp to 0
-        여기선 clamp 예시
-        """
-        min_diff = self.min_value - other.max_value
-        max_diff = self.max_value - other.min_value
+    def subtract(self, other: "UnsignedIntegerInterval") -> "UnsignedIntegerInterval":
+        def _impl(a, b):
+            min_diff = a.min_value - b.max_value
+            max_diff = a.max_value - b.min_value
 
-        # clamp to >= 0
-        if max_diff < 0:
-            # 전부 음수 가능성이면 => 0 미만 => 언더플로 => 실제론 revert
-            # 여기서는 bottom 처리
-            return self.bottom(self.type_length)
+            # 전부 음수가 될 가능성이 있으면 실행 불가 → ⊥
+            if max_diff < 0:
+                return a.make_bottom()
 
-        cmin = max(min_diff, 0)
-        cmax = max(max_diff, 0)
-        return UnsignedIntegerInterval(cmin, cmax, self.type_length)
+            cmin = max(min_diff, 0)
+            cmax = max(max_diff, 0)
+            return UnsignedIntegerInterval(cmin, cmax, a.type_length)
 
-    def difference(self, other):
-        """
-        집합 차 (원래 subtract()에 있던 로직).
-        interval A에서 interval B 교집합 부분을 빼는 연산.
-        """
-        if self.is_bottom() or other.is_bottom():
-            return self
-        inter_min = max(self.min_value, other.min_value)
-        inter_max = min(self.max_value, other.max_value)
-        if inter_min > inter_max:
-            # 교집합 없음
-            return self
+        return Interval._bottom_propagate(self, other, _impl)
 
-        # 교집합이 전체 덮으면 bottom
-        if inter_min <= self.min_value and inter_max >= self.max_value:
-            return self.bottom(self.type_length)
+    def add(self, other: "UnsignedIntegerInterval") -> "UnsignedIntegerInterval":
+        def _impl(a, b):
+            type_max = (1 << a.type_length) - 1
+            smin = min(a.min_value + b.min_value, type_max)
+            smax = min(a.max_value + b.max_value, type_max)
+            return UnsignedIntegerInterval(smin, smax, a.type_length)
 
-        # 부분 차
-        # 간단히 하한 부분만 남긴다거나, 상한 부분만 남긴다거나 해야 하나,
-        # 여기서는 하한부분만 남긴다고 가정
-        new_max = inter_min - 1
-        if new_max < self.min_value:
-            # 하한 부분이 없는 경우, 상한 부분 남김
-            new_min2 = inter_max + 1
-            if new_min2 > self.max_value:
-                return self.bottom(self.type_length)
-            return UnsignedIntegerInterval(new_min2, self.max_value, self.type_length)
+        return Interval._bottom_propagate(self, other, _impl)
 
-        return UnsignedIntegerInterval(self.min_value, new_max, self.type_length)
+    def multiply(self, other: "UnsignedIntegerInterval") -> "UnsignedIntegerInterval":
+        def _impl(a, b):
+            vals = [
+                a.min_value * b.min_value,
+                a.min_value * b.max_value,
+                a.max_value * b.min_value,
+                a.max_value * b.max_value,
+            ]
+            type_max = (1 << a.type_length) - 1
+            return UnsignedIntegerInterval(
+                min(vals),
+                min(max(vals), type_max),
+                a.type_length,
+            )
 
-    def add(self, other):
-        smin = self.min_value + other.min_value
-        smax = self.max_value + other.max_value
-        # clamp to type_max
-        type_max = 2 ** self.type_length - 1
+        return Interval._bottom_propagate(self, other, _impl)
 
-        if smax > type_max:
-            smax = type_max
-        if smin > type_max:
-            smin = type_max
+    def divide(self, other: "UnsignedIntegerInterval") -> "UnsignedIntegerInterval":
+        def _impl(a, b):
+            # 분모가 0 포함 → ⊥
+            if b.min_value <= 0 <= b.max_value:
+                return a.make_bottom()
+
+            nums = [a.min_value, a.max_value]
+            dens = [b.min_value, b.max_value]
+            cand = [n // d for n in nums for d in dens]
+            return UnsignedIntegerInterval(min(cand), max(cand), a.type_length)
+
+        return Interval._bottom_propagate(self, other, _impl)
+
+    def exponentiate(self, other: "UnsignedIntegerInterval") -> "UnsignedIntegerInterval":
+        def _impl(a, b):
+            if b.min_value < 0:          # 음수 지수는 허용 안 함
+                return a.make_bottom()
+
+            type_max = (1 << a.type_length) - 1
+            vals = []
+            for base in (a.min_value, a.max_value):
+                for exp in (b.min_value, b.max_value):
+                    try:
+                        vals.append(pow(base, exp))
+                    except OverflowError:
+                        vals.append(type_max)
+
+            return UnsignedIntegerInterval(
+                min(vals),
+                min(max(vals), type_max),
+                a.type_length,
+            )
+
+        return Interval._bottom_propagate(self, other, _impl)
+
+    def modulo(self, other: "UnsignedIntegerInterval") -> "UnsignedIntegerInterval":
+        def _impl(a, b):
+            if b.min_value <= 0 <= b.max_value:
+                return a.make_bottom()
+
+            # divisor 가 단일 값(d)일 때 최적화
+            if b.min_value == b.max_value:
+                d = b.min_value
+                if a.max_value < d:
+                    return UnsignedIntegerInterval(a.min_value, a.max_value, a.type_length)
+                return UnsignedIntegerInterval(0, d - 1, a.type_length)
+
+            # 범위가 넓은 제수 → 0..(max_d-1)
+            return UnsignedIntegerInterval(0, b.max_value - 1, a.type_length)
+
+        return Interval._bottom_propagate(self, other, _impl)
+
+    # ------------------------------------------------------------------
+    # Shift / Bitwise
+    # ------------------------------------------------------------------
+    def shift(self, shift_iv: "UnsignedIntegerInterval", op: str) -> "UnsignedIntegerInterval":
+        def _impl(a, s):
+            if s.min_value < 0:
+                return a.make_bottom()
+
+            if op == '<<':
+                return a.left_shift(s)
+            return a.right_shift(s)      # '>>' 또는 '>>>'
+
+        return Interval._bottom_propagate(self, shift_iv, _impl)
+
+    def left_shift(self, s: "UnsignedIntegerInterval") -> "UnsignedIntegerInterval":
+        type_max = (1 << self.type_length) - 1
+        smin = min(self.min_value << s.min_value, type_max)
+        smax = min(self.max_value << s.max_value, type_max)
         return UnsignedIntegerInterval(smin, smax, self.type_length)
 
-    def multiply(self, other):
-        vals = [
-            self.min_value * other.min_value,
-            self.min_value * other.max_value,
-            self.max_value * other.min_value,
-            self.max_value * other.max_value
-        ]
-        result_min = min(vals)
-        result_max = max(vals)
-        if result_min < 0:
-            # unsigned라서 음수는 실제로 불가능 → 0으로 clamp
-            result_min = 0
-
-        type_max = 2 ** self.type_length - 1
-        if result_max > type_max:
-            result_max = type_max
-
-        return UnsignedIntegerInterval(result_min, result_max, self.type_length)
-
-    def divide(self, other):
-        # 0 들어가면 bottom
-        if other.min_value == 0 or other.max_value == 0:
-            return self.bottom(self.type_length)
-
-        # 단순 각 끝점 //로 계산
-        def safe_div(a, b):
-            return a // b if b != 0 else None
-
-        candidates = []
-        candidates.append(safe_div(self.min_value, other.max_value))
-        candidates.append(safe_div(self.max_value, max(other.min_value,1)))
-
-        # None 제거
-        candidates = [c for c in candidates if c is not None]
-        if not candidates:
-            return self.bottom(self.type_length)
-
-        new_min = min(candidates)
-        new_max = max(candidates)
-        return UnsignedIntegerInterval(new_min, new_max, self.type_length)
-
-    # ---------- 산술 연산 ----------
-    def exponentiate(self, other):
-        """
-        unsigned a ** b  (b ≥ 0)
-        overflow 시 type 최댓값으로 클램프
-        """
-
-        if self.is_bottom() or other.is_bottom():
-            return self.bottom(self.type_length)
-
-        if other.min_value < 0:
-            return self.bottom(self.type_length)
-
-        base_candidates = [self.min_value, self.max_value]
-        exp_candidates  = [other.min_value, other.max_value]
-        results = []
-        for a in base_candidates:
-            for b in exp_candidates:
-                try:
-                    results.append(pow(a, b))
-                except OverflowError:
-                    results.append(INFINITY)
-
-        new_min = max(0, min(results))
-        new_max = min(max(results), 2 ** self.type_length - 1)
-        return UnsignedIntegerInterval(new_min, new_max, self.type_length)
-
-
-    def modulo(self, other):
-        # 제수가 0을 포함? → ⊥
-        if other.min_value <= 0 <= other.max_value:
-            return self.bottom(self.type_length)
-
-        # 제수 singleton 인 양수 d
-        if other.min_value == other.max_value and other.min_value > 0:
-            d = other.min_value
-            # 피제수 singleton   ↦ 정확한 값
-            if self.min_value == self.max_value:
-                v = self.min_value % d
-                return UnsignedIntegerInterval(v, v, self.type_length)
-            # 피제수 범위가 d 보다 좁다 ↦ 그대로
-            if self.max_value < d:
-                return UnsignedIntegerInterval(self.min_value,
-                                               self.max_value,
-                                               self.type_length)
-            # 그 외는 0..d-1 (보수)
-            return UnsignedIntegerInterval(0, d - 1, self.type_length)
-
-        # 제수가 구간이지만 전부 양수일 때 → 가장 보수적인 0..(max_d-1)
-        max_d = other.max_value
-        return UnsignedIntegerInterval(0, max_d - 1, self.type_length)
-
-    def shift(self, shift_interval, operator):
-        if shift_interval.is_bottom():
-            return self.bottom(self.type_length)
-
-        # 0 이하 시프트 → bottom
-        if shift_interval.min_value < 0:
-            return self.bottom(self.type_length)
-
-        if operator == '<<':
-            return self.left_shift(shift_interval)
-        else:
-            # '>>' or '>>>'
-            return self.right_shift(shift_interval)
-
-    def left_shift(self, shift_interval):
-        smin = self.min_value << shift_interval.min_value
-        smax = self.max_value << shift_interval.max_value
-        type_max = 2 ** self.type_length - 1
-
-        smin = min(smin, type_max)
-        smax = min(smax, type_max)
+    def right_shift(self, s: "UnsignedIntegerInterval") -> "UnsignedIntegerInterval":
+        smin = self.min_value >> s.max_value
+        smax = self.max_value >> s.min_value
         return UnsignedIntegerInterval(smin, smax, self.type_length)
 
-    def right_shift(self, shift_interval):
-        smin = self.min_value >> shift_interval.max_value
-        smax = self.max_value >> shift_interval.min_value
-        # 음수될 일은 없으니 그냥 사용
-        return UnsignedIntegerInterval(smin, smax, self.type_length)
+    def bitwise(self, op: str, other: "UnsignedIntegerInterval") -> "UnsignedIntegerInterval":
+        def _impl(a, b):
+            if op == '&':
+                return UnsignedIntegerInterval(0, min(a.max_value, b.max_value), a.type_length)
+            else:  # '|' 또는 '^'
+                return UnsignedIntegerInterval(0, max(a.max_value, b.max_value), a.type_length)
 
-    def bitwise(self, op, other):
-        """
-        &, |, ^ 에 대한 보수적 추정
-        """
-        if op == '&':
-            # 최소값은 0, 최대값은 min(self.max, other.max)
-            return UnsignedIntegerInterval(0, min(self.max_value, other.max_value), self.type_length)
-        elif op == '|':
-            # 최소값 0, 최대값은 max(self.max, other.max)
-            return UnsignedIntegerInterval(0, max(self.max_value, other.max_value), self.type_length)
-        elif op == '^':
-            # 최소값 0, 최대값은 max(self.max, other.max)
-            return UnsignedIntegerInterval(0, max(self.max_value, other.max_value), self.type_length)
+        return Interval._bottom_propagate(self, other, _impl)
 
     # ------------------------------------------------------------------------
 
@@ -766,7 +674,7 @@ class BoolInterval(Interval):
       - always False = [0,0]
     """
     def __init__(self, min_value=None, max_value=None):
-        super().__init__(min_value, max_value)
+        super().__init__(min_value, max_value, None)
 
     def is_top(self):
         return (self.min_value == 0 and self.max_value == 1)

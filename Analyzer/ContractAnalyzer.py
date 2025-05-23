@@ -5417,48 +5417,51 @@ class ContractAnalyzer:
 
     def convert_to_int(self, sub_val, bits):
         """
-        sub_val을 intN 범위[-2^(bits-1) .. 2^(bits-1)-1]로 클램핑
+        주어진 sub_val(Interval·리터럴·symbolic)을
+        signed int<bits> 범위 [-2^(bits-1) .. 2^(bits-1)-1] 로 변환/클램프한다.
         """
-        type_min = -(2 ** (bits - 1))
-        type_max = (2 ** (bits - 1)) - 1
+        type_min = -(1 << (bits - 1))
+        type_max = (1 << (bits - 1)) - 1
 
-        # Interval
-        if isinstance(sub_val, IntegerInterval) or isinstance(sub_val, UnsignedIntegerInterval):
+        # ────────────────────────────────────────────────────────
+        # 1) Interval → Interval
+        #    ⊥(bottom) 은 그대로 bottom 반환
+        # ────────────────────────────────────────────────────────
+        if isinstance(sub_val, (IntegerInterval, UnsignedIntegerInterval)):
+            if sub_val.is_bottom():  # ★ bottom 체크
+                return IntegerInterval(None, None, bits)
+
             new_min = max(type_min, sub_val.min_value)
             new_max = min(type_max, sub_val.max_value)
-            if new_min > new_max:
-                # bottom
+            if new_min > new_max:  # 교집합이 공집합
                 return IntegerInterval(None, None, bits)
             return IntegerInterval(new_min, new_max, bits)
 
-        elif isinstance(sub_val, BoolInterval):
-            # false => [0,0], true => [1,1], top => [0,1]
-            # clamp to [-2^(bits-1), 2^(bits-1)-1]
-            if sub_val.min_value == 1 and sub_val.max_value == 1:
-                val = 1
-                if val < type_min or val > type_max:
-                    # bottom
-                    return IntegerInterval(None, None, bits)
-                return IntegerInterval(val, val, bits)
-            elif sub_val.min_value == 0 and sub_val.max_value == 0:
-                val = 0
-                if val < type_min or val > type_max:
-                    return IntegerInterval(None, None, bits)
-                return IntegerInterval(val, val, bits)
-            else:
-                # [0,1]
-                # => [0,1] intersect with [type_min..type_max]
-                new_min = max(type_min, 0)
-                new_max = min(type_max, 1)
-                if new_min > new_max:
-                    return IntegerInterval(None, None, bits)
-                return IntegerInterval(new_min, new_max, bits)
+        # ────────────────────────────────────────────────────────
+        # 2) BoolInterval → 0/1 로 압축 후 위와 동일
+        # ────────────────────────────────────────────────────────
+        if isinstance(sub_val, BoolInterval):
+            # 0‥1 과 int<bits> 의 교집합은 그대로 0‥1
+            return IntegerInterval(
+                max(type_min, sub_val.min_value),
+                min(type_max, sub_val.max_value),
+                bits
+            )
 
-        elif isinstance(sub_val, str):
-            # parse or symbolic
+        # ────────────────────────────────────────────────────────
+        # 3) 문자열(리터럴·심볼릭)  → 그대로 symbolic 래퍼
+        # ────────────────────────────────────────────────────────
+        if isinstance(sub_val, str):
             return f"symbolicInt{bits}({sub_val})"
 
-        else:
+        # ────────────────────────────────────────────────────────
+        # 4) 기타(정수 등) → 그대로 Interval 로 래핑
+        # ────────────────────────────────────────────────────────
+        try:
+            v = int(sub_val)
+            v = max(type_min, min(type_max, v))  # 범위 클램프
+            return IntegerInterval(v, v, bits)
+        except (ValueError, TypeError):
             return f"symbolicInt{bits}({sub_val})"
 
     def convert_to_bool(self, sub_val):
