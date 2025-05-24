@@ -1,0 +1,200 @@
+[
+  {
+    "code": "contract QANX {\n}",
+    "startLine": 1,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "struct Lock {\n}",
+    "startLine": 2,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "uint256 tokenAmount;",
+    "startLine": 3,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "uint32 hardLockUntil;",
+    "startLine": 4,
+    "endLine": 4,
+    "event": "add"
+  },
+  {
+    "code": "uint32 softLockUntil;",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "uint8 allowedHops;",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "uint32 lastUnlock;",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "uint256 unlockPerSec;",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "mapping (address => Lock) private _locks;",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "function unlockableBalanceOf(address account) public view virtual returns (uint256) {\n}",
+    "startLine": 13,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "if(block.timestamp < _locks[account].hardLockUntil) {\n}",
+    "startLine": 14,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "return 0;",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 17,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "if(block.timestamp > _locks[account].softLockUntil) {\n}",
+    "startLine": 18,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "return _locks[account].tokenAmount;",
+    "startLine": 19,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 21,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "return (block.timestamp - _locks[account].lastUnlock) * _locks[account].unlockPerSec;",
+    "startLine": 22,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 24,
+    "endLine": 24,
+    "event": "add"
+  },
+  {
+    "code": "function unlock(address account) external returns (bool) {\n}",
+    "startLine": 25,
+    "endLine": 26,
+    "event": "add"
+  },
+  {
+    "code": "uint256 unlockable = unlockableBalanceOf(account);",
+    "startLine": 26,
+    "endLine": 26,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 27,
+    "endLine": 27,
+    "event": "add"
+  },
+  {
+    "code": "require(unlockable > 0 && _locks[account].tokenAmount > 0 && block.timestamp > _locks[account].hardLockUntil, \"No unlockable tokens!\");",
+    "startLine": 28,
+    "endLine": 28,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 29,
+    "endLine": 29,
+    "event": "add"
+  },
+  {
+    "code": "_locks[account].lastUnlock = uint32(block.timestamp);",
+    "startLine": 30,
+    "endLine": 30,
+    "event": "add"
+  },
+  {
+    "code": "_locks[account].tokenAmount = _locks[account].tokenAmount - unlockable;",
+    "startLine": 31,
+    "endLine": 31,
+    "event": "add"
+  },
+  {
+    "code": "_balances[account] = _balances[account] + unlockable;",
+    "startLine": 32,
+    "endLine": 32,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 33,
+    "endLine": 33,
+    "event": "add"
+  },
+  {
+    "code": "if(_locks[account].tokenAmount == 0){\n}",
+    "startLine": 34,
+    "endLine": 35,
+    "event": "add"
+  },
+  {
+    "code": "delete _locks[account];",
+    "startLine": 35,
+    "endLine": 35,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 37,
+    "endLine": 37,
+    "event": "add"
+  },
+  {
+    "code": "return true;",
+    "startLine": 38,
+    "endLine": 38,
+    "event": "add"
+  }
+]

@@ -42,29 +42,26 @@ contract GreenHouse {
         return _bonusPoolLeaderboardLast + 1 - _bonusPoolLeaderboardFirst;
     }
 
-    function _bonusPoolLeaderboardKick(address stakeholder, uint256 positions) internal {
-        // filter remaining participants
+    function _bonusPoolLeaderboardKick(address stakeholder, uint256 positions) internal {      
         uint256 positionsLeftToKick = positions;
         address[] memory leaderboard = new address[](_bonusPoolLeaderboardUsersCount() - positions);
         uint256 ptr = 0;
-        for (
-            uint256 i = _bonusPoolLeaderboardFirst;
-            i <= _bonusPoolLeaderboardLast;
-            i++
-        ) {
+        for (uint256 i = _bonusPoolLeaderboardFirst; i <= _bonusPoolLeaderboardLast; i++) {
             if (positionsLeftToKick > 0 && _bonusPoolLeaderboard[i] == stakeholder) {
                 positionsLeftToKick--;
             } else {
                 leaderboard[ptr] = _bonusPoolLeaderboard[i];
                 ptr++;
             }
-
         }
-        // rebuild the whole leaderboard
-        while (_bonusPoolLeaderboardUsersCount() > 0)
+       
+        while (_bonusPoolLeaderboardUsersCount() > 0) {
             _bonusPoolLeaderboardPop();
-        for (uint256 i = 0; i < leaderboard.length; ++i)
+        }
+
+        for (uint256 i = 0; i < leaderboard.length; ++i) {
             _bonusPoolLeaderboardPush(leaderboard[i]);
+        }
     }
 
 }

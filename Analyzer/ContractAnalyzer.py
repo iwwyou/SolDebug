@@ -1122,36 +1122,65 @@ class ContractAnalyzer:
             stmt_kind: str  # "unary_prefix" / "unary_suffix"
     ):
         ccf = self.contract_cfgs[self.current_target_contract]
-        fcfg = ccf.get_function_cfg(self.current_target_function)
-        if fcfg is None:
+        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+        if self.current_target_function_cfg is None:
             raise ValueError("active FunctionCFG not found")
 
         cur_blk = self.get_current_block()
 
-        # ── 1) LHS 갱신  (++/--  ==  ±= 1 )
-        one_lit = Expression(literal="1", context="LiteralExpContext")
-        self.update_left_var(expr, 1, op_sign, cur_blk.variables, None, None)
-        cur_blk.add_assign_statement(expr, op_sign, one_lit, self.current_start_line)
+        # ──────────────────────────────────────────────
+        # ❶ 피연산 변수의 현재 Interval 가져오기
+        # ──────────────────────────────────────────────
+        cur_val = self.evaluate_expression(expr,
+                                           cur_blk.variables, None, None)
+
+        # (※  evaluate_expression 은 ++x, x-- 양쪽 모두
+        #     동일하게 expr.expression 을 넘겨도 됩니다)
+
+        # ──────────────────────────────────────────────
+        # ❷ “+1” / “-1” 에 사용할 타입-정합 Interval 생성
+        # ──────────────────────────────────────────────
+        if isinstance(cur_val, UnsignedIntegerInterval):
+            one = UnsignedIntegerInterval(1, 1, cur_val.type_length)
+        elif isinstance(cur_val, IntegerInterval):
+            one = IntegerInterval(1, 1, cur_val.type_length)
+        elif isinstance(cur_val, BoolInterval):
+            # ++/-- 가 bool 에 쓰일 일은 없지만 방어적으로
+            one = BoolInterval(1, 1)
+        else:
+            # 주소·string 등에는 ++/-- 가 허용되지 않으므로
+            raise ValueError(f"unsupported ++/-- operand type: {type(cur_val).__name__}")
+
+        # ──────────────────────────────────────────────
+        # ❸ 실제 변수 갱신
+        #     (++/--  ==  <var>  op_sign  1)
+        # ──────────────────────────────────────────────
+        self.update_left_var(expr, one, op_sign, cur_blk.variables, None, None)
+
+        # ▸ CFG statement 기록 (분석-로그 용)
+        cur_blk.add_assign_statement(expr, op_sign,
+                                     Expression(literal="1", context="LiteralExpContext"),
+                                     self.current_start_line)
 
         # ── 2) constructor 였으면 state-variables overwrite
-        if fcfg.function_type == "constructor":
+        if self.current_target_function_cfg.function_type == "constructor":
             self._overwrite_state_vars_from_block(ccf, cur_blk.variables)
 
 
         # ── 3) 갱신된 변수 객체 얻어서 analysis 기록
-        target_var = self._resolve_and_update_expr(expr.left, None, '=', cur_blk.variables,
-                                      self.current_target_function_cfg)
-        self._record_analysis(
-            line_no=self.current_start_line,
-            stmt_type=stmt_kind,
-            expr=expr,
-            var_obj=target_var
-        )
+        #target_var = self._resolve_and_update_expr(expr.left, None, '=', cur_blk.variables,
+        #                              self.current_target_function_cfg)
+        #self._record_analysis(
+        #    line_no=self.current_start_line,
+        #    stmt_type=stmt_kind,
+        #    expr=expr,
+        #    var_obj=target_var
+        #)
 
 
         # ── 4) CFG 저장
-        fcfg.update_block(cur_blk)
-        ccf.functions[self.current_target_function] = fcfg
+        self.current_target_function_cfg.update_block(cur_blk)
+        ccf.functions[self.current_target_function] = self.current_target_function_cfg
         self.contract_cfgs[self.current_target_contract] = ccf
         self.brace_count[self.current_start_line]["cfg_node"] = cur_blk
 
@@ -1164,6 +1193,11 @@ class ContractAnalyzer:
             · struct → 각 필드 delete 재귀
         분석 도메인에서는 “가장 보수적”으로 **bottom** 또는 0-singleton 으로 초기화
         """
+
+        ccf = self.contract_cfgs[self.current_target_contract]
+        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+        if self.current_target_function_cfg is None:
+            raise ValueError("active FunctionCFG not found")
 
         cur_blk = self.get_current_block()
         vars_env = cur_blk.variables
@@ -6472,7 +6506,7 @@ class ContractAnalyzer:
 
         entry = fcfg.get_entry_node()
         start_block, = fcfg.graph.successors(entry)  # exactly one successor
-        start_block.variables = self.copy_variables(fcfg.related_variables)
+        start_block.variables = copy.deepcopy(fcfg.related_variables)
 
         # ① caller_env 의 스냅샷을 그대로 덮어쓴다 (동명 키도 overwrite)
 
