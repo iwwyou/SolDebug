@@ -1,6 +1,5 @@
 contract FraxCrossChainLiquidityTracker {
-    uint256[] public chain_ids_array;
-    mapping(uint256 => bool) public valid_chains;
+    uint256[] public chain_ids_array;   
 
     mapping(uint256 => uint256) public frax_minted; 
     mapping(uint256 => uint256) public fxs_minted; 

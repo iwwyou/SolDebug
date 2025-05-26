@@ -1,6 +1,4 @@
-contract EdenToken {
-    uint256 public override totalSupply;
-    
+contract EdenToken {    
     mapping (address => mapping (address => uint256)) public override allowance;
     
     mapping (address => uint256) public override balanceOf;

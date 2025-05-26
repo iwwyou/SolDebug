@@ -1,7 +1,5 @@
 contract BEP20 {
-    mapping (address=>uint256) balances;
-
-    uint256 public totalSupply;
+    mapping (address=>uint256) balances;    
 
     mapping (address=>mapping (address=>uint256)) allowed;
 

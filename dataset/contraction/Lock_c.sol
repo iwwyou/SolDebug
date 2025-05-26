@@ -17,7 +17,8 @@ contract Lock {
         if (_totalLockRemain > 0) {
             if (block.timestamp >= startLock + lockedTime) {
                 _pending = _totalLockRemain;
-            } else {
+            } 
+            else {
                 uint256 _nUnlock = (lockedTime - (block.timestamp - startLock) - 1) / unlockDuration + 1;
                 _pending = _totalLockRemain - _data.estUnlock * _nUnlock;
             }

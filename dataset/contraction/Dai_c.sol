@@ -37,14 +37,4 @@ contract Dai {
         balanceOf[usr] = add(balanceOf[usr], wad);
         totalSupply    = add(totalSupply, wad);        
     }
-
-    function burn(address usr, uint wad) external {
-        require(balanceOf[usr] >= wad, "Dai/insufficient-balance");
-        if (usr != msg.sender && allowance[usr][msg.sender] != uint(-1)) {
-            require(allowance[usr][msg.sender] >= wad, "Dai/insufficient-allowance");
-            allowance[usr][msg.sender] = sub(allowance[usr][msg.sender], wad);
-        }
-        balanceOf[usr] = sub(balanceOf[usr], wad);
-        totalSupply    = sub(totalSupply, wad);
-    }
 }

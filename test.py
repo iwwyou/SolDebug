@@ -59,327 +59,207 @@ def simulate_inputs(records):
 
 test_inputs = [
   {
-    "code": "contract GreenHouse {\n}",
+    "code": "contract Lock {\n}",
     "startLine": 1,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "uint256 constant internal BONUS_POOL_NEW_STAKEHOLDER_TIME_ADDITION = 900;",
+    "code": "struct LockedData {\n}",
     "startLine": 2,
-    "endLine": 2,
+    "endLine": 3,
     "event": "add"
   },
   {
-    "code": "uint256 constant internal BONUS_POOL_TIMER_INITIAL = 21600;",
+    "code": "uint256 total;",
     "startLine": 3,
     "endLine": 3,
     "event": "add"
   },
   {
-    "code": "uint256 internal _bonusPoolLeaderboardFirst = 1;",
+    "code": "uint256 pending;",
     "startLine": 4,
     "endLine": 4,
     "event": "add"
   },
   {
-    "code": "uint256 internal _bonusPoolLeaderboardLast = 0;",
+    "code": "uint256 estUnlock;",
     "startLine": 5,
     "endLine": 5,
     "event": "add"
   },
   {
-    "code": "uint256 internal _bonusPoolLastDistributedAt = 0;",
+    "code": "uint256 unlockedAmounts;",
     "startLine": 6,
     "endLine": 6,
     "event": "add"
   },
   {
-    "code": "uint256 internal _bonusPoolTimer;",
-    "startLine": 7,
-    "endLine": 7,
-    "event": "add"
-  },
-  {
-    "code": "mapping(uint256 => address) internal _bonusPoolLeaderboard;",
+    "code": "\n",
     "startLine": 8,
     "endLine": 8,
     "event": "add"
   },
   {
-    "code": "mapping(address => uint256) internal _bonusPoolLeaderboardPositionsCount;",
+    "code": "mapping(address => LockedData) public data;",
     "startLine": 9,
     "endLine": 9,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "uint256 public startLock;",
     "startLine": 10,
     "endLine": 10,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "uint256 public unlockDuration = 30 days;",
     "startLine": 11,
     "endLine": 11,
     "event": "add"
   },
   {
-    "code": "function bonusRewardPoolCountdown() public view returns(uint256) {\n}",
+    "code": "uint256 public lockedTime = 6 * 30 days;",
     "startLine": 12,
-    "endLine": 13,
+    "endLine": 12,
     "event": "add"
   },
   {
-    "code": "uint256 timeSinceLastDistributed = block.timestamp - _bonusPoolLastDistributedAt;",
+    "code": "\n",
     "startLine": 13,
     "endLine": 13,
     "event": "add"
   },
   {
-    "code": "if (timeSinceLastDistributed >= _bonusPoolTimer) {\n}",
+    "code": "function pending(address _account) public view returns(uint256 _pending) {\n}",
     "startLine": 14,
     "endLine": 15,
     "event": "add"
   },
   {
-    "code": "return 0;",
+    "code": "LockedData memory _data = data[_account];",
     "startLine": 15,
     "endLine": 15,
     "event": "add"
   },
   {
-    "code": "return _bonusPoolTimer - timeSinceLastDistributed;",
-    "startLine": 17,
-    "endLine": 17,
+    "code": "uint256 _totalLockRemain =  _data.total - _data.unlockedAmounts - _data.pending;",
+    "startLine": 16,
+    "endLine": 16,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "if (_totalLockRemain > 0) {\n}",
+    "startLine": 17,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "if (block.timestamp >= startLock + lockedTime) {\n}",
+    "startLine": 18,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "_pending = _totalLockRemain;",
     "startLine": 19,
     "endLine": 19,
     "event": "add"
   },
   {
-    "code": "function _bonusPoolLeaderboardPush(address value) internal {\n}",
-    "startLine": 20,
-    "endLine": 21,
-    "event": "add"
-  },
-  {
-    "code": "_bonusPoolLeaderboardLast++;",
+    "code": "else {\n}",
     "startLine": 21,
-    "endLine": 21,
+    "endLine": 22,
     "event": "add"
   },
   {
-    "code": "_bonusPoolLeaderboard[_bonusPoolLeaderboardLast] = value;",
+    "code": "uint256 _nUnlock = (lockedTime - (block.timestamp - startLock) - 1) / unlockDuration + 1;",
     "startLine": 22,
     "endLine": 22,
     "event": "add"
   },
   {
-    "code": "_bonusPoolLeaderboardPositionsCount[value] += 1;",
+    "code": "_pending = _totalLockRemain - _data.estUnlock * _nUnlock;",
     "startLine": 23,
     "endLine": 23,
     "event": "add"
   },
   {
-    "code": "if((bonusRewardPoolCountdown()+BONUS_POOL_NEW_STAKEHOLDER_TIME_ADDITION) >= BONUS_POOL_TIMER_INITIAL){\n}",
-    "startLine": 24,
-    "endLine": 25,
-    "event": "add"
-  },
-  {
-    "code": "_bonusPoolTimer += 0;",
-    "startLine": 25,
-    "endLine": 25,
-    "event": "add"
-  },
-  {
-    "code": "} else {\n}",
+    "code": "if (_data.pending > 0) {\n}",
     "startLine": 26,
     "endLine": 27,
     "event": "add"
   },
   {
-    "code": "_bonusPoolTimer += BONUS_POOL_NEW_STAKEHOLDER_TIME_ADDITION;",
+    "code": "_pending += _data.pending;",
     "startLine": 27,
     "endLine": 27,
     "event": "add"
   },
   {
     "code": "\n",
-    "startLine": 30,
-    "endLine": 30,
-    "event": "add"
-  },
-  {
-    "code": "function _bonusPoolLeaderboardPop() internal {\n}",
     "startLine": 31,
-    "endLine": 32,
+    "endLine": 31,
+    "event": "add"
+  },
+{
+    "code": "//@TestCase BEGIN",
+    "startLine": 15,
+    "endLine": 15,
     "event": "add"
   },
   {
-    "code": "address removed = _bonusPoolLeaderboard[_bonusPoolLeaderboardFirst];",
-    "startLine": 32,
-    "endLine": 32,
+    "code": "// @StateVar _data.total = [300,300]",
+    "startLine": 16,
+    "endLine": 16,
     "event": "add"
   },
   {
-    "code": "delete _bonusPoolLeaderboard[_bonusPoolLeaderboardFirst];",
-    "startLine": 33,
-    "endLine": 33,
+    "code": "// @StateVar _data.unlockedAmounts = [0,0]",
+    "startLine": 17,
+    "endLine": 17,
     "event": "add"
   },
   {
-    "code": "_bonusPoolLeaderboardFirst++;",
-    "startLine": 34,
-    "endLine": 34,
+    "code": "// @StateVar _data.pending = [1,1]",
+    "startLine": 18,
+    "endLine": 18,
     "event": "add"
   },
   {
-    "code": "_bonusPoolLeaderboardPositionsCount[removed]--;",
-    "startLine": 35,
-    "endLine": 35,
+    "code": "// @StateVar _data.estUnlock = [2,2]",
+    "startLine": 19,
+    "endLine": 19,
     "event": "add"
   },
   {
-    "code": "if (_bonusPoolLeaderboardPositionsCount[removed] == 0) {\n}",
-    "startLine": 36,
-    "endLine": 37,
+    "code": "// @GlobalVar block.timestamp = [3,3]",
+    "startLine": 20,
+    "endLine": 20,
     "event": "add"
   },
   {
-    "code": "delete _bonusPoolLeaderboardPositionsCount[removed];",
-    "startLine": 37,
-    "endLine": 37,
+    "code": "// @StateVar startLock = [4,4]",
+    "startLine": 21,
+    "endLine": 21,
     "event": "add"
   },
   {
-    "code": "\n",
-    "startLine": 40,
-    "endLine": 40,
+    "code": "// @StateVar lockedTime = [20000000,20000000]",
+    "startLine": 22,
+    "endLine": 22,
     "event": "add"
   },
   {
-    "code": "function _bonusPoolLeaderboardUsersCount() internal view returns(uint256) {\n}",
-    "startLine": 41,
-    "endLine": 42,
+    "code": "// @StateVar unlockDuration = [2592000,2592000]",
+    "startLine": 23,
+    "endLine": 23,
     "event": "add"
   },
   {
-    "code": "return _bonusPoolLeaderboardLast + 1 - _bonusPoolLeaderboardFirst;",
-    "startLine": 42,
-    "endLine": 42,
-    "event": "add"
-  },
-  {
-    "code": "\n",
-    "startLine": 44,
-    "endLine": 44,
-    "event": "add"
-  },
-  {
-    "code": "function _bonusPoolLeaderboardKick(address stakeholder, uint256 positions) internal {\n}",
-    "startLine": 45,
-    "endLine": 46,
-    "event": "add"
-  },
-  {
-    "code": "uint256 positionsLeftToKick = positions;",
-    "startLine": 46,
-    "endLine": 46,
-    "event": "add"
-  },
-  {
-    "code": "address[] memory leaderboard = new address[](_bonusPoolLeaderboardUsersCount() - positions);",
-    "startLine": 47,
-    "endLine": 47,
-    "event": "add"
-  },
-  {
-    "code": "uint256 ptr = 0;",
-    "startLine": 48,
-    "endLine": 48,
-    "event": "add"
-  },
-  {
-    "code": "for (uint256 i = _bonusPoolLeaderboardFirst; i <= _bonusPoolLeaderboardLast; i++) {\n}",
-    "startLine": 49,
-    "endLine": 50,
-    "event": "add"
-  },
-  {
-    "code": "if (positionsLeftToKick > 0 && _bonusPoolLeaderboard[i] == stakeholder) {\n}",
-    "startLine": 50,
-    "endLine": 51,
-    "event": "add"
-  },
-  {
-    "code": "positionsLeftToKick--;",
-    "startLine": 51,
-    "endLine": 51,
-    "event": "add"
-  },
-  {
-    "code": "} else {\n}",
-    "startLine": 52,
-    "endLine": 53,
-    "event": "add"
-  },
-  {
-    "code": "leaderboard[ptr] = _bonusPoolLeaderboard[i];",
-    "startLine": 53,
-    "endLine": 53,
-    "event": "add"
-  },
-  {
-    "code": "ptr++;",
-    "startLine": 54,
-    "endLine": 54,
-    "event": "add"
-  },
-  {
-    "code": "\n",
-    "startLine": 57,
-    "endLine": 57,
-    "event": "add"
-  },
-  {
-    "code": "while (_bonusPoolLeaderboardUsersCount() > 0) {\n}",
-    "startLine": 58,
-    "endLine": 59,
-    "event": "add"
-  },
-  {
-    "code": "_bonusPoolLeaderboardPop();",
-    "startLine": 59,
-    "endLine": 59,
-    "event": "add"
-  },
-  {
-    "code": "\n",
-    "startLine": 61,
-    "endLine": 61,
-    "event": "add"
-  },
-  {
-    "code": "for (uint256 i = 0; i < leaderboard.length; ++i) {\n}",
-    "startLine": 62,
-    "endLine": 63,
-    "event": "add"
-  },
-  {
-    "code": "_bonusPoolLeaderboardPush(leaderboard[i]);",
-    "startLine": 63,
-    "endLine": 63,
-    "event": "add"
-  },
-  {
-    "code": "\n",
-    "startLine": 66,
-    "endLine": 66,
+    "code": "//@TestCase END",
+    "startLine": 24,
+    "endLine": 24,
     "event": "add"
   }
 ]
