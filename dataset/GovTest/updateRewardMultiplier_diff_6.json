@@ -1,0 +1,68 @@
+[
+  {
+    "code": "// @TestCase BEGIN",
+    "startLine": 41,
+    "endLine": 41,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar oldRate = [1401,2001]",
+    "startLine": 42,
+    "endLine": 42,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar newRate = [4201,4801]",
+    "startLine": 43,
+    "endLine": 43,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar passedTime = [700,1300]",
+    "startLine": 44,
+    "endLine": 44,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar oldLockPeriod = [7257600,7257606]",
+    "startLine": 45,
+    "endLine": 45,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar newLockPeriod = [12096000,12096006]",
+    "startLine": 46,
+    "endLine": 46,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar oldAmount = [3501,4101]",
+    "startLine": 47,
+    "endLine": 47,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar newAmount = [7001,7601]",
+    "startLine": 48,
+    "endLine": 48,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar info.rewardMultiplier = [100000,100000]",
+    "startLine": 49,
+    "endLine": 49,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar totalRewardMultiplier = [500000,500000]",
+    "startLine": 50,
+    "endLine": 50,
+    "event": "add"
+  },
+  {
+    "code": "// @TestCase END",
+    "startLine": 51,
+    "endLine": 51,
+    "event": "add"
+  }
+]
