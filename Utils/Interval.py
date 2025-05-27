@@ -739,6 +739,44 @@ class BoolInterval(Interval):
             return self.bottom()
         return BoolInterval(new_min, new_max)
 
+    def logical_op(self, other: "BoolInterval", op: str) -> "BoolInterval":
+        """
+        self  ∈  [s_min, s_max],   other ∈ [o_min, o_max]
+        op == '&&'  →  AND
+        op == '||'  →  OR
+        반환값도 BoolInterval (0 == false, 1 == true)
+        """
+        if not isinstance(other, BoolInterval):
+            raise TypeError("logical_op expects BoolInterval")
+
+        if op not in ("&&", "||"):
+            raise ValueError(f"Unsupported boolean operator '{op}'")
+
+        # ---- AND -----------------------------------------------------
+        if op == "&&":
+            # 확실히 TRUE?   두 피연산자가 모두 확실히 1
+            if self.min_value == 1 and other.min_value == 1:
+                return BoolInterval(1, 1)
+
+            # 확실히 FALSE?  둘 중 하나라도 확실히 0
+            if self.max_value == 0 or other.max_value == 0:
+                return BoolInterval(0, 0)
+
+            # 그 외는 불확실([0,1])
+            return BoolInterval(0, 1)
+
+        # ---- OR  -----------------------------------------------------
+        if op == "||":
+            # 확실히 TRUE?   둘 중 하나라도 확실히 1
+            if self.min_value == 1 or other.min_value == 1:
+                return BoolInterval(1, 1)
+
+            # 확실히 FALSE?  두 피연산자 모두 확실히 0
+            if self.max_value == 0 and other.max_value == 0:
+                return BoolInterval(0, 0)
+
+            return BoolInterval(0, 1)
+
     def less_than(self, other):
         # Boolean에서 < 연산, 크게 의미 X. 여기서는 그대로 자신 반환 혹은 top
         return self

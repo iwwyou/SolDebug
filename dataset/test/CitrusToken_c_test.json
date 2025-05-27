@@ -18,7 +18,7 @@
     "event": "add"
   },
   {
-    "code": "uint256 public totalSupply;",
+    "code": "mapping (address=>mapping (address=>uint256)) allowed;",
     "startLine": 4,
     "endLine": 4,
     "event": "add"
@@ -30,87 +30,75 @@
     "event": "add"
   },
   {
-    "code": "mapping (address=>mapping (address=>uint256)) allowed;",
+    "code": "function transferFrom(address _from,address _to,uint256 _amount) public returns (bool success) {\n}",
     "startLine": 6,
-    "endLine": 6,
+    "endLine": 7,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "require (balances[_from]>=_amount&&allowed[_from][msg.sender]>=_amount&&_amount>0&&balances[_to]+_amount>balances[_to]);",
     "startLine": 7,
     "endLine": 7,
     "event": "add"
   },
   {
-    "code": "function transferFrom(address _from,address _to,uint256 _amount) public returns (bool success) {\n}",
-    "startLine": 8,
-    "endLine": 9,
-    "event": "add"
-  },
-  {
-    "code": "require (balances[_from]>=_amount&&allowed[_from][msg.sender]>=_amount&&_amount>0&&balances[_to]+_amount>balances[_to]);",
-    "startLine": 9,
-    "endLine": 9,
-    "event": "add"
-  },
-  {
     "code": "balances[_from]-=_amount;",
-    "startLine": 10,
-    "endLine": 10,
+    "startLine": 8,
+    "endLine": 8,
     "event": "add"
   },
   {
     "code": "allowed[_from][msg.sender]-=_amount;",
-    "startLine": 11,
-    "endLine": 11,
-    "event": "add"
-  },
-  {
-    "code": "balances[_to]+=_amount;",
-    "startLine": 12,
-    "endLine": 12,
-    "event": "add"
-  },
-  {
-    "code": "return true;",
-    "startLine": 13,
-    "endLine": 13,
-    "event": "add"
-  },
-  {
-    "code": "// @TestCase BEGIN ",
     "startLine": 9,
     "endLine": 9,
     "event": "add"
   },
   {
-    "code": "// @StateVar balances[_from] = [100,200]",
+    "code": "balances[_to]+=_amount;",
     "startLine": 10,
     "endLine": 10,
     "event": "add"
   },
   {
-    "code": "// @StateVar allowed[_from][msg.sender] = [50,90]",
+    "code": "return true;",
     "startLine": 11,
     "endLine": 11,
     "event": "add"
   },
-  {
-    "code": "// @StateVar balances[_to] = [10,20]",
+{
+    "code": "// @TestCase BEGIN",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+{
+    "code": "// @StateVar balances[_from] = [500,600]",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  },
+{
+    "code": "// @StateVar balances[_to] = [200,300]",
+    "startLine": 9,
+    "endLine": 9,
+    "event": "add"
+  },
+{
+    "code": "// @StateVar allowed[_from][msg.sender] = [400,400]",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+{
+    "code": "// @LocalVar _amount = [50,100]",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+{
+    "code": "// @TestCase END",
     "startLine": 12,
     "endLine": 12,
-    "event": "add"
-  },
-  {
-    "code": "// @LocalVar _amount = [5,10]",
-    "startLine": 13,
-    "endLine": 13,
-    "event": "add"
-  },
-  {
-    "code": "// @TestCase END",
-    "startLine": 13,
-    "endLine": 13,
     "event": "add"
   }
 ]

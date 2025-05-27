@@ -1343,7 +1343,7 @@ class ContractAnalyzer:
 
         _ = self.evaluate_function_call_context(expr, current_block.variables, None, None)
 
-        current_block.add_function_call_statement(function_expr, self.current_start_line)
+        current_block.add_function_call_statement(expr, self.current_start_line)
 
         # 10. current_block을 function CFG에 반영
         self.current_target_function_cfg = saved_cfg
@@ -1543,9 +1543,9 @@ class ContractAnalyzer:
 
         # --- 2) edge 재연결
         for ts in old_succs:  # 이전 True-succ
-            for nxt in list(g.successors(ts)):  # 그 뒤 노드들
-                g.add_edge(true_block, nxt)
-                g.add_edge(false_block, nxt)
+            for nxt in list(self.current_target_function_cfg.successors(ts)):  # 그 뒤 노드들
+                self.current_target_function_cfg.add_edge(true_block, nxt)
+                self.current_target_function_cfg.add_edge(false_block, nxt)
 
         # 11. function_cfg 결과를 contract_cfg에 반영
         contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
@@ -3894,7 +3894,7 @@ class ContractAnalyzer:
                 # 1-c) '}' 발견 → close 큐에 push
                 if brace_info["open"] == 0 and brace_info["close"] == 1 and brace_info["cfg_node"] is None:
                     open_brace_info = self.find_corresponding_open_brace(line)
-                    if open_brace_info['cfg_node'].unchecked_block:  # unchecked indicator or general curly brace
+                    if open_brace_info['cfg_node'] is not None and open_brace_info['cfg_node'].unchecked_block == True:  # unchecked indicator or general curly brace
                         continue
                     else :
                         close_brace_queue.append(line)
@@ -3967,6 +3967,46 @@ class ContractAnalyzer:
 
     # ContractAnalyzer.py (또는 해당 클래스가 정의된 모듈)
 
+    def _is_enclosed_by_loop(self, base_line: int) -> bool:
+        """
+        base_line 위쪽으로 올라가면서, 현재 블록이 while/for/doWhile
+        내부에 있는지 판단한다.
+        """
+        # ① base_line 보다 위에 있는 모든 '{' 라인을 역순 탐색
+        for ln in range(base_line - 1, 0, -1):
+            info = self.brace_count.get(ln)
+            if not info:
+                continue
+
+            # ‘{’ 를 열면서 cfg_node 가 있는 경우만
+            if info["open"] == 1 and info["cfg_node"]:
+                node = info["cfg_node"]
+                if node.condition_node_type in {"while", "for", "doWhile"}:
+                    return True  # ← 루프 안에 있음
+                #  (조건 노드가 루프가 아니면 계속 올라감)
+
+            # 함수 시작 지점까지 왔으면 중단
+            if info["cfg_node"] and info["cfg_node"].name == "ENTRY":
+                break
+        return False
+
+    def get_open_brace_info(self, close_ln: int) -> tuple[int, dict] | None:
+        """
+        close_ln 에 위치한 `}` 와 짝이 되는 `{` 의 (line_no, brace_info) 를 찾는다.
+        – 알고리즘: ① depth = 1  (맨 처음 `}` 를 미리 셈)
+                  ② 위로 올라가며   depth += close - open
+                  ③ depth 가 0 이 되는 첫 줄이 매칭
+        """
+        depth = 1  # ← 핵심!
+        for ln in range(close_ln - 1, 0, -1):  # 직전 줄부터 탐색
+            info = self.brace_count.get(ln)
+            if info is None:
+                continue
+            depth += info["close"] - info["open"]
+            if depth == 0 and info["open"] > 0:  # 열린 브레이스가 실제 존재
+                return ln, info
+        return None
+
     def _build_stop_set(self, close_brace_queue: list[int]) -> set[CFGNode]:
         """
         queue의 ***바깥쪽*** '}' 에 대응하는 블록을 기준으로
@@ -3976,13 +4016,22 @@ class ContractAnalyzer:
             return set()
 
         outer_close = close_brace_queue[-1]
-        info = self.find_corresponding_open_brace(outer_close)
-        if not info:
+        open_info = self.get_open_brace_info(outer_close)   # ← 새 헬퍼 사용
+        if not open_info:
             return set()
 
-        base = info["cfg_node"]  # if  혹은 loop
+        open_ln, brace_info = open_info
+        base = brace_info["cfg_node"]  # if / loop 조건 노드
         G = self.current_target_function_cfg.graph
         stop = set()
+
+        # base_line 은 (노드에 src_line 있으면) 그것, 없으면 open_ln
+        base_line = open_ln
+        enclosed_by_loop = self._is_enclosed_by_loop(base_line)
+
+        # ❶ “루프 밖”에서 시작한다면 → left_loop = True
+        #     기존 has_inner_loop 로 잡지 못했던 경우 보정
+
 
         # ────── ❶ 이 close-brace 뭉치 안에 “루프 블록”이 있었나? ──────
         has_inner_loop = False
@@ -3996,7 +4045,7 @@ class ContractAnalyzer:
                 break
 
         # “루프 밖”에서 시작한다면 → left_loop = True
-        left_loop = not has_inner_loop
+        left_loop = not has_inner_loop and not enclosed_by_loop
 
         # ────── ❷ 루트가 loop 인 경우 (기존 로직과 동일) ─────────────
         if base.condition_node_type in {"while", "for", "doWhile"}:
@@ -4035,6 +4084,10 @@ class ContractAnalyzer:
                 if left_loop and (n.join_point_node or n.function_exit_node):
                     stop.add(n)
                     break  # 첫 번째 것만 필요하면 break
+
+                if enclosed_by_loop and (n.join_point_node or n.is_for_increment or n.fixpoint_evaluation_node):
+                    stop.add(n)
+                    break
 
                 # (c) 일반 블록 계속
                 q.extend(G.successors(n))
@@ -4205,6 +4258,31 @@ class ContractAnalyzer:
             return False
         return node in self.traverse_loop_nodes(while_node)
 
+    def _bottom_from_soltype(self, sol_t: SolType):
+        if sol_t.typeCategory == "array":
+            return ArrayVariable(
+                base_type=sol_t.arrayBaseType,
+                array_length=sol_t.arrayLength,
+                is_dynamic=sol_t.isDynamicArray
+            )
+        if sol_t.typeCategory == "mapping":
+            return MappingVariable(
+                key_type=sol_t.mappingKeyType,
+                value_type=sol_t.mappingValueType
+            )
+        if sol_t.typeCategory == "struct":
+            return StructVariable(struct_type=sol_t.structTypeName)
+        et = sol_t.elementaryTypeName
+        if et.startswith("int"):
+            return IntegerInterval.bottom(sol_t.intTypeLength or 256)
+        if et.startswith("uint"):
+            return UnsignedIntegerInterval.bottom(sol_t.intTypeLength or 256)
+        if et == "bool":
+            return BoolInterval.bottom()
+        if et == "address":
+            return UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
+        return f"symbolic_{et}"
+
     def find_corresponding_open_brace(self, close_line):
         """
         닫는 중괄호에 대응되는 여는 중괄호를 찾는 함수입니다.
@@ -4222,7 +4300,7 @@ class ContractAnalyzer:
                 if cfg_node.unchecked_block == True :
                     return brace_info
 
-                if cfg_node and cfg_node.condition_node_type in ["while", "if"]:
+                if cfg_node and cfg_node.condition_node_type in ["while", "if", "for"]:
                     return brace_info
                 elif cfg_node and cfg_node.condition_node_type in ["else if", "else"] :
                     continue
@@ -4742,33 +4820,50 @@ class ContractAnalyzer:
         #     ‣ 매핑  : l‥r 중 ‘이미 존재하는 엔트리’만 patch
         #               (미정의 키는 <unk>로 남김)
         # ────────────────────────────────────────────────────────────────────
+        # ──────────────────────────────────────────────────────────────
+        # ③  범위 Interval  (l < r)  처리  ── 배열 / 매핑  둘 다 here
+        # ----------------------------------------------------------------
         if isinstance(idx_val, (IntegerInterval, UnsignedIntegerInterval)):
             l, r = idx_val.min_value, idx_val.max_value
+
+            # ===== 1) 배열(ArrayVariable) =================================
             if isinstance(callerObject, ArrayVariable):
-                # 배열 길이 확장
-                while r >= len(callerObject.elements):
+
+                # 1-A) **동적 배열**  → 길이 확장 없이 전체 write 로 추상화
+                if callerObject.typeInfo.isDynamicArray:
+                    return callerObject  # <unk>  write
+
+                # 1-B) **정적 배열**  → 선언 길이 한도 내에서만 패딩
+                decl_len = callerObject.typeInfo.arrayLength or 0
+                if r >= decl_len:
+                    raise IndexError(f"Index [{l},{r}] out of range for "
+                                     f"static array '{callerObject.identifier}' "
+                                     f"(declared len={decl_len})")
+
+                # 부족한 구간을 Variables 객체로 채움
+                while len(callerObject.elements) <= r:
+                    new_idx = len(callerObject.elements)
                     callerObject.elements.append(
-                        self._create_new_array_element(callerObject,
-                                                       len(callerObject.elements))
+                        self._create_new_array_element(callerObject, new_idx)
                     )
-                # l‥r 모두 갱신
+
+                # l‥r 모든 요소 patch
                 for i in range(l, r + 1):
                     elem = callerObject.elements[i]
                     nv = self.compound_assignment(elem.value, rVal, operator)
                     self._patch_var_with_new_value(elem, nv)
 
+            # ===== 2) 매핑(MappingVariable) ===============================
             elif isinstance(callerObject, MappingVariable):
                 for i in range(l, r + 1):
                     k = str(i)
-                    if k in callerObject.mapping:  # 존재할 때만
+                    if k in callerObject.mapping:  # 이미 존재하는 키만
                         entry = callerObject.mapping[k]
                         nv = self.compound_assignment(entry.value, rVal, operator)
                         self._patch_var_with_new_value(entry, nv)
-                    # 없으면 unknown 으로 남겨 둠
+                # 존재하지 않는 키는 <unk> 로 유지
 
-            # logging 은 상위 interpret_assignment_statement 가
-            # `<unk>` 플래그를 붙여 기록하므로 여기서는 None 반환
-            return None
+            return None  # logging 은 상위에서 처리
 
         # (idx_val 이 Interval 도 int 도 아니면 – 아직 완전 심볼릭) → 상위에서 <unk> 처리
         return None
@@ -4811,28 +4906,34 @@ class ContractAnalyzer:
             return entry  # logging 용
 
         if isinstance(base_obj, MappingVariable):
-            #
-            #   userInfo[user].index  처럼  “매핑값이 구조체” 인 상황을
-            #   보수적으로 처리한다.
-            #
-            key = "<unk>"  # 아직 어떤 키인지 모름
+            # ① base expression 이 IndexAccess 면 → index 식에서 키 추출
+            key = None
+            base_exp = expr.base  # levels[i]   에서   expr.base == IndexAccess
+            if getattr(base_exp, "context", "") == "IndexAccessExpContext":
+                idx_exp = base_exp.index
+                # 식별자 인덱스  (levels[i]  →  "i")
+                if getattr(idx_exp, "context", "") == "IdentifierExpContext":
+                    key = idx_exp.identifier
+                # 숫자 / 주소 literal 인덱스
+                elif getattr(idx_exp, "context", "") == "LiteralExpContext":
+                    key = str(idx_exp.literal)
+
+            # ② ①에서 못 뽑았고, 매핑에 엔트리 하나뿐이면 그걸 그대로 사용
+            if key is None and len(base_obj.mapping) == 1:
+                key, _ = next(iter(base_obj.mapping.items()))
+
+            # ③ 그래도 못 정했다면 식별자 문자열로 통일
+            if key is None:
+                key = str(idx_exp) if "idx_exp" in locals() else "__any__"
+
+            # ── 엔트리 가져오거나 생성
             if key not in base_obj.mapping:
-                # (1) 매핑 value-type 이 구조체라면 더미 Struct 생성
-                vT = base_obj.valueType  # SolType
-                if isinstance(vT, SolType) and vT.typeCategory == "struct":
-                    stub = StructVariable(f"{base_obj.identifier}[{key}]", vT.structTypeName,
-                                          scope=base_obj.scope)
-                # (2) 구조체가 아니면 그냥 Variables stub
-                else:
-                    stub = Variables(f"{base_obj.identifier}[{key}]",
-                                     value="symbolic", scope=base_obj.scope,
-                                     typeInfo=vT)
-                base_obj.mapping[key] = stub
+                base_obj.mapping[key] = self._create_new_mapping_value(
+                    base_obj, key
+                )
 
             nested = base_obj.mapping[key]
-
-            # 이후 로직은 Struct 분기와 동일하게 진행
-            base_obj = nested  # fall-through → Struct 처리
+            base_obj = nested  # 이후 Struct 처리로 fall-through
 
         if isinstance(base_obj, ArrayVariable):
             # (1) .length  ─ Read-only.  LHS 로 올 수 없으므로 rVal 는 None
@@ -4997,32 +5098,54 @@ class ContractAnalyzer:
 
             var_obj.value = self.compound_assignment(var_obj.value, rv, operator)
 
-        # ─────────────────────── 1. 상위 객체 존재 ──────────────────
         if isinstance(callerObject, ArrayVariable):
+
             if ident not in variables:
                 raise ValueError(f"Index identifier '{ident}' not found.")
             idx_var = variables[ident]
+            iv = idx_var.value  # Interval 또는 ⊥
 
-            # ── ① 인덱스가 ⊥(bottom) 이면 “어느 요소인지 모름” → skip
-            if (self._is_interval(idx_var.value) and idx_var.value.is_bottom()) or \
-                    getattr(idx_var.value, "min_value", None) is None:
-                # record 만 하고 실제 element 확정은 보류
-                return None  # ← **이 두 줄만 추가**
+            # ① ⊥   또는  [l, r] 범위  ⇒  전체-쓰기(추상화)
+            if self._is_interval(iv) and (
+                    iv.is_bottom() or iv.min_value != iv.max_value
+            ):
+                return callerObject  # <unk> 쓰기
 
-            # ── ② 스칼라(singleton) 여부 검사
-            if not self._is_interval(idx_var.value) or \
-                    idx_var.value.min_value != idx_var.value.max_value:
+            # ② singleton [n,n] 이 아니면 오류
+            if not self._is_interval(iv) or iv.min_value != iv.max_value:
                 raise ValueError(f"Array index '{ident}' must resolve to single constant.")
 
-            idx = idx_var.value.min_value
-            if idx < 0 or idx >= len(callerObject.elements):
-                raise IndexError(f"Index {idx} out of range for array '{callerObject.identifier}'")
+            idx = iv.min_value
+            if idx < 0:
+                raise IndexError(f"Negative index {idx} for array '{callerObject.identifier}'")
 
+            # ───── 동적·정적에 따른 분기 ─────────────────────────────────────────────
+            if idx >= len(callerObject.elements):
+
+                if callerObject.typeInfo.isDynamicArray:
+                    # **동적 배열** → 길이 확장하지 않고 전체-쓰기 로 취급
+                    return callerObject  # <unk> 쓰기 (logging 은 상위에서)
+
+                # **정적 배열** → 선언 길이 한도 안에서 패딩
+                decl_len = callerObject.typeInfo.arrayLength or 0
+                if idx >= decl_len:  # 선언 길이 초과면 즉시 오류
+                    raise IndexError(f"Index {idx} out of range for static array "
+                                     f"'{callerObject.identifier}' (declared len={decl_len})")
+
+                # 필요한 칸만 bottom 값으로 채운다
+                base_t = callerObject.typeInfo.arrayBaseType
+                while len(callerObject.elements) <= idx:
+                    callerObject.elements.append(
+                        self._bottom_from_soltype(base_t)
+                    )
+
+            # ───────── 실제 요소 갱신 / 재귀 내려가기 ─────────────────────────────
             elem = callerObject.elements[idx]
-            if isinstance(elem, (StructVariable, ArrayVariable, MappingVariable)) :
-                return elem
+
+            if isinstance(elem, (StructVariable, ArrayVariable, MappingVariable)):
+                return elem  # 더 깊이 체이닝
             elif isinstance(elem, (Variables, EnumVariable)):
-                _apply_to_leaf(elem)
+                _apply_to_leaf(elem)  # leaf 값 갱신
                 return None
 
         # 1-C) StructVariable  → 멤버 접근
@@ -5038,11 +5161,11 @@ class ContractAnalyzer:
 
         # 1-D) MappingVariable → key 가 식별자인 케이스
         if isinstance(callerObject, MappingVariable):
-            # ── ①  키가 “식별자”인 경우 ─────────────────
+            # ── ①  키가 “식별자”인 경우 ─────────────────────────────
             if ident in variables:
                 key_var = variables[ident]
 
-                # (a) 주소형이면 ⇒ 식별자 그대로 사용  ("user")
+                # (a) 주소형 변수  ⇒  식별자 자체 사용 ("user")
                 is_addr = (
                         hasattr(key_var, "typeInfo") and
                         getattr(key_var.typeInfo, "elementaryTypeName", None) == "address"
@@ -5050,32 +5173,60 @@ class ContractAnalyzer:
                 if is_addr:
                     key_str = ident
 
-                # (b) 숫자/bool Interval
+                # (b) 숫자/Bool Interval --------------------------------------
                 elif self._is_interval(key_var.value):
-                    iv = key_var.value
-                    #    ⊥  또는  [l,r]  (r>l)  ➜ “아직 어떤 키인지 모름”
-                    if iv.is_bottom() or iv.min_value != iv.max_value:
-                        return callerObject  # ★ 그냥 매핑 객체만 넘김
-                    key_str = str(iv.min_value)  # singleton ⇒ 확정 키
+                    iv = key_var.value  # Unsigned/Integer/BoolInterval
 
-                # (c) 그밖에 심볼릭 값은 전부 식별자 그대로
+                    # ⊥  (bottom)  ────────────────
+                    #   아직 어떤 값인지 전혀 모를 때 ⇒
+                    #   식별자 그대로 엔트리 하나 만들고 그 엔트리를 바로 반환
+                    if iv.is_bottom():
+                        key_str = ident
+                        if key_str not in callerObject.mapping:
+                            callerObject.mapping[key_str] = self._create_new_mapping_value(
+                                callerObject, key_str
+                            )
+                        return callerObject.mapping[key_str]  # ★ here
+
+                    # [lo, hi]  (다중 singleton) ──────────────────
+                    if iv.min_value != iv.max_value:
+                        span = iv.max_value - iv.min_value + 1
+
+                        if span <= 32:
+                            # 작은 구간이면 lo..hi 전부 생성
+                            for k in range(iv.min_value, iv.max_value + 1):
+                                k_str = str(k)
+                                if k_str not in callerObject.mapping:
+                                    callerObject.mapping[k_str] = self._create_new_mapping_value(
+                                        callerObject, k_str
+                                    )
+                            # 분석-중엔 “매핑 전체” 로 다룰 수 있도록 callerObject 그대로 반환
+                            return callerObject  # ★ here
+                        else:
+                            # 범위가 크면 하나의 <unk> 키로 추상화
+                            return callerObject  # ★ unchanged
+
+                    # singleton  ────────────────────────────────
+                    key_str = str(iv.min_value)  # ★ 확정 키
+
+                # (c) 그밖의 심볼릭 값  ⇒  식별자 그대로
                 else:
                     key_str = ident
 
-            # ── ②  키가 리터럴(‘0x…’ 등) / 선언 안 된 식별자 ──
+            # ── ②  키가 리터럴(‘0x…’ 등) / 선언 안 된 식별자 ────────────
             else:
-                key_str = ident  # 그대로 키로 사용
+                key_str = ident
 
-            # ── ③  엔트리 가져오거나 생성 ──────────────────────
+            # ── ③  엔트리 가져오거나 생성 ────────────────────────────────
             if key_str not in callerObject.mapping:
                 callerObject.mapping[key_str] = self._create_new_mapping_value(
                     callerObject, key_str
                 )
             mvar = callerObject.mapping[key_str]
 
-            # ── ④  복합-타입이면 더 내려가고, 스칼라-leaf 면 갱신 ──
+            # ── ④  복합-타입이면 계속 내려가고, 스칼라면 leaf-갱신 ─────────
             if isinstance(mvar, (StructVariable, ArrayVariable, MappingVariable)):
-                return mvar  # 계속 체이닝( userInfo[user] … )
+                return mvar  # userInfo[user] …
             _apply_to_leaf(mvar)  # Variables / EnumVariable
             return None
 
@@ -5228,20 +5379,46 @@ class ContractAnalyzer:
 
         # callerObject가 있는 경우
         if callerObject is not None:
-            if isinstance(callerObject, ArrayVariable) : # ident_Str이 index면 index별 join 필요 (index의 interval 크기, array의 길이 참조)
+            if isinstance(callerObject, ArrayVariable):
                 if ident_str not in variables:
-                    raise ValueError(f"Index identifier '{ident_str}' not found in variables.")
-                index_var_obj = variables[ident_str]
-                if isinstance(index_var_obj, Variables) :
-                    if index_var_obj.value.min_value == index_var_obj.value.max_value:
-                        idx = index_var_obj.value.min_value
-                else :
-                    raise ValueError(f"This excuse should be analyzed : '{ident_str}'")
+                    raise ValueError(f"Index identifier '{ident_str}' not found.")
 
-                # 경계검사
-                if idx < 0 or idx >= len(callerObject.elements):
-                    raise IndexError(f"Index {idx} out of range in array '{callerObject.identifier}'")
-                return callerObject.elements[idx]
+                idx_var_obj = variables[ident_str]
+                iv = idx_var_obj.value  # Unsigned/IntegerInterval …
+
+                # ── (A) 인덱스가 확정(singleton) ────────────────────────
+                if self._is_interval(iv) and not iv.is_bottom() and iv.min_value == iv.max_value:
+                    idx = iv.min_value
+                    if idx < 0:
+                        raise IndexError(f"Negative index {idx} for array '{callerObject.identifier}'")
+
+                    if idx >= len(callerObject.elements):
+                        # ❗ 요소가 아직 없음 → base-type 의 bottom 값만 돌려준다
+                        base_t = callerObject.typeInfo.arrayBaseType
+                        return self._bottom_from_soltype(base_t)
+                    return callerObject.elements[idx]
+
+                # ── (B) 불확정(bottom 또는 [l,r] 범위) ─────────────────
+                #      ⇒  배열 모든 요소의 join 을 반환
+                if callerObject.elements:
+                    joined = None
+                    for elem in callerObject.elements:
+                        val = getattr(elem, "value", elem)  # 스칼라 / 복합 둘 다 지원
+                        joined = val if joined is None else joined.join(val)
+                    return joined
+
+                # 배열이 비어 있으면 base-type 에 맞는 ⊥ 반환
+                base_t = callerObject.typeInfo.arrayBaseType
+                if base_t.elementaryTypeName.startswith("uint"):
+                    bits = base_t.intTypeLength or 256
+                    return UnsignedIntegerInterval.bottom(bits)
+                if base_t.elementaryTypeName.startswith("int"):
+                    bits = base_t.intTypeLength or 256
+                    return IntegerInterval.bottom(bits)
+                if base_t.elementaryTypeName == "bool":
+                    return BoolInterval.bottom()
+                # 주소/bytes/string 등은 symbol 로
+                return f"symbolic_{callerObject.identifier}[<unk>]"
 
             elif isinstance(callerObject, StructVariable) :
                 if ident_str not in callerObject.members:
@@ -6518,10 +6695,10 @@ class ContractAnalyzer:
         return neg_map.get(op, op)
 
     def evaluate_function_call_context(self, expr, variables, callerObject=None, callerContext=None):
-        if expr.function.context == "MemberAccessContext" : # dynamic array에 대한 push, pop
-            return self.evaluate_expression(expr.function, variables, None, "functionCallContext")
-        elif expr.context =="IdentifierExpContext" :
+        if expr.context =="IdentifierExpContext" :
             function_name = expr.identifier
+        elif expr.function.context == "MemberAccessContext" : # dynamic array에 대한 push, pop
+            return self.evaluate_expression(expr.function, variables, None, "functionCallContext")
         elif expr.function.context == "IdentifierExpContext" :
             function_name = expr.function.identifier
         else:

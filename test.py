@@ -69,228 +69,96 @@ def simulate_inputs(records):
 
 
 test_inputs = [
-    {
-        "code": "contract AloeBlend {\n}",
-        "startLine": 1,
-        "endLine": 2,
-        "event": "add"
-    },
-    {
-        "code": "uint8 public constant MAINTENANCE_FEE = 10;",
-        "startLine": 2,
-        "endLine": 2,
-        "event": "add"
-    },
-    {
-        "code": "\n",
-        "startLine": 3,
-        "endLine": 3,
-        "event": "add"
-    },
-    {
-        "code": "uint256 public maintenanceBudget0;",
-        "startLine": 4,
-        "endLine": 4,
-        "event": "add"
-    },
-    {
-        "code": "\n",
-        "startLine": 5,
-        "endLine": 5,
-        "event": "add"
-    },
-    {
-        "code": "uint256 public maintenanceBudget1;",
-        "startLine": 6,
-        "endLine": 6,
-        "event": "add"
-    },
-    {
-        "code": "\n",
-        "startLine": 7,
-        "endLine": 7,
-        "event": "add"
-    },
-    {
-        "code": "uint224[10] public rewardPerGas0Array;",
-        "startLine": 8,
-        "endLine": 8,
-        "event": "add"
-    },
-    {
-        "code": "\n",
-        "startLine": 9,
-        "endLine": 9,
-        "event": "add"
-    },
-    {
-        "code": "uint224 public rewardPerGas0Accumulator;",
-        "startLine": 10,
-        "endLine": 10,
-        "event": "add"
-    },
-    {
-        "code": "\n",
-        "startLine": 11,
-        "endLine": 11,
-        "event": "add"
-    },
-    {
-        "code": "uint64 public rebalanceCount;",
-        "startLine": 12,
-        "endLine": 12,
-        "event": "add"
-    },
-    {
-        "code": "\n",
-        "startLine": 13,
-        "endLine": 13,
-        "event": "add"
-    },
-    {
-        "code": "function _earmarkSomeForMaintenance(uint256 earned0, uint256 earned1) private returns (uint256, uint256) {\n}",
-        "startLine": 14,
-        "endLine": 15,
-        "event": "add"
-    },
-    {
-        "code": "uint256 toMaintenance;",
-        "startLine": 15,
-        "endLine": 15,
-        "event": "add"
-    },
-    {
-        "code": "\n",
-        "startLine": 16,
-        "endLine": 16,
-        "event": "add"
-    },
-    {
-        "code": "unchecked {\n}",
-        "startLine": 17,
-        "endLine": 18,
-        "event": "add"
-    },
-    {
-        "code": "toMaintenance = earned0 / MAINTENANCE_FEE;",
-        "startLine": 18,
-        "endLine": 18,
-        "event": "add"
-    },
-    {
-        "code": "earned0 -= toMaintenance;",
-        "startLine": 19,
-        "endLine": 19,
-        "event": "add"
-    },
-    {
-        "code": "maintenanceBudget0 += toMaintenance;",
-        "startLine": 20,
-        "endLine": 20,
-        "event": "add"
-    },
-    {
-        "code": "toMaintenance = earned1 / MAINTENANCE_FEE;",
-        "startLine": 21,
-        "endLine": 21,
-        "event": "add"
-    },
-    {
-        "code": "earned1 -= toMaintenance;",
-        "startLine": 22,
-        "endLine": 22,
-        "event": "add"
-    },
-    {
-        "code": "maintenanceBudget1 += toMaintenance;",
-        "startLine": 23,
-        "endLine": 23,
-        "event": "add"
-    },
-    {
-        "code": "\n",
-        "startLine": 25,
-        "endLine": 25,
-        "event": "add"
-    },
-    {
-        "code": "return (earned0, earned1);",
-        "startLine": 26,
-        "endLine": 26,
-        "event": "add"
-    },
-    {
-        "code": "\n",
-        "startLine": 28,
-        "endLine": 28,
-        "event": "add"
-    },
-    {
-        "code": "function pushRewardPerGas0(uint224 rewardPerGas0) private {\n}",
-        "startLine": 29,
-        "endLine": 30,
-        "event": "add"
-    },
-    {
-        "code": "unchecked {\n}",
-        "startLine": 30,
-        "endLine": 31,
-        "event": "add"
-    },
-    {
-        "code": "rewardPerGas0 /= 10;",
-        "startLine": 31,
-        "endLine": 31,
-        "event": "add"
-    },
-    {
-        "code": "rewardPerGas0Accumulator = rewardPerGas0Accumulator + rewardPerGas0 - rewardPerGas0Array[rebalanceCount % 10];",
-        "startLine": 32,
-        "endLine": 32,
-        "event": "add"
-    },
-    {
-        "code": "rewardPerGas0Array[rebalanceCount % 10] = rewardPerGas0;",
-        "startLine": 33,
-        "endLine": 33,
-        "event": "add"
-    },
-    {
-        "code": "// @TestCase BEGIN",
-        "startLine": 30,
-        "endLine": 30,
-        "event": "add"
-    },
-    {
-        "code": "// @LocalVar rewardPerGas0 = [100,100]",
-        "startLine": 31,
-        "endLine": 31,
-        "event": "add"
-    },
-    {
-        "code": "// @StateVar rebalanceCount = [1,1]",
-        "startLine": 32,
-        "endLine": 32,
-        "event": "add"
-    },
-    {
-        "code": "// @StateVar rewardPerGas0Accumulator = [10,20]",
-        "startLine": 33,
-        "endLine": 33,
-        "event": "add"
-    },
-    {
-        "code": "// @StateVar rewardPerGas0Array = array[1,2,3,4,5,6,7,8,9,10]",
-        "startLine": 34,
-        "endLine": 34,
-        "event": "add"
-    },
-    {
-        "code": "// @TestCase END",
-        "startLine": 35,
-        "endLine": 35,
-        "event": "add"
-    }
+  {
+    "code": "contract DapiServer {\n}",
+    "startLine": 1,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "uint256 public constant override HUNDRED_PERCENT = 1e8;",
+    "startLine": 2,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 3,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "function calculateUpdateInPercentage(int224 initialValue, int224 updatedValue) private pure returns (uint256 updateInPercentage) {\n}",
+    "startLine": 4,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "int256 delta = int256(updatedValue) - int256(initialValue);",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "uint256 absoluteDelta = delta > 0 ? uint256(delta) : uint256(-delta);",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "uint256 absoluteInitialValue = initialValue > 0 ? uint256(int256(initialValue)) : uint256(-int256(initialValue));",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "if (absoluteInitialValue == 0) {\n}",
+    "startLine": 9,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "absoluteInitialValue = 1;",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "updateInPercentage = (absoluteDelta * HUNDRED_PERCENT) / absoluteInitialValue;",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+{
+    "code": "// @TestCase BEGIN",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+{
+    "code": "// @LocalVar initialValue = [50,100]",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  },
+{
+    "code": "// @LocalVar updatedValue = [200,300]",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+{
+    "code": "// @TestCase END",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  }
 ]
 
 
@@ -325,5 +193,8 @@ def main(argv: list[str]) -> None:
 if __name__ == "__main__":
     main(sys.argv[1:])
 """
+#start = time.time()
 
 simulate_inputs(test_inputs)
+#end = time.time()
+#print(f"Analyze time : {end - start:.5f} sec")
