@@ -186,27 +186,39 @@
         "event": "add"
     },
     {
-        "code": "// @LocalVar rewardPerGas0 = [100,100]",
+        "code": "// @TestCase BEGIN",
         "startLine": 30,
         "endLine": 30,
         "event": "add"
     },
     {
-        "code": "// @StateVar rebalanceCount = [1,1]",
+        "code": "// @LocalVar rewardPerGas0 = [100,100]",
         "startLine": 31,
         "endLine": 31,
         "event": "add"
     },
     {
-        "code": "// @StateVar rewardPerGas0Accumulator = [10,20]",
+        "code": "// @StateVar rebalanceCount = [1,1]",
         "startLine": 32,
         "endLine": 32,
         "event": "add"
     },
     {
-        "code": "// @StateVar rewardPerGas0Array = array[1,2,3,4,5,6,7,8,9,10]",
+        "code": "// @StateVar rewardPerGas0Accumulator = [10,20]",
         "startLine": 33,
         "endLine": 33,
+        "event": "add"
+    },
+    {
+        "code": "// @StateVar rewardPerGas0Array = array[1,2,3,4,5,6,7,8,9,10]",
+        "startLine": 34,
+        "endLine": 34,
+        "event": "add"
+    },
+    {
+        "code": "// @TestCase END",
+        "startLine": 35,
+        "endLine": 35,
         "event": "add"
     }
 ]

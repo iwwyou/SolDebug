@@ -7057,7 +7057,7 @@ class ContractAnalyzer:
             ret_acc.append(r_val)
             ret_acc.append("__STOP__")  # 실행 중단 플래그
 
-        return r_val
+        return variables
 
     def interpret_revert_statement(self, stmt, variables):
         return variables

@@ -5,7 +5,7 @@ from z3 import *
 
 BEGIN_LINE = 40
 DELTAS     = [1, 3, 6, 10]
-PATTERNS   = ["safe", "diff"]
+PATTERNS   = ["overlap", "diff"]
 MAX_TRIES  = 40
 WEEK, DIV  = 604800, 100000
 
