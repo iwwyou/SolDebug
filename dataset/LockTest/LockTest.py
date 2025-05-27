@@ -2,9 +2,9 @@ import json, pathlib, itertools
 from z3 import *
 
 BEGIN_LINE = 14
-DELTAS     = [0, 2, 5, 10]
+DELTAS     = [1, 3, 6, 10, 15]
 PATTERNS   = ["safe", "diff"]
-MAX_TRIES  = 20
+MAX_TRIES  = 40
 
 T_META = [
     ("_data.total",           "state"),
@@ -27,6 +27,9 @@ def offset_tuple(i, d):
     return (lo, lo + d)
 
 def build_ranges(pat, d):
+    def off(i, d):
+        return (i * (d + 1), i * (d + 1) + d)
+
     if pat == "safe":
         return [
             (200, 200+d),               # total
@@ -39,12 +42,12 @@ def build_ranges(pat, d):
     else:  # diff
         base_total = 300
         return [
-            (base_total, base_total+d),     # total
-            offset_tuple(0,d), offset_tuple(1,d),  # unlocked / pending
-            offset_tuple(2,d),                     # estUnlock
-            offset_tuple(3,d), offset_tuple(4,d),  # ts / start
-            (CONST_LOCKED+d,  CONST_LOCKED+d),
-            (CONST_UNLOCK+d, CONST_UNLOCK+d),
+            (base_total, base_total + d),  # total
+            off(0, d), off(1, d),  # unlockedAmounts / pending
+            off(2, d),  # estUnlock
+            off(4, d), off(3, d),  # ★ ts 는 4,  startLock 은 3  ← 순서 교체
+            (CONST_LOCKED + d, CONST_LOCKED + d),
+            (CONST_UNLOCK + d, CONST_UNLOCK + d),
         ]
 
 def mk_solver(r):
@@ -62,7 +65,7 @@ def mk_solver(r):
     tRemain = total - ua - pend
     nUnlock = (lockT - (ts - st) - 1) / unDur + 1
     p_out   = tRemain - est * nUnlock
-    s.add(tRemain >= 0, p_out >= 0, ts <= st + lockT)
+    s.add(tRemain >= 0, p_out >= 0, ts <= st + lockT, ts>=st)
     return s
 
 def widen_safe(r):
@@ -84,14 +87,14 @@ for pat, d in itertools.product(PATTERNS, DELTAS):
 
     # JSON events: 한 줄 = 한 이벤트
     events, cur = [], BEGIN_LINE + 1
-    events.append({"code": "//@TestCase BEGIN",
+    events.append({"code": "// @TestCase BEGIN",
                    "startLine": cur, "endLine": cur, "event": "add"})
     cur += 1
     for (expr, kind), (lo, hi) in zip(T_META, ranges):
         events.append({"code": f"// {TAG[kind]} {expr} = [{lo},{hi}]",
                        "startLine": cur, "endLine": cur, "event": "add"})
         cur += 1
-    events.append({"code": "//@TestCase END",
+    events.append({"code": "// @TestCase END",
                    "startLine": cur, "endLine": cur, "event": "add"})
 
     fname = f"pending_{pat}_{d}.json"

@@ -1,6 +1,6 @@
 [
   {
-    "code": "//@TestCase BEGIN",
+    "code": "// @TestCase BEGIN",
     "startLine": 15,
     "endLine": 15,
     "event": "add"
@@ -54,7 +54,7 @@
     "event": "add"
   },
   {
-    "code": "//@TestCase END",
+    "code": "// @TestCase END",
     "startLine": 24,
     "endLine": 24,
     "event": "add"

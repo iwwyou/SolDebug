@@ -1,6 +1,6 @@
 [
   {
-    "code": "//@TestCase BEGIN",
+    "code": "// @TestCase BEGIN",
     "startLine": 15,
     "endLine": 15,
     "event": "add"
@@ -30,13 +30,13 @@
     "event": "add"
   },
   {
-    "code": "// @GlobalVar block.timestamp = [33,43]",
+    "code": "// @GlobalVar block.timestamp = [44,54]",
     "startLine": 20,
     "endLine": 20,
     "event": "add"
   },
   {
-    "code": "// @StateVar startLock = [44,54]",
+    "code": "// @StateVar startLock = [33,43]",
     "startLine": 21,
     "endLine": 21,
     "event": "add"
@@ -54,7 +54,7 @@
     "event": "add"
   },
   {
-    "code": "//@TestCase END",
+    "code": "// @TestCase END",
     "startLine": 24,
     "endLine": 24,
     "event": "add"

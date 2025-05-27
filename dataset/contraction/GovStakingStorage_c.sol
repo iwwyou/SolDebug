@@ -41,7 +41,7 @@ contract GovStakingStorage {
         UserInfo storage info = userInfo[user];
         uint256 toRemove = ((((oldLockPeriod - passedTime) / 1 weeks) * oldRate) * oldAmount) / 100000;
         uint256 toAdd = (((newLockPeriod / 1 weeks) * newRate) * newAmount) / 100000;
-        info.rewardMultiplier = info.rewardMulti 9plier + toAdd - toRemove;
+        info.rewardMultiplier = info.rewardMultiplier + toAdd - toRemove;
         totalRewardMultiplier = totalRewardMultiplier + toAdd - toRemove;
     } 
 }

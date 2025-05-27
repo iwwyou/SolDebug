@@ -11,7 +11,8 @@ class CFGNode:
                  fixpoint_evaluation_node=False,
                  loop_exit_node=False,
                  is_for_increment=False,
-                 unchecked_block=False):
+                 unchecked_block=False,
+                 src_line=None):
         self.name = name
 
         self.condition_node = condition_node
@@ -35,6 +36,7 @@ class CFGNode:
 
         self.function_exit_node = False
         self.return_vals = {}
+        self.src_line = src_line
 
     def add_variable_declaration_statement(self, typeObj, varName, initExpr, line_no):
 
