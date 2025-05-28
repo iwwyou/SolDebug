@@ -13,6 +13,8 @@ import copy
 from typing import Dict, cast
 from collections import defaultdict
 from Analyzer.EnhancedSolidityVisitor import TIME_VALUE, READONLY_MEMBERS, READONLY_GLOBAL_BASES
+from decimal import Decimal, InvalidOperation
+import re
 import json
 from pathlib import Path
 from datetime import datetime
@@ -1197,6 +1199,7 @@ class ContractAnalyzer:
             self._overwrite_state_vars_from_block(ccf, cur_blk.variables)
 
         # ─── 3) 갱신된 변수 객체 찾아서 record ─────────────────────
+        base_obj = None  # ←★ 미리 초기화
         target_var = self._resolve_and_update_expr(
             expr,  # ++ / -- 의 피연산자 식
             None, '=',  # new_value 없음 ⇒ 탐색만
@@ -1724,15 +1727,15 @@ class ContractAnalyzer:
         if contract_cfg is None:
             raise ValueError(f"[for] contract CFG '{self.current_target_contract}' not found")
 
-        function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
-        if function_cfg is None:
+        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if self.current_target_function_cfg is None:
             raise ValueError("[for] active function CFG 없음")
 
         # ------------------------------------------------------------------#
         # 2) 루프 직전 블록
         # ------------------------------------------------------------------#
         current_block = self.get_current_block()  # for 키워드 이전 코드가 위치한 블록
-        old_successors = list(function_cfg.graph.successors(current_block))
+        old_successors = list(self.current_target_function_cfg.graph.successors(current_block))
 
         # ------------------------------------------------------------------#
         # 3) init_node 생성 및 initial_statement 해석
@@ -1758,6 +1761,13 @@ class ContractAnalyzer:
                                                    None, None)
                     var_obj.value = val
 
+                init_node.add_variable_declaration_statement(
+                    var_type,
+                    var_name,
+                    init_expr,
+                    line_no=self.current_start_line
+                )
+
             elif ctx == "Expression":
                 tmp_expr = initial_statement["initExpr"]  # Assignment/Update Expression
                 r_val = self.evaluate_expression(tmp_expr.right,
@@ -1768,6 +1778,14 @@ class ContractAnalyzer:
                                      tmp_expr.operator,
                                      init_node.variables,
                                      None, "ForInit")
+
+                # ★  Assignment Statement 기록 ★
+                init_node.add_assign_statement(
+                    tmp_expr.left,
+                    tmp_expr.operator,
+                    tmp_expr.right,
+                    line_no=self.current_start_line
+                )
 
             else:
                 raise ValueError(f"[for] unknown initial_statement ctx '{ctx}'")
@@ -1886,7 +1904,7 @@ class ContractAnalyzer:
         # ------------------------------------------------------------------#
         # 9) 그래프 연결
         # ------------------------------------------------------------------#
-        g = function_cfg.graph
+        g = self.current_target_function_cfg.graph
 
         # 9-1  노드 등록
         for n in (init_node, join_node, cond_node,
@@ -3767,59 +3785,7 @@ class ContractAnalyzer:
         - 한 줄 코드 삽입 : 해당 블록 반환
         - '}' 로 블록-아웃  : process_flow_join 에게 위임
         """
-        # ─── ContractAnalyzer utils/debug.py ──────────────────────────────────
-        import pathlib, textwrap, datetime, importlib.util
-        import networkx as nx
 
-        def dump_cfg(fcfg, tag=""):
-            """
-            FunctionCFG → 그래프 구조/조건/변수 요약을 DEBUG/outputs/ 아래로 저장
-            * tag : "before_else", "after_else" 등 파일명에 꽂아 두면 비교가 쉬움
-            """
-            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            base = pathlib.Path("DEBUG/outputs")
-            base.mkdir(parents=True, exist_ok=True)
-
-            G = fcfg.graph
-
-            # ──────────────────────────────────────────────────────────
-            # ③  pydot + PNG (가장 보기 편함)
-            try:
-                import pydot
-                dot_path = base / f"{fcfg.function_name}_{tag}_{ts}.dot"
-                png_path = base / f"{fcfg.function_name}_{tag}_{ts}.png"
-
-                nx.nx_pydot.write_dot(G, dot_path)
-                (graph,) = pydot.graph_from_dot_file(str(dot_path))
-                graph.write_png(str(png_path))
-                print(f"[CFG-DUMP] PNG saved → {png_path}")
-                return
-            except Exception as e:
-                print(f"[CFG-DUMP] pydot unavailable ({e}); falling back to DOT/TXT")
-
-            # ──────────────────────────────────────────────────────────
-            # ②  DOT 파일만 (Graphviz 로 열어보기)
-            try:
-                dot_path = base / f"{fcfg.function_name}_{tag}_{ts}.dot"
-                nx.nx_pydot.write_dot(G, dot_path)
-                print(f"[CFG-DUMP] DOT saved  → {dot_path}")
-                return
-            except Exception:
-                pass
-
-            # ──────────────────────────────────────────────────────────
-            # ①  콘솔 텍스트
-            print("\n≡≡ CFG TEXT DUMP", tag, "≡≡")
-            for n in G.nodes:
-                succs = [
-                    f"{s.name}({G[n][s].get('condition')})"
-                    if G.has_edge(n, s) else s.name for s in G.successors(n)
-                ]
-                print(
-                    f"· {n.name:<20} | succs={succs} | "
-                    f"cond={n.condition_node_type or '-'} | src={getattr(n, 'src_line', None)}"
-                )
-            print("≡" * 50, "\n")
 
         close_brace_queue: list[int] = []
 
@@ -3914,8 +3880,6 @@ class ContractAnalyzer:
 
         # ── close_brace_queue 가 채워졌다면 블록-아웃 처리 ──
         if close_brace_queue:
-            dump_cfg(self.current_target_function_cfg, tag=f"after_else_{self.current_start_line}")
-
             blk = self.process_flow_join(close_brace_queue)
             if blk:
                 return blk
@@ -4015,7 +3979,7 @@ class ContractAnalyzer:
         if not close_brace_queue:
             return set()
 
-        outer_close = close_brace_queue[-1]
+        outer_close = close_brace_queue[0]
         open_info = self.get_open_brace_info(outer_close)   # ← 새 헬퍼 사용
         if not open_info:
             return set()
@@ -5285,6 +5249,9 @@ class ContractAnalyzer:
         elif expr.context == "LiteralSubDenomination":
             return self.evaluate_literal_with_subdenomination_context(
                 expr, variables, callerObject, callerContext)
+        elif expr.context == "NewExpContext":
+            return self.evaluate_new_expression_context(expr, variables,
+                                                        callerObject, callerContext)
 
         # 단항 연산자
         if expr.operator in ['-', '!', '~'] and expr.expression :
@@ -5293,6 +5260,63 @@ class ContractAnalyzer:
         # 이항 연산자
         if expr.left is not None and expr.right is not None :
             return self.evaluate_binary_operator(expr, variables, callerObject, callerContext)
+
+    def evaluate_new_expression_context(self, expr: Expression,
+                                        variables, callerObject=None, callerContext=None):
+        """
+        ▸ expr.type_name  : visitNewExp() 에서 채워 둔 SolType 인스턴스
+        ▸ 반환값          : 새로 만든 ArrayVariable / MappingVariable /
+                           StructVariable / Variables (elementary) /
+                           심볼릭 address 등
+        """
+
+        sol_t: SolType = expr.type_name  # 타입 정보
+        fresh_id = f"new_{id(expr)}"  # 유니크한 식별자
+
+        # ── (A) 배열 ───────────────────────────────────────────────
+        if sol_t.typeCategory == "array":
+            arr = ArrayVariable(
+                fresh_id,
+                base_type=sol_t.arrayBaseType,
+                array_length=sol_t.arrayLength,
+                is_dynamic=sol_t.isDynamicArray,
+                scope="memory"
+            )
+
+            # ⬇ static-method 직접 호출
+            if ArrayVariable._is_abstractable(sol_t.arrayBaseType):
+                dummy = (IntegerInterval.bottom()
+                         if str(sol_t.arrayBaseType.elementaryTypeName).startswith("int")
+                         else UnsignedIntegerInterval.bottom())
+                arr.initialize_elements(dummy)
+            else:
+                arr.initialize_not_abstracted_type()
+
+            return arr
+
+        # ── (B) 매핑 ───────────────────────────────────────────────
+        if sol_t.typeCategory == "mapping":
+            return MappingVariable(fresh_id,
+                                   key_type=sol_t.mappingKeyType,
+                                   value_type=sol_t.mappingValueType,
+                                   scope="memory")
+
+        # ── (C) 구조체 ─────────────────────────────────────────────
+        if sol_t.typeCategory == "struct":
+            return StructVariable(fresh_id, sol_t.structTypeName, scope="memory")
+
+        # ── (D) 컨트랙트 new Foo()  → 심볼릭 address ───────────────
+        if sol_t.typeCategory == "userDefined" and sol_t.isContract:
+            # “fresh address”를 160-bit Interval TOP 로 두고,
+            # 필요하면 AddressSymbolicManager 로 별도 관리
+            return UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
+
+        # ── (E) 기본형 new uint[](...) 처럼 size 없는 array 등
+        #        또는 new bytes(...) – 메모리 상 동적 할당
+        if sol_t.typeCategory == "elementary":
+            return f"symbolic_{fresh_id}"
+
+        raise ValueError(f"unsupported 'new' type: {sol_t!r}")
 
     # ───────────────────── evaluate_literal_context ──────────────
     def evaluate_literal_context(
@@ -5304,10 +5328,32 @@ class ContractAnalyzer:
 
         lit = expr.literal  # 예: "123", "0x1A", "true", ...
         ety = expr.expr_type  # 'uint'·'int'·'bool'·'string'·'address' 등
+        _NUM_SCI = re.compile(r"^[+-]?\d+([eE][+-]?\d+)$")   # 1e8, 2E+18 …
 
         def _to_scalar_int(txt: str) -> int:
-            """10진·16진(0x)·8진(0o) 등을 int 로 변환, 부호 허용"""
-            return int(txt, 0)  # base=0  →  자동 판별
+            """
+            10·16·8진수(+부호) + decimal scientific notation → int 로 변환.
+            """
+            try:
+                return int(txt, 0)  # 0x… / 0o… / plain decimal
+            except ValueError:
+                pass
+
+        def _parse_maybe_int(txt: str):
+            """10·16·8진수 또는 지수표기를 int 로 반환. 실패하면 None."""
+            # ➊ 0x / 0o / decimal
+            try:
+                return int(txt, 0)
+            except ValueError:
+                pass
+
+            # ➋ scientific notation
+            if _NUM_SCI.match(txt):
+                try:
+                    return int(Decimal(txt))
+                except (InvalidOperation, ValueError):
+                    pass
+            return None
 
         def _literal_is_address(txt: str) -> bool:
             """
@@ -5369,7 +5415,11 @@ class ContractAnalyzer:
             return UnsignedIntegerInterval(val_int, val_int, 160)  # 160-bit 고정
 
         if ety in ("string", "bytes"):
-            return lit  # 심볼릭 취급 ― 추가 분석시 필요하면 해시 등 사용
+            maybe_int = _parse_maybe_int(lit)
+            if maybe_int is not None:
+                # ▶ 사실은 숫자!  → uint256 interval 로 취급
+                return UnsignedIntegerInterval(maybe_int, maybe_int, 256)
+            return lit  # 진짜 문자열이면 그대로 심볼릭
 
         # 기타 타입
         raise ValueError(f"Unsupported literal expr_type '{ety}'")
@@ -6822,6 +6872,59 @@ class ContractAnalyzer:
     # ------------------------------------------------------------------
 
     def interpret_function_cfg(self, fcfg: FunctionCFG, caller_env: dict[str, Variables] | None = None):
+        # ─── ContractAnalyzer utils/debug.py ──────────────────────────────────
+        import pathlib, textwrap, datetime, importlib.util
+        import networkx as nx
+
+        def dump_cfg(fcfg, tag=""):
+            """
+            FunctionCFG → 그래프 구조/조건/변수 요약을 DEBUG/outputs/ 아래로 저장
+            * tag : "before_else", "after_else" 등 파일명에 꽂아 두면 비교가 쉬움
+            """
+            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            base = pathlib.Path("DEBUG/outputs")
+            base.mkdir(parents=True, exist_ok=True)
+
+            G = fcfg.graph
+
+            # ──────────────────────────────────────────────────────────
+            # ③  pydot + PNG (가장 보기 편함)
+            try:
+                import pydot
+                dot_path = base / f"{fcfg.function_name}_{tag}_{ts}.dot"
+                png_path = base / f"{fcfg.function_name}_{tag}_{ts}.png"
+
+                nx.nx_pydot.write_dot(G, dot_path)
+                (graph,) = pydot.graph_from_dot_file(str(dot_path))
+                graph.write_png(str(png_path))
+                print(f"[CFG-DUMP] PNG saved → {png_path}")
+                return
+            except Exception as e:
+                print(f"[CFG-DUMP] pydot unavailable ({e}); falling back to DOT/TXT")
+
+            # ──────────────────────────────────────────────────────────
+            # ②  DOT 파일만 (Graphviz 로 열어보기)
+            try:
+                dot_path = base / f"{fcfg.function_name}_{tag}_{ts}.dot"
+                nx.nx_pydot.write_dot(G, dot_path)
+                print(f"[CFG-DUMP] DOT saved  → {dot_path}")
+                return
+            except Exception:
+                pass
+
+            # ──────────────────────────────────────────────────────────
+            # ①  콘솔 텍스트
+            print("\n≡≡ CFG TEXT DUMP", tag, "≡≡")
+            for n in G.nodes:
+                succs = [
+                    f"{s.name}({G[n][s].get('condition')})"
+                    if G.has_edge(n, s) else s.name for s in G.successors(n)
+                ]
+                print(
+                    f"· {n.name:<20} | succs={succs} | "
+                    f"cond={n.condition_node_type or '-'} | src={getattr(n, 'src_line', None)}"
+                )
+            print("≡" * 50, "\n")
 
         # ─── ① 호출 이전 컨텍스트 백업 ─────────────────────────
         _old_func = self.current_target_function
@@ -6830,6 +6933,8 @@ class ContractAnalyzer:
         # ─── ② 현재 해석 대상 함수로 설정 ─────────────────────
         self.current_target_function = fcfg.function_name
         self.current_target_function_cfg = fcfg
+
+        dump_cfg(self.current_target_function_cfg, tag=f"after_else_{self.current_start_line}")
 
         self._record_enabled = True  # ★ 항상 켠다
         self._seen_stmt_ids.clear()  # ← 중복 방지용 세트 초기화
@@ -6867,19 +6972,19 @@ class ContractAnalyzer:
             # 아니면 predecessor 하나가 있을 것이므로 그 predecessor의 variables를 복사
             preds = list(fcfg.graph.predecessors(node))
 
-            if preds:  # join 이 필요한 경우
+            if preds:
                 joined = None
                 for p in preds:
+
                     if not p.variables:  # “실질-빈” → skip
                         continue
-                    joined = (self.copy_variables(p.variables)
-                              if joined is None
-                              else self.join_variables(joined, p.variables))
-                if joined is not None:  # 무언가 합쳐졌을 때만 덮어쓰기
+                    joined = self.copy_variables(p.variables) if joined is None \
+                        else self.join_variables(joined, p.variables)
+                if joined is not None:
                     node.variables = joined
 
             cur_vars = node.variables
-
+            node.evaluated = True
             # condition node 처리
             if node.condition_node:
                 condition_expr = node.condition_expr
@@ -6991,6 +7096,18 @@ class ContractAnalyzer:
                 else:
                     raise ValueError(f"Unknown condition node type: {node.condition_node_type}")
 
+            # interpret_function_cfg 안, while work: 루프 최상단 근처
+            elif node.is_for_increment:
+                # 1) 증감 expression 들을 모두 실행
+                for stmt in node.statements:
+                    cur_vars = self.update_statement_with_variables(stmt, cur_vars, return_values)
+
+                # 2) successors 에 전달
+                for succ in fcfg.graph.successors(node):
+                    succ.variables = self.copy_variables(node.variables)
+                    work.append(succ)
+                continue  # 이 노드에서 더 할 일 없음
+
             else:
                 # condition node가 아닌 일반 블록
                 # 블록 내 문장 해석
@@ -7069,7 +7186,12 @@ class ContractAnalyzer:
                     # 여러 개면 튜플 형태로 묶어 돌려줌
                     return [rv.value for rv in fcfg.return_vars]
             else:
-                # 이름 없는 (unnamed) return 이고 값도 없으면 None
+                exit_retvals = list(fcfg.get_exit_node().return_vals.values())
+                if exit_retvals:  # ★ 새 코드
+                    joined = exit_retvals[0]
+                    for v in exit_retvals[1:]:
+                        joined = joined.join(v)  # Interval 등은 join
+                    return joined
                 return None
 
         elif len(return_values) == 1:
@@ -7084,31 +7206,50 @@ class ContractAnalyzer:
             return joined_ret
 
     def interpret_variable_declaration_statement(self, stmt, variables):
-        varType = stmt.type_obj
-        varName = stmt.var_name
-        initExpr = stmt.init_expr  # None 가능
+        var_type = stmt.type_obj
+        var_name = stmt.var_name
+        init_expr = stmt.init_expr  # None 가능
 
         # ① 변수 객체 찾기 (process 단계에서 이미 cur_blk.variables 에 들어있음)
-        if varName not in variables:
-            raise ValueError(f"no variable '{varName}' in env")
-        vobj = variables[varName]
+        if var_name not in variables:
+            vobj = Variables(identifier=var_name, scope="local")
+            vobj.typeInfo = var_type
+
+            # 타입에 맞춰 ⊥ 값으로 초기화
+            et = var_type.elementaryTypeName
+            if et.startswith("uint"):
+                bits = var_type.intTypeLength or 256
+                vobj.value = UnsignedIntegerInterval.bottom(bits)
+            elif et.startswith("int"):
+                bits = var_type.intTypeLength or 256
+                vobj.value = IntegerInterval.bottom(bits)
+            elif et == "bool":
+                vobj.value = BoolInterval.bottom()
+            else:  # address / bytes / string 등
+                vobj.value = f"symbol_{var_name}"
+
+            variables[var_name] = vobj  # ★ env 에 등록
+        else:
+            vobj = variables[var_name]
 
         # ② 초기화 식 평가 (있을 때만)
-        if initExpr is not None:
+        if init_expr is not None:
             if isinstance(vobj, ArrayVariable):
-                pass  # inline array 등 필요시
-            elif isinstance(vobj, Variables):
-                vobj.value = self.evaluate_expression(initExpr,
-                                                      variables, None, None)
+                pass  # inline array 등은 필요 시
+            else:  # Variables / EnumVariable
+                vobj.value = self.evaluate_expression(
+                    init_expr, variables, None, None
+                )
 
+            # ─── ③ 로그 기록 (기존 로직 그대로) ─────────────────────────
         stmt_id = id(stmt)
-        # ③ ★ 반드시 로그 기록 – initExpr 유무와 무관 ★
         if self._record_enabled and stmt_id not in self._seen_stmt_ids:
             self._seen_stmt_ids.add(stmt_id)
-            lhs = Expression(identifier=varName, context="IdentifierExpContext")
+            lhs = Expression(identifier=var_name,
+                             context="IdentifierExpContext")
             self._record_analysis(
                 line_no=stmt.src_line,
-                stmt_type=stmt.statement_type,  # 'variableDeclaration'
+                stmt_type=stmt.statement_type,
                 expr=lhs,
                 var_obj=vobj
             )

@@ -38,6 +38,8 @@ class CFGNode:
         self.return_vals = {}
         self.src_line = src_line
 
+        self.function_evaluated=None
+
     def add_variable_declaration_statement(self, typeObj, varName, initExpr, line_no):
 
         # Statement 생성

@@ -70,45 +70,39 @@ def simulate_inputs(records):
 
 test_inputs = [
   {
-    "code": "contract DapiServer {\n}",
+    "code": "contract Lock {\n}",
     "startLine": 1,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "uint256 public constant override HUNDRED_PERCENT = 1e8;",
+    "code": "struct LockedData {\n}",
     "startLine": 2,
-    "endLine": 2,
+    "endLine": 3,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "uint256 total;",
     "startLine": 3,
     "endLine": 3,
     "event": "add"
   },
   {
-    "code": "function calculateUpdateInPercentage(int224 initialValue, int224 updatedValue) private pure returns (uint256 updateInPercentage) {\n}",
+    "code": "uint256 pending;",
     "startLine": 4,
-    "endLine": 5,
+    "endLine": 4,
     "event": "add"
   },
   {
-    "code": "int256 delta = int256(updatedValue) - int256(initialValue);",
+    "code": "uint256 estUnlock;",
     "startLine": 5,
     "endLine": 5,
     "event": "add"
   },
   {
-    "code": "uint256 absoluteDelta = delta > 0 ? uint256(delta) : uint256(-delta);",
+    "code": "uint256 unlockedAmounts;",
     "startLine": 6,
     "endLine": 6,
-    "event": "add"
-  },
-  {
-    "code": "uint256 absoluteInitialValue = initialValue > 0 ? uint256(int256(initialValue)) : uint256(-int256(initialValue));",
-    "startLine": 7,
-    "endLine": 7,
     "event": "add"
   },
   {
@@ -118,48 +112,176 @@ test_inputs = [
     "event": "add"
   },
   {
-    "code": "if (absoluteInitialValue == 0) {\n}",
+    "code": "mapping(address => LockedData) public data;",
     "startLine": 9,
-    "endLine": 10,
+    "endLine": 9,
     "event": "add"
   },
   {
-    "code": "absoluteInitialValue = 1;",
+    "code": "uint256 public startLock;",
     "startLine": 10,
     "endLine": 10,
     "event": "add"
   },
   {
-    "code": "updateInPercentage = (absoluteDelta * HUNDRED_PERCENT) / absoluteInitialValue;",
+    "code": "uint256 public unlockDuration = 30 days;",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "uint256 public lockedTime = 6 * 30 days;",
     "startLine": 12,
     "endLine": 12,
     "event": "add"
   },
-{
+  {
+    "code": "\n",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "function pending(address _account) public view returns(uint256 _pending) {\n}",
+    "startLine": 14,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "LockedData memory _data = data[_account];",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "uint256 _totalLockRemain =  _data.total + _data.unlockedAmounts + _data.pending;",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  },
+  {
+    "code": "if (_totalLockRemain > 0) {\n}",
+    "startLine": 17,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "if (block.timestamp >= startLock + lockedTime) {\n}",
+    "startLine": 18,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "_pending = _totalLockRemain;",
+    "startLine": 19,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "else {\n}",
+    "startLine": 21,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "uint256 _nUnlock = (lockedTime + (block.timestamp + startLock) + 1) / unlockDuration + 1;",
+    "startLine": 22,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "_pending = _totalLockRemain + _data.estUnlock * _nUnlock;",
+    "startLine": 23,
+    "endLine": 23,
+    "event": "add"
+  },
+  {
+    "code": "if (_data.pending > 0) {\n}",
+    "startLine": 26,
+    "endLine": 27,
+    "event": "add"
+  },
+  {
+    "code": "_pending += _data.pending;",
+    "startLine": 27,
+    "endLine": 27,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 31,
+    "endLine": 31,
+    "event": "add"
+  },
+
+  {
     "code": "// @TestCase BEGIN",
-    "startLine": 5,
-    "endLine": 5,
+    "startLine": 15,
+    "endLine": 15,
     "event": "add"
   },
-{
-    "code": "// @LocalVar initialValue = [50,100]",
-    "startLine": 6,
-    "endLine": 6,
+  {
+    "code": "// @StateVar _data.total = [200,203]",
+    "startLine": 16,
+    "endLine": 16,
     "event": "add"
   },
-{
-    "code": "// @LocalVar updatedValue = [200,300]",
-    "startLine": 7,
-    "endLine": 7,
+  {
+    "code": "// @StateVar _data.unlockedAmounts = [0,3]",
+    "startLine": 17,
+    "endLine": 17,
     "event": "add"
   },
-{
+  {
+    "code": "// @StateVar _data.pending = [0,3]",
+    "startLine": 18,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar _data.estUnlock = [0,1]",
+    "startLine": 19,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "// @GlobalVar block.timestamp = [0,3]",
+    "startLine": 20,
+    "endLine": 20,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar startLock = [0,3]",
+    "startLine": 21,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar lockedTime = [15522003,15522003]",
+    "startLine": 22,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar unlockDuration = [2592003,2592003]",
+    "startLine": 23,
+    "endLine": 23,
+    "event": "add"
+  },
+  {
     "code": "// @TestCase END",
-    "startLine": 8,
-    "endLine": 8,
+    "startLine": 24,
+    "endLine": 24,
     "event": "add"
-  }
+  },
+{
+    "code": "// @StateVar _data.estUnlock = [1,4]",
+    "startLine": 19,
+    "endLine": 19,
+    "event": "modify"
+  },
 ]
+
 
 
 
@@ -193,8 +315,8 @@ def main(argv: list[str]) -> None:
 if __name__ == "__main__":
     main(sys.argv[1:])
 """
-#start = time.time()
+start = time.time()
 
 simulate_inputs(test_inputs)
-#end = time.time()
-#print(f"Analyze time : {end - start:.5f} sec")
+end = time.time()
+print(f"Analyze time : {end - start:.5f} sec")

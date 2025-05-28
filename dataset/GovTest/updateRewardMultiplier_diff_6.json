@@ -6,19 +6,19 @@
     "event": "add"
   },
   {
-    "code": "// @LocalVar oldRate = [1401,2001]",
+    "code": "// @LocalVar oldRate = [141,201]",
     "startLine": 42,
     "endLine": 42,
     "event": "add"
   },
   {
-    "code": "// @LocalVar newRate = [4201,4801]",
+    "code": "// @LocalVar newRate = [421,481]",
     "startLine": 43,
     "endLine": 43,
     "event": "add"
   },
   {
-    "code": "// @LocalVar passedTime = [700,1300]",
+    "code": "// @LocalVar passedTime = [70,130]",
     "startLine": 44,
     "endLine": 44,
     "event": "add"
@@ -36,25 +36,25 @@
     "event": "add"
   },
   {
-    "code": "// @LocalVar oldAmount = [3501,4101]",
+    "code": "// @LocalVar oldAmount = [351,411]",
     "startLine": 47,
     "endLine": 47,
     "event": "add"
   },
   {
-    "code": "// @LocalVar newAmount = [7001,7601]",
+    "code": "// @LocalVar newAmount = [701,761]",
     "startLine": 48,
     "endLine": 48,
     "event": "add"
   },
   {
-    "code": "// @StateVar info.rewardMultiplier = [100000,100000]",
+    "code": "// @StateVar info.rewardMultiplier = [10000,10000]",
     "startLine": 49,
     "endLine": 49,
     "event": "add"
   },
   {
-    "code": "// @StateVar totalRewardMultiplier = [500000,500000]",
+    "code": "// @StateVar totalRewardMultiplier = [50000,50000]",
     "startLine": 50,
     "endLine": 50,
     "event": "add"

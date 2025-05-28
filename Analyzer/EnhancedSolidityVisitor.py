@@ -1886,19 +1886,31 @@ class EnhancedSolidityVisitor(SolidityVisitor):
 
         return result_expr
 
+    def _array_length_expr(self, type_ctx):
+        """
+        type_ctx : SolidityParser.TypeNameContext
+        반환      : length  Expression  (없으면 None)
+        """
+        # 배열이 중첩되어도 가장 바깥쪽 ‘[]’ 부터 검사
+        while isinstance(type_ctx, SolidityParser.ArrayTypeContext):
+            # '[' expression? ']'  → 자식 0 = baseType, 1 = expression?
+            if type_ctx.expression():
+                return self.visit(type_ctx.expression())  # Expression 객체
+            type_ctx = type_ctx.typeName()  # 더 안쪽으로…
+        return None
+
     # Visit a parse tree produced by SolidityParser#NewExp.
-    def visitNewExp(self, ctx:SolidityParser.NewExpContext):
-        # 타입 이름 방문
-        type_name = self.visitTypeName(ctx.typeName())
+    def visitNewExp(self, ctx: SolidityParser.NewExpContext):
+        type_obj = SolType()
+        self.visitTypeName(ctx.typeName(), type_obj)  # 타입 파싱
 
-        # Expression 객체 생성
-        result_expr = Expression(
-            operator='new',
-            type_name=type_name,
-            context='NewExpContext'
+        length_expr = self._array_length_expr(ctx.typeName())
+
+        return Expression(
+            context="NewExpContext",
+            typeName=type_obj,
+            arguments=[length_expr] if length_expr else []  # ← 여기에만 넣음
         )
-
-        return result_expr
 
     # Visit a parse tree produced by SolidityParser#BitAndOp.
     def visitBitAndOp(self, ctx:SolidityParser.BitAndOpContext):
