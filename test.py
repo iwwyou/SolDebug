@@ -2,7 +2,7 @@ import json
 from Analyzer.EnhancedSolidityVisitor import EnhancedSolidityVisitor
 from Analyzer.ContractAnalyzer import ContractAnalyzer
 from Analyzer.DebugUnitAnalyzer import DebugBatchManager
-from Utils.util                        import ParserHelpers     # ★ here
+from Utils.Util                        import ParserHelpers     # ★ here
 import time
 
 contract_analyzer = ContractAnalyzer()
@@ -275,39 +275,6 @@ test_inputs = [
   },
 ]
 
-
-
-
-
-
-
-"""
-# ──────────────────────────────────────────────────────────────
-# ❸  CLI 엔트리포인트
-# ----------------------------------------------------------------
-def main(argv: list[str]) -> None:
-    ap = argparse.ArgumentParser(
-        description="Replay JSON input chunks into the incremental analyzer"
-    )
-    ap.add_argument("json_file", help="input file produced by split_solidity_to_inputs")
-    ap.add_argument("-q", "--quiet", action="store_true",
-                    help="suppress per‑line analysis dumps")
-    args = ap.parse_args(argv)
-
-    try:
-        raw = pathlib.Path(args.json_file).read_text(encoding="utf-8")
-        inputs = json.loads(raw)
-    except FileNotFoundError:
-        sys.exit(f"✖ file not found: {args.json_file}")
-    except json.JSONDecodeError as e:
-        sys.exit(f"✖ JSON parse error: {e}")
-
-    simulate_inputs(inputs, silent=args.quiet)
-
-
-if __name__ == "__main__":
-    main(sys.argv[1:])
-"""
 start = time.time()
 
 simulate_inputs(test_inputs)

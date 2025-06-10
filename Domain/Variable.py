@@ -1,216 +1,5 @@
-from Utils.Interval import *
-from antlr4.error.ErrorListener import ErrorListener, ConsoleErrorListener
-
-# util.py
+from Domain.Interval import *
 import copy
-
-from antlr4 import *
-from Parser.SolidityLexer  import SolidityLexer
-from Parser.SolidityParser import SolidityParser
-
-class ParserHelpers:
-    # --------------------------- 컨텍스트 → 파싱 규칙 매핑
-    _CTX_MAP: dict[str, str] = {
-        'contract':'interactiveSourceUnit', 'library':'interactiveSourceUnit',
-        'interface':'interactiveSourceUnit', 'enum':'interactiveSourceUnit',
-        'struct':'interactiveSourceUnit',   'functionDefinition':'interactiveSourceUnit',
-        'constructor':'interactiveSourceUnit', 'fallback':'interactiveSourceUnit',
-        'receive':'interactiveSourceUnit',  'event':'interactiveSourceUnit',
-        'error':'interactiveSourceUnit',    'modifier':'interactiveSourceUnit',
-        'stateVariableDeclaration':'interactiveSourceUnit',
-
-        'enumMember':'interactiveEnumUnit',
-        'structMember':'interactiveStructUnit',
-
-        'simpleStatement':'interactiveBlockUnit', 'if':'interactiveBlockUnit',
-        'for':'interactiveBlockUnit',     'while':'interactiveBlockUnit',
-        'do':'interactiveBlockUnit',      'try':'interactiveBlockUnit',
-        'return':'interactiveBlockUnit',  'break':'interactiveBlockUnit',
-        'continue':'interactiveBlockUnit','emit':'interactiveBlockUnit',
-        'unchecked':'interactiveBlockUnit',
-
-        'doWhileWhile':'interactiveDoWhileUnit',
-        'catch':'interactiveCatchClauseUnit',
-        'else_if':'interactiveIfElseUnit', 'else':'interactiveIfElseUnit',
-
-        'debugUnit':'debugUnit'
-    }
-
-    # --------------------------- map → 규칙 문자열
-    @staticmethod
-    def map_context_type(ctx_type: str) -> str|None:
-        return ParserHelpers._CTX_MAP.get(ctx_type)
-
-    # --------------------------- 파싱
-    @staticmethod
-    def generate_parse_tree(src: str, ctx_type: str, verbose=False):
-        input_stream  = InputStream(src)
-        lexer         = SolidityLexer(input_stream)
-        token_stream  = CommonTokenStream(lexer)
-        parser        = SolidityParser(token_stream)
-
-        # ── ① 에러 리스너 부착 ───────────────────────────────
-        if verbose:
-            # 기본 ConsoleErrorListener 제거
-            parser.removeErrorListeners()
-
-            # ▶ 한 줄짜리 익명 ErrorListener
-            parser.addErrorListener(
-                type(
-                    "InlineErr", (ErrorListener,), {
-                        "syntaxError": lambda self, recognizer, offendingSymbol,
-                                              line, column, msg, e:
-                        print(f"[ANTLR] {line}:{column} {msg}")
-                    }
-                )()
-            )
-        else:
-            # 최소한 기본 오류 출력은 유지하고 싶다면
-            parser.removeErrorListeners()
-            parser.addErrorListener(ConsoleErrorListener.INSTANCE)
-
-        rule = ParserHelpers.map_context_type(ctx_type)
-
-        match rule:
-            case 'interactiveStructUnit':     return parser.interactiveStructUnit()
-            case 'interactiveEnumUnit':       return parser.interactiveEnumUnit()
-            case 'interactiveBlockUnit':      return parser.interactiveBlockUnit()
-            case 'interactiveDoWhileUnit':    return parser.interactiveDoWhileUnit()
-            case 'interactiveIfElseUnit':     return parser.interactiveIfElseUnit()
-            case 'interactiveCatchClauseUnit':return parser.interactiveCatchClauseUnit()
-            case 'debugUnit':                 return parser.debugUnit()
-            case _:                           return parser.interactiveSourceUnit()
-
-# Utils/snapshot_manager.py  (혹은 기존 SnapshotManager 정의 위치)
-import copy
-from collections.abc import Callable
-
-class SnapshotManager:
-    """
-    * register(obj, serializer)              : 객체별 최초 스냅
-    * restore(obj, deserializer)             : 단일 객체 롤백   (기존 인터페이스)
-    * snapshot() -> dict                     : 전체 스냅          (새로 추가)
-    * restore(snap_dict)                     : 전체 롤백          (새로 추가, 오버로드)
-    """
-
-    def __init__(self) -> None:
-        # id(obj) -> { "__dict__": deep-copied dict, "serializer": fn }
-        self._store: dict[int, dict] = {}
-        # id(obj) -> 실객체 참조 (전역 롤백 시 필요)
-        self._ref:   dict[int, object] = {}
-
-    # ───────────────────────────────────────── register
-    def register(self, obj: object, serializer: Callable[[object], dict]) -> None:
-        """
-        처음 보는 변수라면 serializer(obj) 결과를 깊은 복사로 저장
-        (이미 등록돼 있으면 재등록하지 않음)
-        """
-        oid = id(obj)
-        if oid not in self._store:
-            self._store[oid] = {
-                "snap": copy.deepcopy(serializer(obj)),
-                "serializer": serializer,
-            }
-            self._ref[oid] = obj
-
-    # ───────────────────────────────────────── 단일 객체 롤백 (기존용)
-    def restore(self, target, deserializer: Callable[[object, dict], None] | None = None):
-        """
-        ‣ (a) 인자가 2개   → 단일 객체 롤백   : restore(obj, deser)
-        ‣ (b) 인자가 1개   → 전역 롤백       : restore(snap_dict)
-        """
-        # -------- (a) 단일 객체
-        if deserializer is not None:
-            snap_info = self._store.get(id(target))
-            if snap_info is not None:
-                deserializer(target, copy.deepcopy(snap_info["snap"]))
-            return
-
-        # -------- (b) 전역 롤백 (target == snap_dict)
-        snap_dict: dict[int, dict] = target       # type: ignore
-        for oid, saved_state in snap_dict.items():
-            obj = self._ref.get(oid)
-            if obj is None:           # 아직 register 안 된 객체일 수 있음
-                continue
-            # 객체 내부 상태를 원본으로 되돌림
-            obj.__dict__.clear()
-            obj.__dict__.update(copy.deepcopy(saved_state))
-
-    # ───────────────────────────────────────── 전체 스냅
-    # 전체 스냅-샷을 반환
-    def snapshot(self):
-        return copy.deepcopy(self._store)
-
-    # 외부에서 받은 snap(dict) 전체를 되돌린다
-    def restore_from_snap(self, snap):
-        self._store = snap
-
-
-class Statement:
-    def __init__(self, statement_type, **kwargs):
-        self.statement_type = statement_type  # 'assignment', 'if', 'while', 'for', 'return', 'require', 'assert' 등
-
-        # 공통 속성
-        self.expressions = []  # 해당 문에서 사용하는 Expression 객체들
-        self.statements = []   # 블록 내에 포함된 Statement 객체들
-
-        # 각 statement_type별로 필요한 속성 설정
-        if statement_type == 'variableDeclaration' :
-            self.type_obj = kwargs.get('type_obj')  # SolType
-            self.var_name = kwargs.get('var_name')
-            self.init_expr = kwargs.get('init_expr')
-            self.src_line = kwargs.get('src_line')
-        elif statement_type == 'assignment':
-            self.left = kwargs.get('left')        # 좌변 Expression
-            self.operator = kwargs.get('operator')  # 할당 연산자 (예: '=', '+=', '-=' 등)
-            self.right = kwargs.get('right')      # 우변 Expression
-            self.src_line = kwargs.get('src_line')
-        elif statement_type == "functionCall" :
-            self.function_expr = kwargs.get('function_expr')
-            self.src_line = kwargs.get('src_line')
-        elif statement_type == 'return':
-            self.return_expr = kwargs.get('return_expr')
-            self.src_line = kwargs.get('src_line')
-        elif statement_type == 'revert' :
-            self.identifier = kwargs.get('identifier')
-            self.string_literal = kwargs.get('string_literal')
-            self.arguments = kwargs.get('arguments')
-            self.src_line = kwargs.get('src_line')
-
-
-
-class Expression:
-    def __init__(self, left=None, operator=None, right=None, identifier=None, literal=None, var_type=None,
-                 function=None, arguments=None, named_arguments=None, base=None, access=None,
-                 index=None, start_index=None, end_index=None, member=None, options=None,
-                 typeName=None, expression=None, condition=None, true_expr=None, false_expr=None,
-                 is_postfix=None, elements=None, expr_type=None, type_length=256, context=None):
-        self.left = left                # 좌측 피연산자 (Expression)
-        self.operator = operator        # 연산자 (문자열)
-        self.right = right              # 우측 피연산자 (Expression)
-        self.identifier = identifier    # 식별자 (변수 이름, 함수 이름 등)
-        self.literal = literal          # 리터럴 값 (숫자, 문자열 등)
-        self.var_type = var_type        # 변수 타입 (문자열)
-        self.function = function        # 함수 표현식 (Expression)
-        self.arguments = arguments      # 위치 기반 인자 목록 (리스트)
-        self.named_arguments = named_arguments  # 이름 지정 인자 (딕셔너리)
-        self.base = base                # 인덱스 또는 멤버 접근의 대상 표현식 (Expression)
-        self.access = access            # index_access 등
-        self.index = index              # 단일 인덱스 표현식 (Expression)
-        self.start_index = start_index  # 슬라이싱의 시작 인덱스 (Expression)
-        self.end_index = end_index      # 슬라이싱의 끝 인덱스 (Expression)
-        self.member = member            # 멤버 이름 (문자열)
-        self.options = options          # 함수 호출 옵션 (딕셔너리)
-        self.typeName = typeName        # 타입 변환의 대상 타입 이름 (문자열)
-        self.expression = expression    # 변환될 표현식 또는 단일 표현식 (Expression)
-        self.condition = condition      # 조건식 (삼항 연산자용) (Expression)
-        self.true_expr = true_expr      # 조건식이 참일 때의 표현식 (Expression)
-        self.false_expr = false_expr    # 조건식이 거짓일 때의 표현식 (Expression)
-        self.is_postfix = is_postfix    # 후위 연산자 여부 (Boolean)
-        self.elements = elements        # 튜플 또는 배열의 요소들 (리스트)
-        self.expr_type = expr_type      # 표현식의 타입 (예: 'int', 'uint', 'bool')
-        self.type_length = type_length  # 타입의 길이 (예: 256)
-        self.context = context
 
 class SolType:
     def __init__(self):
@@ -233,7 +22,6 @@ class SolType:
         self.structTypeName = None  # 구조체 이름 (문자열)
         self.enumTypeName = None
 
-
 class Variables:
     def __init__(self, identifier=None, value=None,
                  isConstant=False, scope=None, typeInfo=None):
@@ -249,7 +37,7 @@ class Variables:
 
 
 class GlobalVariable(Variables):
-    def __init__(self, identifier=None, isConstant=False, scope=None, base=None, member=None, value=None, typeInfo=None):
+    def __init__(self, identifier=None, isConstant=False, scope=None, base=None, member=None, value=None):
         super().__init__(identifier, value, isConstant, scope)
         self.base = base
         self.member = member
@@ -264,73 +52,6 @@ class GlobalVariable(Variables):
     @property
     def current(self):
         return self.debug_override if self.debug_override is not None else self.value
-
-class AddressSymbolicManager:
-    """
-    160-bit 주소 공간의 심볼릭 ID ↔ Interval ↔ 변수 alias 를 한 곳에서 관리
-    """
-    ADDR_BITS = 160
-    MAX_ADDR = (1 << ADDR_BITS) - 1
-    TOP_INTERVAL = UnsignedIntegerInterval(0, MAX_ADDR, ADDR_BITS)
-    _typeinfo = SolType()                 # 빈 객체 먼저 만들고
-    _typeinfo.typeCategory = "elementary" # 필드 수동 설정
-    _typeinfo.elementaryTypeName = "address"
-
-    def __init__(self):
-        self._next_id: int = 1                    # fresh ID counter
-        self._id_to_iv: dict[int, UnsignedIntegerInterval] = {}
-        self._id_to_vars: dict[int, set[str]] = {}  # 해당 ID를 쓰는 변수명 모음
-
-    @staticmethod
-    def top_interval() -> UnsignedIntegerInterval:
-        return UnsignedIntegerInterval(0, 2 ** 160 - 1, type_length=160)
-
-    # ───────────────────────────────── fresh / fixed  ID 발급
-    def fresh_id(self) -> int:
-        nid = self._next_id
-        self._next_id += 1
-        return nid
-
-    def alloc_fresh_interval(self) -> UnsignedIntegerInterval:
-        """새 ID 하나 -> Interval [id,id] 반환"""
-        nid = self.fresh_id()
-        iv  = UnsignedIntegerInterval(nid, nid, self.ADDR_BITS)
-        self._id_to_iv[nid] = iv
-        self._id_to_vars[nid] = set()
-        return iv                                  # value 필드에 그대로 쓰면 됨
-
-    def register_fixed_id(self, nid: int,
-                          iv: UnsignedIntegerInterval | None = None):
-        """
-        주석처럼 `symbolicAddress 101` 이 들어왔을 때 호출.
-        이미 등록돼 있으면 그대로 두고, 없으면 Interval을 결정해 추가.
-        """
-        if nid not in self._id_to_iv:
-            if iv is None:
-                iv = UnsignedIntegerInterval(nid, nid, self.ADDR_BITS)
-            self._id_to_iv[nid] = iv
-            self._id_to_vars[nid] = set()
-
-    # ───────────────────────────────── 변수-ID 바인딩
-    def bind_var(self, var_name: str, nid: int):
-        self._id_to_vars.setdefault(nid, set()).add(var_name)
-
-    # ───────────────────────────────── 조회
-    def get_interval(self, nid: int) -> UnsignedIntegerInterval:
-        return self._id_to_iv[nid]
-
-    def get_alias_set(self, nid: int) -> set[str]:
-        return self._id_to_vars.get(nid, set())
-
-    # ───────────────────────────────── ranged 할당 예시
-    def alloc_range(self, start: int, end: int) -> int:
-        """
-        [start,end] Interval 로 묶인 새 ID 발급 후 ID 반환
-        """
-        nid = self.fresh_id()
-        self._id_to_iv[nid] = UnsignedIntegerInterval(start, end, self.ADDR_BITS)
-        self._id_to_vars[nid] = set()
-        return nid
 
 class ArrayVariable(Variables):
     """
@@ -477,8 +198,7 @@ class ArrayVariable(Variables):
                       scope=self.scope, typeInfo=et)
         )
 
-    def initialize_not_abstracted_type(self,
-                                       sm: AddressSymbolicManager | None = None):
+    def initialize_not_abstracted_type(self):
         """address / bytes / string 등 — address 는 fresh interval, 나머진 심볼"""
         if self.typeInfo.isDynamicArray:
             return
@@ -522,7 +242,7 @@ class ArrayVariable(Variables):
                         else UnsignedIntegerInterval.bottom()
                     sub_arr.initialize_elements(dummy)
                 else:
-                    sub_arr.initialize_not_abstracted_type(sm=None)
+                    sub_arr.initialize_not_abstracted_type()
                 self.elements.append(sub_arr)
                 continue
             # ─ leaf element -----------------------------------------------------------------
@@ -670,15 +390,13 @@ class StructVariable(Variables):
     # ------------------------------------------------------------------
     def initialize_struct(
         self,
-        struct_def: StructDefinition,
-        sm: "AddressSymbolicManager | None" = None,
+        struct_def: StructDefinition
     ):
         """
         struct_def.members :
             [{ "member_name": str, "member_type": SolType }, ... ]
         - sm : AddressSymbolicManager (주소 타입이면 fresh interval 발급용)
         """
-
 
         def _make_var(var_id: str, sol_t: SolType) -> Variables:
             """SolType → 적절한 Variables/ArrayVariable/MappingVariable 생성"""
@@ -705,10 +423,10 @@ class StructVariable(Variables):
                     elif bt.elementaryTypeName == "bool":
                         arr.initialize_elements(BoolInterval.bottom())
                     else:          # address / bytes / string 등
-                        arr.initialize_not_abstracted_type(sm=sm)
+                        arr.initialize_not_abstracted_type()
                 else:
                     # 다차원 배열(배열의 base 가 또 SolType(array)) → 재귀적으로 helper가 처리
-                    arr.initialize_not_abstracted_type(sm=sm)
+                    arr.initialize_not_abstracted_type()
                 return arr
 
             # 2) 매핑  ---------------------------------------------------

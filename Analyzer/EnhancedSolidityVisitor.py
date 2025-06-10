@@ -2,7 +2,7 @@ from Parser.SolidityParser import SolidityParser
 from Parser.SolidityVisitor import SolidityVisitor
 # 맨 위 import 부분
 from antlr4.tree.Tree import TerminalNodeImpl
-from Utils.util import * # Expression, Variables class
+from Utils.Util import * # Expression, Variables class
 from typing import List, Tuple
 
 

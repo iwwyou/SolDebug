@@ -73,7 +73,7 @@ class IntegerInterval(Interval):
         return (self.min_value == NEG_INFINITY
                 and self.max_value == INFINITY)
 
-
+    @staticmethod
     def _bottom_propagate(a, b, fn):
         if a.is_bottom() or b.is_bottom():
             return a.__class__(None, None, a.type_length)
@@ -677,7 +677,7 @@ class BoolInterval(Interval):
         super().__init__(min_value, max_value, None)
 
     def is_top(self):
-        return (self.min_value == 0 and self.max_value == 1)
+        return self.min_value == 0 and self.max_value == 1
 
     @staticmethod
     def top():
@@ -723,7 +723,7 @@ class BoolInterval(Interval):
             return self.bottom()
         return BoolInterval(new_min, new_max)
 
-    def widen(self, current_interval):
+    def widen(self):
         # bool에선 widen => top
         return self.top()
 
@@ -739,7 +739,7 @@ class BoolInterval(Interval):
             return self.bottom()
         return BoolInterval(new_min, new_max)
 
-    def logical_op(self, other: "BoolInterval", op: str) -> "BoolInterval":
+    def logical_op(self, other: "BoolInterval", op: str):
         """
         self  ∈  [s_min, s_max],   other ∈ [o_min, o_max]
         op == '&&'  →  AND
@@ -775,9 +775,9 @@ class BoolInterval(Interval):
             if self.max_value == 0 and other.max_value == 0:
                 return BoolInterval(0, 0)
 
-            return BoolInterval(0, 1)
+        return BoolInterval(0, 1)
 
-    def less_than(self, other):
+    def less_than(self):
         # Boolean에서 < 연산, 크게 의미 X. 여기서는 그대로 자신 반환 혹은 top
         return self
 
@@ -805,7 +805,7 @@ class BoolInterval(Interval):
         if (self.min_value == 1 and self.max_value == 1) or \
            (other.min_value == 1 and other.max_value == 1):
             return BoolInterval(1,1)
-        if (self.max_value == 0 and other.max_value == 0):
+        if self.max_value == 0 and other.max_value == 0:
             return BoolInterval(0,0)
         return BoolInterval(0,1)
 

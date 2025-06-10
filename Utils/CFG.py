@@ -1,6 +1,7 @@
 # SolidityGuardian/Utils/CFG.py
 import networkx as nx
-from Utils.util import *
+from Interpreter.IR import *
+from Domain.Variable import *
 
 class CFGNode:
     def __init__(self, name,
