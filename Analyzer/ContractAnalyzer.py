@@ -136,11 +136,42 @@ class ContractAnalyzer:
         if event == "add":
             self._insert_lines(start_line, lines)  # ← 종전 알고리즘
 
+
         elif event == "modify":
-            # “삭제 후 삽입” ··· 삭제 분석 → 삽입 분석 두 번 호출
-            self.update_code(start_line, end_line, "", event="delete")
-            self.update_code(start_line, start_line + len(lines) - 1,
-                             new_code, event="add")
+
+            # (1) 새 코드 줄 리스트
+
+            new_lines = new_code.split("\n")
+
+            # (2) ① 줄 수가 같지 않다면 → delete + add 로 fallback
+
+            if (end_line - start_line + 1) != len(new_lines):
+                # delete
+
+                self.update_code(start_line, end_line, "", event="delete")
+
+                # add (line 수가 달라졌으므로 뒤쪽을 밀어냄)
+
+                self.update_code(start_line, start_line + len(new_lines) - 1,
+
+                                 new_code, event="add")
+
+                return
+
+            # (3) ② 줄 수가 동일 → **덮어쓰기** 만 수행
+
+            ln = start_line
+
+            for line in new_lines:
+                # full-code 버퍼 교체
+
+                self.full_code_lines[ln] = line
+
+                # 바로 context 분석
+
+                self.analyze_context(ln, line)
+
+                ln += 1
 
 
         elif event == "delete":

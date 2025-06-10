@@ -64,7 +64,7 @@ def map_context_type(context_type):
         'catch': 'interactiveCatchClauseUnit',
         'else_if': 'interactiveIfElseUnit',
         'else': 'interactiveIfElseUnit',
-        'intentUnit' : 'intentUnit'
+        'debugUnit' : 'debugUnit'
     }
 
     try:
@@ -111,8 +111,9 @@ async def websocket_endpoint(websocket: WebSocket):
             code = message['code']
             start_line = message['startLine']
             end_line = message['endLine']
+            event = message['event']
 
-            contract_analyzer.update_code(start_line, end_line, code)
+            contract_analyzer.update_code(start_line, end_line, code, event)
             context_type = contract_analyzer.get_current_context_type()
 
             # Parse the received code based on context_type

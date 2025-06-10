@@ -11,61 +11,54 @@ batch_mgr         = DebugBatchManager(contract_analyzer, snapman)
 
 
 def simulate_inputs(records):
-
-    in_testcase = False          # ── 현재 @TestCase 블록 안인지
+    in_testcase = False
 
     for rec in records:
-        code, s, e, ev = rec["code"], rec["startLine"], rec["endLine"], rec["event"]
-        print("code : ", code)
-        contract_analyzer.update_code(s, e, code, ev)
+      code, s, e, ev = rec["code"], rec["startLine"], rec["endLine"], rec["event"]
+      contract_analyzer.update_code(s, e, code, ev)  # solidity 소스 갱신
 
-        stripped = code.lstrip()
+      stripped = code.lstrip()
 
-        # ─────────────────────────────────────────────
-        # ①  BEGIN / END 마커
-        # ─────────────────────────────────────────────
-        if stripped.startswith("// @TestCase BEGIN"):
-            # 이전 덩어리 남아 있으면 먼저 flush
-            batch_mgr.flush()
-            in_testcase = True
-            continue
+      # ① BEGIN / END ---------------------------------------------------
+      if stripped.startswith("// @TestCase BEGIN"):
+        batch_mgr.reset()  # ★ 새 TC 시작
+        in_testcase = True
+        continue
 
-        if stripped.startswith("// @TestCase END"):
-            start = time.time()
-            batch_mgr.flush()     # ← 지금까지 모은 거 처리
-            end = time.time()
-            print(f"Analyze time : {end - start:.5f} sec")
-            in_testcase = False
-            continue
+      if stripped.startswith("// @TestCase END"):
+        batch_mgr.flush()  # TC 완성 → 1 회 해석
+        in_testcase = False
+        continue
 
-        # ─────────────────────────────────────────────
-        # ②  디버그 주석 (@StateVar 등)
-        # ─────────────────────────────────────────────
-        if in_testcase and stripped.startswith("// @"):
-            # 배치에 축적
-            batch_mgr.add_line(code, s, e)
-            continue
+      # ② 디버그 주석 (@StateVar, @GlobalVar …) --------------------------
+      if stripped.startswith("// @"):
+        if ev == "add":
+          batch_mgr.add_line(code, s, e)
+        elif ev == "modify":
+          batch_mgr.modify_line(code, s, e)
+        elif ev == "delete":
+          batch_mgr.delete_line(s)
 
-        # ─────────────────────────────────────────────
-        # ③  일반 Solidity 코드
-        # ─────────────────────────────────────────────
-        if code.strip() == "":
-            continue
+        # BEGIN-END 밖이면 즉시 재-해석
+        if not in_testcase:
+          batch_mgr.flush()
+        continue
 
-        ctx  = contract_analyzer.get_current_context_type()
+      # ③ 일반 Solidity 코드 --------------------------------------------
+      if code.strip():
+        ctx = contract_analyzer.get_current_context_type()
         tree = ParserHelpers.generate_parse_tree(code, ctx, True)
-
         EnhancedSolidityVisitor(contract_analyzer).visit(tree)
 
-        # ✨ ★ 여기서 바로 찍어 보기 ★ ✨
-        analysis = contract_analyzer.get_line_analysis(s, e)
-        if analysis:  # 비어 있지 않을 때만
-          print(f"[{s}-{e}]  analysis ⇒")
-          for ln, recs in analysis.items():
-            for r in recs:
-              print(f"  L{ln:3} | {r['kind']:>14} | {r['vars']}")
+      # ✨ ★ 여기서 바로 찍어 보기 ★ ✨
+      analysis = contract_analyzer.get_line_analysis(s, e)
+      if analysis:  # 비어 있지 않을 때만
+        print(f"[{s}-{e}]  analysis ⇒")
+      for ln, recs in analysis.items():
+        for r in recs:
+          print(f"  L{ln:3} | {r['kind']:>14} | {r['vars']}")
 
-        print("--------------------------------------------------------")
+      print("--------------------------------------------------------")
 
 
 test_inputs = [

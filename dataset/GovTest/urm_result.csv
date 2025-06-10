@@ -1,9 +1,0 @@
-function,pattern,delta,var,low,high
-updateRewardMultiplier,diff,1,totalRewardMultiplier,500420,500502
-updateRewardMultiplier,diff,3,totalRewardMultiplier,501643,502147
-updateRewardMultiplier,diff,6,totalRewardMultiplier,504980,506759
-updateRewardMultiplier,diff,10,totalRewardMultiplier,512234,516912
-updateRewardMultiplier,overlap,1,totalRewardMultiplier,513920,518685
-updateRewardMultiplier,overlap,3,totalRewardMultiplier,510880,526365
-updateRewardMultiplier,overlap,6,totalRewardMultiplier,505120,539685
-updateRewardMultiplier,overlap,10,totalRewardMultiplier,495200,560805

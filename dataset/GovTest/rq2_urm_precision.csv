@@ -1,9 +1,0 @@
-function,pattern,delta,fin_ratio,f90
-updateRewardMultiplier,diff,1,1.0,82.0
-updateRewardMultiplier,diff,3,1.0,168.0
-updateRewardMultiplier,diff,6,1.0,296.5
-updateRewardMultiplier,diff,10,1.0,467.8
-updateRewardMultiplier,overlap,1,1.0,4765.0
-updateRewardMultiplier,overlap,3,1.0,5161.666666666667
-updateRewardMultiplier,overlap,6,1.0,5760.833333333333
-updateRewardMultiplier,overlap,10,1.0,6560.5
