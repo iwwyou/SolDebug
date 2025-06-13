@@ -1,3 +1,6 @@
+import copy
+from collections.abc import Callable
+
 class SnapshotManager:
     """
     * register(obj, serializer)              : 객체별 최초 스냅

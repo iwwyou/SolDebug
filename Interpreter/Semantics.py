@@ -1,9 +1,9 @@
-from Domain.Variable import *
-from Interpreter.IR import *
 from Analyzer.ContractAnalyzer import *
 from Utils.CFG import *
 import re
 from decimal import Decimal, InvalidOperation
+from Analyzer.EnhancedSolidityVisitor import TIME_VALUE, READONLY_MEMBERS, READONLY_GLOBAL_BASES
+from typing import Dict
 
 class Semantics :
 
@@ -1781,6 +1781,951 @@ class Semantics :
                 return callerObject
         raise ValueError(f"Unexpected variable of binary_exp_context")
 
+    def update_variables_with_condition(self, variables, condition_expr, is_true_branch):
+        """
+            condition_expr: Expression
+              - 연산자(operator)가 비교연산(==,!=,<,>,<=,>=)일 수도 있고,
+              - 논리연산(&&, ||, !)일 수도 있고,
+              - 단일 변수(IdentifierExpContext)나 bool literal, etc. 일 수도 있음
+            is_true_branch:
+              - True => 조건이 만족되는 브랜치 (if, while 등의 true 분기)
+              - False => 조건이 불만족인 브랜치 (else, while not, etc)
+            variables: { var_name: Variables }  (CFGNode 상의 변수 상태)
+            """
+
+        if self._is_read_only_expr(condition_expr, variables): return
+
+        # 1) condition_expr.operator 파악
+        op = condition_expr.operator
+
+        # 2) 만약 operator가 None인데, context가 IdentifierExpContext(단일 변수) 등 “단순 bool 변환”이라면
+        if op is None:
+            # 예: if (myBoolVar) => true branch라면 myBoolVar = [1,1], false branch라면 myBoolVar=[0,0]
+            return self._update_single_condition(variables, condition_expr, is_true_branch)
+
+        # 3) 논리 연산 처리
+        elif op in ['&&', '||', '!']:
+            return self._update_logical_condition(variables, condition_expr, is_true_branch)
+
+        # 4) 비교 연산 처리 (==, !=, <, >, <=, >=)
+        elif op in ['==', '!=', '<', '>', '<=', '>=']:
+            return self._update_comparison_condition(variables, condition_expr, is_true_branch)
+
+        else:
+            raise ValueError(f"This operator '{op}' is not expected operator")
+
+    def _update_single_condition(self, vars_, cond_expr, is_true_branch):
+        # bool literal인 경우는 영향 없음
+        if cond_expr.context == "LiteralExpContext":
+            return
+
+        val = self.evaluate_expression(cond_expr, vars_, None, None)
+        # ▸ bool interval로 강제 변환
+        if not isinstance(val, BoolInterval):
+            if self._is_interval(val):  # 숫자/주소
+                val = self._convert_int_to_bool_interval(val)
+            else:
+                return  # symbol 등 – 포기
+
+        tgt = BoolInterval(1, 1) if is_true_branch else BoolInterval(0, 0)
+        refined = val.meet(tgt)
+
+        name = (cond_expr.identifier
+                if cond_expr.context == "IdentifierExpContext" else None)
+        if name and name in vars_:
+            vars_[name].value = refined
+
+    def _update_logical_condition(
+            self,
+            variables: dict[str, Variables],
+            cond_expr: Expression,
+            is_true_branch: bool) -> None:
+
+        op = cond_expr.operator  # '&&', '||', '!'
+        # ───────── NOT ─────────
+        if op == '!':
+            # !X : true-branch → X=false, false-branch → X=true
+            return self._update_single_condition(
+                variables,
+                cond_expr.expression,  # operand
+                not is_true_branch)
+
+        # AND / OR 는 좌·우 피연산자 필요
+        condA = cond_expr.left
+        condB = cond_expr.right
+
+        # ───────── AND ─────────
+        if op == '&&':
+            if is_true_branch:  # 둘 다 참이어야 함
+                self.update_variables_with_condition(variables, condA, True)
+                self.update_variables_with_condition(variables, condB, True)
+            else:  # A==false  또는  B==false
+                # 두 피연산자 모두 “0 가능”하도록 meet
+                self.update_variables_with_condition(variables, condA, False)
+                self.update_variables_with_condition(variables, condB, False)
+            return
+
+        # ───────── OR ─────────
+        if op == '||':
+            if is_true_branch:  # A==true  또는  B==true
+                # 둘 다 “1 가능”으로 넓힘 (정보 손실 최소화)
+                self.update_variables_with_condition(variables, condA, True)
+                self.update_variables_with_condition(variables, condB, True)
+            else:  # 둘 다 false
+                self.update_variables_with_condition(variables, condA, False)
+                self.update_variables_with_condition(variables, condB, False)
+            return
+
+        raise ValueError(f"Unexpected logical operator '{op}'")
+
+    def _update_comparison_condition(
+            self,
+            variables: dict[str, Variables],
+            cond_expr: Expression,
+            is_true_branch: bool) -> None:
+
+        # ───── 헬퍼 ──────────────────────────────────────────────
+        def _is_literal_expr(e: Expression) -> bool:
+            return getattr(e, "context", "") == "LiteralExpContext"
+
+        def _maybe_update(expr, variables, new_iv):
+            if self._is_read_only_expr(expr, variables):
+                return  # read-only → 변수 상태 수정 X
+            self.update_left_var(expr, new_iv, '=', variables)
+
+        # ───── 준비 ─────────────────────────────────────────────
+        op = cond_expr.operator
+        actual_op = op if is_true_branch else self.negate_operator(op)
+        left_expr = cond_expr.left
+        right_expr = cond_expr.right
+
+        left_val = self.evaluate_expression(left_expr, variables, None, None)
+        right_val = self.evaluate_expression(right_expr, variables, None, None)
+
+        # ───────── CASE 1 : 둘 다 Interval ─────────────────────
+        if self._is_interval(left_val) and self._is_interval(right_val):
+            new_l, new_r = self.refine_intervals_for_comparison(left_val, right_val, actual_op)
+            _maybe_update(left_expr, variables, new_l)
+            _maybe_update(right_expr, variables, new_r)
+            return
+
+        # ───────── CASE 2-A : Interval vs literal ──────────────
+        if self._is_interval(left_val) and not self._is_interval(right_val):
+            coerced_r = self._coerce_literal_to_interval(right_val, left_val.type_length)
+            new_l, _dummy = self.refine_intervals_for_comparison(left_val, coerced_r, actual_op)
+            _maybe_update(left_expr, variables, new_l)  # ★ 변경
+            return
+
+        # ───────── CASE 2-B : literal vs Interval ──────────────
+        if self._is_interval(right_val) and not self._is_interval(left_val):
+            coerced_l = self._coerce_literal_to_interval(left_val, right_val.type_length)
+            _dummy, new_r = self.refine_intervals_for_comparison(coerced_l, right_val, actual_op)
+            _maybe_update(right_expr, variables, new_r)  # ★ 변경
+            return
+
+        # ───────── CASE 3 : BoolInterval 비교 ──────────────────
+        if isinstance(left_val, BoolInterval) or isinstance(right_val, BoolInterval):
+            self._update_bool_comparison(
+                variables,
+                left_expr, right_expr,
+                left_val, right_val,
+                actual_op)
+            return
+
+        # ───────── CASE 4 : address Interval 비교 ───────────────
+        if (self._is_interval(left_val) and left_val.type_length == 160) or \
+                (self._is_interval(right_val) and right_val.type_length == 160):
+
+            if not self._is_interval(left_val):
+                left_val = self._coerce_literal_to_interval(left_val, 160)
+            if not self._is_interval(right_val):
+                right_val = self._coerce_literal_to_interval(right_val, 160)
+
+            new_l, new_r = self.refine_intervals_for_comparison(left_val, right_val, actual_op)
+            _maybe_update(left_expr, variables, new_l)  # ★ 변경
+            _maybe_update(right_expr, variables, new_r)  # ★ 변경
+            return
+
+    def refine_intervals_for_comparison(
+            self,
+            a_iv,  # IntegerInterval | UnsignedIntegerInterval
+            b_iv,
+            op: str):
+
+        # ── bottom short-cut ─────────────────────────
+        if a_iv.is_bottom() or b_iv.is_bottom():
+            return (a_iv.bottom(a_iv.type_length),
+                    b_iv.bottom(b_iv.type_length))
+
+        A, B = a_iv.copy(), b_iv.copy()
+
+        # 내부 헬퍼 -----------------------------------
+        def clamp_max(iv, new_max):
+            if iv.is_bottom():
+                return iv
+            if new_max < iv.min_value:
+                return iv.bottom(iv.type_length)
+            iv.max_value = min(iv.max_value, new_max)
+            return iv
+
+        def clamp_min(iv, new_min):
+            if iv.is_bottom():
+                return iv
+            if new_min > iv.max_value:
+                return iv.bottom(iv.type_length)
+            iv.min_value = max(iv.min_value, new_min)
+            return iv
+
+        # --------------------------------------------
+
+        # <  ------------------------------------------------
+        if op == '<':
+            if B.min_value != NEG_INFINITY:
+                A = clamp_max(A, B.min_value - 1)
+            if not A.is_bottom() and A.max_value != INFINITY:
+                B = clamp_min(B, A.max_value + 1)
+            return A, B
+
+        # >  ------------------------------------------------
+        if op == '>':
+            if B.max_value != INFINITY:
+                A = clamp_min(A, B.max_value + 1)
+            if not A.is_bottom() and A.min_value != NEG_INFINITY:
+                B = clamp_max(B, A.min_value - 1)
+            return A, B
+
+        # <=  -----------------------------------------------
+        if op == '<=':
+            lt_a, lt_b = self.refine_intervals_for_comparison(a_iv, b_iv, '<')
+            eq_a, eq_b = self.refine_intervals_for_comparison(a_iv, b_iv, '==')
+            return lt_a.join(eq_a), lt_b.join(eq_b)
+
+        # >=  -----------------------------------------------
+        if op == '>=':
+            gt_a, gt_b = self.refine_intervals_for_comparison(a_iv, b_iv, '>')
+            eq_a, eq_b = self.refine_intervals_for_comparison(a_iv, b_iv, '==')
+            return gt_a.join(eq_a), gt_b.join(eq_b)
+
+        # ==  -----------------------------------------------
+        if op == '==':
+            meet = A.meet(B)
+            return meet, meet
+
+        # !=  -----------------------------------------------
+        if op == '!=':
+            if (A.min_value == A.max_value ==
+                    B.min_value == B.max_value):
+                # 동일 싱글톤이면 모순
+                return (A.bottom(A.type_length),
+                        B.bottom(B.type_length))
+            return A, B
+
+        # 알 수 없는 op → 변경 없음
+        return A, B
+
+    def _coerce_literal_to_interval(self, lit, default_bits=256):
+        def _hex_addr_to_interval(hex_txt: str) -> UnsignedIntegerInterval:
+            """‘0x…’ 문자열을 160-bit UnsignedInterval 로 변환"""
+            val = int(hex_txt, 16)
+            return UnsignedIntegerInterval(val, val, 160)
+
+        def _is_address_literal(txt: str) -> bool:
+            return txt.lower().startswith("0x") and all(c in "0123456789abcdef" for c in txt[2:])
+
+        if isinstance(lit, (int, float)):
+            v = int(lit)
+            return IntegerInterval(v, v, default_bits) if v < 0 \
+                else UnsignedIntegerInterval(v, v, default_bits)
+        if isinstance(lit, str):
+            if _is_address_literal(lit):
+                return _hex_addr_to_interval(lit)  # ◀︎ NEW
+            try:
+                v = int(lit, 0)
+                return IntegerInterval(v, v, default_bits) if v < 0 \
+                    else UnsignedIntegerInterval(v, v, default_bits)
+            except ValueError:
+                return IntegerInterval(None, None, default_bits)  # bottom
+        return IntegerInterval(None, None, default_bits)
+
+    def _update_bool_comparison(
+            self,
+            variables: dict[str, Variables],
+            left_expr: Expression,
+            right_expr: Expression,
+            left_val,  # evaluate_expression 결과
+            right_val,  # 〃
+            op: str  # '==', '!=' ...
+    ):
+        """
+        bool - bool 비교식을 통해 피연산자의 BoolInterval 을 좁힌다.
+          * op == '==' : 두 피연산자가 동일 값이어야 함 → 교집합(meet)
+          * op == '!=' : 두 피연산자가 상이해야 함
+                         ─ 한쪽이 단정(True/False) ⇒ 다른 쪽은 반대값으로
+                         ─ 양쪽 모두 Top([0,1]) ⇒ 정보 부족 → 건너뜀
+        """
+
+        # ───────────────── 0. BoolInterval 변환 ─────────────────
+        def _as_bool_iv(val):
+            # 이미 BoolInterval
+            if isinstance(val, BoolInterval):
+                return val
+            # 정수 Interval [0,0]/[1,1] => BoolInterval
+            if self._is_interval(val):
+                return self._convert_int_to_bool_interval(val)
+            return None  # 그밖엔 Bool 로 간주하지 않음
+
+        l_iv = _as_bool_iv(left_val)
+        r_iv = _as_bool_iv(right_val)
+        if l_iv is None or r_iv is None:
+            # 둘 다 Bool 로 환원 안 되면 관여하지 않는다
+            return
+
+        # ※ left_expr / right_expr 가 identifier 인지 → 이름 얻기
+        l_name = self._extract_identifier_if_possible(left_expr)
+        r_name = self._extract_identifier_if_possible(right_expr)
+
+        # helper ― 변수 env 에 실제 적용
+        def _replace(name, new_iv: BoolInterval):
+            if name in variables and isinstance(variables[name].value, BoolInterval):
+                variables[name].value = variables[name].value.meet(new_iv)
+
+        # ───────────────── 1. op == '==' ───────────────────────
+        if op == "==":
+            meet = l_iv.meet(r_iv)  # 교집합
+            _replace(l_name, meet)
+            _replace(r_name, meet)
+            return
+
+        # ───────────────── 2. op == '!=' ───────────────────────
+        if op == "!=":
+            # 한쪽이 [1,1]/[0,0] 처럼 단정이라면 → 다른 쪽을 반대 값으로 강제
+            def _is_const(iv: BoolInterval) -> bool:
+                return iv.min_value == iv.max_value
+
+            if _is_const(l_iv) and _is_const(r_iv):
+                # 둘 다 단정인데 현재 env 가 모순이면 meet 하면 bottom,
+                # 분석기에서는 “실행 불가” 분기로 처리하거나 그대로 둠
+                if l_iv.equals(r_iv):
+                    # a != a 는 거짓 ⇒ 해당 분기는 불가능 → 아무 것도 하지 않고 탈출
+                    return
+                # a(0) != b(1) 처럼 이미 참 ⇒ 정보 없음
+                return
+
+            if _is_const(l_iv):
+                opposite = BoolInterval(0, 0) if l_iv.min_value == 1 else BoolInterval(1, 1)
+                _replace(r_name, opposite)
+                return
+
+            if _is_const(r_iv):
+                opposite = BoolInterval(0, 0) if r_iv.min_value == 1 else BoolInterval(1, 1)
+                _replace(l_name, opposite)
+                return
+
+            # 양쪽 다 [0,1] → 정보 없음
+            return
+
+        # ───────────────── 3. <,>,<=,>= (불리언엔 의미 X) ──────
+        #   원하는 정책에 따라 symbolic 처리하거나 경고만 남김
+        #   여기선 그냥 통과
+        return
+
+    def update_statement_with_variables(self, stmt, current_variables, ret_acc=None):
+        if stmt.statement_type == 'variableDeclaration':
+            return self.interpret_variable_declaration_statement(stmt, current_variables)
+        elif stmt.statement_type == 'assignment':
+            return self.interpret_assignment_statement(stmt, current_variables)
+        elif stmt.statement_type == 'functionCall':
+            return self.interpret_function_call_statement(stmt, current_variables)
+        elif stmt.statement_type == 'return':
+            return self.interpret_return_statement(stmt, current_variables)
+        elif stmt.statement_type == 'revert':
+            return self.interpret_revert_statement(stmt, current_variables)
+        elif stmt.statement_type == 'break':
+            return self.interpret_break_statement(stmt, current_variables)
+        elif stmt.statement_type == 'continue':
+            return self.interpret_continue_statement(stmt, current_variables)
+        else:
+            raise ValueError(f"Statement '{stmt.statement_type}' is not implemented.")
+
+    def interpret_function_cfg(self, fcfg: FunctionCFG, caller_env: dict[str, Variables] | None = None):
+        # ─── ContractAnalyzer utils/debug.py ──────────────────────────────────
+        import pathlib, textwrap, datetime, importlib.util
+        import networkx as nx
+
+        def dump_cfg(fcfg, tag=""):
+            """
+            FunctionCFG → 그래프 구조/조건/변수 요약을 DEBUG/outputs/ 아래로 저장
+            * tag : "before_else", "after_else" 등 파일명에 꽂아 두면 비교가 쉬움
+            """
+            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            base = pathlib.Path("DEBUG/outputs")
+            base.mkdir(parents=True, exist_ok=True)
+
+            G = fcfg.graph
+
+            # ──────────────────────────────────────────────────────────
+            # ③  pydot + PNG (가장 보기 편함)
+            try:
+                import pydot
+                dot_path = base / f"{fcfg.function_name}_{tag}_{ts}.dot"
+                png_path = base / f"{fcfg.function_name}_{tag}_{ts}.png"
+
+                nx.nx_pydot.write_dot(G, dot_path)
+                (graph,) = pydot.graph_from_dot_file(str(dot_path))
+                graph.write_png(str(png_path))
+                print(f"[CFG-DUMP] PNG saved → {png_path}")
+                return
+            except Exception as e:
+                print(f"[CFG-DUMP] pydot unavailable ({e}); falling back to DOT/TXT")
+
+            # ──────────────────────────────────────────────────────────
+            # ②  DOT 파일만 (Graphviz 로 열어보기)
+            try:
+                dot_path = base / f"{fcfg.function_name}_{tag}_{ts}.dot"
+                nx.nx_pydot.write_dot(G, dot_path)
+                print(f"[CFG-DUMP] DOT saved  → {dot_path}")
+                return
+            except Exception:
+                pass
+
+            # ──────────────────────────────────────────────────────────
+            # ①  콘솔 텍스트
+            print("\n≡≡ CFG TEXT DUMP", tag, "≡≡")
+            for n in G.nodes:
+                succs = [
+                    f"{s.name}({G[n][s].get('condition')})"
+                    if G.has_edge(n, s) else s.name for s in G.successors(n)
+                ]
+                print(
+                    f"· {n.name:<20} | succs={succs} | "
+                    f"cond={n.condition_node_type or '-'} | src={getattr(n, 'src_line', None)}"
+                )
+            print("≡" * 50, "\n")
+
+        # ─── ① 호출 이전 컨텍스트 백업 ─────────────────────────
+        _old_func = self.an.current_target_function
+        _old_fcfg = self.an.current_target_function_cfg
+
+        # ─── ② 현재 해석 대상 함수로 설정 ─────────────────────
+        self.an.current_target_function = fcfg.function_name
+        self.an.current_target_function_cfg = fcfg
+
+        dump_cfg(self.an.current_target_function_cfg, tag=f"after_else_{self.an.current_start_line}")
+
+        self._record_enabled = True  # ★ 항상 켠다
+        self.an._seen_stmt_ids.clear()  # ← 중복 방지용 세트 초기화
+        for blk in fcfg.graph.nodes:  # ← 기존 로그 전부 clear
+            for st in blk.statements:
+                ln = getattr(st, "src_line", None)
+                if ln is not None:
+                    self.an.analysis_per_line[ln].clear()
+
+        entry = fcfg.get_entry_node()
+        start_block, = fcfg.graph.successors(entry)  # exactly one successor
+        start_block.variables = copy.deepcopy(fcfg.related_variables)
+
+        # ① caller_env 의 스냅샷을 그대로 덮어쓴다 (동명 키도 overwrite)
+
+        if caller_env is not None:
+            for k, v in caller_env.items():
+                start_block.variables[k] = v
+
+        # ────────────────── work-list 초기화 ───────────────────────────────
+        work = deque([start_block])
+        visited: set[CFGNode] = set()  # 첫 블록도 분석해야 하므로 비워 둠
+
+        # return_values를 모아둘 자료구조 (나중에 exit node에서 join)
+        return_values = []
+
+        while work:
+            node = work.popleft()
+            if node in visited:
+                continue
+            visited.add(node)
+
+            # 이전 block 분석 결과 반영
+            # join_point_node인 경우 predecessor들의 결과를 join한뒤 analyzingNode에 반영
+            # 아니면 predecessor 하나가 있을 것이므로 그 predecessor의 variables를 복사
+            preds = list(fcfg.graph.predecessors(node))
+
+            if preds:
+                joined = None
+                for p in preds:
+                    if not p.variables:  # “실질-빈” → skip
+                        continue
+                    joined = self.copy_variables(p.variables) if joined is None \
+                        else self.join_variables(joined, p.variables)
+                if joined is not None:
+                    node.variables = joined
+
+            cur_vars = node.variables
+            node.evaluated = True
+            # condition node 처리
+            if node.condition_node:
+                condition_expr = node.condition_expr
+                ln = getattr(node, "src_line", None)  # 없으면 None
+
+                if node.condition_node_type in ["if", "else if"]:
+                    # true/false branch 각각 하나의 successor 가정
+                    true_successors = [s for s in fcfg.graph.successors(node) if
+                                       fcfg.graph.edges[node, s].get('condition') == True]
+                    false_successors = [s for s in fcfg.graph.successors(node) if
+                                        fcfg.graph.edges[node, s].get('condition') == False]
+
+                    # 각각 한 개라 가정
+                    if len(true_successors) != 1 or len(false_successors) != 1:
+                        raise ValueError(
+                            "if/else if node must have exactly one true successor and one false successor.")
+
+                    true_variables = self.copy_variables(cur_vars)
+                    false_variables = self.copy_variables(cur_vars)
+
+                    self.update_variables_with_condition(true_variables, condition_expr, is_true_branch=True)
+                    self.update_variables_with_condition(false_variables, condition_expr, is_true_branch=False)
+
+                    can_true = self._branch_feasible(true_variables, condition_expr, True)
+                    can_false = self._branch_feasible(false_variables, condition_expr, False)
+
+                    if not can_true and not can_false:
+                        # 이론상 불가능·모순 ⇒ 둘 다 버리고 다음 노드 탐색 중단
+                        continue
+
+                    # ── (B) True-브랜치 env 스냅샷 ─────────────────────────
+                    if self._record_enabled and ln is not None:
+                        self._record_analysis(
+                            line_no=ln,
+                            stmt_type="branchTrue",
+                            env=true_variables
+                        )
+
+                    # true branch로 이어지는 successor enqueue
+                    true_succ = true_successors[0]
+                    false_succ = false_successors[0]
+
+                    if can_true:
+                        true_succ.variables = true_variables
+                        work.append(true_succ)
+                    else:
+                        # 불가능 브랜치엔 “⊥” 찍어 두고 그래프 생략
+                        self._set_bottom_env(true_succ.variables)
+
+                    if can_false:
+                        false_succ.variables = false_variables
+                        work.append(false_succ)
+                    else:
+                        self._set_bottom_env(false_succ.variables)
+
+                    continue
+
+                elif node.condition_node_type in ["require", "assert"]:
+                    # true branch만 존재한다고 가정
+                    true_successors = [s for s in fcfg.graph.successors(node) if
+                                       fcfg.graph.edges[node, s].get('condition') == True]
+
+                    if len(true_successors) != 1:
+                        raise ValueError("require/assert node must have exactly one true successor.")
+
+                    true_variables = self.copy_variables(cur_vars)
+                    self.update_variables_with_condition(true_variables, condition_expr, is_true_branch=True)
+
+                    can_true = self._branch_feasible(true_variables, condition_expr, True)
+
+                    self._record_analysis(
+                        line_no=ln,
+                        stmt_type="requireTrue",
+                        env=true_variables
+                    )
+
+                    true_succ = true_successors[0]
+
+                    if can_true:
+                        true_succ.variables = true_variables
+                        work.append(true_succ)
+                    else:
+                        # 불가능 브랜치엔 “⊥” 찍어 두고 그래프 생략
+                        self._set_bottom_env(true_succ.variables)
+
+                    continue
+
+                elif node.condition_node_type in ["while", "for", "do_while"]:
+                    # while 루프 처리
+                    # fixpoint 계산 후 exit_node 반환
+                    exit_node = self.fixpoint(node)
+                    # exit_node의 successor는 하나라고 가정
+                    successors = list(fcfg.graph.successors(exit_node))
+                    if len(successors) == 1:
+                        next_node = successors[0]
+                        next_node.variables = self.copy_variables(exit_node.variables)
+                        work.append(next_node)
+                    elif len(successors) == 0:
+                        # while 종료 후 아무 successor도 없으면 끝
+                        pass
+                    else:
+                        raise ValueError("While exit node must have exactly one successor.")
+                    continue
+
+                elif node.fixpoint_evaluation_node:
+                    # 그냥 continue
+                    continue
+                else:
+                    raise ValueError(f"Unknown condition node type: {node.condition_node_type}")
+
+            # interpret_function_cfg 안, while work: 루프 최상단 근처
+            elif node.is_for_increment:
+                # 1) 증감 expression 들을 모두 실행
+                for stmt in node.statements:
+                    cur_vars = self.update_statement_with_variables(stmt, cur_vars, return_values)
+
+                # 2) successors 에 전달
+                for succ in fcfg.graph.successors(node):
+                    succ.variables = self.copy_variables(node.variables)
+                    work.append(succ)
+                continue  # 이 노드에서 더 할 일 없음
+
+            else:
+                # condition node가 아닌 일반 블록
+                # 블록 내 문장 해석
+                for stmt in node.statements:
+                    cur_vars = self.update_statement_with_variables(stmt, cur_vars, return_values)
+                    if "__STOP__" in return_values:  # 플래그만 넣어도 되고
+                        break
+
+                # return이나 revert를 만나지 않았다면 successors 방문
+                successors = list(fcfg.graph.successors(node))
+                if len(successors) == 1:
+                    next_node = successors[0]
+                    # next_node에 현재 변수 상태를 반영
+                    next_node.variables = self.copy_variables(cur_vars)
+                    work.append(next_node)
+                elif len(successors) > 1:
+                    raise ValueError("Non-condition, non-join node should not have multiple successors.")
+                # successors가 없으면 리프노드이므로 그냥 끝.
+
+        self._force_join_before_exit(fcfg)
+        self._sync_named_return_vars(fcfg)  # ★ 여기서 값/객체 맞춰 주기
+
+        self.an.current_target_function = _old_func
+        self.an.current_target_function_cfg = _old_fcfg
+
+        # ⑥  callee 의 최종 변수 집합을 caller_env 로 역-반영
+        if caller_env is not None:
+            exit_env = fcfg.get_exit_node().variables
+            for k, v in exit_env.items():
+                if k in caller_env:  # ① 기존 키만 덮어쓰기
+                    if hasattr(caller_env[k], "value"):
+                        caller_env[k].value = v.value
+                    else:
+                        caller_env[k] = v  # 복합-타입은 객체 공유
+                elif isinstance(v, (MappingVariable, ArrayVariable)):
+                    # ② “스토리지 엔트리 신규 생성”만 선택적으로 반영
+                    caller_env[k] = v  # (필요 시 얕은 복사)
+
+        def _log_implicit_return(var_objs: list[Variables]):
+            if not self._record_enabled:
+                return
+            ln = self._last_executable_line(fcfg)
+            if ln is None:
+                return
+            if len(var_objs) == 1:
+                lhs = Expression(identifier=var_objs[0].identifier,
+                                 context="IdentifierExpContext")
+                self._record_analysis(
+                    line_no=ln,
+                    stmt_type="implicitReturn",
+                    expr=lhs,
+                    var_obj=var_objs[0]
+                )
+            else:
+                flat = {}
+                for vo in var_objs:
+                    self._flatten_var(vo, vo.identifier, flat)
+                self._record_analysis(
+                    line_no=ln,
+                    stmt_type="implicitReturn",
+                    env={k: v for k, v in flat.items()}
+                )
+
+        # exit node에 도달했다면 return_values join
+        # 모든 return을 모아 exit node에서 join 처리할 수 있으나, 여기서는 단순히 top-level에서 return_values를 join
+        # ── ⑦  최종 반환값 계산 ────────────────────────────────
+        if len(return_values) == 0:
+            # (A) 명시적 return 이 없을 때
+            if fcfg.return_vars:  # named returns 존재
+                _log_implicit_return(fcfg.return_vars)
+                self._record_enabled = False
+                if len(fcfg.return_vars) == 1:
+                    ret_obj = fcfg.return_vars[0]  # Variables 객체
+                    return ret_obj.value  # Interval / 값 반환
+                else:
+                    # 여러 개면 튜플 형태로 묶어 돌려줌
+                    return [rv.value for rv in fcfg.return_vars]
+            else:
+                exit_retvals = list(fcfg.get_exit_node().return_vals.values())
+                if exit_retvals:  # ★ 새 코드
+                    joined = exit_retvals[0]
+                    for v in exit_retvals[1:]:
+                        joined = joined.join(v)  # Interval 등은 join
+                    return joined
+                return None
+
+        elif len(return_values) == 1:
+            self._record_enabled = False
+            return return_values[0]
+
+        else:
+            self._record_enabled = False
+            joined_ret = return_values[0]
+            for rv in return_values[1:]:
+                joined_ret = joined_ret.join(rv)
+            return joined_ret
+
+    def interpret_variable_declaration_statement(self, stmt, variables):
+        var_type = stmt.type_obj
+        var_name = stmt.var_name
+        init_expr = stmt.init_expr  # None 가능
+
+        # ① 변수 객체 찾기 (process 단계에서 이미 cur_blk.variables 에 들어있음)
+        if var_name not in variables:
+            vobj = Variables(identifier=var_name, scope="local")
+            vobj.typeInfo = var_type
+
+            # 타입에 맞춰 ⊥ 값으로 초기화
+            et = var_type.elementaryTypeName
+            if et.startswith("uint"):
+                bits = var_type.intTypeLength or 256
+                vobj.value = UnsignedIntegerInterval.bottom(bits)
+            elif et.startswith("int"):
+                bits = var_type.intTypeLength or 256
+                vobj.value = IntegerInterval.bottom(bits)
+            elif et == "bool":
+                vobj.value = BoolInterval.bottom()
+            else:  # address / bytes / string 등
+                vobj.value = f"symbol_{var_name}"
+
+            variables[var_name] = vobj  # ★ env 에 등록
+        else:
+            vobj = variables[var_name]
+
+        # ② 초기화 식 평가 (있을 때만)
+        if init_expr is not None:
+            if isinstance(vobj, ArrayVariable):
+                pass  # inline array 등은 필요 시
+            else:  # Variables / EnumVariable
+                vobj.value = self.evaluate_expression(
+                    init_expr, variables, None, None
+                )
+
+            # ─── ③ 로그 기록 (기존 로직 그대로) ─────────────────────────
+        stmt_id = id(stmt)
+        if self._record_enabled and stmt_id not in self._seen_stmt_ids:
+            self._seen_stmt_ids.add(stmt_id)
+            lhs = Expression(identifier=var_name,
+                             context="IdentifierExpContext")
+            self._record_analysis(
+                line_no=stmt.src_line,
+                stmt_type=stmt.statement_type,
+                expr=lhs,
+                var_obj=vobj
+            )
+
+        return variables
+
+    def interpret_assignment_statement(self, stmt, variables):
+        # 0) RHS 계산 – 기존과 동일
+        lexp, rexpr, op = stmt.left, stmt.right, stmt.operator
+        if isinstance(rexpr, Expression):
+            r_val = self.evaluate_expression(rexpr, variables, None, None)
+        else:  # 이미 Interval·리터럴 등 평가완료 값
+            r_val = rexpr
+
+        # 1) LHS 에 반영
+        self.update_left_var(lexp, r_val, op, variables, None, None)
+
+        # 2) 로그 기록 ────────────────
+        stmt_id = id(stmt)
+        if self._record_enabled and stmt_id not in self._seen_stmt_ids:
+            self._seen_stmt_ids.add(stmt_id)
+
+            # (A) 이번 대입이 가리키는 **leaf-변수** 탐색 (값은 patch 하지 않음)
+            tgt = self._resolve_and_update_expr(
+                lexp,  # ← expression
+                None,  # rVal (탐색만 하므로 None)
+                '=',  # op   (아무거나 OK)
+                variables,  # 현재 블록 env
+                self.current_target_function_cfg  # fcfg
+            )
+
+            # ── ① LHS 가 배열/매핑 단일-엔트리였을 경우 ──────────────────
+            if tgt:
+                self._record_analysis(
+                    line_no=stmt.src_line,
+                    stmt_type=stmt.statement_type,
+                    expr=lexp,
+                    var_obj=tgt
+                )
+                return variables  # 이미 기록했으니 끝
+
+            # ── ② 배열/매핑 “전체” 또는 <unk> 인덱스 로깅 로직 (변경 없음) ──
+            base_obj = self._resolve_and_update_expr(
+                lexp.base, None, '=', variables,
+                self.current_target_function_cfg
+            )
+
+            if isinstance(base_obj, ArrayVariable):
+                self._record_analysis(
+                    line_no=stmt.src_line,
+                    stmt_type=stmt.statement_type,
+                    expr=lexp.base,
+                    var_obj=base_obj  # flatten-array
+                )
+                return variables
+
+            if isinstance(base_obj, MappingVariable):
+                concrete = self._try_concrete_key(lexp.index, variables)
+
+                if concrete is not None:
+                    entry = base_obj.mapping.get(concrete)
+                    if entry is None:
+                        entry = self._create_new_mapping_value(base_obj, concrete)
+                        base_obj.mapping[concrete] = entry
+
+                    self._record_analysis(
+                        line_no=stmt.src_line,
+                        stmt_type=stmt.statement_type,
+                        expr=lexp,
+                        var_obj=entry
+                    )
+                else:
+                    whole = self._serialize_val(base_obj)
+                    idx_s = self._expr_to_str(lexp.index)
+                    self.analysis_per_line[stmt.src_line].append({
+                        "kind": stmt.statement_type,
+                        "vars": {
+                            base_obj.identifier: whole,
+                            f"{base_obj.identifier}[{idx_s}]": "<unk>"
+                        }
+                    })
+
+        return variables
+
+    def interpret_function_call_statement(self, stmt, variables):
+        function_expr = stmt.function_expr
+        return_value = self.evaluate_function_call_context(function_expr, variables, None, None)
+
+        return variables
+
+    def interpret_return_statement(self, stmt, variables, ret_acc=None):
+        rexpr = stmt.return_expr
+        r_val = self.evaluate_expression(rexpr, variables, None, None)
+
+        stmt_id = id(stmt)
+        # ③ ★ 반드시 로그 기록 – initExpr 유무와 무관 ★
+        if self._record_enabled and stmt_id not in self._seen_stmt_ids:
+            self._seen_stmt_ids.add(stmt_id)
+            if (rexpr and  # 반환식이 있고
+                    getattr(rexpr, "context", "") == "TupleExpressionContext"):
+                # ── (1)  earned0 / earned1  …  각각 따로 찍기 ─────────────
+                flat = {}
+                for sub_e, sub_v in zip(rexpr.elements, r_val):
+                    k = self._expr_to_str(sub_e)  # "earned0" / "earned1"
+                    flat[k] = self._serialize_val(sub_v)
+                self.analysis_per_line[stmt.src_line].append(
+                    {"kind": stmt.statement_type, "vars": flat}
+                )
+            else:
+                # ── (2)  단일 반환값 (기존 로직) ──────────────────────────
+                dummy = Variables(identifier="__ret__", value=r_val, scope="tmp")
+                self._record_analysis(
+                    line_no=stmt.src_line,
+                    stmt_type=stmt.statement_type,
+                    expr=rexpr,
+                    var_obj=dummy
+                )
+
+        # exit-node 에 값 저장 (변경 없음)
+        exit_node = self.current_target_function_cfg.get_exit_node()
+        exit_node.return_vals[stmt.src_line] = r_val
+        if ret_acc is not None:
+            ret_acc.append(r_val)
+            ret_acc.append("__STOP__")  # 실행 중단 플래그
+
+        return variables
+
+    def interpret_revert_statement(self, stmt, variables):
+        return variables
+
+    def interpret_break_statement(self, stmt, variables):
+        return variables
+
+    def interpret_continue_statement(self, stmt, variables):
+        return variables
+
+    # ContractAnalyzer (또는 Expression helper 모듈) 내부에 추가
+    def _extract_identifier_if_possible(self, expr: Expression) -> str | None:
+        """
+        Expression 이 단순 ‘경로(path)’ 형태인지 판별해
+          -  foo                      → "foo"
+          -  foo.bar                 → "foo.bar"
+          -  foo[3]                  → "foo[3]"
+          -  foo.bar[2].baz          → "foo.bar[2].baz"
+        처럼 **오직 식별자 / 멤버 / 정수-리터럴 인덱스**만으로 이루어져 있을 때
+        그 전체 경로 문자열을 돌려준다.
+
+        산술, 함수 호출, 심볼릭 인덱스 등이 섞이면 None 반환.
+        """
+
+        # ───── 1. 멤버/인덱스가 전혀 없는 루트 ─────
+        if expr.base is None:
+            # 순수 식별자인지 확인
+            if expr.context == "IdentifierExpContext":
+                return expr.identifier
+            return None  # literal, 연산 등 → 식별자 아님
+
+        # ───── 2. 먼저 base-경로를 재귀적으로 확보 ──────
+        base_path = self._extract_identifier_if_possible(expr.base)
+        if base_path is None:
+            return None  # base 가 이미 복합 → 포기
+
+        # ───── 3.A  멤버 접근 foo.bar ──────────────
+        if expr.member is not None:
+            return f"{base_path}.{expr.member}"
+
+        # ───── 3.B  인덱스 접근 foo[3] ─────────────
+        if expr.index is not None:
+            # 인덱스가 “정수 리터럴”인지(실행 시 결정되면 안 됨)
+            if expr.index.context == "LiteralExpContext" and str(expr.index.literal).lstrip("-").isdigit():
+                return f"{base_path}[{int(expr.index.literal, 0)}]"
+            return None  # 심볼릭 인덱스면 변수 하나로 볼 수 없음
+
+        # 그 밖의 케이스(예: 슬라이스, 함수 호출 등)
+        return None
+
+    def _convert_int_to_bool_interval(self, int_interval):
+        """
+        간단히 [0,0] => BoolInterval(0,0),
+             [1,1] => BoolInterval(1,1)
+             그외 => BoolInterval(0,1)
+        """
+        if int_interval.is_bottom():
+            return BoolInterval(None, None)
+        if int_interval.min_value == 0 and int_interval.max_value == 0:
+            return BoolInterval(0, 0)  # always false
+        elif int_interval.min_value == 1 and int_interval.max_value == 1:
+            return BoolInterval(1, 1)  # always true
+        else:
+            return BoolInterval(0, 1)  # unknown
+
+    def negate_operator(self, op: str) -> str:
+        neg_map = {
+            '==': '!=',
+            '!=': '==',
+            '<': '>=',
+            '>': '<=',
+            '<=': '>',
+            '>=': '<'
+        }
+        return neg_map.get(op, op)
+
     def compound_assignment(self, left_interval, right_interval, operator):
         """
         +=, -=, <<= … 등 복합 대입 연산자의 interval 계산.
@@ -2634,3 +3579,83 @@ class Semantics :
             self._fill_array(var_obj, new_val)
         else:
             self._apply_new_value_to_variable(var_obj, new_val)
+
+    def _is_read_only_expr(self, e: Expression, variables: dict) -> bool:
+        ctx = getattr(e, "context", "")
+
+        # ── (a) 숫자‧문자‧bool 리터럴
+        if ctx == "LiteralExpContext":
+            return True
+
+        # ── (b) 배열·주소·함수의 read-only 멤버
+        if ctx == "MemberAccessContext":
+            if e.member in READONLY_MEMBERS:
+                return True
+            # type(uint256).max 등
+            if getattr(e.base, "context", "") == "MetaTypeContext":
+                return True
+
+        # ── (c) 전역(block/msg/tx) 멤버 → 쓰기 불가
+        if ctx == "MemberAccessContext" and isinstance(e.base, Expression):
+            if getattr(e.base, "identifier", "") in READONLY_GLOBAL_BASES:
+                return True
+
+        # ── (d) constant / immutable 변수
+        if (ctx == "IdentifierExpContext"
+                and e.identifier in variables
+                and getattr(variables[e.identifier], "isConstant", False)):
+            return True
+
+        return False
+
+    def copy_variables(self, src: Dict[str, Variables]) -> Dict[str, Variables]:
+        """
+        변수 env 를 **deep copy** 하되, 원본의 서브-클래스를 그대로 보존한다.
+        """
+        dst: Dict[str, Variables] = {}
+
+        for name, v in src.items():
+
+            # ───────── Array ─────────
+            if isinstance(v, ArrayVariable):
+                new_arr = ArrayVariable(
+                    identifier=v.identifier,
+                    base_type=copy.deepcopy(v.typeInfo.arrayBaseType),
+                    array_length=v.typeInfo.arrayLength,
+                    is_dynamic=v.typeInfo.isDynamicArray,
+                    scope=v.scope
+                )
+                new_arr.elements = [
+                    self.copy_variables({e.identifier: e})[e.identifier] for e in v.elements
+                ]
+                dst[name] = new_arr
+                continue
+
+            # ───────── Struct ─────────
+            if isinstance(v, StructVariable):
+                new_st = StructVariable(
+                    identifier=v.identifier,
+                    struct_type=v.typeInfo.structTypeName,
+                    scope=v.scope
+                )
+                new_st.members = self.copy_variables(v.members)
+                dst[name] = new_st
+                continue
+
+            # ───────── Mapping ────────
+            if isinstance(v, MappingVariable):
+                new_mp = MappingVariable(
+                    identifier=v.identifier,
+                    key_type=copy.deepcopy(v.typeInfo.mappingKeyType),
+                    value_type=copy.deepcopy(v.typeInfo.mappingValueType),
+                    scope=v.scope
+                )
+                # key-value 재귀 복사
+                new_mp.mapping = self.copy_variables(v.mapping)
+                dst[name] = new_mp
+                continue
+
+            # ───────── 기타(Variables / EnumVariable 등) ────────
+            dst[name] = copy.deepcopy(v)  # 가장 안전
+
+        return dst
