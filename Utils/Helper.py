@@ -259,12 +259,12 @@ class VariableEnv:
         VariableEnv._merge_by_mode(old, new, "narrow"))
 
     @staticmethod
-    def _is_interval(x) -> bool:
+    def is_interval(x) -> bool:
         """Integer / UnsignedInteger 계열인지 판단"""
         return isinstance(x, (IntegerInterval, UnsignedIntegerInterval))
 
     @staticmethod
-    def _bottom_from_soltype(sol_t: SolType):
+    def bottom_from_soltype(sol_t: SolType):
         if sol_t.typeCategory == "array":
             return ArrayVariable(
                 base_type=sol_t.arrayBaseType,
@@ -288,5 +288,73 @@ class VariableEnv:
         if et == "address":
             return UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
         return f"symbolic_{et}"
+
+    @staticmethod
+    def compare_intervals(left_interval, right_interval, operator):
+        """
+        두 Interval 비교 → BoolInterval(min, max) 반환
+            [1,1] : definitely-true
+            [0,0] : definitely-false
+            [0,1] : 불확정(top)
+        """
+
+        # 값이 하나라도 없으면 판단 불가 → TOP
+        if (left_interval.min_value is None or left_interval.max_value is None or
+                right_interval.min_value is None or right_interval.max_value is None):
+            return BoolInterval(0, 1)  # [0,1]
+
+        definitely_true = False
+        definitely_false = False
+
+        # ───────── 비교 연산별 판정 ────────────────────────────────
+        if operator == '==':
+            if left_interval.max_value < right_interval.min_value or \
+                    left_interval.min_value > right_interval.max_value:
+                definitely_false = True
+            elif (left_interval.min_value == left_interval.max_value ==
+                  right_interval.min_value == right_interval.max_value):
+                definitely_true = True
+
+        elif operator == '!=':
+            if left_interval.max_value < right_interval.min_value or \
+                    left_interval.min_value > right_interval.max_value:
+                definitely_true = True
+            elif (left_interval.min_value == left_interval.max_value ==
+                  right_interval.min_value == right_interval.max_value):
+                definitely_false = True
+
+        elif operator == '<':
+            if left_interval.max_value < right_interval.min_value:
+                definitely_true = True
+            elif left_interval.min_value >= right_interval.max_value:
+                definitely_false = True
+
+        elif operator == '>':
+            if left_interval.min_value > right_interval.max_value:
+                definitely_true = True
+            elif left_interval.max_value <= right_interval.min_value:
+                definitely_false = True
+
+        elif operator == '<=':
+            if left_interval.max_value <= right_interval.min_value:
+                definitely_true = True
+            elif left_interval.min_value > right_interval.max_value:
+                definitely_false = True
+
+        elif operator == '>=':
+            if left_interval.min_value >= right_interval.max_value:
+                definitely_true = True
+            elif left_interval.max_value < right_interval.min_value:
+                definitely_false = True
+
+        else:
+            raise ValueError(f"Unsupported comparison operator: {operator}")
+
+        # ───────── BoolInterval 생성 ─────────────────────────────
+        if definitely_true and not definitely_false:
+            return BoolInterval(1, 1)  # [1,1]  확실히 true
+        if definitely_false and not definitely_true:
+            return BoolInterval(0, 0)  # [0,0]  확실히 false
+        return BoolInterval(0, 1)  # [0,1]  불확정(top)
 
 

@@ -330,6 +330,8 @@ class MappingVariable(Variables):
         # 기타 타입일 경우 None
         return None
 
+
+
 class StructDefinition:
     def __init__(self, struct_name):
         self.struct_name = struct_name

@@ -1,6 +1,5 @@
-from Interpreter.Semantics import *
-from collections import deque, defaultdict
-from typing import Dict
+from Analyzer.ContractAnalyzer import *
+from Interpreter.Semantics.Refine import *
 
 class Engine:
     """
@@ -8,8 +7,7 @@ class Engine:
     – 실제 ‘한 줄 해석’은 Semantics 에게 위임.
     """
 
-    def __init__(self, sem: Semantics, an:ContractAnalyzer):
-        self.sems = sem
+    def __init__(self, an:ContractAnalyzer):
         self.an = an
 
     def transfer_function(self, node: CFGNode,
@@ -27,7 +25,7 @@ class Engine:
                     (p for p in preds if getattr(p, "condition_node", False)),
                     None  # ← 조건-노드가 없을 때는 None
                 )
-                self.sems.update_variables_with_condition(out_vars,
+                Refine.update_variables_with_condition(out_vars,
                                                      cond_node.condition_expr,
                                                      node.is_true_branch)
             else:

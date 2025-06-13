@@ -1,3 +1,4 @@
+from Interpreter.Semantics.Update import *
 from Analyzer.ContractAnalyzer import *
 from decimal import Decimal, InvalidOperation
 import re
@@ -118,7 +119,7 @@ class Evaluation :
         ety = expr.expr_type  # 'uint'·'int'·'bool'·'string'·'address' 등
         _NUM_SCI = re.compile(r"^[+-]?\d+([eE][+-]?\d+)$")  # 1e8, 2E+18 …
 
-        def _to_scalar_int(txt: str) -> int:
+        def _to_scalar_int(txt: str) :
             """
             10·16·8진수(+부호) + decimal scientific notation → int 로 변환.
             """
@@ -166,7 +167,7 @@ class Evaluation :
                 key = lit
                 if key not in callerObject.mapping:
                     # 새 엔트리 생성
-                    new_var = self._create_new_mapping_value(callerObject, key)
+                    new_var = callerObject.get_or_create(key)
                     # CFG 에 반영
                     self.update_mapping_in_cfg(callerObject.identifier, key, new_var)
                 return callerObject.mapping[key]
@@ -225,7 +226,7 @@ class Evaluation :
                 iv = idx_var_obj.value  # Unsigned/IntegerInterval …
 
                 # ── (A) 인덱스가 확정(singleton) ────────────────────────
-                if self._is_interval(iv) and not iv.is_bottom() and iv.min_value == iv.max_value:
+                if VariableEnv.is_interval(iv) and not iv.is_bottom() and iv.min_value == iv.max_value:
                     idx = iv.min_value
                     if idx < 0:
                         raise IndexError(f"Negative index {idx} for array '{callerObject.identifier}'")
@@ -233,7 +234,7 @@ class Evaluation :
                     if idx >= len(callerObject.elements):
                         # ❗ 요소가 아직 없음 → base-type 의 bottom 값만 돌려준다
                         base_t = callerObject.typeInfo.arrayBaseType
-                        return self._bottom_from_soltype(base_t)
+                        return VariableEnv.bottom_from_soltype(base_t)
                     return callerObject.elements[idx]
 
                 # ── (B) 불확정(bottom 또는 [l,r] 범위) ─────────────────
@@ -305,9 +306,7 @@ class Evaluation :
 
                 # ── ③ 매핑 엔트리 가져오거나 생성 ─────────────
                 if key_val not in callerObject.mapping:
-                    callerObject.mapping[key_val] = self._create_new_mapping_value(
-                        callerObject, key_val
-                    )
+                    callerObject.mapping[key_val] = callerObject.get_or_create(key_val)
                 mvar = callerObject.mapping[key_val]
                 # ── ④ 반환 규칙 ────────────────────────────
                 if isinstance(mvar, (StructVariable, ArrayVariable, MappingVariable)):
@@ -357,8 +356,7 @@ class Evaluation :
                 full_name = f"{baseVal}.{member}"
                 if isinstance(callerObject, MappingVariable):
                     if full_name not in callerObject.mapping:
-                        callerObject.mapping[full_name] = self._create_new_mapping_value(
-                            callerObject, full_name)
+                        callerObject.mapping[full_name] = callerObject.get_or_create(full_name)
                     entry = callerObject.mapping[full_name]
                     return entry.value if hasattr(entry, "value") else entry
 
@@ -439,7 +437,7 @@ class Evaluation :
                 else:
                     ln = len(baseVal.elements)
                     return UnsignedIntegerInterval(ln, ln, 256)
-                return ln
+
             # .push() / .pop()  – 동적배열만 허용
             if callerContext == "functionCallContext":
                 if not baseVal.typeInfo.isDynamicArray:
@@ -707,7 +705,7 @@ class Evaluation :
         """
         r_val = self.evaluate_expression(expr.right, variables, None, None)
         # LHS 쪽 환경 업데이트
-        self.update_left_var(expr.left, r_val, '=', variables,
+        Update.update_left_var(expr.left, r_val, '=', variables,
                              callerObject, callerContext)
         return r_val  # ← ‘값을 돌려주기’ 핵심!
 
@@ -787,16 +785,23 @@ class Evaluation :
         elif operator == '**':
             result = leftInterval.exponentiate(rightInterval)
         # 시프트 연산자 처리
-        elif operator in ['<<', '>>', '>>>']:
-            if 'int' in expr.expr_type:
-                result = IntegerInterval.shift(leftInterval, rightInterval, operator)
-            elif 'uint' in expr.expr_type:
-                result = UnsignedIntegerInterval.shift(leftInterval, rightInterval, operator)
+        elif operator in ('<<', '>>', '>>>'):
+            if (isinstance(leftInterval, IntegerInterval) and
+                    isinstance(rightInterval, IntegerInterval)):
+                result = leftInterval.shift(rightInterval, operator)
+
+            elif (isinstance(leftInterval, UnsignedIntegerInterval) and
+                  isinstance(rightInterval, UnsignedIntegerInterval)):
+                result = leftInterval.shift(rightInterval, operator)
+
             else:
-                raise ValueError(f"Unsupported type '{expr.expr_type}' for shift operation")
+                raise ValueError(
+                    f"Shift operands must both be int/uint intervals, got "
+                    f"{type(leftInterval).__name__} and {type(rightInterval).__name__}"
+                )
         # 비교 연산자 처리
         elif operator in ['==', '!=', '<', '>', '<=', '>=']:
-            result = self.compare_intervals(leftInterval, rightInterval, operator)
+            result = VariableEnv.compare_intervals(leftInterval, rightInterval, operator)
         # 논리 연산자 처리
         elif operator in ['&&', '||']:
             result = leftInterval.logical_op(rightInterval, operator)
@@ -887,28 +892,237 @@ class Evaluation :
 
         return return_value
 
+    def update_mapping_in_cfg(self, mapVarName: str, key_str: str, new_var_obj: Variables):
+        """
+        mapVarName: "myMapping"
+        key_str: "someKey"
+        new_var_obj: 새로 만든 Variables(...) for the mapping value
+        여기에 state_variable_node, function_cfg 등을 업데이트
+        """
+        contract_cfg = self.an.contract_cfgs.get(self.an.current_target_contract)
+        if not contract_cfg:
+            raise ValueError(f"Unable to find contract CFG for {self.an.current_target_contract}")
 
-def update_mapping_in_cfg(self, mapVarName: str, key_str: str, new_var_obj: Variables):
-    """
-    mapVarName: "myMapping"
-    key_str: "someKey"
-    new_var_obj: 새로 만든 Variables(...) for the mapping value
-    여기에 state_variable_node, function_cfg 등을 업데이트
-    """
-    contract_cfg = self.an.contract_cfgs.get(self.an.current_target_contract)
-    if not contract_cfg:
-        raise ValueError(f"Unable to find contract CFG for {self.an.current_target_contract}")
+        # state_variable_node 갱신
+        if contract_cfg.state_variable_node and mapVarName in contract_cfg.state_variable_node.variables:
+            mapVar = contract_cfg.state_variable_node.variables[mapVarName]
+            if isinstance(mapVar, MappingVariable):
+                mapVar.mapping[key_str] = new_var_obj
 
-    # state_variable_node 갱신
-    if contract_cfg.state_variable_node and mapVarName in contract_cfg.state_variable_node.variables:
-        mapVar = contract_cfg.state_variable_node.variables[mapVarName]
-        if isinstance(mapVar, MappingVariable):
-            mapVar.mapping[key_str] = new_var_obj
+        # 함수 CFG 갱신
+        function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
+        if function_cfg:
+            if mapVarName in function_cfg.related_variables:
+                mapVar2 = function_cfg.related_variables[mapVarName]
+                if isinstance(mapVar2, MappingVariable):
+                    mapVar2.mapping[key_str] = new_var_obj
 
-    # 함수 CFG 갱신
-    function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
-    if function_cfg:
-        if mapVarName in function_cfg.related_variables:
-            mapVar2 = function_cfg.related_variables[mapVarName]
-            if isinstance(mapVar2, MappingVariable):
-                mapVar2.mapping[key_str] = new_var_obj
+    def convert_to_uint(self, sub_val, bits):
+        """
+        sub_val을 uintN 범위 [0 .. 2^bits−1] 로 변환/클램프
+        """
+        type_max = (1 << bits) - 1  # 2**bits - 1 과 동일
+
+        # ────────────────────────────────────────────────────────
+        # 1) Interval 계열 (Unsigned / Integer)
+        # ────────────────────────────────────────────────────────
+        if isinstance(sub_val, (UnsignedIntegerInterval, IntegerInterval)):
+            if sub_val.is_bottom():  # ★ bottom 우선 검사
+                return UnsignedIntegerInterval(None, None, bits)
+
+            new_min = max(0, sub_val.min_value)
+            new_max = min(type_max, sub_val.max_value)
+            if new_min > new_max:  # 교집합이 공집합
+                return UnsignedIntegerInterval(None, None, bits)
+
+            return UnsignedIntegerInterval(new_min, new_max, bits)
+
+        # ────────────────────────────────────────────────────────
+        # 2) BoolInterval  (0 또는 1)
+        # ────────────────────────────────────────────────────────
+        if isinstance(sub_val, BoolInterval):
+            return UnsignedIntegerInterval(
+                sub_val.min_value, sub_val.max_value, bits
+            )  # 이미 0‥1 범위
+
+        # ────────────────────────────────────────────────────────
+        # 3) 문자열(리터럴·symbolic) → symbolic 래퍼
+        # ────────────────────────────────────────────────────────
+        if isinstance(sub_val, str):
+            return f"symbolicUint{bits}({sub_val})"
+
+        # ────────────────────────────────────────────────────────
+        # 4) 기타(정수 등) → 그대로 Interval 로 래핑
+        # ────────────────────────────────────────────────────────
+        try:
+            v = int(sub_val)
+            v = max(0, min(type_max, v))
+            return UnsignedIntegerInterval(v, v, bits)
+        except (ValueError, TypeError):
+            return f"symbolicUint{bits}({sub_val})"
+
+    def convert_to_int(self, sub_val, bits):
+        """
+        주어진 sub_val(Interval·리터럴·symbolic)을
+        signed int<bits> 범위 [-2^(bits-1) .. 2^(bits-1)-1] 로 변환/클램프한다.
+        """
+        type_min = -(1 << (bits - 1))
+        type_max = (1 << (bits - 1)) - 1
+
+        # ────────────────────────────────────────────────────────
+        # 1) Interval → Interval
+        #    ⊥(bottom) 은 그대로 bottom 반환
+        # ────────────────────────────────────────────────────────
+        if isinstance(sub_val, (IntegerInterval, UnsignedIntegerInterval)):
+            if sub_val.is_bottom():  # ★ bottom 체크
+                return IntegerInterval(None, None, bits)
+
+            new_min = max(type_min, sub_val.min_value)
+            new_max = min(type_max, sub_val.max_value)
+            if new_min > new_max:  # 교집합이 공집합
+                return IntegerInterval(None, None, bits)
+            return IntegerInterval(new_min, new_max, bits)
+
+        # ────────────────────────────────────────────────────────
+        # 2) BoolInterval → 0/1 로 압축 후 위와 동일
+        # ────────────────────────────────────────────────────────
+        if isinstance(sub_val, BoolInterval):
+            # 0‥1 과 int<bits> 의 교집합은 그대로 0‥1
+            return IntegerInterval(
+                max(type_min, sub_val.min_value),
+                min(type_max, sub_val.max_value),
+                bits
+            )
+
+        # ────────────────────────────────────────────────────────
+        # 3) 문자열(리터럴·심볼릭)  → 그대로 symbolic 래퍼
+        # ────────────────────────────────────────────────────────
+        if isinstance(sub_val, str):
+            return f"symbolicInt{bits}({sub_val})"
+
+        # ────────────────────────────────────────────────────────
+        # 4) 기타(정수 등) → 그대로 Interval 로 래핑
+        # ────────────────────────────────────────────────────────
+        try:
+            v = int(sub_val)
+            v = max(type_min, min(type_max, v))  # 범위 클램프
+            return IntegerInterval(v, v, bits)
+        except (ValueError, TypeError):
+            return f"symbolicInt{bits}({sub_val})"
+
+    def convert_to_bool(self, sub_val):
+        """
+        int/uint interval -> 0 => false, !=0 => true => [0,1] 형태
+        """
+        if isinstance(sub_val, IntegerInterval) or isinstance(sub_val, UnsignedIntegerInterval):
+            if sub_val.is_bottom():
+                return BoolInterval(None, None)
+            # if entire range is strictly 0..0 => false
+            if sub_val.min_value == 0 and sub_val.max_value == 0:
+                return BoolInterval(0, 0)
+            # if entire range is non-zero => true => [1,1]
+            if sub_val.min_value > 0:
+                return BoolInterval(1, 1)
+            # if partial includes 0 and nonzero => [0,1]
+            return BoolInterval(0, 1)
+
+        elif isinstance(sub_val, BoolInterval):
+            # 이미 bool => 그대로 반환 가능
+            return sub_val
+
+        elif isinstance(sub_val, str):
+            # string => symbolic bool
+            return BoolInterval(0, 1)
+
+        # fallback
+        return BoolInterval(0, 1)
+
+    def evaluate_binary_operator_of_index(self, result, callerObject):
+        def array_base_is_address(arr: ArrayVariable) -> bool:
+            et = arr.typeInfo.arrayBaseType
+            if isinstance(et, SolType):
+                return et.elementaryTypeName == "address"
+            return et == "address"
+
+        if isinstance(callerObject, ArrayVariable):
+            # 숫자/인터벌이 아니면 그대로 symbolic
+            if not hasattr(result, "min_value"):
+                return f"symbolicIndex({callerObject.identifier}[{result}])"
+
+            # bottom → symbolic
+            if result.is_bottom():
+                return f"symbolicIndex({callerObject.identifier}[BOTTOM])"
+
+            l, r = result.min_value, result.max_value
+
+            # ─── (A) 단일 인덱스 ───────────────────────────────
+            if l == r:
+                try:
+                    elem = callerObject.get_or_create_element(l)
+                except IndexError:
+                    return f"symbolicIndex({callerObject.identifier}[{l}])"
+                return elem.value if hasattr(elem, "value") else elem
+
+            # ─── (B) 범위 [l..r]  → join  ─────────────────────
+            span = r - l
+            # ① 범위가 너무 넓거나(≳1024) + 동적 배열이 비어 있으면 ⇒ TOP
+            if span > 1024 or (callerObject.typeInfo.isDynamicArray and len(callerObject.elements) == 0):
+                if array_base_is_address(callerObject):  # ← ② baseVal → callerObject 로 수정
+                    return UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
+                return f"symbolicIndexRange({callerObject.identifier}[{result}])"
+
+            joined = None
+            for idx in range(l, r + 1):
+                try:
+                    elem = callerObject.get_or_create_element(idx)
+                except IndexError:
+                    return f"symbolicIndexRange({callerObject.identifier}[{result}])"
+
+                val = elem.value if hasattr(elem, "value") else elem
+                if hasattr(val, "join"):
+                    joined = val if joined is None else joined.join(val)
+                else:
+                    return f"symbolicMixedType({callerObject.identifier}[{result}])"
+
+            return joined
+
+        # 3) callerObject가 MappingVariable인 경우 (비슷한 로직 확장 가능)
+        if isinstance(callerObject, MappingVariable):
+            # result => 단일 키 or 범위 => map lookup
+            if not hasattr(result, 'min_value') or not hasattr(result, 'max_value'):
+                # symbolic
+                return f"symbolicMappingIndex({callerObject.identifier}[{result}])"
+
+            if result.is_bottom():
+                return f"symbolicMappingIndex({callerObject.identifier}[BOTTOM])"
+
+            min_idx = result.min_value
+            max_idx = result.max_value
+            if min_idx == max_idx:
+                key_str = str(min_idx)
+                if key_str in callerObject.mapping:
+                    return callerObject.mapping[key_str].value
+                else:
+                    # 새로 추가 or symbolic
+                    new_var_obj = callerObject.get_or_create(key_str)
+                    self.update_mapping_in_cfg(callerObject.identifier, key_str, new_var_obj)
+                    return new_var_obj.value
+            else:
+                # 범위 [min_idx .. max_idx]  ─ MappingVariable -----------------------------
+                joined = None
+                for k in range(min_idx, max_idx + 1):
+                    k_str = str(k)
+                    if k_str not in callerObject.mapping:
+                        new_obj = callerObject.get_or_create(k_str)
+                        self.update_mapping_in_cfg(callerObject.identifier, k_str, new_obj)
+                        val = new_obj.value
+                    else:
+                        val = callerObject.mapping[k_str].value
+
+                    if hasattr(val, "join"):
+                        joined = val if joined is None else joined.join(val)
+                    else:
+                        return f"symbolicMixedType({callerObject.identifier}[{result}])"
+
+                return joined
+        return
