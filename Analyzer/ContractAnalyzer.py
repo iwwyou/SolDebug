@@ -10,6 +10,7 @@ from solcx.exceptions import SolcError
 from collections import defaultdict, deque
 from Domain.Address import *
 from Utils.Helper import *
+from Utils.Snapshot import *
 
 class ContractAnalyzer:
 
@@ -125,70 +126,42 @@ class ContractAnalyzer:
         if event == "add":
             self._insert_lines(start_line, lines)  # ← 종전 알고리즘
 
-
         elif event == "modify":
-
             # (1) 새 코드 줄 리스트
-
             new_lines = new_code.split("\n")
-
             # (2) ① 줄 수가 같지 않다면 → delete + add 로 fallback
-
             if (end_line - start_line + 1) != len(new_lines):
-                # delete
-
                 self.update_code(start_line, end_line, "", event="delete")
-
                 # add (line 수가 달라졌으므로 뒤쪽을 밀어냄)
-
                 self.update_code(start_line, start_line + len(new_lines) - 1,
-
                                  new_code, event="add")
-
                 return
 
             # (3) ② 줄 수가 동일 → **덮어쓰기** 만 수행
-
             ln = start_line
-
             for line in new_lines:
                 # full-code 버퍼 교체
-
                 self.full_code_lines[ln] = line
-
                 # 바로 context 분석
-
                 self.analyze_context(ln, line)
-
                 ln += 1
-
 
         elif event == "delete":
             offset = end_line - start_line + 1
             # A.  삭제 전 rollback (종전 그대로)  …
-
             # B-1.  메타데이터 pop
-
             for ln in range(start_line, end_line + 1):
                 self.full_code_lines.pop(ln, None)
-
                 self.brace_count.pop(ln, None)
-
                 self.analysis_per_line.pop(ln, None)
-
             # B-2.  뒤쪽 라인을 앞으로 당김
-
             keys_to_shift = sorted(
-
                 [ln for ln in self.full_code_lines if ln > end_line]
-
             )
 
             for old_ln in keys_to_shift:
                 new_ln = old_ln - offset
-
                 self.full_code_lines[new_ln] = self.full_code_lines.pop(old_ln)
-
                 self._shift_meta(old_ln, new_ln)  # ★
 
         # ──────────────────────────────────────────────────────────
@@ -624,16 +597,13 @@ class ContractAnalyzer:
                 pass
             elif variable_obj.typeInfo.typeCategory == "elementary":
                 et = variable_obj.typeInfo.elementaryTypeName
-
                 # ── ① int / uint / bool 은 종전 로직 유지
                 if et.startswith(("int", "uint", "bool")):
                     variable_obj.value = self.calculate_default_interval(et)
-
                 # ── ② **address → fresh symbolic interval 로 변경**
                 elif et == "address":
                     # 초기화식이 없으면 전체 주소 공간으로 보수적으로 설정
                     variable_obj.value = UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
-                    # fresh-ID 는 **발급하지 않는다** → sm.bind_var 도 호출하지 않음
 
                 # (string / bytes 등 - 추상화 안 할 타입은 심볼릭 문자열 그대로)
                 else:
