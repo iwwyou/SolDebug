@@ -57,7 +57,7 @@ class Refine:
         # ▸ bool interval로 강제 변환
         if not isinstance(val, BoolInterval):
             if VariableEnv.is_interval(val):  # 숫자/주소
-                val = self._convert_int_to_bool_interval(val)
+                val = VariableEnv.convert_int_to_bool_interval(val)
             else:
                 return  # symbol 등 – 포기
 
@@ -341,7 +341,7 @@ class Refine:
                 return val
             # 정수 Interval [0,0]/[1,1] => BoolInterval
             if VariableEnv.is_interval(val):
-                return self._convert_int_to_bool_interval(val)
+                return VariableEnv.convert_int_to_bool_interval(val)
             return None  # 그밖엔 Bool 로 간주하지 않음
 
         l_iv = _as_bool_iv(left_val)
@@ -426,21 +426,6 @@ class Refine:
             return True
 
         return False
-
-    def _convert_int_to_bool_interval(self, int_interval):
-        """
-        간단히 [0,0] => BoolInterval(0,0),
-             [1,1] => BoolInterval(1,1)
-             그외 => BoolInterval(0,1)
-        """
-        if int_interval.is_bottom():
-            return BoolInterval(None, None)
-        if int_interval.min_value == 0 and int_interval.max_value == 0:
-            return BoolInterval(0, 0)  # always false
-        elif int_interval.min_value == 1 and int_interval.max_value == 1:
-            return BoolInterval(1, 1)  # always true
-        else:
-            return BoolInterval(0, 1)  # unknown
 
     def negate_operator(self, op: str) -> str:
         neg_map = {

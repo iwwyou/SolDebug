@@ -2,7 +2,6 @@ from Interpreter.Semantics.Evaluation import Evaluation
 from Analyzer.ContractAnalyzer import *
 
 class Update :
-    _GLOBAL_BASES = {"block", "msg", "tx"}
 
     def __init__(self, an:ContractAnalyzer):
         self.an = an
@@ -495,16 +494,6 @@ class Update :
 
         _apply_to_leaf(target_var)
         return None
-
-    def _is_global_expr(self, expr: Expression) -> bool:
-        """
-        Expression 이 block.xxx / msg.xxx / tx.xxx 형태인지 검사.
-        """
-        return (
-                expr.member is not None  # x.y 형태
-                and expr.base is not None
-                and getattr(expr.base, "identifier", None) in self._GLOBAL_BASES
-        )
 
     def _touch_index_entry(self, container, idx: int):
         """배열/매핑에서 idx 번째 엔트리를 가져오거나 필요 시 생성"""

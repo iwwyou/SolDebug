@@ -10,6 +10,7 @@ from Domain.Variable import (Variables, ArrayVariable,
                              StructVariable, MappingVariable, EnumVariable)
 from Domain.Interval import *   # ← 딱 이 정도만 있으면 됨
 from Domain.Type import SolType
+from Domain.IR import Expression
 
 class ParserHelpers:
     # --------------------------- 컨텍스트 → 파싱 규칙 매핑
@@ -89,6 +90,7 @@ class VariableEnv:
     변수 환경(dict[str, Variables])을 deep-copy / 비교 / merge 하는 공통 유틸.
     * Engine, Semantics 모두 같은 로직을 필요로 하므로 여기로 끌어올렸다.
     """
+    _GLOBAL_BASES = {"block", "msg", "tx"}
 
     # ─────────────────────────────────────────── 복사 / 비교
     @staticmethod
@@ -173,6 +175,11 @@ class VariableEnv:
                 ):
                     return False
         return True
+
+    @staticmethod
+    def env_equal(a: dict[str, Variables] | None,
+                   b: dict[str, Variables] | None) -> bool:
+        return VariableEnv.variables_equal(a or {}, b or {})
 
     # ─────────────────────────────────────────── join / widen / narrow
     @staticmethod
@@ -357,4 +364,29 @@ class VariableEnv:
             return BoolInterval(0, 0)  # [0,0]  확실히 false
         return BoolInterval(0, 1)  # [0,1]  불확정(top)
 
+    @staticmethod
+    def convert_int_to_bool_interval(int_interval):
+        """
+        간단히 [0,0] => BoolInterval(0,0),
+             [1,1] => BoolInterval(1,1)
+             그외 => BoolInterval(0,1)
+        """
+        if int_interval.is_bottom():
+            return BoolInterval(None, None)
+        if int_interval.min_value == 0 and int_interval.max_value == 0:
+            return BoolInterval(0, 0)  # always false
+        elif int_interval.min_value == 1 and int_interval.max_value == 1:
+            return BoolInterval(1, 1)  # always true
+        else:
+            return BoolInterval(0, 1)  # unknown
 
+    @staticmethod
+    def is_global_expr(expr: Expression) -> bool:
+        """
+        Expression 이 block.xxx / msg.xxx / tx.xxx 형태인지 검사.
+        """
+        return (
+                expr.member is not None  # x.y 형태
+                and expr.base is not None
+                and getattr(expr.base, "identifier", None) in VariableEnv._GLOBAL_BASES
+        )
