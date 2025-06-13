@@ -9,7 +9,7 @@ class Update :
 
     def update_left_var(self, expr, rVal, operator, variables, callerObject=None, callerContext=None):
         # ── ① 글로벌이면 갱신 금지 ─────────────────────────
-        if callerObject is None and callerContext is None and self._is_global_expr(expr):
+        if callerObject is None and callerContext is None and VariableEnv.is_global_expr(expr):
             return None
 
         if expr.context == "IndexAccessContext":
@@ -139,7 +139,7 @@ class Update :
         #      · balances[msg.sender]         (1-단계)
         #      · allowed[msg.sender][_from]   (2-단계)
         # ────────────────────────────────────────────────
-        if self._is_global_expr(expr) and isinstance(callerObject, MappingVariable):
+        if VariableEnv.is_global_expr(expr) and isinstance(callerObject, MappingVariable):
             key = f"{expr.base.identifier}.{member}"  # "msg.sender"
 
             # (1) 엔트리 없으면 생성

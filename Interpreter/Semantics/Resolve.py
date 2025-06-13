@@ -56,7 +56,7 @@ class Resolve:
                                                                  callerObject=None, callerContext=None):
         # base
         base_obj = self._resolve_and_update_expr(
-            expr.base, rVal, operator, variables,  # ← ❌  인수순서/개수 모두 틀림
+            expr.base, rVal, operator, variables,
             fcfg, None, "TestingIndexAccess"
         )
         # index
