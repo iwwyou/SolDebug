@@ -1,7 +1,20 @@
-from Interpreter.Semantics.Update import *
+from Interpreter.Semantics.Update import Update
+from Interpreter.Semantics.Evaluation import Evaluation
+from Analyzer.ContractAnalyzer import ContractAnalyzer
 from Analyzer.EnhancedSolidityVisitor import READONLY_MEMBERS, READONLY_GLOBAL_BASES
+from Domain.Interval import *
+from Domain.Variable import Variables
+from Domain.IR import Expression
+from Utils.Helper import VariableEnv
+
 
 class Refine:
+
+    def __init__(self, an:ContractAnalyzer):
+        self.an = an
+        self.ev = Evaluation(an)
+        self.up = Update(an)
+
     def update_variables_with_condition(self, variables, condition_expr, is_true_branch):
         """
             condition_expr: Expression
@@ -105,14 +118,10 @@ class Refine:
             cond_expr: Expression,
             is_true_branch: bool) -> None:
 
-        # ───── 헬퍼 ──────────────────────────────────────────────
-        def _is_literal_expr(e: Expression) -> bool:
-            return getattr(e, "context", "") == "LiteralExpContext"
-
         def _maybe_update(expr, variables, new_iv):
             if self._is_read_only_expr(expr, variables):
                 return  # read-only → 변수 상태 수정 X
-            Update.update_left_var(expr, new_iv, '=', variables)
+            self.up.update_left_var(expr, new_iv, '=', variables)
 
         # ───── 준비 ─────────────────────────────────────────────
         op = cond_expr.operator
@@ -120,25 +129,25 @@ class Refine:
         left_expr = cond_expr.left
         right_expr = cond_expr.right
 
-        left_val = Evaluation.evaluate_expression(left_expr, variables, None, None)
-        right_val = Evaluation.evaluate_expression(right_expr, variables, None, None)
+        left_val = self.ev.evaluate_expression(left_expr, variables, None, None)
+        right_val = self.ev.evaluate_expression(right_expr, variables, None, None)
 
         # ───────── CASE 1 : 둘 다 Interval ─────────────────────
-        if self._is_interval(left_val) and self._is_interval(right_val):
+        if VariableEnv.is_interval(left_val) and VariableEnv.is_interval(right_val):
             new_l, new_r = self.refine_intervals_for_comparison(left_val, right_val, actual_op)
             _maybe_update(left_expr, variables, new_l)
             _maybe_update(right_expr, variables, new_r)
             return
 
         # ───────── CASE 2-A : Interval vs literal ──────────────
-        if self._is_interval(left_val) and not self._is_interval(right_val):
+        if VariableEnv.is_interval(left_val) and not VariableEnv.is_interval(right_val):
             coerced_r = self._coerce_literal_to_interval(right_val, left_val.type_length)
             new_l, _dummy = self.refine_intervals_for_comparison(left_val, coerced_r, actual_op)
             _maybe_update(left_expr, variables, new_l)  # ★ 변경
             return
 
         # ───────── CASE 2-B : literal vs Interval ──────────────
-        if self._is_interval(right_val) and not self._is_interval(left_val):
+        if VariableEnv.is_interval(right_val) and not VariableEnv.is_interval(left_val):
             coerced_l = self._coerce_literal_to_interval(left_val, right_val.type_length)
             _dummy, new_r = self.refine_intervals_for_comparison(coerced_l, right_val, actual_op)
             _maybe_update(right_expr, variables, new_r)  # ★ 변경
@@ -154,12 +163,12 @@ class Refine:
             return
 
         # ───────── CASE 4 : address Interval 비교 ───────────────
-        if (self._is_interval(left_val) and left_val.type_length == 160) or \
-                (self._is_interval(right_val) and right_val.type_length == 160):
+        if (VariableEnv.is_interval(left_val) and left_val.type_length == 160) or \
+                (VariableEnv.is_interval(right_val) and right_val.type_length == 160):
 
-            if not self._is_interval(left_val):
+            if not VariableEnv.is_interval(left_val):
                 left_val = self._coerce_literal_to_interval(left_val, 160)
-            if not self._is_interval(right_val):
+            if not VariableEnv.is_interval(right_val):
                 right_val = self._coerce_literal_to_interval(right_val, 160)
 
             new_l, new_r = self.refine_intervals_for_comparison(left_val, right_val, actual_op)
@@ -285,13 +294,53 @@ class Refine:
                          ─ 양쪽 모두 Top([0,1]) ⇒ 정보 부족 → 건너뜀
         """
 
+        def extract_identifier_if_possible(expr: Expression) -> str | None:
+            """
+            Expression 이 단순 ‘경로(path)’ 형태인지 판별해
+              -  foo                      → "foo"
+              -  foo.bar                 → "foo.bar"
+              -  foo[3]                  → "foo[3]"
+              -  foo.bar[2].baz          → "foo.bar[2].baz"
+            처럼 **오직 식별자 / 멤버 / 정수-리터럴 인덱스**만으로 이루어져 있을 때
+            그 전체 경로 문자열을 돌려준다.
+
+            산술, 함수 호출, 심볼릭 인덱스 등이 섞이면 None 반환.
+            """
+
+            # ───── 1. 멤버/인덱스가 전혀 없는 루트 ─────
+            if expr.base is None:
+                # 순수 식별자인지 확인
+                if expr.context == "IdentifierExpContext":
+                    return expr.identifier
+                return None  # literal, 연산 등 → 식별자 아님
+
+            # ───── 2. 먼저 base-경로를 재귀적으로 확보 ──────
+            base_path = extract_identifier_if_possible(expr.base)
+            if base_path is None:
+                return None  # base 가 이미 복합 → 포기
+
+            # ───── 3.A  멤버 접근 foo.bar ──────────────
+            if expr.member is not None:
+                return f"{base_path}.{expr.member}"
+
+            # ───── 3.B  인덱스 접근 foo[3] ─────────────
+            if expr.index is not None:
+                # 인덱스가 “정수 리터럴”인지(실행 시 결정되면 안 됨)
+                if expr.index.context == "LiteralExpContext" and str(expr.index.literal).lstrip("-").isdigit():
+                    return f"{base_path}[{int(expr.index.literal, 0)}]"
+                return None  # 심볼릭 인덱스면 변수 하나로 볼 수 없음
+
+            # 그 밖의 케이스(예: 슬라이스, 함수 호출 등)
+            return None
+
+
         # ───────────────── 0. BoolInterval 변환 ─────────────────
         def _as_bool_iv(val):
             # 이미 BoolInterval
             if isinstance(val, BoolInterval):
                 return val
             # 정수 Interval [0,0]/[1,1] => BoolInterval
-            if self._is_interval(val):
+            if VariableEnv.is_interval(val):
                 return self._convert_int_to_bool_interval(val)
             return None  # 그밖엔 Bool 로 간주하지 않음
 
@@ -302,8 +351,8 @@ class Refine:
             return
 
         # ※ left_expr / right_expr 가 identifier 인지 → 이름 얻기
-        l_name = self._extract_identifier_if_possible(left_expr)
-        r_name = self._extract_identifier_if_possible(right_expr)
+        l_name = extract_identifier_if_possible(left_expr)
+        r_name = extract_identifier_if_possible(right_expr)
 
         # helper ― 변수 env 에 실제 적용
         def _replace(name, new_iv: BoolInterval):
@@ -392,3 +441,14 @@ class Refine:
             return BoolInterval(1, 1)  # always true
         else:
             return BoolInterval(0, 1)  # unknown
+
+    def negate_operator(self, op: str) -> str:
+        neg_map = {
+            '==': '!=',
+            '!=': '==',
+            '<': '>=',
+            '>': '<=',
+            '<=': '>',
+            '>=': '<'
+        }
+        return neg_map.get(op, op)

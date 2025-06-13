@@ -1,4 +1,4 @@
-from Interpreter.Semantics.Evaluation import *
+from Interpreter.Semantics.Evaluation import Evaluation
 from Analyzer.ContractAnalyzer import *
 
 class Update :
@@ -6,6 +6,7 @@ class Update :
 
     def __init__(self, an:ContractAnalyzer):
         self.an = an
+        self.ev = Evaluation(an)
 
     def update_left_var(self, expr, rVal, operator, variables, callerObject=None, callerContext=None):
         # ── ① 글로벌이면 갱신 금지 ─────────────────────────
@@ -44,7 +45,7 @@ class Update :
             return None
 
         # (2) 인덱스 식 abstract-eval → int or Interval
-        idx_val = Evaluation.evaluate_expression(expr, variables, None, None)
+        idx_val = self.ev.evaluate_expression(expr, variables, None, None)
 
         # ────────────────────────────────────────────────────────────────────
         # ① singleton [n,n]  → n 로 확정

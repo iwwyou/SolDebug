@@ -1,4 +1,4 @@
-from Interpreter.Semantics.Update import *
+from Interpreter.Semantics.Update import Update
 from Analyzer.ContractAnalyzer import *
 from decimal import Decimal, InvalidOperation
 import re
@@ -11,6 +11,7 @@ class Evaluation :
         나머지 속성·헬퍼는 전부 위임(propagation)한다.
         """
         self.an = analyzer  # composition
+        self.up = Update(analyzer)
 
     def evaluate_expression(self, expr: Expression, variables, callerObject=None, callerContext=None):
         if expr.context == "LiteralExpContext":
@@ -705,7 +706,7 @@ class Evaluation :
         """
         r_val = self.evaluate_expression(expr.right, variables, None, None)
         # LHS 쪽 환경 업데이트
-        Update.update_left_var(expr.left, r_val, '=', variables,
+        self.up.update_left_var(expr.left, r_val, '=', variables,
                              callerObject, callerContext)
         return r_val  # ← ‘값을 돌려주기’ 핵심!
 
