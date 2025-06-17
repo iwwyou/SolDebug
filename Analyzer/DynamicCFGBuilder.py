@@ -3,18 +3,57 @@ from Utils.CFG import CFGNode, FunctionCFG
 from Utils.Helper import VariableEnv
 from Analyzer.ContractAnalyzer import ContractAnalyzer
 from Interpreter.Engine import Engine
+from Domain.IR import Expression
 from collections import deque
+from typing import cast, Optional
 
 class DynamicCFGBuilder:
     def __init__(self, an: ContractAnalyzer):
         self.an = an
         self.eng = Engine(an)
 
-    # ─────────────────────────────────────────────────────
-    # 지역변수 선언 전용 헬퍼
-    # ─────────────────────────────────────────────────────
-    def add_variable_declaration(
-            self,
+    @staticmethod
+    def splice_modifier(
+            fn_cfg: FunctionCFG,  # 호출 중인 함수-CFG
+            modifier_cfg: FunctionCFG,  # StaticCFGFactory 가 만든 원본
+            prefix: str  # ex) "onlyOwner"
+    ) -> None:
+        """
+        * modifier_cfg 의 노드·엣지를 얕은 복사(pfx 붙여서) → fn_cfg.graph 에 삽입
+        * placeholder 노드를 함수 ENTRY/EXIT 와 연결
+        """
+        g_fn, g_mod = fn_cfg.graph, modifier_cfg.graph
+        node_map: dict[CFGNode, CFGNode] = {}
+
+        # 1) 노드 복사 (+ prefix)
+        for n in g_mod.nodes:
+            clone = CFGNode(f"{prefix}::{n.name}")
+            clone.variables = VariableEnv.copy_variables(getattr(n, "variables", {}))
+            node_map[n] = clone
+            g_fn.add_node(clone)
+
+        # 2) 엣지 복사
+        for u, v in g_mod.edges:
+            g_fn.add_edge(node_map[u], node_map[v])
+
+        # 3) placeholder 처리
+        entry = fn_cfg.get_entry_node()
+        exit_ = fn_cfg.get_exit_node()
+
+        for orig in g_mod.nodes:
+            if orig.name.startswith("MOD_PLACEHOLDER"):
+                ph = node_map[orig]
+                preds = list(g_fn.predecessors(ph))
+                succs = list(g_fn.successors(ph))
+                g_fn.remove_node(ph)
+
+                for p in preds:
+                    g_fn.add_edge(p, entry)
+                for s in succs:
+                    g_fn.add_edge(exit_, s)
+
+    @staticmethod
+    def build_variable_declaration(
             *,
             cur_block: CFGNode,
             var_obj,
@@ -47,6 +86,29 @@ class DynamicCFGBuilder:
         if line_no not in brace_count:
             brace_count[line_no] = {"open": 0, "close": 0, "cfg_node": None}
         brace_count[line_no]["cfg_node"] = cur_block
+
+    @staticmethod
+    def build_assignment_statement(
+            *,
+            cur_block: CFGNode,
+            expr: Expression,  # a = b, a[i] += 1 …
+            line_no: int,
+            fcfg: FunctionCFG,
+            brace_count: dict,
+    ) -> None:
+
+        # 1) 노드에 Statement 추가
+        cur_block.add_assign_statement(expr.left,
+                                       expr.operator,
+                                       expr.right,
+                                       line_no)
+
+        # 2) FunctionCFG 에 변경 반영
+        fcfg.update_block(cur_block)
+
+        # 3) brace_count 매핑
+        bc = brace_count.setdefault( line_no, {"open": 0, "close": 0, "cfg_node": cast(Optional[CFGNode], None)})
+        bc["cfg_node"] = cur_block
 
     def get_current_block(self) -> CFGNode:
         """

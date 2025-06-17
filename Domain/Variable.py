@@ -17,12 +17,13 @@ class Variables:
 
 
 class GlobalVariable(Variables):
-    def __init__(self, identifier=None, isConstant=False, scope=None, base=None, member=None, value=None):
+    def __init__(self, identifier=None, isConstant=False, scope=None, base=None, member=None, value=None
+                 , typeInfo=None):
         super().__init__(identifier, value, isConstant, scope)
         self.base = base
         self.member = member
         self.value = value
-        self.typeInfo = SolType()
+        self.typeInfo = typeInfo
 
         self.default_value: Interval | str | None = None  # 런타임 기본값
         self.debug_override: Interval | str | None = None  # 마지막 @GlobalVar 값
@@ -329,8 +330,6 @@ class MappingVariable(Variables):
                 return BoolInterval(False, True)
         # 기타 타입일 경우 None
         return None
-
-
 
 class StructDefinition:
     def __init__(self, struct_name):

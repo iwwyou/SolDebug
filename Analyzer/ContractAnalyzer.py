@@ -11,6 +11,11 @@ from collections import defaultdict, deque
 from Domain.Address import *
 from Utils.Helper import *
 from Utils.Snapshot import *
+from Analyzer.DynamicCFGBuilder import DynamicCFGBuilder
+from Analyzer.RecordManager import RecordManager
+from Analyzer.StaticCFGFactory import StaticCFGFactory
+from Interpreter.Semantics.Evaluation import Evaluation
+from Interpreter.Semantics.Update import Update
 
 class ContractAnalyzer:
 
@@ -39,23 +44,12 @@ class ContractAnalyzer:
         # for Multiple Contract
         self.contract_cfgs = {} # name -> CFG
 
-        self.analysis_per_line: dict[int, list[dict]] = defaultdict(list)
+        self.builder = DynamicCFGBuilder(self)
+        self.recorder = RecordManager()
+        self.evaluator = Evaluation(self)
+        self.updater = Update(self)
 
-    # ──────────────────────────────────────────────────────────────
-    # Snapshot 전용 내부 헬퍼  ―  외부에서 쓸 일 없으므로 “프라이빗” 네이밍
-    # ----------------------------------------------------------------
-    @staticmethod
-    def _ser(v):  # obj → dict
-        return v.__dict__
-
-    @staticmethod
-    def _de(v, snap):  # dict → obj
-        v.__dict__.clear()
-        v.__dict__.update(snap)
-
-    # 공통 ‘한 줄 helper’
-    def _register_var(self, var_obj):
-        self.snapman.register(var_obj, self._ser)
+        self.analysis_per_line = self.recorder.ledger
 
     """
     Prev analysis part
@@ -401,100 +395,10 @@ class ContractAnalyzer:
         address 계열 글로벌은 UnsignedIntegerInterval(160bit) 로,
         uint  계열은 [0,0] 256-bit Interval 로 초기화한다.
         """
-        if contract_name in self.contract_cfgs:
-            return
+        self.current_target_contract = contract_name
+        cfg = StaticCFGFactory.make_contract_cfg(self, contract_name)
 
-        cfg = ContractCFG(contract_name)
-
-        # ────────── 1. local helpers ──────────
-        def _u256(val: int = 0) -> UnsignedIntegerInterval:
-            """[val,val] 256-bit uint Interval"""
-            return UnsignedIntegerInterval(val, val, 256)
-
-        def _addr_fixed(nid: int) -> UnsignedIntegerInterval:
-            """symbolicAddress nid → Interval [nid,nid] (일관성 위해 매니저에 등록)"""
-            self.sm.register_fixed_id(nid)
-            return self.sm.get_interval(nid)
-
-        def _sol_elem(name: str, bits: int | None = None) -> SolType:
-            T = SolType()
-            T.typeCategory = "elementary"
-            T.elementaryTypeName = name
-            if bits is not None:
-                T.intTypeLength = bits
-            return T
-
-        # ────────── 2. 글로벌 변수 테이블 ──────────
-        cfg.globals = {
-            # --- block ---
-            "block.basefee": GlobalVariable(
-                identifier="block.basefee",
-                value=_u256(),
-                typeInfo=_sol_elem("uint")),
-            "block.blobbasefee": GlobalVariable(
-                identifier="block.blobbasefee",
-                value=_u256(),
-                typeInfo=_sol_elem("uint")),
-            "block.chainid": GlobalVariable(
-                identifier="block.chainid",
-                value=_u256(),
-                typeInfo=_sol_elem("uint")),
-            "block.coinbase": GlobalVariable(
-                identifier="block.coinbase",
-                value=_addr_fixed(0),
-                typeInfo=_sol_elem("address")),
-            "block.difficulty": GlobalVariable(
-                identifier="block.difficulty",
-                value=_u256(),
-                typeInfo=_sol_elem("uint")),
-            "block.gaslimit": GlobalVariable(
-                identifier="block.gaslimit",
-                value=_u256(),
-                typeInfo=_sol_elem("uint")),
-            "block.number": GlobalVariable(
-                identifier="block.number",
-                value=_u256(),
-                typeInfo=_sol_elem("uint")),
-            "block.prevrandao": GlobalVariable(
-                identifier="block.prevrandao",
-                value=_u256(),
-                typeInfo=_sol_elem("uint")),
-            "block.timestamp": GlobalVariable(
-                identifier="block.timestamp",
-                value=_u256(),
-                typeInfo=_sol_elem("uint")),
-
-            # --- msg ---
-            "msg.sender": GlobalVariable(
-                identifier="msg.sender",
-                value=_addr_fixed(101),
-                typeInfo=_sol_elem("address")),
-            "msg.value": GlobalVariable(
-                identifier="msg.value",
-                value=_u256(),
-                typeInfo=_sol_elem("uint")),
-
-            # --- tx ---
-            "tx.gasprice": GlobalVariable(
-                identifier="tx.gasprice",
-                value=_u256(),
-                typeInfo=_sol_elem("uint")),
-            "tx.origin": GlobalVariable(
-                identifier="tx.origin",
-                value=_addr_fixed(100),
-                typeInfo=_sol_elem("address")),
-        }
-
-        # ── 새로 추가: 모든 global 을 SnapshotManager に 등록
-        for gv in cfg.globals.values():
-            self._register_var(gv)
-
-        # ────────── 3. bookkeeping ──────────
-        self.contract_cfgs[contract_name] = cfg
         self.brace_count[self.current_start_line]['cfg_node'] = cfg
-
-    def get_contract_cfg(self, contract_name):
-        return self.contract_cfgs.get(contract_name)
 
     # for interactiveEnumDefinition in Solidity.g4
     def process_enum_definition(self, enum_name):
@@ -584,7 +488,7 @@ class ContractAnalyzer:
                 elif variable_obj.typeInfo.arrayBaseType.elementaryTypeName.startswith("bool") :
                     variable_obj.initialize_elements(BoolInterval.bottom())
                 elif variable_obj.typeInfo.arrayBaseType.elementaryTypeName in ["address", "address payable", "string", "bytes", "Byte", "Fixed", "Ufixed"] :
-                    variable_obj.initialize_not_abstracted_type(variable_obj.identifier)
+                    variable_obj.initialize_not_abstracted_type()
             elif isinstance(variable_obj, StructVariable) :
                 if variable_obj.typeInfo.structTypeName in contract_cfg.structDefs.keys():
                     struct_def = contract_cfg.structDefs[variable_obj.typeInfo.structTypeName]
@@ -599,8 +503,7 @@ class ContractAnalyzer:
                 et = variable_obj.typeInfo.elementaryTypeName
                 # ── ① int / uint / bool 은 종전 로직 유지
                 if et.startswith(("int", "uint", "bool")):
-                    variable_obj.value = self.calculate_default_interval(et)
-                # ── ② **address → fresh symbolic interval 로 변경**
+                    variable_obj.value = self.evaluator.calculate_default_interval(et)
                 elif et == "address":
                     # 초기화식이 없으면 전체 주소 공간으로 보수적으로 설정
                     variable_obj.value = UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
@@ -610,7 +513,11 @@ class ContractAnalyzer:
                     variable_obj.value = f"symbol_{variable_obj.identifier}"
         else : # 초기화 식이 있으면
             if isinstance(variable_obj, ArrayVariable) :
-                inlineArrayValues = self.evaluate_expression(init_expr, contract_cfg.state_variable_node.variables, None, None)
+                inlineArrayValues = self.evaluator.evaluate_expression(
+                    init_expr,
+                    contract_cfg.state_variable_node.variables,
+                    None,
+                    None)
 
                 for value in inlineArrayValues :
                     variable_obj.elements.append(value)
@@ -619,9 +526,13 @@ class ContractAnalyzer:
             elif isinstance(variable_obj, MappingVariable) : # 관련된 경우 없을 듯
                 pass
             elif variable_obj.typeInfo.typeCategory == "elementary" :
-                variable_obj.value = self.evaluate_expression(init_expr, contract_cfg.state_variable_node.variables, None, None)
+                variable_obj.value = self.evaluator.evaluate_expression(
+                    init_expr,
+                    contract_cfg.state_variable_node.variables,
+                    None,
+                    None)
 
-        self._register_var(variable_obj)
+        self.register_var(variable_obj)
 
         # 4. 상태 변수를 ContractCFG에 추가
         contract_cfg.add_state_variable(variable_obj, expr=init_expr, line_no=self.current_start_line)
@@ -640,7 +551,6 @@ class ContractAnalyzer:
     # ② constant 변수 처리 (CFG·심볼 테이블 반영)
     # ---------------------------------------------------------------------------
     def process_constant_variable(self, variable_obj, init_expr):
-
         # 1. 컨트랙트 CFG 확보
         contract_cfg = self.contract_cfgs[self.current_target_contract]
         if contract_cfg is None:
@@ -655,14 +565,14 @@ class ContractAnalyzer:
 
         #    평가 컨텍스트는 현재까지의 state-variable 노드 변수들
         state_vars = contract_cfg.state_variable_node.variables
-        value = self.evaluate_expression(init_expr, state_vars, None, None)
+        value = self.evaluator.evaluate_expression(init_expr, state_vars, None, None)
         if value is None:
             raise ValueError(f"Unable to evaluate constant expression for '{variable_obj.identifier}'")
 
         variable_obj.value = value
         variable_obj.isConstant = True  # (안전용 중복 설정)
 
-        self._register_var(variable_obj)
+        self.register_var(variable_obj)
 
         # 3. ContractCFG 에 추가 (state 변수와 동일 API 사용)
         contract_cfg.add_state_variable(variable_obj, expr=init_expr, line_no=self.current_start_line)
@@ -688,42 +598,10 @@ class ContractAnalyzer:
         if contract_cfg is None:
             raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
 
-        # 1) 빈 CFG 생성
-        modifier_cfg = FunctionCFG(function_type='modifier',
-                                   function_name=modifier_name)
-
-        # 2) 파라미터 처리 (없으면 {} 로 대체)
-        parameters = parameters or {}
-        for var_name, type_info in parameters.items():
-            # 파라미터용 Variables 객체 한 개 생성
-            var_obj = Variables(identifier=var_name, scope="local")
-            var_obj.typeInfo = type_info
-
-            # elementary 타입이면 보수적 default 값 부여
-            if type_info.typeCategory == "elementary":
-                et = type_info.elementaryTypeName
-                if et.startswith(("int", "uint", "bool")):
-                    var_obj.value = self.calculate_default_interval(et)
-                elif et == "address":
-                    # 파라미터 address → 전체 범위
-                    var_obj.value = UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
-                else:  # bytes / string 등
-                    var_obj.value = f"symbol_{var_name}"
-
-            modifier_cfg.add_related_variable(var_obj)
-
-        if contract_cfg.state_variable_node:
-            for var in contract_cfg.state_variable_node.variables.values():
-                modifier_cfg.add_related_variable(var)
-
-        for gv in contract_cfg.globals.values():  # ← 새 코드
-            modifier_cfg.add_related_variable(gv)  # (얕은 복사 필요 없고
-            #     원본 객체를 그대로 써도 OK)
+        mod_cfg = StaticCFGFactory.make_modifier_cfg(self, contract_cfg, modifier_name, parameters)
 
         # 3) CFG 저장
-        contract_cfg.functions[modifier_name] = modifier_cfg
-        self.contract_cfgs[self.current_target_contract] = contract_cfg
-        self.brace_count[self.current_start_line]['cfg_node'] = modifier_cfg.get_entry_node()
+        self.brace_count[self.current_start_line]['cfg_node'] = mod_cfg.get_entry_node()
 
     # ContractAnalyzer.py  ----------------------------------------------
 
@@ -747,77 +625,19 @@ class ContractAnalyzer:
 
         mod_cfg: FunctionCFG = contract_cfg.functions[modifier_name]
 
-        # ── ② modifier-CFG 의 노드·엣지를 함수-CFG 로 복사 ───────
-        g_fn = fn_cfg.graph
-        g_mod = mod_cfg.graph
+        self.builder.splice_modifier(fn_cfg, mod_cfg, modifier_name)
 
-        # 노드 이름이 겹칠 위험이 있으니 prefix 붙여서 복사
-        node_map: dict[CFGNode, CFGNode] = {}
-        for n in g_mod.nodes:
-            new_n = CFGNode(f"{modifier_name}::{n.name}")
-            # 변수 환경은 빈 딕셔너리로 시작
-            new_n.variables = self.copy_variables(getattr(n, "variables", {}))
-            node_map[n] = new_n
-            g_fn.add_node(new_n)
+    def process_constructor_definition(self, name, params, modifiers):
+        ccf = self.contract_cfgs[self.current_target_contract]
 
-        for u, v in g_mod.edges:
-            g_fn.add_edge(node_map[u], node_map[v])
+        ctor_cfg = StaticCFGFactory.make_constructor_cfg(
+            self, name, params, modifiers
+        )
+        ccf.add_constructor_to_cfg(ctor_cfg)
+        self.contract_cfgs[self.current_target_contract] = ccf
 
-        # ── ③ placeholder 스플라이스 ─────────────────────────────
-        entry = fn_cfg.get_entry_node()
-        exit_ = fn_cfg.get_exit_node()
-
-        for mod_node_orig in g_mod.nodes:
-            if mod_node_orig.name.startswith("MOD_PLACEHOLDER"):
-                ph = node_map[mod_node_orig]  # 복사된 placeholder
-
-                preds = list(g_fn.predecessors(ph))
-                succs = list(g_fn.successors(ph))
-
-                # placeholder 제거
-                g_fn.remove_node(ph)
-
-                # preds  →  entry
-                for p in preds:
-                    g_fn.add_edge(p, entry)
-
-                # exit  →  succs
-                for s in succs:
-                    g_fn.add_edge(exit_, s)
-
-        # (선택) ④ modifier 의 global/상태 변수 사용 정보를
-        #        fn_cfg.related_variables 와 join 하고 싶다면 여기서 처리
-
-    def process_constructor_definition(self, constructor_name, parameters, modifiers):
-        # 현재 컨텍스트에서 타겟 컨트랙트를 가져옴
-        contract_cfg = self.contract_cfgs[self.current_target_contract]
-
-        if not contract_cfg:
-            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
-
-        # Constructor에 대한 FunctionCFG 생성
-        constructor_cfg = FunctionCFG(function_type='constructor', function_name=constructor_name)
-
-        # 파라미터가 있을 경우, 이를 FunctionCFG에 추가
-        for variable in parameters:
-            constructor_cfg.add_related_variable(variable)
-
-        # Modifier가 있을 경우 이를 FunctionCFG에 추가
-        for modifier_name in modifiers:
-            self.process_modifier_invocation(constructor_cfg, modifier_name)
-
-        # Constructor CFG를 ContractCFG에 추가
-        contract_cfg.add_constructor_to_cfg(constructor_cfg)
-
-        # 10. contract_cfg를 contract_cfgs에 반영
-        self.contract_cfgs[self.current_target_contract] = contract_cfg
-
-        # 현재 state_variable_node에서 상태 변수를 가져와 related_variables에 추가
-        if contract_cfg.state_variable_node:
-            for var_name, var_info in contract_cfg.state_variable_node.variables.items():
-                constructor_cfg.add_related_variable(var_info)
-
-        self.brace_count[self.current_start_line]['cfg_node'] = constructor_cfg.get_entry_node()
+        # brace_count - 디폴트 entry 등록
+        self.brace_count[self.current_start_line]["cfg_node"] = ctor_cfg.get_entry_node()
 
     # ContractAnalyzer.py  ─ process_function_definition  (address-symb ✚ 최신 Array/Struct 초기화 반영)
 
@@ -828,69 +648,15 @@ class ContractAnalyzer:
             modifiers: list[str],
             returns: list[Variables] | None,
     ):
-        # ───────────────────────────────────────────────────────────────
-        # 1. 컨트랙트 CFG
-        # ----------------------------------------------------------------
         contract_cfg = self.contract_cfgs[self.current_target_contract]
-
         if contract_cfg is None:
             raise ValueError(f"Contract CFG for {self.current_target_contract} not found.")
 
-        # ───────────────────────────────────────────────────────────────
-        # 2. 함수 CFG 객체
-        # ----------------------------------------------------------------
-        fcfg = FunctionCFG(function_type="function", function_name=function_name)
+        fcfg = StaticCFGFactory.make_function_cfg(self, function_name, parameters, modifiers, returns)
 
-        # ───────────────────────────────────────────────────────────────
-        # 3. 파라미터 → related_variables
-        # ----------------------------------------------------------------
-        for p_type, p_name in parameters:
-            if p_name:  # 이름이 있는 것만 변수화
-                var = self._make_param_variable(p_type, p_name, scope="local")
-                fcfg.add_related_variable(var)
-                fcfg.parameters.append(p_name)
-
-        # ───────────────────────────────────────────────────────────────
-        # 4. Modifier invocation → CFG 병합
-        # ----------------------------------------------------------------
-        for m_name in modifiers:
-            self.process_modifier_invocation(fcfg, m_name)
-
-        # ───────────────────────────────────────────────────────────────
-        # 5. Return 변수 처리
-        # ----------------------------------------------------------------
-        for r_type, r_name in returns:
-            if r_name:
-                rv = self._make_param_variable(r_type, r_name, scope="local")
-                fcfg.add_related_variable(rv)
-                fcfg.return_vars.append(rv)
-            else:
-                fcfg.return_types.append(r_type)
-
-        # ───────────────────────────────────────────────────────────────
-        # 6. 상태 변수 → related_variables 에 복사
-        # ----------------------------------------------------------------
-        if contract_cfg.state_variable_node:
-            for var in contract_cfg.state_variable_node.variables.values():
-                fcfg.add_related_variable(var)
-
-        # 6-B. 글로벌 변수(block/msg/tx…) ----------------------------------------------
-        for gv in contract_cfg.globals.values():  # ← 새 코드
-            fcfg.add_related_variable(gv)  # (얕은 복사 필요 없고
-            #     원본 객체를 그대로 써도 OK)
-
-        # ───────────────────────────────────────────────────────────────
-        # 7. 결과를 ContractCFG 에 반영
-        # ----------------------------------------------------------------
         contract_cfg.functions[function_name] = fcfg
         self.contract_cfgs[self.current_target_contract] = contract_cfg
-
-        # ───────────────────────────────────────────────────────────────
-        # 8. brace_count 에 함수 entry 노드 기록
-        # ----------------------------------------------------------------
         self.brace_count[self.current_start_line]["cfg_node"] = fcfg.get_entry_node()
-
-    # ContractAnalyzer.py  ─ process_variable_declaration  (address-symbolic & 최신 Array/Struct 초기화 반영)
 
     def process_variable_declaration(
             self,
@@ -898,15 +664,13 @@ class ContractAnalyzer:
             var_name: str,
             init_expr: Expression | None = None
     ):
-        # ───────────────────────────────────────────────────────────────
-        # 1. CFG 컨텍스트
-        # ----------------------------------------------------------------
+
         ccf = self.contract_cfgs[self.current_target_contract]
         self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
         if self.current_target_function_cfg is None:
             raise ValueError("variableDeclaration: active FunctionCFG not found")
 
-        cur_blk = self.get_current_block()
+        cur_blk = self.builder.get_current_block()
 
         # ───────────────────────────────────────────────────────────────
         # 2. 변수 객체 생성
@@ -949,9 +713,6 @@ class ContractAnalyzer:
             v = Variables(identifier=var_name, scope="local")
             v.typeInfo = type_obj
 
-        # ───────────────────────────────────────────────────────────────
-        # 3. 기본값 / 초기화식 해석
-        # ----------------------------------------------------------------
         if init_expr is None:
             # ── 배열 기본
             if isinstance(v, ArrayVariable):
@@ -967,13 +728,13 @@ class ContractAnalyzer:
                     elif et == "bool":
                         v.initialize_elements(BoolInterval.bottom())
                     else:
-                        v.initialize_not_abstracted_type(sm=self.sm)
+                        v.initialize_not_abstracted_type()
 
             # ── 구조체 기본
             elif isinstance(v, StructVariable):
                 if v.typeInfo.structTypeName not in ccf.structDefs:
                     raise ValueError(f"Undefined struct {v.typeInfo.structTypeName}")
-                v.initialize_struct(ccf.structDefs[v.typeInfo.structTypeName], sm=self.sm)
+                v.initialize_struct(ccf.structDefs[v.typeInfo.structTypeName])
 
             # ── enum 기본 (첫 멤버)
             elif isinstance(v, EnumVariable):
@@ -1000,13 +761,12 @@ class ContractAnalyzer:
         # 3-b. 초기화식이 존재하는 경우
         # ----------------------------------------------------------------
         else:
-            resolved = self.evaluate_expression(init_expr,
+            resolved = self.evaluator.evaluate_expression(init_expr,
                                                 cur_blk.variables, None, None)
 
             # ───────────────────── 구조체 / 배열 / 매핑 ─────────────────────
             if isinstance(resolved, (StructVariable, ArrayVariable, MappingVariable)):
-                v = self._deep_clone_variable(resolved, var_name)  # ★ 새 객체 생성
-                # (별도로 cur_blk.variables 에도 등록해야 함 – 아래 4단계 참고)
+                v = VariableEnv.deep_clone_variable(resolved, var_name)  # ★ 새 객체 생성
 
             # ───────────────────── enum 초기화 ─────────────────────────────
             elif isinstance(v, EnumVariable):
@@ -1036,106 +796,67 @@ class ContractAnalyzer:
                 elif isinstance(v, StructVariable) and isinstance(resolved, StructVariable):
                     v.copy_from(resolved)
 
-        # ───────────────────────────────────────────────────────────────
-        # 4. CFG 노드 업데이트
-        # ----------------------------------------------------------------
-        cur_blk.variables[v.identifier] = v
-        cur_blk.add_variable_declaration_statement(type_obj, var_name, init_expr, self.current_start_line)
-        self.current_target_function_cfg.add_related_variable(v)
-        self.current_target_function_cfg.update_block(cur_blk)
-
-        lhs_expr = Expression(identifier=var_name, context="IdentifierExpContext")
-        self._record_analysis(
-            line_no=self.current_start_line,
-            stmt_type="varDeclaration",
-            expr=lhs_expr,  # ← 좌변 Expression
-            var_obj=v  # ← 방금 만든 Variables / ArrayVariable …
-        )
-
-        # ───────────────────────────────────────────────────────────────
-        # 5. 저장 및 brace_count
-        # ----------------------------------------------------------------
-        ccf.functions[self.current_target_function] = self.current_target_function_cfg
-        self.contract_cfgs[self.current_target_contract] = ccf
-        self.brace_count[self.current_start_line]["cfg_node"] = cur_blk
-
-        self.current_target_function_cfg = None
-
-    def process_assignment_expression(self, expr):
-        # 1. 현재 타겟 컨트랙트의 CFG 가져오기
-        contract_cfg = self.contract_cfgs[self.current_target_contract]
-        if not contract_cfg:
-            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
-
-        # 2. 현재 타겟 함수의 CFG 가져오기
-        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
-        if not self.current_target_function_cfg:
-            raise ValueError("No active function to add variables to.")
-
-        # 3. 현재 블록의 CFG 노드 가져오기
-        current_block = self.get_current_block()
-
-        # assignment에 대한 abstract interpretation 수행
-        rExpVal = self.evaluate_expression(expr.right, current_block.variables, None, None)
-        self.update_left_var(expr.left, rExpVal, expr.operator, current_block.variables, None, None)
-
-        current_block.add_assign_statement(expr.left, expr.operator, expr.right, self.current_start_line)
-
-        if self.current_target_function_cfg.function_type == "constructor" :
-            self._overwrite_state_vars_from_block(contract_cfg, current_block.variables)
-
-        base_obj = None
-        # 2) 방금 변경된 변수 객체 가져오기
-        target_var = self._resolve_and_update_expr(
-            expr.left, None, '=', current_block.variables,
-            self.current_target_function_cfg
-        )
-
-        if target_var is None:
-            # a[i] / map[k] 같은 경우 처리
-            base_obj = self._resolve_and_update_expr(
-                expr.left.base, None, '=', current_block.variables,
-                self.current_target_function_cfg
+            # ────────────────── ③ CFG-빌더 / 레코더 위임 ─────────
+            #    · 그래프/노드 업데이트는 cfg_builder에게
+            #    · 분석 기록은 rec_mgr 에게
+            self.builder.build_variable_declaration(
+                cur_block=cur_blk,
+                var_obj=v,
+                type_obj=type_obj,
+                init_expr=init_expr,
+                line_no=self.current_start_line,
+                fcfg=self.current_target_function_cfg,
+                brace_count=self.brace_count,  # ← builder가 필요하다면 전달
             )
 
-            # ─ Array ─
-            if isinstance(base_obj, ArrayVariable):
-                concrete = self._try_concrete_key(expr.left.index, current_block.variables)
-                if concrete is not None:  # a[5] = …
-                    target_var = base_obj.elements[int(concrete)]
-                else:  # a[i] = … (i 가 ⊥/TOP)
-                    target_var = base_obj  # whole array 기록 + <unk>
+            self.recorder.record_variable_declaration(
+                line_no=self.current_start_line,
+                var_name=var_name,
+                var_obj=v,
+            )
 
-            # ─ Mapping ─
-            elif isinstance(base_obj, MappingVariable):
-                concrete = self._try_concrete_key(expr.left.index, current_block.variables)
-                if concrete is not None:
-                    target_var = base_obj.mapping.setdefault(
-                        concrete,
-                        self._create_new_mapping_value(base_obj, concrete)
-                    )
-                else:
-                    target_var = base_obj  # mapping 전체 + <unk>
+            # ────────────────── ④ 저장 & 정리 ────────────────────
+            ccf.functions[self.current_target_function] = self.current_target_function_cfg
+            self.contract_cfgs[self.current_target_contract] = ccf
+            self.current_target_function_cfg = None
 
-        # 3) analysis 기록 (기존 호출 그대로)
-        self._record_analysis(
-            line_no=self.current_start_line,
-            stmt_type="assignment",
-            expr=expr.left if target_var is not base_obj else expr.left.base,
-            var_obj=target_var
+    # Analyzer/ContractAnalyzer.py
+    def process_assignment_expression(self, expr: Expression) -> None:
+        # 1. CFG 컨텍스트 --------------------------------------------------
+        ccf = self.contract_cfgs[self.current_target_contract]
+        fcfg = ccf.get_function_cfg(self.current_target_function)
+        if fcfg is None:
+            raise ValueError("No active function CFG.")
+
+        cur_blk = self.builder.get_current_block()
+
+        # 2. 값 해석 + 변수 갱신  -----------------------------------------
+        r_val = self.evaluator.evaluate_expression(
+            expr.right, cur_blk.variables, None, None
+        )
+        #   ⬇️ Update 내부에서   recorder.record_assignment(...) 호출
+        self.updater.update_left_var(
+            expr,  # 좌변/우변을 통째로 넘김
+            r_val,
+            expr.operator,
+            cur_blk.variables,
         )
 
-        # 9. current_block을 function CFG에 반영
-        self.current_target_function_cfg.update_block(current_block)  # 변경된 블록을 반영
+        # 3. CFG 노드/엣지 정리  -----------------------------------------
+        self.builder.build_assignment_statement(
+            cur_block=cur_blk,
+            expr=expr,
+            line_no=self.current_start_line,
+            fcfg=fcfg,
+            brace_count=self.brace_count,
+        )
 
-        # 10. function_cfg 결과를 contract_cfg에 반영
-        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
+        # 4. constructor 특수 처리 & 저장 -------------------------------
+        if fcfg.function_type == "constructor":
+            self._overwrite_state_vars_from_block(ccf, cur_blk.variables)
 
-        # 11. contract_cfg를 contract_cfgs에 반영
-        self.contract_cfgs[self.current_target_contract] = contract_cfg
-
-        # 12. brace_count에 CFG 노드 정보 업데이트 (함수의 시작 라인 정보 사용)
-        self.brace_count[self.current_start_line]['cfg_node'] = current_block
+        ccf.functions[self.current_target_function] = fcfg
+        self.contract_cfgs[self.current_target_contract] = ccf
 
     def _handle_unary_incdec(
             self,
@@ -2344,7 +2065,7 @@ class ContractAnalyzer:
         if gv_obj.identifier not in cfg.globals:
             gv_obj.default_value = gv_obj.value
             cfg.globals[gv_obj.identifier] = gv_obj
-            self.snapman.register(gv_obj, self._ser)  # ★ 스냅
+            self.snapman.register(gv_obj, self.ser)  # ★ 스냅
 
         g = cfg.globals[gv_obj.identifier]
 
@@ -2355,7 +2076,7 @@ class ContractAnalyzer:
 
         # ── delete  → snapshot 복원 + override 해제 ───────────────
         elif ev == "delete":
-            self.snapman.restore(g, self._de)  # ★ 롤백
+            self.snapman.restore(g, self.de)  # ★ 롤백
             g.debug_override = None
 
         else:
@@ -2369,92 +2090,60 @@ class ContractAnalyzer:
                 self.sm.register_fixed_id(nid, iv)
                 self.sm.bind_var(g.identifier, nid)
 
-        self.add_batch_target(self.current_target_function_cfg)
+        self._batch_targets.add(self.current_target_function_cfg)
 
         self.current_target_function_cfg = None
 
     # ─────────────────────────────────────────────────────────────
     def process_state_var_for_debug(self, lhs_expr: Expression, value):
-        """
-        @StateVar …   주석 처리
-        lhs_expr : Expression (identifier / .member / [index] …)
-        value    : Interval | BoolInterval | UnsignedIntegerInterval(160-bit) | str
-        """
-        cfg = self.contract_cfgs[self.current_target_contract]
-        self.current_target_function_cfg = cfg.get_function_cfg(self.current_target_function)
-        ev = self.current_edit_event
-        if self.current_target_function_cfg is None:
-            raise ValueError("@StateVar debug must appear inside a function body.")
+        ccf  = self.contract_cfgs[self.current_target_contract]
+        fcfg = ccf.get_function_cfg(self.current_target_function)
+        if fcfg is None:
+            raise ValueError("@StateVar must be inside a function.")
 
-        # 1) 변수 객체 위치 탐색 + 값 대입
-        var_obj = self._resolve_and_update_expr(lhs_expr, value, '=',
-                                                self.current_target_function_cfg.related_variables,
-                                                self.current_target_function_cfg)
-        if var_obj is None:
-            raise ValueError("LHS cannot be resolved to a state variable.")
+        self.updater.apply_debug_directive(
+            scope="state",
+            lhs_expr=lhs_expr,
+            value=value,
+            variables=fcfg.related_variables,
+            edit_event=self.current_edit_event,
+        )
 
-        # 최초 등록 시 snapshot
-        if id(var_obj) not in self.snapman._store:
-            self.snapman.register(var_obj, self._ser)
+        # 함수 다시 해석하도록 배치
+        self._batch_targets.add(fcfg)
 
-        if ev in ("add", "modify"):
-            self._patch_var_with_new_value(var_obj, value)
-        elif ev == "delete":
-            self.snapman.restore(var_obj, self._de)
-        else:
-            raise ValueError(f"unknown event {ev!r}")
-
-        # 2) 주소형이면 심볼릭-ID 바인딩
-        if (getattr(var_obj.typeInfo, "elementaryTypeName", None) == "address" and
-                isinstance(var_obj.value, UnsignedIntegerInterval)):
-            iv = var_obj.value
-            if iv.min_value == iv.max_value:
-                nid = iv.min_value
-                self.sm.register_fixed_id(nid, iv)
-                self.sm.bind_var(var_obj.identifier, nid)
-
-        self.add_batch_target(self.current_target_function_cfg)
-
-        self.current_target_function_cfg = None
-
-    # ─────────────────────────────────────────────────────────────
+    # ------------------------------------------------------------------
+    #  @LocalVar   debug 주석
+    # ------------------------------------------------------------------
     def process_local_var_for_debug(self, lhs_expr: Expression, value):
-        """
-        @LocalVar …   주석 처리 (함수 내부 로컬)
-        """
-        ev = self.current_edit_event
-        cfg = self.contract_cfgs[self.current_target_contract]
-        self.current_target_function_cfg = cfg.get_function_cfg(self.current_target_function)
-        if self.current_target_function_cfg is None:
-            raise ValueError("@LocalVar debug must appear inside a function body.")
+        ccf  = self.contract_cfgs[self.current_target_contract]
+        fcfg = ccf.get_function_cfg(self.current_target_function)
+        if fcfg is None:
+            raise ValueError("@LocalVar must be inside a function.")
 
-        var_obj = self._resolve_and_update_expr(lhs_expr, value, '=',
-                                                self.current_target_function_cfg.related_variables,
-                                                self.current_target_function_cfg)
+        self.updater.apply_debug_directive(
+            scope="local",
+            lhs_expr=lhs_expr,
+            value=value,
+            variables=fcfg.related_variables,
+            edit_event=self.current_edit_event,
+        )
 
-        if var_obj is None:
-            raise ValueError("LHS cannot be resolved to a local variable.")
+        self._batch_targets.add(fcfg)
 
-        if id(var_obj) not in self.snapman._store:
-            self.snapman.register(var_obj, self._ser)
 
-        if ev in ("add", "modify"):
-            var_obj.value = value
-        elif ev == "delete":
-            self.snapman.restore(var_obj, self._de)
-        else:
-            raise ValueError(f"unknown event {ev!r}")
+    # ──────────────────────────────────────────────────────────────
+    # Snapshot 전용 내부 헬퍼  ―  외부에서 쓸 일 없으므로 “프라이빗” 네이밍
+    # ----------------------------------------------------------------
+    @staticmethod
+    def ser(v):  # obj → dict
+        return v.__dict__
 
-        # 주소형 → 심볼릭-ID 바인딩
-        if (getattr(var_obj.typeInfo, "elementaryTypeName", None) == "address" and
-                isinstance(var_obj.value, UnsignedIntegerInterval)):
-            iv = var_obj.value
-            if iv.min_value == iv.max_value:
-                nid = iv.min_value
-                self.sm.register_fixed_id(nid, iv)
-                self.sm.bind_var(var_obj.identifier, nid)
+    @staticmethod
+    def de(v, snap):  # dict → obj
+        v.__dict__.clear()
+        v.__dict__.update(snap)
 
-        # 함수 재해석
-        self.add_batch_target(self.current_target_function_cfg)
-
-        self.current_target_function_cfg = None
+    # 공통 ‘한 줄 helper’
+    def register_var(self, var_obj):
+        self.snapman.register(var_obj, self.ser)

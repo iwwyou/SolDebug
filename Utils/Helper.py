@@ -1,5 +1,7 @@
 import copy
 from typing import Dict, Any
+from dataclasses import dataclass
+from typing import Optional, Union
 
 from antlr4 import *
 from Parser.SolidityLexer  import SolidityLexer
@@ -143,6 +145,36 @@ class VariableEnv:
             dst[name] = copy.deepcopy(v)
 
         return dst
+
+    @staticmethod
+    def deep_clone_variable(var_obj, new_name: str):
+        """
+        var_obj   : 복제할 원본 변수 객체
+        new_name  : 로컬 변수로 선언될 새 이름
+
+        반환      : var_obj 와 동일한 타입의 “독립적인” 복사본
+        """
+        import copy
+        new_var = copy.deepcopy(var_obj)  # 깊은 복사
+        new_var.identifier = new_name  # 최상위 이름 교체
+
+        # ── Struct 내부 멤버 식별자 업데이트 ──────────────────────
+        if hasattr(new_var, "members"):  # StructVariable
+            for m in new_var.members.values():
+                tail = m.identifier.split('.', 1)[-1]  # 기존 “a.b.c”
+                m.identifier = f"{new_name}.{tail}"
+
+        # ── 배열 요소 식별자 업데이트 ─────────────────────────────
+        if hasattr(new_var, "elements"):  # ArrayVariable
+            for i, e in enumerate(new_var.elements):
+                e.identifier = f"{new_name}[{i}]"
+
+        # ── 매핑 value 식별자 업데이트 ───────────────────────────
+        if hasattr(new_var, "mapping"):  # MappingVariable
+            for k, v in new_var.mapping.items():
+                v.identifier = f"{new_name}[{k}]"
+
+        return new_var
 
     @staticmethod
     def variables_equal(a: Dict[str, "Variables"] | None,
@@ -297,74 +329,6 @@ class VariableEnv:
         return f"symbolic_{et}"
 
     @staticmethod
-    def compare_intervals(left_interval, right_interval, operator):
-        """
-        두 Interval 비교 → BoolInterval(min, max) 반환
-            [1,1] : definitely-true
-            [0,0] : definitely-false
-            [0,1] : 불확정(top)
-        """
-
-        # 값이 하나라도 없으면 판단 불가 → TOP
-        if (left_interval.min_value is None or left_interval.max_value is None or
-                right_interval.min_value is None or right_interval.max_value is None):
-            return BoolInterval(0, 1)  # [0,1]
-
-        definitely_true = False
-        definitely_false = False
-
-        # ───────── 비교 연산별 판정 ────────────────────────────────
-        if operator == '==':
-            if left_interval.max_value < right_interval.min_value or \
-                    left_interval.min_value > right_interval.max_value:
-                definitely_false = True
-            elif (left_interval.min_value == left_interval.max_value ==
-                  right_interval.min_value == right_interval.max_value):
-                definitely_true = True
-
-        elif operator == '!=':
-            if left_interval.max_value < right_interval.min_value or \
-                    left_interval.min_value > right_interval.max_value:
-                definitely_true = True
-            elif (left_interval.min_value == left_interval.max_value ==
-                  right_interval.min_value == right_interval.max_value):
-                definitely_false = True
-
-        elif operator == '<':
-            if left_interval.max_value < right_interval.min_value:
-                definitely_true = True
-            elif left_interval.min_value >= right_interval.max_value:
-                definitely_false = True
-
-        elif operator == '>':
-            if left_interval.min_value > right_interval.max_value:
-                definitely_true = True
-            elif left_interval.max_value <= right_interval.min_value:
-                definitely_false = True
-
-        elif operator == '<=':
-            if left_interval.max_value <= right_interval.min_value:
-                definitely_true = True
-            elif left_interval.min_value > right_interval.max_value:
-                definitely_false = True
-
-        elif operator == '>=':
-            if left_interval.min_value >= right_interval.max_value:
-                definitely_true = True
-            elif left_interval.max_value < right_interval.min_value:
-                definitely_false = True
-
-        else:
-            raise ValueError(f"Unsupported comparison operator: {operator}")
-
-        # ───────── BoolInterval 생성 ─────────────────────────────
-        if definitely_true and not definitely_false:
-            return BoolInterval(1, 1)  # [1,1]  확실히 true
-        if definitely_false and not definitely_true:
-            return BoolInterval(0, 0)  # [0,0]  확실히 false
-        return BoolInterval(0, 1)  # [0,1]  불확정(top)
-
-    @staticmethod
     def convert_int_to_bool_interval(int_interval):
         """
         간단히 [0,0] => BoolInterval(0,0),
@@ -390,3 +354,13 @@ class VariableEnv:
                 and expr.base is not None
                 and getattr(expr.base, "identifier", None) in VariableEnv._GLOBAL_BASES
         )
+
+VariableLike = Union[
+    Variables, StructVariable, ArrayVariable,
+    MappingVariable, EnumVariable
+]
+
+@dataclass
+class LeafInfo:
+    touched: Optional[VariableLike]   # 실제 값(or 전체 array/mapping)을 바꾼 leaf
+    base:    Optional[VariableLike]   # a[i] 같은 경우 array/map 루트

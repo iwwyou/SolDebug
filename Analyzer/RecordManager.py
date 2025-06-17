@@ -1,20 +1,7 @@
-# Analyzer/RecordManager.py
-"""RecordManager
-========================================
-A *thin* utility that turns rich, nested CFG variable environments into a flat
-serialisable structure that can be consumed by the UI (or tests) and keeps the
-per‑line analysis ledger.
-
-This class intentionally **knows nothing about control‑flow** – it only
-receives events (with optional `Expression`, `Variables`, environment dicts,
-etc.) and converts them to a uniform dict‑based record which the front‑end can
-render.
-"""
-
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Dict, List, Any, Union
+from typing import Dict, List, Any, Optional, Union
 
 from Domain.IR import Expression
 from Domain.Variable import (
@@ -26,21 +13,18 @@ from Domain.Variable import (
 )
 
 class RecordManager:
-    """A *stateless* façade – you hand it pieces of information and it stores
-    them inside an internal `defaultdict( list )` keyed by source‑line.
-
-    ContractAnalyzer (or the forthcoming DynamicCFGBuilder) is expected to own
-    a *single* `RecordManager` instance and call the public helpers whenever it
-    wants to publish something for debugging / UI.
-    """
-
-    # ---------------------------------------------------------------------
-    # CTOR / internal state
-    # ---------------------------------------------------------------------
 
     def __init__(self) -> None:
-        # line_no -> List[record‑dict]
-        self._acc: defaultdict[int, List[Dict[str, Any]]] = defaultdict(list)
+        # line_no -> list[ record-dict ]
+        self.ledger: defaultdict[int, List[Dict[str, Any]]] = defaultdict(list)
+
+    # ------------------------------------------------------ public accessors
+    def __getitem__(self, line_no: int) -> List[Dict[str, Any]]:
+        """Syntactic sugar so legacy `self.analysis_per_line[ln]` still works."""
+        return self.ledger[line_no]     # ← list · auto-created by defaultdict
+
+    def get_range(self, start: int, end: int) -> Dict[int, List[Dict[str, Any]]]:
+        return {ln: self.ledger[ln] for ln in range(start, end + 1) if ln in self.ledger}
 
     # ─────────────────────────────────────────────────────
     # 지역변수 선언 기록
@@ -76,7 +60,7 @@ class RecordManager:
             )
 
         # ③ analysis_per_line[line_no] 에 저장/교체
-        rec_list = self.analysis_per_line[line_no]
+        rec_list = self.ledger[line_no]
         # 같은 식별자 선언이 이미 있으면 덮어쓰기
         for i, old in enumerate(rec_list):
             if old.get("kind") == "varDeclaration" and \
@@ -85,6 +69,51 @@ class RecordManager:
                 break
         else:
             rec_list.append(record)
+
+
+    def record_assignment(
+        self,
+        *,
+        line_no: int,
+        expr: Expression,
+        var_obj,
+        base_obj=None,
+    ) -> None:
+
+        # ① “루트” 표현식 문자열
+        root_expr = expr.left if var_obj is not base_obj else expr.left.base
+        key_prefix = self._expr_to_str(root_expr)
+
+        # ② payload 작성
+        if isinstance(var_obj, (ArrayVariable, StructVariable, MappingVariable)):
+            flat: Dict[str, Any] = {}
+            self._flatten_var(var_obj, key_prefix, flat)
+            payload: Dict[str, Any] = {"kind": "assignment", "vars": flat}
+        else:
+            payload = {
+                "kind": "assignment",
+                "vars": {
+                    key_prefix: self._serialize_val(
+                        getattr(var_obj, "value", None)
+                    )
+                },
+            }
+
+        # ③ line_no → rec_list 가져오기
+        rec_list = self.ledger[line_no]          #   self._acc  == defaultdict(list)
+
+        # ④ “같은 루트-키” 기록이 이미 있으면 **교체**, 없으면 append
+        new_keys = set(payload["vars"].keys())
+        for idx, rec in enumerate(rec_list):
+            if (
+                rec.get("kind") == "assignment"
+                and set(rec.get("vars", {}).keys()) == new_keys
+            ):
+                rec_list[idx] = payload          # ← 덮어쓰기
+                break
+        else:
+            rec_list.append(payload)             # ← 새로 추가
+
 
     # ---------------------------------------------------------------------
     # Public API
@@ -134,14 +163,6 @@ class RecordManager:
                 and set(old.get("vars", {}).keys()) == set(new["vars"].keys())
             ),
         )
-
-    # ------------------------------------------------------------------
-    # Query helpers (for UI / tests)
-    # ------------------------------------------------------------------
-
-    def get_range(self, start_ln: int, end_ln: int) -> Dict[int, List[Dict[str, Any]]]:
-        """Return the slice `[start_ln, end_ln]` (inclusive) of the ledger."""
-        return {ln: self._acc[ln] for ln in range(start_ln, end_ln + 1) if ln in self._acc}
 
     # ------------------------------------------------------------------
     # Internal helpers

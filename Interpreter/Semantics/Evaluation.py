@@ -802,7 +802,7 @@ class Evaluation :
                 )
         # 비교 연산자 처리
         elif operator in ['==', '!=', '<', '>', '<=', '>=']:
-            result = VariableEnv.compare_intervals(leftInterval, rightInterval, operator)
+            result = Evaluation.compare_intervals(leftInterval, rightInterval, operator)
         # 논리 연산자 처리
         elif operator in ['&&', '||']:
             result = leftInterval.logical_op(rightInterval, operator)
@@ -1127,3 +1127,85 @@ class Evaluation :
 
                 return joined
         return
+
+    @staticmethod
+    def calculate_default_interval(var_type):
+        # 1. int 타입 처리
+        if var_type.startswith("int"):
+            length = int(var_type[3:]) if var_type != "int" else 256  # int 타입의 길이 (기본값은 256)
+            return IntegerInterval.bottom(length)  # int의 기본 범위 반환
+
+        # 2. uint 타입 처리
+        elif var_type.startswith("uint"):
+            length = int(var_type[4:]) if var_type != "uint" else 256  # uint 타입의 길이 (기본값은 256)
+            return UnsignedIntegerInterval.bottom(length)  # uint의 기본 범위 반환
+
+        # 3. bool 타입 처리
+        elif var_type == "bool":
+            return BoolInterval()  # bool은 항상 0 또는 1
+
+        # 4. 기타 처리 (필요시 확장 가능)
+        else:
+            raise ValueError(f"Unsupported type for default interval: {var_type}")
+
+    @staticmethod
+    def compare_intervals(left_interval, right_interval, operator):
+
+        # 값이 하나라도 없으면 판단 불가 → TOP
+        if (left_interval.min_value is None or left_interval.max_value is None or
+                right_interval.min_value is None or right_interval.max_value is None):
+            return BoolInterval(0, 1)  # [0,1]
+
+        definitely_true = False
+        definitely_false = False
+
+        # ───────── 비교 연산별 판정 ────────────────────────────────
+        if operator == '==':
+            if left_interval.max_value < right_interval.min_value or \
+                    left_interval.min_value > right_interval.max_value:
+                definitely_false = True
+            elif (left_interval.min_value == left_interval.max_value ==
+                  right_interval.min_value == right_interval.max_value):
+                definitely_true = True
+
+        elif operator == '!=':
+            if left_interval.max_value < right_interval.min_value or \
+                    left_interval.min_value > right_interval.max_value:
+                definitely_true = True
+            elif (left_interval.min_value == left_interval.max_value ==
+                  right_interval.min_value == right_interval.max_value):
+                definitely_false = True
+
+        elif operator == '<':
+            if left_interval.max_value < right_interval.min_value:
+                definitely_true = True
+            elif left_interval.min_value >= right_interval.max_value:
+                definitely_false = True
+
+        elif operator == '>':
+            if left_interval.min_value > right_interval.max_value:
+                definitely_true = True
+            elif left_interval.max_value <= right_interval.min_value:
+                definitely_false = True
+
+        elif operator == '<=':
+            if left_interval.max_value <= right_interval.min_value:
+                definitely_true = True
+            elif left_interval.min_value > right_interval.max_value:
+                definitely_false = True
+
+        elif operator == '>=':
+            if left_interval.min_value >= right_interval.max_value:
+                definitely_true = True
+            elif left_interval.max_value < right_interval.min_value:
+                definitely_false = True
+
+        else:
+            raise ValueError(f"Unsupported comparison operator: {operator}")
+
+        # ───────── BoolInterval 생성 ─────────────────────────────
+        if definitely_true and not definitely_false:
+            return BoolInterval(1, 1)  # [1,1]  확실히 true
+        if definitely_false and not definitely_true:
+            return BoolInterval(0, 0)  # [0,0]  확실히 false
+        return BoolInterval(0, 1)  # [0,1]  불확정(top)
