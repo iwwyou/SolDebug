@@ -167,6 +167,11 @@ class Update :
         if VariableEnv.is_global_expr(expr) and isinstance(callerObject, MappingVariable):
             key = f"{expr.base.identifier}.{member}"  # "msg.sender"
 
+            if not callerObject.struct_defs or not callerObject.enum_defs:
+                ccf = self.an.contract_cfgs[self.an.current_target_contract]
+                callerObject.struct_defs = ccf.structDefs
+                callerObject.enum_defs = ccf.enumDefs
+
             # (1) 엔트리 없으면 생성
             if key not in callerObject.mapping:
                 callerObject.mapping[key] = callerObject.get_or_create(key)

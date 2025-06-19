@@ -278,8 +278,8 @@ class MappingVariable(Variables):
         self.typeInfo.mappingValueType = value_type
 
         self.mapping: dict[str, Variables] = {}
-        self._struct_defs = struct_defs or {}
-        self._enum_defs   = enum_defs   or {}
+        self.struct_defs = struct_defs or {}
+        self.enum_defs   = enum_defs   or {}
     # ────────────────────────────────────────────────
     # 값-생성 전용 private 헬퍼
     # ────────────────────────────────────────────────
@@ -307,8 +307,8 @@ class MappingVariable(Variables):
                 key_type=sol_t.mappingKeyType,
                 value_type=sol_t.mappingValueType,
                 scope=self.scope,
-                struct_defs=self._struct_defs,
-                enum_defs=self._enum_defs,  # ⭐️ 재귀 전파
+                struct_defs=self.struct_defs,
+                enum_defs=self.enum_defs,  # ⭐️ 재귀 전파
             )
 
         # 3) 구조체 ------------------------------------------------------
@@ -317,8 +317,8 @@ class MappingVariable(Variables):
                                 struct_type=sol_t.structTypeName,
                                 scope=self.scope)
 
-            if sol_t.structTypeName in self._struct_defs:  # ⭐️ 멤버 초기화
-                sv.initialize_struct(self._struct_defs[sol_t.structTypeName])
+            if sol_t.structTypeName in self.struct_defs:  # ⭐️ 멤버 초기화
+                sv.initialize_struct(self.struct_defs[sol_t.structTypeName])
 
             return sv
 
@@ -328,8 +328,8 @@ class MappingVariable(Variables):
                               scope=self.scope)
 
             # enum 정의가 있으면 멤버 테이블 세팅
-            if sol_t.enumTypeName in self._enum_defs:
-                defn = self._enum_defs[sol_t.enumTypeName]  # EnumDefinition
+            if sol_t.enumTypeName in self.enum_defs:
+                defn = self.enum_defs[sol_t.enumTypeName]  # EnumDefinition
                 ev.members = {m: i for i, m in enumerate(defn.members)}
                 ev.valueIndex = 0
                 ev.value = 0  # 기본값 첫 멤버

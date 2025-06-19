@@ -301,6 +301,11 @@ class Evaluation :
             # ContractAnalyzer.evaluate_identifier_context 내부
 
             elif isinstance(callerObject, MappingVariable):
+                if not callerObject.struct_defs or not callerObject.enum_defs:
+                    ccf = self.an.contract_cfgs[self.an.current_target_contract]
+                    callerObject.struct_defs = ccf.structDefs
+                    callerObject.enum_defs = ccf.enumDefs
+
                 # ── ① key 결정 ──────────────────────────────────
                 if ident_str in variables:  # ident_str == 변수명
                     key_var = variables[ident_str]
@@ -1129,6 +1134,11 @@ class Evaluation :
 
             if result.is_bottom():
                 return f"symbolicMappingIndex({callerObject.identifier}[BOTTOM])"
+
+            if not callerObject.struct_defs or not callerObject.enum_defs:
+                ccf = self.an.contract_cfgs[self.an.current_target_contract]
+                callerObject.struct_defs = ccf.structDefs
+                callerObject.enum_defs = ccf.enumDefs
 
             min_idx = result.min_value
             max_idx = result.max_value
