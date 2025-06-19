@@ -2,9 +2,11 @@ from Parser.SolidityParser import SolidityParser
 from Parser.SolidityVisitor import SolidityVisitor
 # 맨 위 import 부분
 from antlr4.tree.Tree import TerminalNodeImpl
-from Utils.Util import * # Expression, Variables class
-from typing import List, Tuple
 
+from Domain.Variable import Variables, GlobalVariable, ArrayVariable, StructVariable, EnumVariable, MappingVariable
+from Domain.Type import SolType
+from Domain.Interval import IntegerInterval, UnsignedIntegerInterval, BoolInterval
+from Domain.IR import Expression
 
 KEYWORD_IDENTIFIERS = {
     "from", "to", "payable", "returns",      # 필요 시 계속 추가

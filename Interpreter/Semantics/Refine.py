@@ -1,6 +1,12 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:                                         # 타입 검사 전용
+     from Analyzer.ContractAnalyzer import ContractAnalyzer
+
 from Interpreter.Semantics.Update import Update
 from Interpreter.Semantics.Evaluation import Evaluation
-from Analyzer.ContractAnalyzer import ContractAnalyzer
 from Analyzer.EnhancedSolidityVisitor import READONLY_MEMBERS, READONLY_GLOBAL_BASES
 from Domain.Interval import *
 from Domain.Variable import Variables
@@ -10,7 +16,7 @@ from Utils.Helper import VariableEnv
 
 class Refine:
 
-    def __init__(self, an:ContractAnalyzer):
+    def __init__(self, an:"ContractAnalyzer"):
         self.an = an
         self.ev = Evaluation(an)
         self.up = Update(an)

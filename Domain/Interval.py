@@ -372,6 +372,22 @@ class IntegerInterval(Interval):
             return self
         return IntegerInterval(-self.max_value, -self.min_value, self.type_length)
 
+    # Interval.py  ─ IntegerInterval 안쪽, 앞/뒤 어디든 메서드 하나만 삽입
+    # ---------- 단항 연산 ----------
+    def bitwise_not(self) -> "IntegerInterval":
+        """
+        단항  '~'  (two’s-complement 가정).
+        구간 [min,max]  →  [~max, ~min]  으로 보수-변환 후
+        비트폭 한계에 맞춰 클램프한다.
+        """
+        if self.is_bottom():
+            return self
+        lo_bound = -(1 << (self.type_length - 1))
+        hi_bound = (1 << (self.type_length - 1)) - 1
+        new_min = max(lo_bound, ~self.max_value)
+        new_max = min(hi_bound, ~self.min_value)
+        return IntegerInterval(new_min, new_max, self.type_length)
+
     def prefix_increment(self):
         if self.is_bottom():
             return self
@@ -662,6 +678,22 @@ class UnsignedIntegerInterval(Interval):
 
         return Interval._bottom_propagate(self, other, _impl)
 
+    # Interval.py  ─ UnsignedIntegerInterval 내부
+    # ---------- 단항 연산 ----------
+    def bitwise_not(self) -> "UnsignedIntegerInterval":
+        """
+        uintN 의  '~'  는  (2^N-1) − x  와 동일.
+        구간 [min,max]  →  [mask-max , mask-min]
+        """
+        if self.is_bottom():
+            return self
+        mask = (1 << self.type_length) - 1
+        return UnsignedIntegerInterval(
+            mask - self.max_value,
+            mask - self.min_value,
+            self.type_length
+        )
+
     # ------------------------------------------------------------------------
 
 
@@ -820,6 +852,11 @@ class BoolInterval(Interval):
             return BoolInterval(1,1)
         # 그 외 => [0,1]
         return BoolInterval(0,1)
+
+    # Interval.py  ─ BoolInterval 내부
+    def bitwise_not(self) -> "BoolInterval":
+        # bool 에서는 ~ 연산을 논리 not 과 동일하게 다룬다.
+        return self.logical_not()
 
     def __repr__(self):
         if self.is_bottom():

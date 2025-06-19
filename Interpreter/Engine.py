@@ -1,4 +1,9 @@
-from Analyzer.ContractAnalyzer import ContractAnalyzer
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:                                         # 타입 검사 전용
+     from Analyzer.ContractAnalyzer import ContractAnalyzer
 
 from Interpreter.Semantics.Refine import Refine
 from Interpreter.Semantics.Runtime import Runtime
@@ -16,7 +21,7 @@ class Engine:
     – 실제 ‘한 줄 해석’은 Semantics 에게 위임.
     """
 
-    def __init__(self, an:ContractAnalyzer):
+    def __init__(self, an:"ContractAnalyzer"):
         self.an = an
         self.ref = Refine(an)
         self.runtime = Runtime(an)

@@ -1,8 +1,7 @@
-import json
 from Analyzer.EnhancedSolidityVisitor import EnhancedSolidityVisitor
 from Analyzer.ContractAnalyzer import ContractAnalyzer
 from Analyzer.DebugUnitAnalyzer import DebugBatchManager
-from Utils.Util                        import ParserHelpers     # ★ here
+from Utils.Helper                      import ParserHelpers     # ★ here
 import time
 
 contract_analyzer = ContractAnalyzer()

@@ -16,6 +16,7 @@ from Analyzer.StaticCFGFactory import StaticCFGFactory
 from Interpreter.Semantics.Evaluation import Evaluation
 from Interpreter.Semantics.Update import Update
 from Interpreter.Semantics.Refine import Refine
+from Interpreter.Semantics.Runtime import Runtime
 
 class ContractAnalyzer:
 
@@ -49,6 +50,7 @@ class ContractAnalyzer:
         self.evaluator = Evaluation(self)
         self.updater = Update(self)
         self.refiner = Refine(self)
+        self.runtime = Runtime(self)
 
         self.analysis_per_line = self.recorder.ledger
 
@@ -1686,6 +1688,70 @@ class ContractAnalyzer:
 
         self._batch_targets.add(fcfg)
 
+    def get_line_analysis(self, start_ln: int, end_ln: int) -> dict[int, list[dict]]:
+        """
+        [start_ln, end_ln] 구간에 대해
+        { line_no: [ {kind: ..., vars:{...}}, ... ], ... }  형태 반환
+        (구간 안에 기록이 없으면 key 자체가 없다)
+        """
+        return {
+            ln: self.analysis_per_line[ln]
+            for ln in range(start_ln, end_ln + 1)
+            if ln in self.analysis_per_line
+        }
+
+    def send_report_to_front(
+            self,
+            patched_lines: list[tuple[str, int, int]] | None = None
+    ) -> None:
+
+        # 0) ‘어떤 라인을 보여줄지’ 결정 ---------------------------
+        touched: set[int] = set()
+
+        # (A) 호출 측에서 주석 라인을 넘겨준 경우
+        if patched_lines:
+            for _code, s, e in patched_lines:
+                touched.update(range(s, e + 1))
+
+        # (B) 주석 라인을 안 받았거나, 비어 있다면
+        #     ⇢ 방금 재-해석한 함수 전체 라인 사용
+        if not touched and getattr(self, "_last_func_lines", None):
+            s, e = self._last_func_lines
+            touched.update(range(s, e + 1))
+
+        if not touched:
+            print("※ send_report_to_front : 보여줄 라인이 없습니다.")
+            return
+
+        # 1) 라인별 분석 결과 수집 -------------------------------
+        lmin, lmax = min(touched), max(touched)
+        payload = self.get_line_analysis(lmin, lmax)
+
+        if not payload:
+            print("※ 분석 결과가 없습니다.")
+            return
+
+        print("\n=======  ANALYSIS  =======")
+        for ln in sorted(payload):
+            for rec in payload[ln]:
+                kind = rec.get("kind", "?")
+                vars_ = rec.get("vars", {})
+                print(f"{ln:4} │ {kind:<12} │ {vars_}")
+        print("==========================\n")
+
+    # ContractAnalyzer.py  (클래스 내부)
+
+    def flush_reinterpret_target(self) -> None:
+        if not self._batch_targets:
+            return
+        fcfg = self._batch_targets.pop()
+        self.runtime.interpret_function_cfg(fcfg, None)
+
+        ln_set = {st.src_line
+                  for blk in fcfg.graph.nodes
+                  for st in blk.statements
+                  if getattr(st, "src_line", None)}
+        self._last_func_lines = (min(ln_set), max(ln_set)) if ln_set else None
 
     # ──────────────────────────────────────────────────────────────
     # Snapshot 전용 내부 헬퍼  ―  외부에서 쓸 일 없으므로 “프라이빗” 네이밍

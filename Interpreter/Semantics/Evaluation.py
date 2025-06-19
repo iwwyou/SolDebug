@@ -1,7 +1,12 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:                                         # 타입 검사 전용
+     from Analyzer.ContractAnalyzer import ContractAnalyzer
+
 from Interpreter.Semantics.Update import Update
 from Interpreter.Semantics.Runtime import Runtime
-
-from Analyzer.ContractAnalyzer import ContractAnalyzer
 
 from Domain.Variable import Variables, ArrayVariable, StructVariable, MappingVariable, EnumVariable, EnumDefinition
 from Domain.Type import SolType
@@ -15,7 +20,7 @@ import re
 
 class Evaluation :
 
-    def __init__(self, analyzer: ContractAnalyzer):
+    def __init__(self, analyzer: "ContractAnalyzer"):
         """
         Semantics 인스턴스는 ContractAnalyzer 하나만 품고,
         나머지 속성·헬퍼는 전부 위임(propagation)한다.

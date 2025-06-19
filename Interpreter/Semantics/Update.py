@@ -1,8 +1,21 @@
-from Analyzer.ContractAnalyzer import *
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:                                         # 타입 검사 전용
+     from Analyzer.ContractAnalyzer import ContractAnalyzer
+
+from Interpreter.Semantics.Evaluation import Evaluation
+from Domain.Interval import *
+from Domain.Variable import Variables, ArrayVariable, MappingVariable, StructVariable, EnumVariable
+from Domain.Address import AddressSymbolicManager
+from Domain.IR import Expression
+from Utils.Helper import VariableEnv
+
 
 class Update :
 
-    def __init__(self, an:ContractAnalyzer):
+    def __init__(self, an:"ContractAnalyzer"):
         self.an = an
         self.ev = Evaluation(an)
 

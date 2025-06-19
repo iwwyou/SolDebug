@@ -1,15 +1,21 @@
+from __future__ import annotations
+
 # Analyzer/CFGBuilder.py
 from Utils.CFG import CFGNode, FunctionCFG
 from Utils.Helper import VariableEnv
-from Analyzer.ContractAnalyzer import ContractAnalyzer
 from Interpreter.Engine import Engine
 from Domain.IR import Expression
 from Domain.Variable import Variables
 from collections import deque
 from typing import cast, Optional
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:                                         # 타입 검사 전용
+     from Analyzer.ContractAnalyzer import ContractAnalyzer
+
 class DynamicCFGBuilder:
-    def __init__(self, an: ContractAnalyzer):
+    def __init__(self, an: "ContractAnalyzer"):
         self.an = an
         self.eng = Engine(an)
 

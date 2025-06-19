@@ -1,4 +1,10 @@
-from Analyzer.ContractAnalyzer import ContractAnalyzer
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:                                         # 타입 검사 전용
+     from Analyzer.ContractAnalyzer import ContractAnalyzer
+
 from Utils.CFG import CFGNode, FunctionCFG
 from Utils.Helper import VariableEnv
 from Domain.Variable import Variables, MappingVariable, ArrayVariable, StructVariable
@@ -12,7 +18,7 @@ import copy
 from collections import deque
 
 class Runtime:
-    def __init__(self, analyzer: ContractAnalyzer):
+    def __init__(self, analyzer: "ContractAnalyzer"):
         """
         Semantics 인스턴스는 ContractAnalyzer 하나만 품고,
         나머지 속성·헬퍼는 전부 위임(propagation)한다.
