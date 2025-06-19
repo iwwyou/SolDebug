@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Dict, List, Any, Optional, Union
+from typing import Dict, List, Any, Union
 
 from Domain.IR import Expression
 from Domain.Variable import (
@@ -218,7 +218,7 @@ class RecordManager:
     # ------------------------------------------------------------------
 
     def _append_or_replace(self, line_no: int, new_rec: Dict[str, Any], *, replace_rule) -> None:
-        existing = self._acc[line_no]
+        existing = self.ledger[line_no]
         for idx, rec in enumerate(existing):
             if replace_rule(rec, new_rec):
                 existing[idx] = new_rec  # replace in‑place
