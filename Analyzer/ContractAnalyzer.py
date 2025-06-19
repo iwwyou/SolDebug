@@ -7,7 +7,6 @@ from solcx import (
     get_installed_solc_versions
 )
 from solcx.exceptions import SolcError
-from collections import defaultdict, deque
 from Domain.Address import *
 from Utils.Helper import *
 from Utils.Snapshot import *
@@ -16,6 +15,7 @@ from Analyzer.RecordManager import RecordManager
 from Analyzer.StaticCFGFactory import StaticCFGFactory
 from Interpreter.Semantics.Evaluation import Evaluation
 from Interpreter.Semantics.Update import Update
+from Interpreter.Semantics.Refine import Refine
 
 class ContractAnalyzer:
 
@@ -48,6 +48,7 @@ class ContractAnalyzer:
         self.recorder = RecordManager()
         self.evaluator = Evaluation(self)
         self.updater = Update(self)
+        self.refiner = Refine(self)
 
         self.analysis_per_line = self.recorder.ledger
 
@@ -853,137 +854,97 @@ class ContractAnalyzer:
 
         # 4. constructor 특수 처리 & 저장 -------------------------------
         if fcfg.function_type == "constructor":
-            self._overwrite_state_vars_from_block(ccf, cur_blk.variables)
+            state_vars = ccf.state_variable_node.variables
+
+            # ③ scope=='state' 인 항목을 그대로 복사해 덮어쓰기
+            for name, var in state_vars.items():
+                if getattr(var, "scope", None) != "state":
+                    continue
+                state_vars[name] = VariableEnv.copy_variables({name: var})[name]
 
         ccf.functions[self.current_target_function] = fcfg
         self.contract_cfgs[self.current_target_contract] = ccf
 
-    def _handle_unary_incdec(
-            self,
-            expr: Expression,  # ++x   또는   x--   의  피연산식
-            op_sign: str,  # "+="  또는  "-="
-            stmt_kind: str  # "unary_prefix" / "unary_suffix"
-    ):
+    # --------------------------------------------------------------
+    #  ++x / --x   (prefix·suffix 공통)
+    # --------------------------------------------------------------
+    def handle_unary_incdec(self, expr: Expression,
+                             op_sign: str,  # "+=" | "-="
+                             stmt_kind: str):  # "unary_prefix" | "unary_suffix"
         ccf = self.contract_cfgs[self.current_target_contract]
-        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
-        if self.current_target_function_cfg is None:
+        fcfg = ccf.get_function_cfg(self.current_target_function)
+        if fcfg is None:
             raise ValueError("active FunctionCFG not found")
 
-        cur_blk = self.get_current_block()
+        cur_blk = self.builder.get_current_block()
 
-        # ──────────────────────────────────────────────
-        # ❶ 피연산 변수의 현재 Interval 가져오기
-        # ──────────────────────────────────────────────
-        cur_val = self.evaluate_expression(expr,
-                                           cur_blk.variables, None, None)
+        # ① 현재 값 읽기 → 타입에 맞는 “1” Interval 준비 -------------
+        cur_val = self.evaluator.evaluate_expression(
+            expr, cur_blk.variables, None, None)
 
-        # (※  evaluate_expression 은 ++x, x-- 양쪽 모두
-        #     동일하게 expr.expression 을 넘겨도 됩니다)
-
-        # ──────────────────────────────────────────────
-        # ❷ “+1” / “-1” 에 사용할 타입-정합 Interval 생성
-        # ──────────────────────────────────────────────
         if isinstance(cur_val, UnsignedIntegerInterval):
             one = UnsignedIntegerInterval(1, 1, cur_val.type_length)
         elif isinstance(cur_val, IntegerInterval):
             one = IntegerInterval(1, 1, cur_val.type_length)
         elif isinstance(cur_val, BoolInterval):
-            # ++/-- 가 bool 에 쓰일 일은 없지만 방어적으로
-            one = BoolInterval(1, 1)
+            one = BoolInterval(1, 1)  # 거의 안 쓰임 – 방어 코드
         else:
-            # 주소·string 등에는 ++/-- 가 허용되지 않으므로
-            raise ValueError(f"unsupported ++/-- operand type: {type(cur_val).__name__}")
+            raise ValueError(f"unsupported ++/-- type {type(cur_val).__name__}")
 
-        # ──────────────────────────────────────────────
-        # ❸ 실제 변수 갱신
-        #     (++/--  ==  <var>  op_sign  1)
-        # ──────────────────────────────────────────────
-        self.update_left_var(expr, one, op_sign, cur_blk.variables, None, None)
-
-        # ▸ CFG statement 기록 (분석-로그 용)
-        cur_blk.add_assign_statement(expr, op_sign,
-                                     Expression(literal="1", context="LiteralExpContext"),
-                                     self.current_start_line)
-
-        # ── 2) constructor 였으면 state-variables overwrite
-        if self.current_target_function_cfg.function_type == "constructor":
-            self._overwrite_state_vars_from_block(ccf, cur_blk.variables)
-
-        # ─── 3) 갱신된 변수 객체 찾아서 record ─────────────────────
-        base_obj = None  # ←★ 미리 초기화
-        target_var = self._resolve_and_update_expr(
-            expr,  # ++ / -- 의 피연산자 식
-            None, '=',  # new_value 없음 ⇒ 탐색만
-            cur_blk.variables,
-            self.current_target_function_cfg
+        # ② 실제 값 패치 (+ Recorder 자동 기록) -----------------------
+        self.updater.update_left_var(
+            expr, one, op_sign, cur_blk.variables
         )
 
-        if target_var is None:  # 배열·매핑 인덱스가 불확정한 경우 등
-            base_obj = self._resolve_and_update_expr(
-                expr.base, None, '=', cur_blk.variables,
-                self.current_target_function_cfg
-            )
-            if isinstance(base_obj, ArrayVariable):
-                concrete = self._try_concrete_key(expr.index, cur_blk.variables)
-                if concrete is not None:
-                    target_var = base_obj.elements[int(concrete)]
-                else:
-                    target_var = base_obj  # whole-array + <unk>
-            elif isinstance(base_obj, MappingVariable):
-                concrete = self._try_concrete_key(expr.index, cur_blk.variables)
-                if concrete is not None:
-                    target_var = base_obj.mapping.setdefault(
-                        concrete,
-                        self._create_new_mapping_value(base_obj, concrete)
-                    )
-                else:
-                    target_var = base_obj  # whole-mapping + <unk>
-
-        self._record_analysis(
+        # ③ CFG Statement 삽입 -------------------------------------
+        self.builder.build_unary_statement(
+            cur_block=cur_blk,
+            expr=expr,
+            op_token=stmt_kind,  # 기록용 토큰 – 원하면 '++' 등으로
             line_no=self.current_start_line,
-            stmt_type=stmt_kind,  # "unary_prefix" 또는 "unary_suffix"
-            expr=expr if target_var is not base_obj else expr.base,
-            var_obj=target_var
+            fcfg=fcfg,
+            brace_count=self.brace_count,
         )
 
-        # ── 4) CFG 저장
-        self.current_target_function_cfg.update_block(cur_blk)
-        ccf.functions[self.current_target_function] = self.current_target_function_cfg
+        # ④ constructor 특수 처리 + 저장 ---------------------------
+        if fcfg.function_type == "constructor":
+            state_vars = ccf.state_variable_node.variables
+
+            # ③ scope=='state' 인 항목을 그대로 복사해 덮어쓰기
+            for name, var in state_vars.items():
+                if getattr(var, "scope", None) != "state":
+                    continue
+                state_vars[name] = VariableEnv.copy_variables({name: var})[name]
+
+        fcfg.update_block(cur_blk)
+        ccf.functions[self.current_target_function] = fcfg
         self.contract_cfgs[self.current_target_contract] = ccf
-        self.brace_count[self.current_start_line]["cfg_node"] = cur_blk
 
-    def _handle_delete(self, target_expr: Expression):
-        """
-        Solidity `delete x` :
-            · 스칼라 → 기본값(0 / false / 0x0 …)
-            · 배열   → 동적이면 length 0, 정적이면 요소 0
-            · 매핑   → entry 제거
-            · struct → 각 필드 delete 재귀
-        분석 도메인에서는 “가장 보수적”으로 **bottom** 또는 0-singleton 으로 초기화
-        """
-
+    # --------------------------------------------------------------
+    #  delete <expr>
+    # --------------------------------------------------------------
+    def handle_delete(self, target_expr: Expression):
         ccf = self.contract_cfgs[self.current_target_contract]
-        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
-        if self.current_target_function_cfg is None:
+        fcfg = ccf.get_function_cfg(self.current_target_function)
+        if fcfg is None:
             raise ValueError("active FunctionCFG not found")
 
-        cur_blk = self.get_current_block()
+        cur_blk = self.builder.get_current_block()
         vars_env = cur_blk.variables
 
-        # 1) 대상 변수 객체 찾기 (update 없는 '=' 호출하여 객체만 받아옴)
-        var_obj = self._resolve_and_update_expr(
-            target_expr, rVal=None, operator="=", variables=vars_env,
-            fcfg=self.current_target_function_cfg)
+        # ① 대상 객체 resolve  (update-free 버전)
+        var_obj = self.updater.resolve_lhs_expr(target_expr, vars_env)
+        if var_obj is None:
+            raise ValueError("LHS cannot be resolved.")
 
-        # 2) 타입별 ‘기본값’ 적용 -----------------------------------------
+        # ② 값 wipe  ----------------------------------------------
         def _wipe(obj):
             if isinstance(obj, MappingVariable):
                 obj.mapping.clear()
             elif isinstance(obj, ArrayVariable):
                 obj.elements.clear()
             elif isinstance(obj, StructVariable):
-                for m in obj.members.values():
-                    _wipe(m)
+                for m in obj.members.values(): _wipe(m)
             elif isinstance(obj, EnumVariable):
                 obj.value = IntegerInterval(0, 0, 256)
             elif isinstance(obj, Variables):
@@ -997,80 +958,97 @@ class ContractAnalyzer:
                     obj.value = BoolInterval(0, 0)
                 elif et == "address":
                     obj.value = UnsignedIntegerInterval(0, 0, 160)
-                else:  # bytes / string …
+                else:
                     obj.value = f"symbolic_zero_{obj.identifier}"
 
         _wipe(var_obj)
 
-        # 3) 로그 & CFG 저장 (기존 ++/-- 로직과 동일 형태)
-        cur_blk.add_assign_statement(
-            target_expr, "delete", None, self.current_start_line)
+        # ③ Recorder 로그 -----------------------------------------
+        self.recorder.record_assignment(
+            line_no=self.current_start_line,
+            expr=target_expr,
+            var_obj=var_obj,
+            base_obj=None,
+        )
 
-        fcfg = self.current_target_function_cfg
+        # ④ CFG Statement 삽입 & 저장 ------------------------------
+        self.builder.build_unary_statement(
+            cur_block=cur_blk,
+            expr=target_expr,
+            op_token="delete",
+            line_no=self.current_start_line,
+            fcfg=fcfg,
+            brace_count=self.brace_count,
+        )
+
         fcfg.update_block(cur_blk)
-        self.contract_cfgs[self.current_target_contract] \
-            .functions[self.current_target_function] = fcfg
-        self.brace_count[self.current_start_line]["cfg_node"] = cur_blk
+        ccf.functions[self.current_target_function] = fcfg
+        self.contract_cfgs[self.current_target_contract] = ccf
 
     # ───────────────────────────────────────────────────────────
     def process_unary_prefix_operation(self, expr: Expression):
         if expr.operator == "++":
-            self._handle_unary_incdec(expr.expression, "+=", "unary_prefix")
+            self.handle_unary_incdec(expr.expression, "+=", "unary_prefix")
         elif expr.operator == "--":
-            self._handle_unary_incdec(expr.expression, "-=", "unary_prefix")
+            self.handle_unary_incdec(expr.expression, "-=", "unary_prefix")
         elif expr.operator == "delete":
-            self._handle_delete(expr.expression)
+            self.handle_delete(expr.expression)
         else:
             raise ValueError(f"Unsupported prefix operator {expr.operator}")
 
     def process_unary_suffix_operation(self, expr: Expression):
         if expr.operator == "++":
-            self._handle_unary_incdec(expr.expression, "+=", "unary_suffix")
+            self.handle_unary_incdec(expr.expression, "+=", "unary_suffix")
         elif expr.operator == "--":
-            self._handle_unary_incdec(expr.expression, "-=", "unary_suffix")
+            self.handle_unary_incdec(expr.expression, "-=", "unary_suffix")
         else:
             raise ValueError(f"Unsupported suffix operator {expr.operator}")
 
-    def process_function_call(self, expr):
-        """
-        함수 호출을 처리하는 메소드입니다.
-        :param expr: Expression 객체 (FunctionCall)
-        :return: 함수 호출 결과 (Interval 또는 None)
-        """
+    # ==================================================================
+    #  함수 호출 처리
+    # ==================================================================
+    # ==================================================================
+    #  함수 호출 처리
+    # ==================================================================
+    def process_function_call(self, expr: Expression) -> None:
+        # ① CFG 컨텍스트 -------------------------------------------------
+        ccf = self.contract_cfgs[self.current_target_contract]
+        fcfg = ccf.get_function_cfg(self.current_target_function)
+        if fcfg is None:
+            raise ValueError("No active function CFG.")
 
-        # 1. 현재 타겟 컨트랙트의 CFG 가져오기
-        contract_cfg = self.contract_cfgs[self.current_target_contract]
-        if not contract_cfg:
-            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+        cur_blk = self.builder.get_current_block()
 
-        # 2. 현재 타겟 함수의 CFG 가져오기
-        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
-        if not self.current_target_function_cfg:
-            raise ValueError("No active function to add variables to.")
+        # ② 실제 호출 해석  ---------------------------------------------
+        _ = self.evaluator.evaluate_function_call_context(
+            expr,
+            cur_blk.variables,
+            None,
+            None,
+        )
+        # (Evaluate → Update 경유로 변수 변화는 자동 기록됨)
 
-        saved_cfg = self.current_target_function_cfg  # ⭐ CFG 백업
-        saved_fn = self.current_target_function  # ⭐ 함수 이름 백업
+        # ③ CFG 노드/엣지 정리  ----------------------------------------
+        self.builder.build_function_call_statement(
+            cur_block=cur_blk,
+            expr=expr,
+            line_no=self.current_start_line,
+            fcfg=fcfg,
+            brace_count=self.brace_count,
+        )
 
-        current_block = self.get_current_block()
-        # 3. 함수 표현식 가져오기
-        function_expr = expr.function
+        # ④ constructor 특수 처리  -------------------------------------
+        if fcfg.function_type == "constructor":
+            state_vars = ccf.state_variable_node.variables
+            # ‣ scope=='state' 인 항목만 deep-copy 로 덮어쓰기
+            for name, var in state_vars.items():
+                if getattr(var, "scope", None) != "state":
+                    continue
+                state_vars[name] = VariableEnv.copy_variables({name: var})[name]
 
-        _ = self.evaluate_function_call_context(expr, current_block.variables, None, None)
-
-        current_block.add_function_call_statement(expr, self.current_start_line)
-
-        # 10. current_block을 function CFG에 반영
-        self.current_target_function_cfg = saved_cfg
-        self.current_target_function = saved_fn
-        self.current_target_function_cfg.update_block(current_block)
-
-        # 6) 상위 구조로 반영
-        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
-        self.contract_cfgs[self.current_target_contract] = contract_cfg
-        self.brace_count[self.current_start_line]['cfg_node'] = current_block
-
-        # 7) 컨텍스트 정리 (설계에 따라 유지/제거)
-        self.current_target_function_cfg = None
+        # ⑤ CFG 저장  ---------------------------------------------------
+        ccf.functions[self.current_target_function] = fcfg
+        self.contract_cfgs[self.current_target_contract] = ccf
 
     def process_payable_function_call(self, expr):
         # Handle payable function calls
@@ -1080,974 +1058,551 @@ class ContractAnalyzer:
         # Handle function calls with options
         pass
 
-    def process_if_statement(self, condition_expr):
-        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
-        contract_cfg = self.contract_cfgs[self.current_target_contract]
-        if not contract_cfg:
-            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
-
-        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
-        if not self.current_target_function_cfg:
-            raise ValueError("No active function to process the if statement.")
-
-        # 2. 현재 블록 가져오기
-        current_block = self.get_current_block()
-
-        # 3. 조건식 블록 생성 및 평가
-        condition_block = CFGNode(name=f"if_condition_{self.current_start_line}",
-                                  condition_node=True,
-                                  condition_node_type="if",
-                                  src_line=self.current_start_line)
-        condition_block.condition_expr = condition_expr
-        # 7. True 분기에서 변수 상태 복사 및 업데이트
-        condition_block.variables = self.copy_variables(current_block.variables)
-
-        # 4. brace_count 업데이트 - 존재하지 않으면 초기화
-        if self.current_start_line not in self.brace_count:
-            self.brace_count[self.current_start_line] = {}
-        self.brace_count[self.current_start_line]['cfg_node'] = condition_block
-
-        # 5. True 분기 블록 생성
-        true_block = CFGNode(name=f"if_true_{self.current_start_line+1}",
-                             branch_node=True,
-                             is_true_branch=True,
-                             src_line=self.current_start_line)
-        true_block.variables = self.copy_variables(current_block.variables)
-        # 7. True 분기에서 변수 상태 복사 및 업데이트
-        self.update_variables_with_condition(true_block.variables, condition_expr, is_true_branch=True)
-
-        # ❶――― 〈True-분기〉 변수 환경을 즉시 기록
-        self._record_analysis(
-            line_no=self.current_start_line,  # if 조건이 적힌 라인
-            stmt_type="branchTrue",  # 또는 "ifConditionTrue" 등 통일된 tag
-            env=true_block.variables  # 좁혀진 Interval 들
-        )
-
-        false_block = CFGNode(name=f"if_false_{self.current_start_line}",
-                              branch_node=True,
-                              is_true_branch=False,
-                              src_line=self.current_start_line)
-        false_block.variables = self.copy_variables(current_block.variables)
-        self.update_variables_with_condition(false_block.variables, condition_expr, is_true_branch=False)
-
-
-        # 8. 현재 블록의 후속 노드 처리 (기존 current_block의 successors를 가져옴)
-        successors = list(self.current_target_function_cfg.graph.successors(current_block))
-
-        # 기존 current_block과 successor들의 edge를 제거
-        for successor in successors:
-            self.current_target_function_cfg.graph.remove_edge(current_block, successor)
-
-        # 9. CFG 노드 추가
-        self.current_target_function_cfg.graph.add_node(condition_block)
-        self.current_target_function_cfg.graph.add_node(true_block)
-        self.current_target_function_cfg.graph.add_node(false_block)
-
-        # 10. 조건 블록과 True/False 분기 연결
-        self.current_target_function_cfg.graph.add_edge(current_block, condition_block)
-        self.current_target_function_cfg.graph.add_edge(condition_block, true_block, condition=True)
-        self.current_target_function_cfg.graph.add_edge(condition_block, false_block, condition=False)
-
-        # 11. True 분기 후속 노드 연결
-        for successor in successors:
-            self.current_target_function_cfg.graph.add_edge(true_block, successor)
-            self.current_target_function_cfg.graph.add_edge(false_block, successor)
-
-        # 11. function_cfg 결과를 contract_cfg에 반영
-        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
-
-        # 12. contract_cfg를 contract_cfgs에 반영
-        self.contract_cfgs[self.current_target_contract] = contract_cfg
-
-        # 12. brace_count에 CFG 노드 정보 업데이트 (함수의 시작 라인 정보 사용)
-        self.brace_count[self.current_start_line]['cfg_node'] = condition_block
-
-        self.current_target_function_cfg = None
-
-    def process_else_if_statement(self, condition_expr):
-        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
-        contract_cfg = self.contract_cfgs[self.current_target_contract]
-        if not contract_cfg:
-            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
-
-        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
-        if not self.current_target_function_cfg:
-            raise ValueError("No active function to process the else-if statement.")
-
-        # 2. 이전 조건 노드를 가져와서 부정된 조건을 처리
-        previous_condition_node = self.find_corresponding_condition_node()
-        if not previous_condition_node:
-            raise ValueError("No previous if or else if node found for else-if statement.")
-
-        # --- 0) 기존 successor 기억
-        old_succs = [
-            s for s in self.current_target_function_cfg.graph.successors(previous_condition_node)
-            if self.current_target_function_cfg.graph.get_edge_data(previous_condition_node, s).get('condition') is True
-        ]
-
-        # 3. 이전 조건 노드의 False 분기 제거
-        false_successors = list(self.current_target_function_cfg.graph.successors(previous_condition_node))
-        for successor in false_successors:
-            edge_data = self.current_target_function_cfg.graph.get_edge_data(previous_condition_node, successor)
-            if edge_data.get('condition') is False:
-                self.current_target_function_cfg.graph.remove_edge(previous_condition_node, successor)
-
-                # 2) false_block -> successor edge들도 제거
-                succs_of_false = list(self.current_target_function_cfg.graph.successors(successor))
-                for s in succs_of_false:
-                    self.current_target_function_cfg.graph.remove_edge(successor, s)
-
-        # 3. 이전 조건 노드에서 False 분기 처리 (가상의 블록)
-        temp_variables = self.copy_variables(previous_condition_node.variables)
-        self.update_variables_with_condition(temp_variables, previous_condition_node.condition_expr,
-                                             is_true_branch=False)
-
-        # 4. else if 조건식 블록 생성
-        condition_block = CFGNode(name=f"else_if_condition_{self.current_start_line}",
-                                  branch_node=True,
-                                  is_true_branch=False,
-                                  condition_node=True,
-                                  condition_node_type="else if",
-                                  src_line=self.current_start_line)
-        condition_block.condition_expr = condition_expr
-        condition_block.variables = self.copy_variables(temp_variables)
-
-        # 5. brace_count 업데이트 - 존재하지 않으면 초기화
-        if self.current_start_line not in self.brace_count:
-            self.brace_count[self.current_start_line] = {}
-        self.brace_count[self.current_start_line]['cfg_node'] = condition_block
-
-        # 6. True 분기 블록 생성
-        true_block = CFGNode(name=f"else_if_true_{self.current_start_line}",
-                             branch_node=True,
-                             is_true_branch=True,
-                             src_line=self.current_start_line)
-        true_block.variables = self.copy_variables(condition_block.variables)
-
-        self.update_variables_with_condition(true_block.variables, condition_expr, is_true_branch=True)
-
-        # ❶――― 〈True-분기〉 변수 환경을 즉시 기록
-        self._record_analysis(
-            line_no=self.current_start_line,  # if 조건이 적힌 라인
-            stmt_type="branchTrue",  # 또는 "ifConditionTrue" 등 통일된 tag
-            env=true_block.variables  # 좁혀진 Interval 들
-        )
-
-        # 5. False 분기 블록 생성
-        false_block = CFGNode(name=f"else_if_false_{self.current_start_line}",
-                              branch_node=True,
-                              is_true_branch=False,
-                              src_line=self.current_start_line)
-
-        false_block.variables = self.copy_variables(condition_block.variables)
-        self.update_variables_with_condition(false_block.variables, condition_expr,
-                                             is_true_branch=False)
-
-
-        # 8. 이전 조건 블록과 새로운 else_if_condition 블록 연결
-        self.current_target_function_cfg.graph.add_edge(previous_condition_node, condition_block, condition=False)
-
-        # 9. 새로운 조건 블록과 True 블록 연결
-        self.current_target_function_cfg.graph.add_node(condition_block)
-        self.current_target_function_cfg.graph.add_node(true_block)
-        self.current_target_function_cfg.graph.add_node(false_block)
-
-        self.current_target_function_cfg.graph.add_edge(condition_block, true_block, condition=True)
-        self.current_target_function_cfg.graph.add_edge(condition_block, false_block, condition=False)
-
-        # --- 2) edge 재연결
-        for ts in old_succs:  # 이전 True-succ
-            for nxt in list(self.current_target_function_cfg.successors(ts)):  # 그 뒤 노드들
-                self.current_target_function_cfg.add_edge(true_block, nxt)
-                self.current_target_function_cfg.add_edge(false_block, nxt)
-
-        # 11. function_cfg 결과를 contract_cfg에 반영
-        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
-
-        # 12. contract_cfg를 contract_cfgs에 반영
-        self.contract_cfgs[self.current_target_contract] = contract_cfg
-
-        # 12. brace_count에 CFG 노드 정보 업데이트 (함수의 시작 라인 정보 사용)
-        self.brace_count[self.current_start_line]['cfg_node'] = condition_block
-
-        self.current_target_function_cfg = None
-
-    def process_else_statement(self):
-        # ───────────────────────── 1. CFG 컨텍스트 ─────────────────────────
+    def process_if_statement(self, condition_expr: Expression) -> None:
+        # ── 1. CFG 컨텍스트 ─────────────────────────────────────────────
         ccf = self.contract_cfgs[self.current_target_contract]
-        if ccf is None:
-            raise ValueError(f"Contract CFG for {self.current_target_contract} not found.")
+        fcfg = ccf.get_function_cfg(self.current_target_function)
+        if fcfg is None:
+            raise ValueError("No active function CFG.")
+
+        cur_blk = self.builder.get_current_block()
+
+        # ── 2. True / False 분기용 변수-환경 준비 ──────────────────────
+        true_env = VariableEnv.copy_variables(cur_blk.variables)
+        false_env = VariableEnv.copy_variables(cur_blk.variables)
+
+        self.refiner.update_variables_with_condition(true_env, condition_expr, True)
+        self.refiner.update_variables_with_condition(false_env, condition_expr, False)
+
+        # True-분기 환경을 바로 기록 (False 쪽도 필요하면 동일 방식 사용)
+        self.recorder.add_env_record(
+            line_no=self.current_start_line,
+            stmt_type="branchTrue",
+            env=true_env,
+        )
+
+        # ── 3. 그래프에 if-구조 삽입  ➜ DynamicCFGBuilder 위임 ──────────
+        self.builder.build_if_statement(
+            cur_block=cur_blk,
+            condition_expr=condition_expr,
+            true_env=true_env,
+            false_env=false_env,
+            line_no=self.current_start_line,
+            fcfg=fcfg,
+            brace_count=self.brace_count,
+        )
+
+        # ── 4. 저장 & 마무리 ───────────────────────────────────────────
+        ccf.functions[self.current_target_function] = fcfg
+        self.contract_cfgs[self.current_target_contract] = ccf
+
+    def process_else_if_statement(self, condition_expr: Expression) -> None:
+        ccf = self.contract_cfgs[self.current_target_contract]
+        fcfg = ccf.get_function_cfg(self.current_target_function)
+        if fcfg is None:
+            raise ValueError("No active function CFG.")
+        prev_cond = self.builder.find_corresponding_condition_node()
+        if prev_cond is None:
+            raise ValueError("else-if used without a preceding if/else-if.")
+
+        # --- 현재 false-분기로 내려온 변수 env --------------------
+        false_base_env = VariableEnv.copy_variables(prev_cond.variables)
+        self.refiner.update_variables_with_condition(
+            false_base_env, prev_cond.condition_expr, is_true_branch=False
+        )
+
+        # --- 새 true/false env ------------------------------------
+        true_env = VariableEnv.copy_variables(false_base_env)
+        false_env = VariableEnv.copy_variables(false_base_env)
+        self.refiner.update_variables_with_condition(true_env, condition_expr, True)
+        self.refiner.update_variables_with_condition(false_env, condition_expr, False)
+
+        # branch-True interval 기록
+        self.recorder.add_env_record(
+            line_no=self.current_start_line,
+            stmt_type="branchTrue",
+            env=true_env,
+        )
+
+        # --- 그래프 삽입 ------------------------------------------
+        cur_blk_dummy = CFGNode("ELSE_FALSE_TMP")  # false-dummy 역할
+        cur_blk_dummy.variables = false_base_env
+        # (그래프에 넣진 않고 env 복사 용도로만 사용)
+
+        new_cond = self.builder.build_else_if_statement(
+            prev_cond=prev_cond,
+            condition_expr=condition_expr,
+            cur_block=cur_blk_dummy,
+            true_env=true_env,
+            false_env=false_env,
+            line_no=self.current_start_line,
+            fcfg=fcfg,
+            brace_count=self.brace_count,
+        )
+
+        # 저장
+        ccf.functions[self.current_target_function] = fcfg
+        self.contract_cfgs[self.current_target_contract] = ccf
+
+    def process_else_statement(self) -> None:
+        # ── 1. CFG 컨텍스트 --------------------------------------------------
+        ccf = self.contract_cfgs[self.current_target_contract]
         fcfg = ccf.get_function_cfg(self.current_target_function)
         if fcfg is None:
             raise ValueError("No active FunctionCFG when processing 'else'.")
 
-        # ───────────────────────── 2. 직전 조건-노드 탐색 ───────────────────
-        cond_node: CFGNode = self.find_corresponding_condition_node()
+        # ── 2. 직전 if / else-if 노드 찾기 -----------------------------------
+        cond_node = self.builder.find_corresponding_condition_node()
         if cond_node is None:
-            raise ValueError("No preceding 'if/else-if' for this 'else'.")
+            raise ValueError("No preceding if/else-if for this 'else'.")
 
-        g = fcfg.graph
-
-        # ── 2-A) 기존 **False** succ edge 제거
-        for succ in list(g.successors(cond_node)):
-            if g[cond_node][succ].get("condition") is False:
-                g.remove_edge(cond_node, succ)
-
-                # 👉 succ 가 가지고 있던 모든 outbound edge 제거
-                for s in list(g.successors(succ)):
-                    g.remove_edge(succ, s)
-
-        # ── 2-B) “True succ” 들 저장 (join 지점 후보)
-        true_succs = [
-            s for s in g.successors(cond_node)
-            if g[cond_node][s].get("condition") is True
-        ]
-
-        # ───────────────────────── 3. else 블록 생성 ──────────────────────
-        else_blk = CFGNode(f"else_block_{self.current_start_line}",
-                           branch_node=True,
-                           is_true_branch=False,
-                           src_line=self.current_start_line)
-
-        # (1) 변수환경 = cond_node 변수 deep-copy
-        else_blk.variables = self.copy_variables(cond_node.variables)
-        # (2) cond 부정 적용
-        self.update_variables_with_condition(
-            else_blk.variables,
-            cond_node.condition_expr,
-            is_true_branch=False
+        # ── 3. else 분기용 변수-환경 생성 ------------------------------------
+        else_env = VariableEnv.copy_variables(cond_node.variables)
+        self.refiner.update_variables_with_condition(
+            else_env, cond_node.condition_expr, is_true_branch=False
         )
 
-        # ───────────────────────── 4. 그래프 연결 ─────────────────────────
-        g.add_node(else_blk)
-        g.add_edge(cond_node, else_blk, condition=False)  # False 브랜치
-
-        for ts in true_succs:  # True 블록(들)
-            for nxt in list(g.successors(ts)):  # 그 블록이 향하던 곳
-                g.add_edge(else_blk, nxt)  # else ─▶ same succ
-
-        # ───────────────────────── 5. brace_count 갱신 ────────────────────
-        self.brace_count.setdefault(self.current_start_line, {})
-        self.brace_count[self.current_start_line]["cfg_node"] = else_blk
-
-        # ───────────────────────── 6. 분석 결과 기록 ──────────────────────
-        #   “else { … }” 첫 줄에서   ▶  분기 전 전체 env 스냅-숏 저장
-        self._record_analysis(
+        #   ▸ 디버깅/UI 용으로 env 기록
+        self.recorder.add_env_record(
             line_no=self.current_start_line,
-            stmt_type="branchTrue",
-            env=else_blk.variables  # flatten 은 _record_analysis 내부에서 수행
+            stmt_type="branchTrue",  # 기존 if/else-if 과 동일 태그 유지
+            env=else_env,
         )
 
-        # ───────────────────────── 7. CFG 저장 ────────────────────────────
+        # ── 4. 그래프 작업은 Builder 에 위임 -------------------------------
+        self.builder.build_else_statement(
+            cond_node=cond_node,
+            else_env=else_env,
+            line_no=self.current_start_line,
+            fcfg=fcfg,
+            brace_count=self.brace_count,
+        )
+
+        # ── 5. 저장 ----------------------------------------------------------
         ccf.functions[self.current_target_function] = fcfg
         self.contract_cfgs[self.current_target_contract] = ccf
 
-        self.current_target_function_cfg = None
+    def process_while_statement(self, condition_expr: Expression) -> None:
+        # 1. CFG 컨텍스트 ---------------------------------------------------
+        ccf = self.contract_cfgs[self.current_target_contract]
+        fcfg = ccf.get_function_cfg(self.current_target_function)
+        if fcfg is None:
+            raise ValueError("No active function CFG.")
 
-    def process_while_statement(self, condition_expr):
-        # 1. Get the current contract and function CFG
-        contract_cfg = self.contract_cfgs.get(self.current_target_contract)
-        if not contract_cfg:
-            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+        cur_blk = self.builder.get_current_block()
 
-        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
-        if not self.current_target_function_cfg:
-            raise ValueError("No active function to process the while statement.")
+        # 2. 분기별 변수 환경 ----------------------------------------------
+        join_env = VariableEnv.copy_variables(cur_blk.variables)
 
-        # 2. Get the current block
-        current_block = self.get_current_block()
+        true_env = VariableEnv.copy_variables(join_env)
+        false_env = VariableEnv.copy_variables(join_env)
 
-        # 3. Create the join point node (entry point for the loop)
-        join_node = CFGNode(name=f"while_join_{self.current_start_line}",
-                            fixpoint_evaluation_node=True)
+        self.refiner.update_variables_with_condition(true_env, condition_expr, True)
+        self.refiner.update_variables_with_condition(false_env, condition_expr, False)
 
-        # Copy variables from current_block to join_node
-        join_node.variables = self.copy_variables(current_block.variables) # while문 이전에서 들어온 변수의 상태
-        join_node.fixpoint_evaluation_node_vars = self.copy_variables(current_block.variables)
+        # True-분기 env 를 즉시 기록
+        self.recorder.add_env_record(
+            line_no=self.current_start_line,
+            stmt_type="branchTrue",
+            env=true_env,
+        )
 
-        successors = list(self.current_target_function_cfg.graph.successors(current_block))
+        # 3. 그래프 구축은 Builder 에 위임 -------------------------------
+        self.builder.build_while_statement(
+            cur_block=cur_blk,
+            condition_expr=condition_expr,
+            join_env=join_env,
+            true_env=true_env,
+            false_env=false_env,
+            line_no=self.current_start_line,
+            fcfg=fcfg,
+            brace_count=self.brace_count,
+        )
 
-        # 기존 current_block과 successor들의 edge를 제거
-        for successor in successors:
-            self.current_target_function_cfg.graph.remove_edge(current_block, successor)
+        # 4. 저장 ----------------------------------------------------------
+        ccf.functions[self.current_target_function] = fcfg
+        self.contract_cfgs[self.current_target_contract] = ccf
 
-        # 4. Create the condition node
-        condition_node = CFGNode(name=f"while_condition_{self.current_start_line}",
-                                 condition_node=True,
-                                 condition_node_type="while",
-                                 src_line=self.current_start_line)
-        condition_node.condition_expr = condition_expr  # Store the condition expression for later use
-        condition_node.variables = self.copy_variables(join_node.variables)
+    def process_for_statement(
+            self,
+            initial_statement: dict | None = None,
+            condition_expr: Expression | None = None,
+            increment_expr: Expression | None = None,
+    ) -> None:
+        # 1. CFG 컨텍스트 --------------------------------------------------
+        ccf = self.contract_cfgs[self.current_target_contract]
+        fcfg = ccf.get_function_cfg(self.current_target_function)
+        if fcfg is None:
+            raise ValueError("No active function CFG.")
 
+        cur_blk = self.builder.get_current_block()
 
-        # 5. Connect the current block to the join node (if not already connected)
-        self.current_target_function_cfg.graph.add_node(join_node)
-        self.current_target_function_cfg.graph.add_edge(current_block, join_node)
+        # 2. ─────── init-노드 (있을 때만)  &  변수 환경 --------------------
+        init_node: CFGNode | None = None
 
-        # 6. Connect the join node to the condition node
-        self.current_target_function_cfg.graph.add_node(condition_node)
-        self.current_target_function_cfg.graph.add_edge(join_node, condition_node)
+        if initial_statement:
+            ctx = initial_statement["context"]
 
-        # 7. Create the true node (loop body)
-        true_node = CFGNode(name=f"while_body_{self.current_start_line}",
-                            branch_node=True,
-                            is_true_branch=True)
-        true_node.is_loop_body = True
-        true_node.variables = self.copy_variables(condition_node.variables)
-        self.update_variables_with_condition(true_node.variables, condition_expr, is_true_branch=True)
-
-        # 8. Create the false node (exit block)
-        false_node = CFGNode(name=f"while_exit_{self.current_start_line}",
-                             loop_exit_node=True,
-                             branch_node=True,
-                             is_true_branch=False)
-        self.update_variables_with_condition(false_node.variables,
-                                             condition_expr,
-                                             is_true_branch=False)
-
-        # 9. Connect the condition node's true branch to the true node
-        self.current_target_function_cfg.graph.add_node(true_node)
-        self.current_target_function_cfg.graph.add_edge(condition_node, true_node, condition=True)
-
-        # 10. Connect the condition node's false branch to the false node
-        self.current_target_function_cfg.graph.add_node(false_node)
-        self.current_target_function_cfg.graph.add_edge(condition_node, false_node, condition=False)
-
-        # 기존 current_block과 successor들을 false block의 successor로
-        for successor in successors:
-            self.current_target_function_cfg.graph.add_edge(false_node, successor)
-
-        # 11. Connect the true node back to the join node (loop back)
-        self.current_target_function_cfg.graph.add_edge(true_node, join_node)
-
-        # 8. Return 노드에 대한 brace_count 업데이트
-        if self.current_start_line not in self.brace_count:
-            self.brace_count[self.current_start_line] = {}
-        self.brace_count[self.current_start_line]['cfg_node'] = condition_node
-
-        # 8. CFG 업데이트
-        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
-        self.contract_cfgs[self.current_target_contract] = contract_cfg
-
-        self.current_target_function_cfg = None
-
-    def process_for_statement(self, initial_statement=None, condition_expr=None, increment_expr=None):
-
-        # 1) 현재 컨트랙트 / 함수 CFG 가져오기
-        contract_cfg = self.contract_cfgs.get(self.current_target_contract)
-        if contract_cfg is None:
-            raise ValueError(f"[for] contract CFG '{self.current_target_contract}' not found")
-
-        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
-        if self.current_target_function_cfg is None:
-            raise ValueError("[for] active function CFG 없음")
-
-        # ------------------------------------------------------------------#
-        # 2) 루프 직전 블록
-        # ------------------------------------------------------------------#
-        current_block = self.get_current_block()  # for 키워드 이전 코드가 위치한 블록
-        old_successors = list(self.current_target_function_cfg.graph.successors(current_block))
-
-        # ------------------------------------------------------------------#
-        # 3) init_node 생성 및 initial_statement 해석
-        # ------------------------------------------------------------------#
-        init_node = CFGNode(f"for_init_{self.current_start_line}")
-        init_node.variables = self.copy_variables(current_block.variables)
-
-        if initial_statement is not None:
-            ctx = initial_statement.get("context")
+            init_node = CFGNode(f"for_init_{self.current_start_line}")
+            init_node.variables = VariableEnv.copy_variables(cur_blk.variables)
 
             if ctx == "VariableDeclaration":
-                var_type = initial_statement["initVarType"]
-                var_name = initial_statement["initVarName"]
-                init_expr = initial_statement["initValExpr"]  # Expression | None
+                v_type = initial_statement["initVarType"]
+                v_name = initial_statement["initVarName"]
+                init_expr = initial_statement["initValExpr"]
 
-                var_obj = Variables(identifier=var_name, scope="local")  # ★
-                var_obj.typeInfo = var_type  # ★
-                init_node.variables[var_name] = var_obj
-
+                # 값 해석 + 실제 변수 갱신
                 if init_expr is not None:
-                    val = self.evaluate_expression(init_expr,
-                                                   init_node.variables,
-                                                   None, None)
-                    var_obj.value = val
+                    r_val = self.evaluator.evaluate_expression(
+                        init_expr, init_node.variables, None, None
+                    )
+                else:
+                    r_val = None
 
+                # 변수 객체 생성 & env 삽입
+                v_obj = Variables(identifier=v_name, scope="local")
+                v_obj.typeInfo = v_type
+                if r_val is not None:
+                    v_obj.value = r_val
+                init_node.variables[v_name] = v_obj
+
+                # CFG Statement
                 init_node.add_variable_declaration_statement(
-                    var_type,
-                    var_name,
-                    init_expr,
-                    line_no=self.current_start_line
+                    v_type, v_name, init_expr, self.current_start_line
+                )
+
+                # 기록
+                self.recorder.record_variable_declaration(
+                    line_no=self.current_start_line,
+                    var_name=v_name,
+                    var_obj=v_obj,
                 )
 
             elif ctx == "Expression":
-                tmp_expr = initial_statement["initExpr"]  # Assignment/Update Expression
-                r_val = self.evaluate_expression(tmp_expr.right,
-                                                 init_node.variables,
-                                                 None, None)
-                self.update_left_var(tmp_expr.left,
-                                     r_val,
-                                     tmp_expr.operator,
-                                     init_node.variables,
-                                     None, "ForInit")
-
-                # ★  Assignment Statement 기록 ★
-                init_node.add_assign_statement(
-                    tmp_expr.left,
-                    tmp_expr.operator,
-                    tmp_expr.right,
-                    line_no=self.current_start_line
+                assn_expr = initial_statement["initExpr"]  # Assignment 식
+                r_val = self.evaluator.evaluate_expression(
+                    assn_expr.right, init_node.variables, None, None
                 )
-
+                # Update 내부에서 기록까지 수행
+                self.updater.update_left_var(
+                    assn_expr, r_val, assn_expr.operator, init_node.variables
+                )
+                # CFG Statement
+                init_node.add_assign_statement(
+                    assn_expr.left, assn_expr.operator, assn_expr.right,
+                    self.current_start_line,
+                )
             else:
-                raise ValueError(f"[for] unknown initial_statement ctx '{ctx}'")
+                raise ValueError(f"[for] unknown init ctx '{ctx}'")
 
-        # ------------------------------------------------------------------#
-        # 4) join_node  (fix-point evaluation node)
-        # ------------------------------------------------------------------#
-        join_node = CFGNode(f"for_join_{self.current_start_line}",
-                            fixpoint_evaluation_node=True)
-        join_node.variables = self.copy_variables(init_node.variables)
-        join_node.fixpoint_evaluation_node_vars = self.copy_variables(init_node.variables)
+        # 3. ─────── 분기용 변수-환경 (join / true / false) ----------------
+        join_env = VariableEnv.copy_variables(init_node.variables if init_node else cur_blk.variables)
 
-        # ------------------------------------------------------------------#
-        # 5) condition_node
-        # ------------------------------------------------------------------#
-        cond_node = CFGNode(f"for_condition_{self.current_start_line}",
-                            condition_node=True,
-                            condition_node_type="for",
-                            src_line=self.current_start_line)
-        cond_node.condition_expr = condition_expr
-        cond_node.variables = self.copy_variables(join_node.variables)
-
-        # ------------------------------------------------------------------#
-        # 6) body_node
-        # ------------------------------------------------------------------#
-        body_node = CFGNode(f"for_body_{self.current_start_line}",
-                            branch_node=True,
-                            is_true_branch=True)
-        body_node.is_loop_body = True
-        body_node.variables = self.copy_variables(cond_node.variables)
+        true_env = VariableEnv.copy_variables(join_env)
+        false_env = VariableEnv.copy_variables(join_env)
 
         if condition_expr is not None:
-            self.update_variables_with_condition(body_node.variables,
-                                                 condition_expr,
-                                                 is_true_branch=True)
+            self.refiner.update_variables_with_condition(true_env, condition_expr, True)
+            self.refiner.update_variables_with_condition(false_env, condition_expr, False)
 
-        # ------------------------------------------------------------------#
-        # 7) increment_node
-        # ------------------------------------------------------------------#
-        incr_node = CFGNode(f"for_increment_{self.current_start_line}",
-                            is_for_increment=True)
-        incr_node.variables = self.copy_variables(body_node.variables)
-
-        # ───────────────────────── for-increment helper ──────────────────────────
-        def _make_one_interval(var_expr: Expression, cur_vars: dict[str, Variables]):
-            """
-            var_expr 로 가리키는 변수의 타입(uint / int)에 맞춰
-            숫자 1을 UnsignedIntegerInterval 또는 IntegerInterval 로 래핑해 준다.
-            """
-            # var_expr 가 가리키는 실제 변수 객체 확보
-            v_obj = self._resolve_and_update_expr(var_expr, 1, '=', cur_vars,
-                                                   self.current_target_function_cfg)
-            if v_obj is None or v_obj.typeInfo is None:
-                # fallback – 그냥 리터럴 1 (실패해도 compound_assignment 쪽에서 처리는 됨)
-                return 1
-
-            et = v_obj.typeInfo.elementaryTypeName
-            bits = v_obj.typeInfo.intTypeLength or 256
-
-            if et.startswith("uint"):
-                return UnsignedIntegerInterval(1, 1, bits)
-            elif et.startswith("int"):
-                return IntegerInterval(1, 1, bits)
-            else:
-                # bool 이나 기타가 for-counter 로 쓰이는 경우는 거의 없지만 안전장치
-                return 1
-
-        # ──────────────────────────────────────────────────────────────────────────
+        # 4. ─────── increment-노드 (있을 때만) ----------------------------
+        incr_node: CFGNode | None = None
         if increment_expr is not None:
-            op = increment_expr.operator
+            incr_node = CFGNode(f"for_incr_{self.current_start_line}", is_for_increment=True)
+            incr_node.variables = VariableEnv.copy_variables(true_env)  # body-out env
 
-            # ① ++ / -- -----------------------------------------------------------
+            # ++ / -- / += 1  같은 간단한 형태만 처리
+            op = increment_expr.operator
             if op in {"++", "--"}:
-                one_iv = _make_one_interval(increment_expr.expression,
-                                            incr_node.variables)
+                one_iv = UnsignedIntegerInterval(1, 1, 256)
+                self.updater.update_left_var(
+                    increment_expr.expression, one_iv,
+                    "+=" if op == "++" else "-=", incr_node.variables,
+                )
                 incr_node.add_assign_statement(
                     increment_expr.expression,
                     "+=" if op == "++" else "-=",
-                    # Statement 에도 Interval 을 넘겨둔다 (직렬화용)
-                    one_iv,
-                    self.current_start_line
+                    Expression(literal="1", context="LiteralExpContext"),
+                    self.current_start_line,
                 )
-
-            # ② += / -= -----------------------------------------------------------
-            elif op in {"+=", "-="}:
-                # RHS 가 리터럴이면 타입에 맞춰 Interval 로 변환
-                rhs_iv = (_make_one_interval(increment_expr.left,
-                                             incr_node.variables)
-                          if increment_expr.right.context == "LiteralExpContext"
-                             and str(increment_expr.right.literal) == "1"
-                          else increment_expr.right)
-
+            else:
+                # += / -= …  (복합 대입) 그대로 사용
+                r_val = self.evaluator.evaluate_expression(
+                    increment_expr.right, incr_node.variables, None, None
+                )
+                self.updater.update_left_var(
+                    increment_expr.left, r_val, op, incr_node.variables,
+                )
                 incr_node.add_assign_statement(
-                    increment_expr.left,
-                    op,
-                    rhs_iv,
-                    self.current_start_line
+                    increment_expr.left, op, increment_expr.right,
+                    self.current_start_line,
                 )
 
-            else:
-                raise ValueError(f"[for] unexpected increment operator '{op}'")
-
-        # ------------------------------------------------------------------#
-        # 8) exit_node  (loop-false 블록)
-        # ------------------------------------------------------------------#
-        exit_node = CFGNode(f"for_exit_{self.current_start_line}", loop_exit_node=True,
-                            branch_node=True,
-                            is_true_branch=False)
-        exit_node.variables = self.copy_variables(join_node.variables)
-
-        if condition_expr is not None:  # ★
-            self.update_variables_with_condition(exit_node.variables,
-                                                 condition_expr,
-                                                 is_true_branch=False)
-
-        # ------------------------------------------------------------------#
-        # 9) 그래프 연결
-        # ------------------------------------------------------------------#
-        g = self.current_target_function_cfg.graph
-
-        # 9-1  노드 등록
-        for n in (init_node, join_node, cond_node,
-                  body_node, incr_node, exit_node):
-            g.add_node(n)
-
-        # 9-2  엣지 연결
-        g.add_edge(current_block, init_node)  # pre → init
-        g.add_edge(init_node, join_node)  # init → join
-        g.add_edge(join_node, cond_node)  # join → cond
-        g.add_edge(cond_node, body_node, condition=True)  # True
-        g.add_edge(cond_node, exit_node, condition=False)  # False
-        g.add_edge(body_node, incr_node)  # body → incr
-        g.add_edge(incr_node, join_node)  # incr → join (back-edge)
-
-        # 9-3  루프 탈출 후 원래 successor 로 이어주기         ★
-        for succ in old_successors:
-            g.remove_edge(current_block, succ)
-            g.add_edge(exit_node, succ)
-
-        # brace_count 업데이트 (선택)
-        if self.current_start_line not in self.brace_count:
-            self.brace_count[self.current_start_line] = {}
-        self.brace_count[self.current_start_line]['cfg_node'] = cond_node
-
-        self.current_target_function_cfg = None
-
-    def process_continue_statement(self):
-        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
-        contract_cfg = self.contract_cfgs.get(self.current_target_contract)
-        if not contract_cfg:
-            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
-
-        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
-        if not self.current_target_function_cfg:
-            raise ValueError("No active function to process the continue statement.")
-
-        # 2. 현재 블록 가져오기 (continue가 발생한 블록)
-        current_block = self.get_current_block()
-
-        # 3. 현재 블록에 continue statement 추가 (Statement 객체로 추가)
-        current_block.add_continue_statement(self.current_start_line)
-
-        # 4. 재귀적으로 fixpoint_evaluation_node 찾기
-        fixpoint_evaluation_node = self.find_fixpoint_evaluation_node(current_block)
-        if not fixpoint_evaluation_node:
-            raise ValueError("No corresponding loop join node found for continue statement.")
-
-        # 5. 현재 블록의 모든 successor와의 edge 제거
-        successors = list(self.current_target_function_cfg.graph.successors(current_block))
-        for successor in successors:
-            self.current_target_function_cfg.graph.remove_edge(current_block, successor)
-
-        # 6. 현재 블록을 fixpoint_evaluation_node로 연결 (loop로 다시 돌아감)
-        self.current_target_function_cfg.graph.add_edge(current_block, fixpoint_evaluation_node)
-
-        # 8. Return 노드에 대한 brace_count 업데이트
-        if self.current_start_line not in self.brace_count:
-            self.brace_count[self.current_start_line] = {}
-        self.brace_count[self.current_start_line]['cfg_node'] = current_block
-
-        # 7. CFG 업데이트
-        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
-        self.contract_cfgs[self.current_target_contract] = contract_cfg
-
-        self.current_target_function_cfg = None
-
-    def process_break_statement(self):
-        """
-        `break` 가 등장했을 때 CFG 를 올바르게 재-배선한다.
-
-        ①  break 가 위치한 블록(current_block) → loop-exit-node 로 edge 추가
-        ②  condition-node → “루프 안쪽으로 들어가는 유일 진입점”
-            ( - for : incr_node,  while : join_node ) 으로 향하는 edge 제거
-        ③  이미 만들어져 있던 pred → incr|join edge 들도 끊어서
-            true-branch 가 leaf 판정에 잡히지 않도록 만든다.
-        """
-
-        def debug_path_to_header(cur_blk, g):
-            """cur_blk → … → loop header 로 가는 모든 선행-경로를 출력"""
-            from collections import deque
-            Q = deque([(cur_blk, [cur_blk.name])])
-            seen = set()
-            while Q:
-                n, path = Q.popleft()
-                if n in seen:  # 사이클 방지
-                    continue
-                seen.add(n)
-
-                if n.condition_node and n.condition_node_type in ("for", "while", "doWhile"):
-                    print("FOUND!", " → ".join(path))
-                    return n
-                for p in g.predecessors(n):
-                    Q.append((p, path + [p.name]))
-            print("❌ header 미발견")
-            return None
-
-        # ────────────────────────────────────────────────────────────
-        # 1) 준비 – CFG 컨텍스트
-        # ────────────────────────────────────────────────────────────
-        contract_cfg = self.contract_cfgs.get(self.current_target_contract)
-        if not contract_cfg:
-            raise ValueError(f"[break] contract CFG '{self.current_target_contract}' not found")
-
-        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
-        if not self.current_target_function_cfg:
-            raise ValueError("[break] active function CFG 없음")
-
-        g = self.current_target_function_cfg.graph
-        cur_blk = self.get_current_block()
-        debug_path_to_header(cur_blk, g)
-
-        # ────────────────────────────────────────────────────────────
-        # 2) break 구문 statement 추가
-        # ────────────────────────────────────────────────────────────
-        cur_blk.add_break_statement(self.current_start_line)
-
-        # ────────────────────────────────────────────────────────────
-        # 3) “현재 루프”의 구성요소 찾기
-        #    ▸ condition_node              ▸ loop_exit_node(false-branch)
-        # ────────────────────────────────────────────────────────────
-        cond_node = self.find_loop_condition_node(cur_blk)
-        if cond_node is None:
-            raise ValueError("[break] surrounding loop condition-node not found")
-
-        exit_node = self.current_target_function_cfg.get_false_block(cond_node)  # while / for 공통
-        if exit_node is None or not exit_node.loop_exit_node:
-            raise ValueError("[break] loop-exit-node 찾기 실패")
-
-        # ────────────────────────────────────────────────────────────
-        # 4) 기존 cur_blk → successors edge 제거,
-        #    cur_blk → exit_node 로 연결
-        # ────────────────────────────────────────────────────────────
-        for succ in list(g.successors(cur_blk)):
-            g.remove_edge(cur_blk, succ)
-        g.add_edge(cur_blk, exit_node)
-
-        # ────────────────────────────────────────────────────────────
-        # 6) bookkeeping – brace_count & CFG 저장
-        # ────────────────────────────────────────────────────────────
-        self.brace_count.setdefault(self.current_start_line, {})["cfg_node"] = cur_blk
-
-        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
-        self.contract_cfgs[self.current_target_contract] = contract_cfg
-
-        self.current_target_function_cfg = None
-
-    def process_return_statement(self, return_expr=None):
-        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
-        contract_cfg = self.contract_cfgs.get(self.current_target_contract)
-        if not contract_cfg:
-            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
-
-        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
-        if not self.current_target_function_cfg:
-            raise ValueError("No active function to process the return statement.")
-
-        # 2. 현재 블록 가져오기
-        current_block = self.get_current_block()
-
-        # 3. 반환값이 있는 경우 expression 평가
-        if return_expr:
-            return_value = self.evaluate_expression(return_expr, current_block.variables, None, None)
-        else:
-            return_value = None
-
-            # ────────── ② 분석 기록 ──────────
-            #  (a) TupleExpression – 요소별 flatten
-            if return_expr and return_expr.context == "TupleExpressionContext":
-                flat = {
-                    self._expr_to_str(e): self._serialize_val(v)
-                    for e, v in zip(return_expr.elements, return_value)
-                }
-                self._record_analysis(
-                    line_no=self.current_start_line,
-                    stmt_type="return",
-                    env={**flat}  # ← env 인자로 직접 flatten 전달
-                )
-
-            #  (b) Named-return variables &  `return;`
-            elif return_expr is None and self.current_target_function_cfg.return_vars:
-                flat = {
-                    rv.identifier: self._serialize_val(rv.value)
-                    for rv in self.current_target_function_cfg.return_vars
-                }
-                self._record_analysis(
-                    line_no=self.current_start_line,
-                    stmt_type="return",
-                    env=flat
-                )
-
-            #  (c) 단일 값
-            else:
-                self._record_analysis(
-                    line_no=self.current_start_line,
-                    stmt_type="return",
-                    expr=return_expr,
-                    var_obj=Variables("__ret__", return_value, scope="tmp")
-                )
-
-        # 4. Return 구문을 current_block에 추가
-        current_block.add_return_statement(return_expr=return_expr, line_no=self.current_start_line)
-
-        # 5. function_exit_node에 return 값을 저장
-        exit_node = self.current_target_function_cfg.get_exit_node()
-        exit_node.return_vals[self.current_start_line] = return_value  # 반환 값을 exit_node의 return_val에 기록
-
-        # 7. current_block에서 exit_node로 직접 연결
-        self.current_target_function_cfg.graph.add_edge(current_block, exit_node)
-
-        # 8. CFG 업데이트
-        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
-        self.contract_cfgs[self.current_target_contract] = contract_cfg
-
-        # 9. current_target_function_cfg를 None으로 설정하여 함수 종료
-        self.current_target_function_cfg = None
-
-    def process_revert_statement(self, revert_identifier=None, string_literal=None, call_argument_list=None):
-        # 1. 현재 타겟 컨트랙트의 CFG 가져오기
-        contract_cfg = self.contract_cfgs[self.current_target_contract]
-        if not contract_cfg:
-            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
-
-        # 2. 현재 타겟 함수의 CFG 가져오기
-        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
-        if not self.current_target_function_cfg:
-            raise ValueError("No active function to process the revert statement.")
-
-        # 3. 현재 블록 가져오기
-        current_block = self.get_current_block()
-
-        current_block.add_revert_statement(revert_identifier, string_literal, call_argument_list)
-
-        # 5. 함수의 exit 노드와 현재 노드 간 연결이 이미 존재하는지 확인
-        exit_node = self.current_target_function_cfg.get_exit_node()
-        if not self.current_target_function_cfg.graph.has_edge(current_block, exit_node):
-            # 기존 엣지가 없으면 연결
-            self.current_target_function_cfg.graph.add_edge(current_block, exit_node)
-
-        # 7. Revert 노드의 brace_count 업데이트
-        if self.current_start_line not in self.brace_count:
-            self.brace_count[self.current_start_line] = {}
-        self.brace_count[self.current_start_line]['cfg_node'] = current_block
-
-        # 6. CFG 업데이트
-        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
-        self.contract_cfgs[self.current_target_contract] = contract_cfg
-
-        self.current_target_function_cfg = None
-
-    def process_require_statement(self, condition_expr, string_literal):
-        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
-        contract_cfg = self.contract_cfgs[self.current_target_contract]
-        if not contract_cfg:
-            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
-
-        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
-        g = self.current_target_function_cfg.graph
-        if not self.current_target_function_cfg:
-            raise ValueError("No active function to process the require statement.")
-
-        # 2. 현재 블록 가져오기
-        current_block = self.get_current_block()
-
-        # ── 4  조건-노드 생성
-        req_cond = CFGNode(
-            name=f"require_condition_{self.current_start_line}",
-            condition_node=True,
-            condition_node_type="require",
-            src_line=self.current_start_line
-        )
-        req_cond.condition_expr = condition_expr
-        req_cond.variables = self.copy_variables(current_block.variables)
-
-        # ── 5 True-블록
-        true_blk = CFGNode(name=f"require_true_{self.current_start_line}",
-                           branch_node=True,
-                           is_true_branch=True,
-                           src_line=self.current_start_line)
-        true_blk.variables = self.copy_variables(req_cond.variables)
-        self.update_variables_with_condition(true_blk.variables,
-                                             condition_expr,
-                                             is_true_branch=True)
-
-
-        # ─── True 블록 생성 후에만 기록
-        self._record_analysis(
+        # 5. ─────── 그래프 구성은 Builder 에 위임 ------------------------
+        self.builder.build_for_statement(
+            cur_block=cur_blk,
+            init_node=init_node,
+            join_env=join_env,
+            cond_expr=condition_expr,
+            true_env=true_env,
+            false_env=false_env,
+            incr_node=incr_node,
             line_no=self.current_start_line,
-            stmt_type="requireTrue",  # camelCase 유지
-            env=true_blk.variables  # 좁혀진 Interval 들
+            fcfg=fcfg,
+            brace_count=self.brace_count,
         )
 
-        succs = list(g.successors(current_block))
-        # ── 6 CFG 재배선 (successor edge 이동)
-        for s in succs:
-           g.remove_edge(current_block, s)
-        g.add_node(req_cond)
-        g.add_edge(current_block, req_cond)
+        # 6. 저장 ---------------------------------------------------------
+        ccf.functions[self.current_target_function] = fcfg
+        self.contract_cfgs[self.current_target_contract] = ccf
 
-        # ── 8 False-분기 : exit 노드로
-        exit_node = self.current_target_function_cfg.get_exit_node()
-        g.add_edge(req_cond, exit_node, condition=False)
+    def process_continue_statement(self) -> None:
+        # 1) CFG 컨텍스트
+        ccf = self.contract_cfgs[self.current_target_contract]
+        fcfg = ccf.get_function_cfg(self.current_target_function)
+        if fcfg is None:
+            raise ValueError("No active FunctionCFG when processing 'continue'.")
 
-        # ── 9 True-분기 연결
-        g.add_node(true_blk)
-        g.add_edge(req_cond, true_blk, condition=True)
+        # 2) 현재 블록
+        cur_blk = self.builder.get_current_block()
 
-        for s in succs or [exit_node]:  # succs 가 없으면 exit 직행
-            g.add_edge(true_blk, s)
-
-        # ── 10 brace_count
-        self.brace_count.setdefault(self.current_start_line, {})["cfg_node"] = req_cond
-
-        # ── 11 CFG / contract 갱신
-        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
-        self.contract_cfgs[self.current_target_contract] = contract_cfg
-        self.current_target_function_cfg = None
-
-    def process_assert_statement(self, condition_expr, string_literal):
-        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
-        contract_cfg = self.contract_cfgs[self.current_target_contract]
-        if not contract_cfg:
-            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
-
-        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
-        if not self.current_target_function_cfg:
-            raise ValueError("No active function to process the require statement.")
-
-        # 2. 현재 블록 가져오기
-        current_block = self.get_current_block()
-
-        g = self.current_target_function_cfg.graph
-        succs = list(g.successors(current_block))
-        for s in succs:
-            g.remove_edge(current_block, s)  # 기존 edge 제거
-
-        # ── 3 successors, 4 조건노드 생성
-        assert_cond = CFGNode(
-            name=f"assert_condition_{self.current_start_line}",
-            condition_node=True,
-            condition_node_type="assert",
-            src_line=self.current_start_line
+        # 3) 그래프 처리 → Builder 에 위임
+        self.builder.build_continue_statement(
+            cur_block=cur_blk,
+            line_no=self.current_start_line,
+            fcfg=fcfg,
+            brace_count=self.brace_count,
         )
-        assert_cond.condition_expr = condition_expr
 
-        # ── 5 True-블록
-        true_blk = CFGNode(name=f"assert_true_{self.current_start_line}",
-                           branch_node=True,
-                           is_true_branch=True,
-                           src_line=self.current_start_line)
-        true_blk.variables = self.copy_variables(current_block.variables)
-        self.update_variables_with_condition(true_blk.variables,
-                                             condition_expr,
-                                             is_true_branch=True)
+        # 5) 저장
+        ccf.functions[self.current_target_function] = fcfg
+        self.contract_cfgs[self.current_target_contract] = ccf
 
-        g.add_node(true_blk)
-        g.add_edge(assert_cond, true_blk, condition=True)
+    def process_break_statement(self) -> None:
+        ccf = self.contract_cfgs[self.current_target_contract]
+        fcfg = ccf.get_function_cfg(self.current_target_function)
+        if fcfg is None:
+            raise ValueError("No active FunctionCFG when processing 'break'.")
 
-        #     · True-블록 이후 기존 succ 으로 이어주기
-        for s in (succs or [self.current_target_function_cfg.get_exit_node()]):
-            g.add_edge(true_blk, s)
+        cur_blk = self.builder.get_current_block()
 
-        # ── ③ False-분기 → exit
-        exit_node = self.current_target_function_cfg.get_exit_node()
-        g.add_edge(assert_cond, exit_node, condition=False)
+        self.builder.build_break_statement(
+            cur_block=cur_blk,
+            line_no=self.current_start_line,
+            fcfg=fcfg,
+            brace_count=self.brace_count,
+        )
 
-        # ── ④ 분석 결과 : True-분기 스냅샷만 기록
-        self._record_analysis(
+        ccf.functions[self.current_target_function] = fcfg
+        self.contract_cfgs[self.current_target_contract] = ccf
+
+    # Analyzer/ContractAnalyzer.py
+    def process_return_statement(self, return_expr: Expression | None = None) -> None:
+        # ── 1. CFG 컨텍스트 -------------------------------------------------
+        ccf = self.contract_cfgs[self.current_target_contract]
+        fcfg = ccf.get_function_cfg(self.current_target_function)
+        if fcfg is None:
+            raise ValueError("No active FunctionCFG when processing 'return'.")
+
+        cur_blk = self.builder.get_current_block()
+
+        # ── 2. 값 평가 ------------------------------------------------------
+        r_val = None
+        if return_expr is not None:
+            r_val = self.evaluator.evaluate_expression(
+                return_expr, cur_blk.variables, None, None
+            )
+
+        # ── 3. 그래프 & statement 구축  → builder 위임 ---------------------
+        self.builder.build_return_statement(
+            cur_block=cur_blk,
+            return_expr=return_expr,
+            return_val=r_val,
+            line_no=self.current_start_line,
+            fcfg=fcfg,
+            brace_count=self.brace_count,
+        )
+
+        # ── 4. 기록 ---------------------------------------------------------
+        self.recorder.record_return(
+            line_no=self.current_start_line,
+            return_expr=return_expr,
+            return_val=r_val,
+            fn_cfg=fcfg,
+        )
+
+        # ── 5. CFG 저장 -----------------------------------------------------
+        ccf.functions[self.current_target_function] = fcfg
+        self.contract_cfgs[self.current_target_contract] = ccf
+
+    # Analyzer/ContractAnalyzer.py
+    def process_revert_statement(
+            self,
+            revert_identifier: str | None = None,
+            string_literal: str | None = None,
+            call_argument_list: list[Expression] | None = None,
+    ) -> None:
+        # ── 1. CFG context ---------------------------------------------------
+        ccf = self.contract_cfgs[self.current_target_contract]
+        fcfg = ccf.get_function_cfg(self.current_target_function)
+        if fcfg is None:
+            raise ValueError("No active FunctionCFG when processing 'revert'.")
+
+        cur_blk = self.builder.get_current_block()
+
+        # ── 2. graph / statement  → builder ---------------------------------
+        self.builder.build_revert_statement(
+            cur_block=cur_blk,
+            revert_id=revert_identifier,
+            string_literal=string_literal,
+            call_args=call_argument_list,
+            line_no=self.current_start_line,
+            fcfg=fcfg,
+            brace_count=self.brace_count,
+        )
+
+        # ── 3. analysis record ----------------------------------------------
+        self.recorder.record_revert(
+            line_no=self.current_start_line,
+            revert_id=revert_identifier,
+            string_literal=string_literal,
+            call_args=call_argument_list,
+        )
+
+        # ── 4. save CFG ------------------------------------------------------
+        ccf.functions[self.current_target_function] = fcfg
+        self.contract_cfgs[self.current_target_contract] = ccf
+
+    # Analyzer/ContractAnalyzer.py
+    def process_require_statement(
+            self,
+            condition_expr: Expression,
+            string_literal: str | None,
+    ) -> None:
+        # 1) CFG context -----------------------------------------------------
+        ccf = self.contract_cfgs[self.current_target_contract]
+        fcfg = ccf.get_function_cfg(self.current_target_function)
+        if fcfg is None:
+            raise ValueError("No active FunctionCFG.")
+
+        cur_blk = self.builder.get_current_block()
+
+        # 2) True-branch 환경 ------------------------------------------------
+        true_env = VariableEnv.copy_variables(cur_blk.variables)
+        self.refiner.update_variables_with_condition(
+            true_env, condition_expr, is_true_branch=True
+        )
+
+        # 3) 분석 로그 -------------------------------------------------------
+        self.recorder.add_env_record(
+            line_no=self.current_start_line,
+            stmt_type="requireTrue",
+            env=true_env,
+        )
+
+        # 4) 그래프 구성 → builder ------------------------------------------
+        self.builder.build_require_statement(
+            cur_block=cur_blk,
+            condition_expr=condition_expr,
+            true_env=true_env,
+            line_no=self.current_start_line,
+            fcfg=fcfg,
+            brace_count=self.brace_count,
+        )
+
+        # 5) 저장 ------------------------------------------------------------
+        ccf.functions[self.current_target_function] = fcfg
+        self.contract_cfgs[self.current_target_contract] = ccf
+
+    # Analyzer/ContractAnalyzer.py
+    def process_assert_statement(
+            self,
+            condition_expr: Expression,
+            string_literal: str | None,
+    ) -> None:
+        # 1) CFG context -----------------------------------------------------
+        ccf = self.contract_cfgs[self.current_target_contract]
+        fcfg = ccf.get_function_cfg(self.current_target_function)
+        if fcfg is None:
+            raise ValueError("No active FunctionCFG.")
+
+        cur_blk = self.builder.get_current_block()
+
+        # 2) True-branch 환경(조건이 만족되는 경로) ---------------------------
+        true_env = VariableEnv.copy_variables(cur_blk.variables)
+        self.refiner.update_variables_with_condition(
+            true_env, condition_expr, is_true_branch=True
+        )
+
+        # 3) 기록 (True-분기 snapshot) ----------------------------------------
+        self.recorder.add_env_record(
             line_no=self.current_start_line,
             stmt_type="assertTrue",
-            env=true_blk.variables
+            env=true_env,
         )
 
-        # ➌ ====== brace_count 등록 (IDE cursor tracking용) ====================
-        self.brace_count.setdefault(self.current_start_line, {})["cfg_node"] = assert_cond
-        # ====================================================================
+        # 4) CFG 구성 ---------------------------------------------------------
+        self.builder.build_assert_statement(
+            cur_block=cur_blk,
+            condition_expr=condition_expr,
+            true_env=true_env,
+            line_no=self.current_start_line,
+            fcfg=fcfg,
+            brace_count=self.brace_count,
+        )
 
-        # ── 10 CFG / contract 갱신
-        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
-        self.contract_cfgs[self.current_target_contract] = contract_cfg
-        self.current_target_function_cfg = None
+        # 5) 저장 -------------------------------------------------------------
+        ccf.functions[self.current_target_function] = fcfg
+        self.contract_cfgs[self.current_target_contract] = ccf
 
     # ContractAnalyzer.py  (추가/수정)
 
-    def process_identifier_expression(self, ident_expr: Expression):
+    # Analyzer/ContractAnalyzer.py
+    def process_identifier_expression(self, ident_expr: Expression) -> None:
         """
-        · ident_expr.identifier 가 '_' 이고,
-        · 현재 CFG 가 modifier 이면 → placeholder 처리
-        · 아니면 평범한 identifier 로서 evaluate
+        · ident == '_'  and  현재 CFG 가 modifier 이면  placeholder 처리
+          그렇지 않으면 그냥 식별자 평가(별도 로직).
         """
-        ident_str = ident_expr.identifier
-        cfg = self.contract_cfgs[self.current_target_contract]
-        fcfg = cfg.get_function_cfg(self.current_target_function)
+        ident = ident_expr.identifier
+        ccf = self.contract_cfgs[self.current_target_contract]
+        fcfg = ccf.get_function_cfg(self.current_target_function)
 
-        # ───── modifier placeholder “_”인지 검사 ─────
-        if ident_str == "_" and fcfg and fcfg.function_type == "modifier":
-            self._create_modifier_placeholder_node(fcfg)
-            return  # 값-업데이트 없음
+        # ── modifier placeholder (‘_’) --------------------------------------
+        if ident == "_" and fcfg and fcfg.function_type == "modifier":
+            cur_blk = self.builder.get_current_block()
 
-    def process_unchecked_indicator(self):
-        # 1. 현재 컨트랙트와 함수의 CFG 가져오기
-        contract_cfg = self.contract_cfgs[self.current_target_contract]
-        if not contract_cfg:
-            raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
+            # ⬇️  새 helper 호출
+            self.builder.build_modifier_placeholder(
+                cur_block=cur_blk,
+                fcfg=fcfg,
+                line_no=self.current_start_line,
+                brace_count=self.brace_count,
+            )
+            return  # 값-해석 없음
 
-        self.current_target_function_cfg = contract_cfg.get_function_cfg(self.current_target_function)
-        if not self.current_target_function_cfg:
-            raise ValueError("No active function to process the require statement.")
+        # … 이하 “일반 identifier” 처리는 기존 로직 유지 …
 
-        # 2. 현재 블록 가져오기
-        current_block = self.get_current_block()
-        unchecked_block = CFGNode(name=f"unchecked_{self.current_start_line}",
-                                  unchecked_block=True)
-        unchecked_block.variables = self.copy_variables(current_block.variables)
+    # Analyzer/ContractAnalyzer.py
+    def process_unchecked_indicator(self) -> None:
+        # ── 1. CFG 컨텍스트 --------------------------------------------
+        ccf = self.contract_cfgs[self.current_target_contract]
+        fcfg = ccf.get_function_cfg(self.current_target_function)
+        if fcfg is None:
+            raise ValueError("No active FunctionCFG when processing 'unchecked'.")
 
-        g = self.current_target_function_cfg.graph
-        for succ in list(g.successors(current_block)):
-            g.remove_edge(current_block, succ)
-            g.add_edge(unchecked_block, succ)
+        # ── 2. 현재 블록, 빌더 호출 -------------------------------------
+        cur_blk = self.builder.get_current_block()
 
-        # ── 7 current_block → 조건노드
-        g.add_node(unchecked_block)
-        g.add_edge(current_block, unchecked_block)
+        self.builder.build_unchecked_block(
+            cur_block=cur_blk,
+            line_no=self.current_start_line,
+            fcfg=fcfg,
+            brace_count=self.brace_count,
+        )
 
-        self.brace_count.setdefault(self.current_start_line, {})["cfg_node"] = unchecked_block
-
-        # ====================================================================
-
-        # ── 10 CFG / contract 갱신
-        contract_cfg.functions[self.current_target_function] = self.current_target_function_cfg
-        self.contract_cfgs[self.current_target_contract] = contract_cfg
-        self.current_target_function_cfg = None
+        # ── 3. 저장 ------------------------------------------------------
+        ccf.functions[self.current_target_function] = fcfg
+        self.contract_cfgs[self.current_target_contract] = ccf
 
     def process_global_var_for_debug(self, gv_obj: GlobalVariable):
         """

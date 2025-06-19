@@ -12,6 +12,8 @@ from Domain.Variable import (
     EnumVariable,
 )
 
+from Utils.CFG import FunctionCFG
+
 class RecordManager:
 
     def __init__(self) -> None:
@@ -114,6 +116,53 @@ class RecordManager:
         else:
             rec_list.append(payload)             # ← 새로 추가
 
+    def record_return(
+            self,
+            *,
+            line_no: int,
+            return_expr: Expression | None,
+            return_val,
+            fn_cfg: FunctionCFG,
+    ) -> None:
+
+        if return_expr and return_expr.context == "TupleExpressionContext":
+            flat = {
+                self._expr_to_str(e): self._serialize_val(v)
+                for e, v in zip(return_expr.elements, return_val)
+            }
+            payload = {"kind": "return", "vars": flat}
+
+        elif return_expr is None and fn_cfg.return_vars:
+            flat = {
+                rv.identifier: self._serialize_val(rv.value)
+                for rv in fn_cfg.return_vars
+            }
+            payload = {"kind": "return", "vars": flat}
+
+        else:
+            key = self._expr_to_str(return_expr) if return_expr else "<value>"
+            payload = {"kind": "return",
+                       "vars": {key: self._serialize_val(return_val)}}
+
+        self.ledger[line_no].append(payload)
+
+    def record_revert(
+            self,
+            *,
+            line_no: int,
+            revert_id: str | None,
+            string_literal: str | None,
+            call_args: list[Expression] | None,
+    ) -> None:
+        payload = {
+            "kind": "revert",
+            "detail": {
+                "id": revert_id or "",
+                "msg": string_literal or "",
+                "args": [self._expr_to_str(a) for a in call_args] if call_args else [],
+            },
+        }
+        self.ledger[line_no].append(payload)
 
     # ---------------------------------------------------------------------
     # Public API
