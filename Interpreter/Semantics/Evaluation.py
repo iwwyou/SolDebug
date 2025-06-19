@@ -104,10 +104,14 @@ class Evaluation :
 
         # ── (B) 매핑 ───────────────────────────────────────────────
         if sol_t.typeCategory == "mapping":
+            ccf = self.an.contract_cfgs[self.an.current_target_contract]
+
             return MappingVariable(fresh_id,
                                    key_type=sol_t.mappingKeyType,
                                    value_type=sol_t.mappingValueType,
-                                   scope="memory")
+                                   scope="memory",
+                                   struct_defs=ccf.structDefs,  # ⭐️ 전달
+                                   enum_defs=ccf.enumDefs)  # ⭐️ 전달)
 
         # ── (C) 구조체 ─────────────────────────────────────────────
         if sol_t.typeCategory == "struct":

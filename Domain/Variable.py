@@ -15,6 +15,27 @@ class Variables:
         self.value = value  # interval
         self.initial_value = copy.deepcopy(value)  # ← NEW
 
+class StructDefinition:
+    def __init__(self, struct_name):
+        self.struct_name = struct_name
+        self.members = []
+
+    def add_member(self, var_name, type_obj):
+        self.members.append({'member_name' : var_name, 'member_type' : type_obj})
+
+class EnumDefinition:
+    def __init__(self, enum_name):
+        self.enum_name = enum_name
+        self.members = []  # 멤버들의 리스트
+
+    def add_member(self, member_name):
+        if member_name not in self.members:
+            self.members.append(member_name)
+        else:
+            raise ValueError(f"Member '{member_name}' is already defined in enum '{self.enum_name}'.")
+
+    def get_member(self, index):
+        return self.members[index]
 
 class GlobalVariable(Variables):
     def __init__(self, identifier=None, isConstant=False, scope=None, base=None, member=None, value=None
@@ -239,16 +260,26 @@ class ArrayVariable(Variables):
         return et.startswith("int") or et.startswith("uint") or et == "bool"
 
 class MappingVariable(Variables):
-    def __init__(self, identifier=None, key_type=None, value_type=None, value=None,
-                 isConstant=False, scope=None):
-        super().__init__(identifier, value, isConstant, scope)
+    def __init__(
+        self,
+        identifier: str | None = None,
+        key_type: SolType | None = None,
+        value_type: SolType | None = None,
+        *,
+        scope: str | None = None,
+        struct_defs: dict[str, StructDefinition] | None = None,
+        enum_defs: dict[str, EnumDefinition] | None = None,          # ⭐️ enum 목록 전달
+    ):
+        super().__init__(identifier, value=None, isConstant=False, scope=scope)
+
         self.typeInfo = SolType()
-        self.typeInfo.typeCategory = 'mapping'
-        self.typeInfo.mappingKeyType = key_type    # SolType 객체
-        self.typeInfo.mappingValueType = value_type # SolType 객체
-        self.mapping = {}
+        self.typeInfo.typeCategory     = "mapping"
+        self.typeInfo.mappingKeyType   = key_type
+        self.typeInfo.mappingValueType = value_type
 
-
+        self.mapping: dict[str, Variables] = {}
+        self._struct_defs = struct_defs or {}
+        self._enum_defs   = enum_defs   or {}
     # ────────────────────────────────────────────────
     # 값-생성 전용 private 헬퍼
     # ────────────────────────────────────────────────
@@ -272,10 +303,12 @@ class MappingVariable(Variables):
         # 2) 매핑 --------------------------------------------------------
         if sol_t.typeCategory == "mapping":
             return MappingVariable(
-                identifier  = sub_id,
-                key_type    = sol_t.mappingKeyType,
-                value_type  = sol_t.mappingValueType,
-                scope       = self.scope,
+                identifier=sub_id,
+                key_type=sol_t.mappingKeyType,
+                value_type=sol_t.mappingValueType,
+                scope=self.scope,
+                struct_defs=self._struct_defs,
+                enum_defs=self._enum_defs,  # ⭐️ 재귀 전파
             )
 
         # 3) 구조체 ------------------------------------------------------
@@ -283,8 +316,25 @@ class MappingVariable(Variables):
             sv = StructVariable(identifier=sub_id,
                                 struct_type=sol_t.structTypeName,
                                 scope=self.scope)
-            # 필요하다면 여기서 멤버 재귀 초기화
+
+            if sol_t.structTypeName in self._struct_defs:  # ⭐️ 멤버 초기화
+                sv.initialize_struct(self._struct_defs[sol_t.structTypeName])
+
             return sv
+
+        if sol_t.typeCategory == "enum":
+            ev = EnumVariable(identifier=sub_id,
+                              enum_type=sol_t.enumTypeName,
+                              scope=self.scope)
+
+            # enum 정의가 있으면 멤버 테이블 세팅
+            if sol_t.enumTypeName in self._enum_defs:
+                defn = self._enum_defs[sol_t.enumTypeName]  # EnumDefinition
+                ev.members = {m: i for i, m in enumerate(defn.members)}
+                ev.valueIndex = 0
+                ev.value = 0  # 기본값 첫 멤버
+
+            return ev
 
         # 4) elementary -------------------------------------------------
         v = Variables(identifier=sub_id, scope=self.scope)
@@ -331,13 +381,6 @@ class MappingVariable(Variables):
         # 기타 타입일 경우 None
         return None
 
-class StructDefinition:
-    def __init__(self, struct_name):
-        self.struct_name = struct_name
-        self.members = []
-
-    def add_member(self, var_name, type_obj):
-        self.members.append({'member_name' : var_name, 'member_type' : type_obj})
 
 # utils.py  (발췌) ─ StructVariable  전체
 
@@ -370,14 +413,19 @@ class StructVariable(Variables):
     # 초기화
     # ------------------------------------------------------------------
     def initialize_struct(
-        self,
-        struct_def: StructDefinition
+            self,
+            struct_def: StructDefinition,
+            *,  # ⬅️  키워드-전용
+            struct_defs: dict[str, StructDefinition] | None = None
     ):
         """
         struct_def.members :
             [{ "member_name": str, "member_type": SolType }, ... ]
         - sm : AddressSymbolicManager (주소 타입이면 fresh interval 발급용)
         """
+
+        if struct_defs is None:
+            struct_defs = {struct_def.struct_name: struct_def}  # fallback
 
         def _make_var(var_id: str, sol_t: SolType) -> Variables:
             """SolType → 적절한 Variables/ArrayVariable/MappingVariable 생성"""
@@ -424,9 +472,13 @@ class StructVariable(Variables):
                 sv = StructVariable(identifier=var_id,
                                     struct_type=sol_t.structTypeName,
                                     scope=self.scope)
-                # struct 정의가 이미 ContractCFG.structDefs 에 저장돼 있다고 가정
-                # **여기서 struct_def를 다시 찾아 재귀 초기화 할 수도 있음**
-                return sv  # 값은 호출 측에서 후처리
+
+                # 🔑 중첩 struct 정의가 있으면 **재귀 초기화**
+                nested_def = struct_defs.get(sol_t.structTypeName)
+                if nested_def is not None:
+                    sv.initialize_struct(nested_def, struct_defs=struct_defs)
+
+                return sv
 
             # 4) elementary  --------------------------------------------
             v = Variables(identifier=var_id, scope=self.scope)
@@ -459,21 +511,6 @@ class StructVariable(Variables):
     def __repr__(self):
         mem_str = ", ".join(f"{k}:{v.value}" for k, v in self.members.items())
         return f"StructVariable({self.identifier}){{{mem_str}}}"
-
-class EnumDefinition:
-    def __init__(self, enum_name):
-        self.enum_name = enum_name
-        self.members = []  # 멤버들의 리스트
-
-    def add_member(self, member_name):
-        if member_name not in self.members:
-            self.members.append(member_name)
-        else:
-            raise ValueError(f"Member '{member_name}' is already defined in enum '{self.enum_name}'.")
-
-    def get_member(self, index):
-        return self.members[index]
-
 
 class EnumVariable(Variables):
     def __init__(self, identifier=None, enum_type=None, value=None, isConstant=False, scope=None):
