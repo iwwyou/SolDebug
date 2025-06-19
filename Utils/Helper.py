@@ -1,7 +1,5 @@
 import copy
 from typing import Dict, Any
-from dataclasses import dataclass
-from typing import Optional, Union
 
 from antlr4 import *
 from Parser.SolidityLexer  import SolidityLexer
@@ -354,13 +352,3 @@ class VariableEnv:
                 and expr.base is not None
                 and getattr(expr.base, "identifier", None) in VariableEnv._GLOBAL_BASES
         )
-
-VariableLike = Union[
-    Variables, StructVariable, ArrayVariable,
-    MappingVariable, EnumVariable
-]
-
-@dataclass
-class LeafInfo:
-    touched: Optional[VariableLike]   # 실제 값(or 전체 array/mapping)을 바꾼 leaf
-    base:    Optional[VariableLike]   # a[i] 같은 경우 array/map 루트

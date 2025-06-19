@@ -1,5 +1,14 @@
-from Analyzer.ContractAnalyzer import *
+from Analyzer.ContractAnalyzer import ContractAnalyzer
+
 from Interpreter.Semantics.Refine import Refine
+from Interpreter.Semantics.Runtime import Runtime
+
+from Domain.Variable import Variables
+
+from Utils.CFG import CFGNode
+from Utils.Helper import VariableEnv
+
+from collections import defaultdict, deque
 
 class Engine:
     """
@@ -10,11 +19,12 @@ class Engine:
     def __init__(self, an:ContractAnalyzer):
         self.an = an
         self.ref = Refine(an)
+        self.runtime = Runtime(an)
 
     def transfer_function(self, node: CFGNode,
                           in_vars: dict[str, Variables]) -> dict[str, Variables]:
 
-        out_vars = self.copy_variables(in_vars)
+        out_vars = VariableEnv.copy_variables(in_vars)
         changed = False
 
         # ─ 1) 조건 노드 ───────────────────────────────────────
@@ -47,7 +57,7 @@ class Engine:
 
             for stmt in node.statements:
                 before = VariableEnv.copy_variables(out_vars)  # 🟢 깊은 사본
-                self.sems.update_statement_with_variables(stmt, out_vars)
+                self.runtime.update_statement_with_variables(stmt, out_vars)
                 if not VariableEnv.env_equal(before, out_vars):  # 🟢 깊이 비교
                     changed = True
         # ─ 4) 결과 반환 ──────────────────────────────────────
@@ -88,7 +98,7 @@ class Engine:
 
         for n in loop_nodes:
             if n.fixpoint_evaluation_node and in_vars[n] is None:
-                in_vars[n] = self.copy_variables(n.variables)
+                in_vars[n] = VariableEnv.copy_variables(n.variables)
 
         # ───── 초기 in (헤드의 in = 외부 predecessor join) ─────
         start_env = None
@@ -113,7 +123,7 @@ class Engine:
                 new_out = VariableEnv.join_variables_simple(out_old, out_new)
 
             if node.fixpoint_evaluation_node:
-                node.fixpoint_evaluation_node_vars = copy.deepcopy(new_out)
+                node.fixpoint_evaluation_node_vars = VariableEnv.copy_variables(new_out)
 
             if VariableEnv.variables_equal(out_old, new_out):
                 continue

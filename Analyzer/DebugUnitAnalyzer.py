@@ -1,6 +1,6 @@
 # Analyzer/DebugBatchManager.py
 # ────────────────────────────
-from Utils.Util              import ParserHelpers
+from Utils.Helper              import ParserHelpers
 from Analyzer.EnhancedSolidityVisitor import EnhancedSolidityVisitor
 
 class DebugBatchManager:

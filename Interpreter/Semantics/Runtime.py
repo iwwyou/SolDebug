@@ -18,6 +18,7 @@ class Runtime:
         나머지 속성·헬퍼는 전부 위임(propagation)한다.
         """
         self.an = analyzer  # composition
+        self.rec = analyzer.recorder
         self.ref = Refine(analyzer)
         self.eval = Evaluation(analyzer)
         self.up = Update(analyzer)
@@ -42,60 +43,6 @@ class Runtime:
             raise ValueError(f"Statement '{stmt.statement_type}' is not implemented.")
 
     def interpret_function_cfg(self, fcfg: FunctionCFG, caller_env: dict[str, Variables] | None = None):
-        # ─── ContractAnalyzer utils/debug.py ──────────────────────────────────
-        import pathlib, datetime
-        import networkx as nx
-
-        def dump_cfg(fcfg, tag=""):
-            """
-            FunctionCFG → 그래프 구조/조건/변수 요약을 DEBUG/outputs/ 아래로 저장
-            * tag : "before_else", "after_else" 등 파일명에 꽂아 두면 비교가 쉬움
-            """
-            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            base = pathlib.Path("DEBUG/outputs")
-            base.mkdir(parents=True, exist_ok=True)
-
-            G = fcfg.graph
-
-            # ──────────────────────────────────────────────────────────
-            # ③  pydot + PNG (가장 보기 편함)
-            try:
-                import pydot
-                dot_path = base / f"{fcfg.function_name}_{tag}_{ts}.dot"
-                png_path = base / f"{fcfg.function_name}_{tag}_{ts}.png"
-
-                nx.nx_pydot.write_dot(G, dot_path)
-                (graph,) = pydot.graph_from_dot_file(str(dot_path))
-                graph.write_png(str(png_path))
-                print(f"[CFG-DUMP] PNG saved → {png_path}")
-                return
-            except Exception as e:
-                print(f"[CFG-DUMP] pydot unavailable ({e}); falling back to DOT/TXT")
-
-            # ──────────────────────────────────────────────────────────
-            # ②  DOT 파일만 (Graphviz 로 열어보기)
-            try:
-                dot_path = base / f"{fcfg.function_name}_{tag}_{ts}.dot"
-                nx.nx_pydot.write_dot(G, dot_path)
-                print(f"[CFG-DUMP] DOT saved  → {dot_path}")
-                return
-            except Exception:
-                pass
-
-            # ──────────────────────────────────────────────────────────
-            # ①  콘솔 텍스트
-            print("\n≡≡ CFG TEXT DUMP", tag, "≡≡")
-            for n in G.nodes:
-                succs = [
-                    f"{s.name}({G[n][s].get('condition')})"
-                    if G.has_edge(n, s) else s.name for s in G.successors(n)
-                ]
-                print(
-                    f"· {n.name:<20} | succs={succs} | "
-                    f"cond={n.condition_node_type or '-'} | src={getattr(n, 'src_line', None)}"
-                )
-            print("≡" * 50, "\n")
-
         # ─── ① 호출 이전 컨텍스트 백업 ─────────────────────────
         _old_func = self.an.current_target_function
         _old_fcfg = self.an.current_target_function_cfg
@@ -103,8 +50,6 @@ class Runtime:
         # ─── ② 현재 해석 대상 함수로 설정 ─────────────────────
         self.an.current_target_function = fcfg.function_name
         self.an.current_target_function_cfg = fcfg
-
-        dump_cfg(self.an.current_target_function_cfg, tag=f"after_else_{self.an.current_start_line}")
 
         self._record_enabled = True  # ★ 항상 켠다
         self.an._seen_stmt_ids.clear()  # ← 중복 방지용 세트 초기화
@@ -186,11 +131,7 @@ class Runtime:
 
                     # ── (B) True-브랜치 env 스냅샷 ─────────────────────────
                     if self._record_enabled and ln is not None:
-                        self._record_analysis(
-                            line_no=ln,
-                            stmt_type="branchTrue",
-                            env=true_variables
-                        )
+                        self.rec.add_env_record(ln, "branchTrue", true_variables)
 
                     # true branch로 이어지는 successor enqueue
                     true_succ = true_successors[0]
@@ -224,11 +165,7 @@ class Runtime:
 
                     can_true = self._branch_feasible(true_variables, condition_expr, True)
 
-                    self._record_analysis(
-                        line_no=ln,
-                        stmt_type="requireTrue",
-                        env=true_variables
-                    )
+                    self.rec.add_env_record(ln, "requireTrue", true_variables)
 
                     true_succ = true_successors[0]
 
@@ -321,23 +258,15 @@ class Runtime:
             if ln is None:
                 return
             if len(var_objs) == 1:
-                lhs = Expression(identifier=var_objs[0].identifier,
-                                 context="IdentifierExpContext")
-                self._record_analysis(
+                self.rec.record_return(
                     line_no=ln,
-                    stmt_type="implicitReturn",
-                    expr=lhs,
-                    var_obj=var_objs[0]
+                    return_expr=None,
+                    return_val=var_objs[0].value,
+                    fn_cfg=fcfg
                 )
             else:
-                flat = {}
-                for vo in var_objs:
-                    self._flatten_var(vo, vo.identifier, flat)
-                self._record_analysis(
-                    line_no=ln,
-                    stmt_type="implicitReturn",
-                    env={k: v for k, v in flat.items()}
-                )
+                flat = {v.identifier: self.rec._serialize_val(v.value) for v in var_objs}
+                self.rec.add_env_record(ln, "implicitReturn", flat)
 
         # exit node에 도달했다면 return_values join
         # 모든 return을 모아 exit node에서 join 처리할 수 있으나, 여기서는 단순히 top-level에서 return_values를 join
@@ -409,18 +338,12 @@ class Runtime:
                     init_expr, variables, None, None
                 )
 
-            # ─── ③ 로그 기록 (기존 로직 그대로) ─────────────────────────
-        stmt_id = id(stmt)
-        if self._record_enabled and stmt_id not in self.an._seen_stmt_ids:
-            self.an._seen_stmt_ids.add(stmt_id)
-            lhs = Expression(identifier=var_name,
-                             context="IdentifierExpContext")
-            self._record_analysis(
-                line_no=stmt.src_line,
-                stmt_type=stmt.statement_type,
-                expr=lhs,
-                var_obj=vobj
-            )
+                # ③ RecordManager 로 기록  ← 기존 _record_analysis 블록 삭제
+                self.rec.record_variable_declaration(
+                    line_no=stmt.src_line,
+                    var_name=var_name,
+                    var_obj=vobj
+                )
 
         return variables
 
@@ -435,71 +358,6 @@ class Runtime:
         # 1) LHS 에 반영
         self.up.update_left_var(lexp, r_val, op, variables, None, None)
 
-        # 2) 로그 기록 ────────────────
-        stmt_id = id(stmt)
-        if self._record_enabled and stmt_id not in self.an._seen_stmt_ids:
-            self.an._seen_stmt_ids.add(stmt_id)
-
-            # (A) 이번 대입이 가리키는 **leaf-변수** 탐색 (값은 patch 하지 않음)
-            tgt = self._resolve_and_update_expr(
-                lexp,  # ← expression
-                None,  # rVal (탐색만 하므로 None)
-                '=',  # op   (아무거나 OK)
-                variables,  # 현재 블록 env
-                self.an.current_target_function_cfg  # fcfg
-            )
-
-            # ── ① LHS 가 배열/매핑 단일-엔트리였을 경우 ──────────────────
-            if tgt:
-                self._record_analysis(
-                    line_no=stmt.src_line,
-                    stmt_type=stmt.statement_type,
-                    expr=lexp,
-                    var_obj=tgt
-                )
-                return variables  # 이미 기록했으니 끝
-
-            # ── ② 배열/매핑 “전체” 또는 <unk> 인덱스 로깅 로직 (변경 없음) ──
-            base_obj = self._resolve_and_update_expr(
-                lexp.base, None, '=', variables,
-                self.an.current_target_function_cfg
-            )
-
-            if isinstance(base_obj, ArrayVariable):
-                self._record_analysis(
-                    line_no=stmt.src_line,
-                    stmt_type=stmt.statement_type,
-                    expr=lexp.base,
-                    var_obj=base_obj  # flatten-array
-                )
-                return variables
-
-            if isinstance(base_obj, MappingVariable):
-                concrete = self._try_concrete_key(lexp.index, variables)
-
-                if concrete is not None:
-                    entry = base_obj.mapping.get(concrete)
-                    if entry is None:
-                        entry = base_obj.get_or_create(concrete)
-                        base_obj.mapping[concrete] = entry
-
-                    self._record_analysis(
-                        line_no=stmt.src_line,
-                        stmt_type=stmt.statement_type,
-                        expr=lexp,
-                        var_obj=entry
-                    )
-                else:
-                    whole = self._serialize_val(base_obj)
-                    idx_s = self._expr_to_str(lexp.index)
-                    self.an.analysis_per_line[stmt.src_line].append({
-                        "kind": stmt.statement_type,
-                        "vars": {
-                            base_obj.identifier: whole,
-                            f"{base_obj.identifier}[{idx_s}]": "<unk>"
-                        }
-                    })
-
         return variables
 
     def interpret_function_call_statement(self, stmt, variables):
@@ -512,29 +370,13 @@ class Runtime:
         rexpr = stmt.return_expr
         r_val = self.eval.evaluate_expression(rexpr, variables, None, None)
 
-        stmt_id = id(stmt)
-        # ③ ★ 반드시 로그 기록 – initExpr 유무와 무관 ★
-        if self._record_enabled and stmt_id not in self.an._seen_stmt_ids:
-            self.an._seen_stmt_ids.add(stmt_id)
-            if (rexpr and  # 반환식이 있고
-                    getattr(rexpr, "context", "") == "TupleExpressionContext"):
-                # ── (1)  earned0 / earned1  …  각각 따로 찍기 ─────────────
-                flat = {}
-                for sub_e, sub_v in zip(rexpr.elements, r_val):
-                    k = self._expr_to_str(sub_e)  # "earned0" / "earned1"
-                    flat[k] = self._serialize_val(sub_v)
-                self.analysis_per_line[stmt.src_line].append(
-                    {"kind": stmt.statement_type, "vars": flat}
-                )
-            else:
-                # ── (2)  단일 반환값 (기존 로직) ──────────────────────────
-                dummy = Variables(identifier="__ret__", value=r_val, scope="tmp")
-                self._record_analysis(
-                    line_no=stmt.src_line,
-                    stmt_type=stmt.statement_type,
-                    expr=rexpr,
-                    var_obj=dummy
-                )
+        # NEW ─ 반드시 한 줄로 기록
+        self.rec.record_return(
+            line_no=stmt.src_line,
+            return_expr=rexpr,
+            return_val=r_val,
+            fn_cfg=self.an.current_target_function_cfg
+        )
 
         # exit-node 에 값 저장 (변경 없음)
         exit_node = self.an.current_target_function_cfg.get_exit_node()

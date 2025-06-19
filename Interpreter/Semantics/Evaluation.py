@@ -1,5 +1,15 @@
 from Interpreter.Semantics.Update import Update
-from Analyzer.ContractAnalyzer import *
+from Interpreter.Semantics.Runtime import Runtime
+
+from Analyzer.ContractAnalyzer import ContractAnalyzer
+
+from Domain.Variable import Variables, ArrayVariable, StructVariable, MappingVariable, EnumVariable, EnumDefinition
+from Domain.Type import SolType
+from Domain.Interval import Interval, IntegerInterval, BoolInterval, UnsignedIntegerInterval
+from Domain.IR import Expression
+
+from Utils.Helper import VariableEnv
+
 from decimal import Decimal, InvalidOperation
 import re
 
@@ -12,6 +22,7 @@ class Evaluation :
         """
         self.an = analyzer  # composition
         self.up = Update(analyzer)
+        self.runtime = Runtime(analyzer)
 
     def evaluate_expression(self, expr: Expression, variables, callerObject=None, callerContext=None):
         if expr.context == "LiteralExpContext":
@@ -802,7 +813,18 @@ class Evaluation :
                 )
         # 비교 연산자 처리
         elif operator in ['==', '!=', '<', '>', '<=', '>=']:
-            result = Evaluation.compare_intervals(leftInterval, rightInterval, operator)
+            # 두 피연산자가 모두 Interval 계열인지 검사
+            if not (isinstance(leftInterval, (IntegerInterval,
+                                              UnsignedIntegerInterval,
+                                              BoolInterval))
+                    and isinstance(rightInterval, (IntegerInterval,
+                                                   UnsignedIntegerInterval,
+                                                   BoolInterval))):
+                # Interval 아니면 “결과 불확정” 으로 취급
+                result = BoolInterval.top()  # [0,1]
+            else:
+                result = Evaluation.compare_intervals(
+                    leftInterval, rightInterval, operator)
         # 논리 연산자 처리
         elif operator in ['&&', '||']:
             result = leftInterval.logical_op(rightInterval, operator)
@@ -886,7 +908,7 @@ class Evaluation :
             function_cfg.related_variables.setdefault(k, v)
 
         # 6) 실제 함수 CFG 해석
-        return_value = self.interpret_function_cfg(function_cfg, variables)  # ← caller env 전달
+        return_value = self.runtime.interpret_function_cfg(function_cfg, variables)  # ← caller env 전달
 
         # 7) 함수 컨텍스트 복원
         self.an.current_target_function = saved_function
