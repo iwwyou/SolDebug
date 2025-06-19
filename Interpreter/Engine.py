@@ -5,9 +5,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:                                         # 타입 검사 전용
      from Analyzer.ContractAnalyzer import ContractAnalyzer
 
-from Interpreter.Semantics.Refine import Refine
-from Interpreter.Semantics.Runtime import Runtime
-
 from Domain.Variable import Variables
 
 from Utils.CFG import CFGNode
@@ -21,10 +18,22 @@ class Engine:
     – 실제 ‘한 줄 해석’은 Semantics 에게 위임.
     """
 
-    def __init__(self, an:"ContractAnalyzer"):
-        self.an = an
-        self.ref = Refine(an)
-        self.runtime = Runtime(an)
+    class Engine:
+        """
+        – CFG work-list, widen / narrow, fix-point.
+        – 실제 ‘한 줄 해석’은 Semantics 에게 위임.
+        """
+
+        def __init__(self, an: "ContractAnalyzer"):
+            self.an = an
+
+        @property
+        def ref(self):
+            return self.an.refiner
+
+        @property
+        def runtime(self):
+            return self.an.runtime
 
     def transfer_function(self, node: CFGNode,
                           in_vars: dict[str, Variables]) -> dict[str, Variables]:

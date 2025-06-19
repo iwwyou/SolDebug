@@ -1,11 +1,15 @@
-from Analyzer.ContractAnalyzer import ContractAnalyzer
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:                                         # 타입 검사 전용
+     from Analyzer.ContractAnalyzer import ContractAnalyzer
+
 from Utils.CFG import ContractCFG, FunctionCFG
 from Domain.Interval import UnsignedIntegerInterval, IntegerInterval, BoolInterval
 from Domain.Variable import GlobalVariable, Variables, ArrayVariable, StructVariable, EnumVariable
 from Domain.Address import AddressSymbolicManager
 from Domain.Type import SolType
-
-
 
 class StaticCFGFactory:
 
@@ -158,7 +162,12 @@ class StaticCFGFactory:
         # 파라미터->Variables
         for typ, pname in params:
             if pname:
-                var = StaticCFGFactory.make_param_variable(typ, pname, scope="local")
+                var = StaticCFGFactory.make_param_variable(
+                    an,  # 🔑 ContractAnalyzer 인스턴스
+                    typ,  # SolType
+                    pname,  # 식별자
+                    scope="local"
+                )
                 cfg.add_related_variable(var)
                 cfg.parameters.append(pname)
 
@@ -183,7 +192,12 @@ class StaticCFGFactory:
 
         for p_type, p_name in params:
             if p_name:  # 이름이 있는 것만 변수화
-                var = StaticCFGFactory.make_param_variable(p_type, p_name, scope="local")
+                var = StaticCFGFactory.make_param_variable(
+                    an,  # 🔑
+                    p_type,
+                    p_name,
+                    scope="local"
+                )
                 fcfg.add_related_variable(var)
                 fcfg.parameters.append(p_name)
 
@@ -192,7 +206,12 @@ class StaticCFGFactory:
 
         for r_type, r_name in returns:
             if r_name:
-                rv = StaticCFGFactory.make_param_variable(r_type, r_name, scope="local")
+                rv = StaticCFGFactory.make_param_variable(
+                    an,  # 🔑
+                    r_type,
+                    r_name,
+                    scope="local"
+                )
                 fcfg.add_related_variable(rv)
                 fcfg.return_vars.append(rv)
             else:

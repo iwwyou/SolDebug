@@ -5,9 +5,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:                                         # 타입 검사 전용
      from Analyzer.ContractAnalyzer import ContractAnalyzer
 
-from Interpreter.Semantics.Update import Update
-from Interpreter.Semantics.Runtime import Runtime
-
 from Domain.Variable import Variables, ArrayVariable, StructVariable, MappingVariable, EnumVariable, EnumDefinition
 from Domain.Type import SolType
 from Domain.Interval import Interval, IntegerInterval, BoolInterval, UnsignedIntegerInterval
@@ -21,13 +18,18 @@ import re
 class Evaluation :
 
     def __init__(self, analyzer: "ContractAnalyzer"):
-        """
-        Semantics 인스턴스는 ContractAnalyzer 하나만 품고,
-        나머지 속성·헬퍼는 전부 위임(propagation)한다.
-        """
-        self.an = analyzer  # composition
-        self.up = Update(analyzer)
-        self.runtime = Runtime(analyzer)
+        # ContractAnalyzer 인스턴스만 보관해 두고,
+        # 나머지 컴포넌트는 필요할 때 property 로 접근합니다.
+        self.an = analyzer
+
+    # ── lazy properties ──────────────────────────────────────────────
+    @property
+    def up(self):
+        return self.an.updater          # Update 싱글톤
+
+    @property
+    def runtime(self):
+        return self.an.runtime          # Runtime 싱글톤
 
     def evaluate_expression(self, expr: Expression, variables, callerObject=None, callerContext=None):
         if expr.context == "LiteralExpContext":

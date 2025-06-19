@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:                                         # 타입 검사 전용
      from Analyzer.ContractAnalyzer import ContractAnalyzer
 
-from Interpreter.Semantics.Evaluation import Evaluation
 from Domain.Interval import *
 from Domain.Variable import Variables, ArrayVariable, MappingVariable, StructVariable, EnumVariable
 from Domain.Address import AddressSymbolicManager
@@ -15,9 +14,12 @@ from Utils.Helper import VariableEnv
 
 class Update :
 
-    def __init__(self, an:"ContractAnalyzer"):
+    def __init__(self, an: "ContractAnalyzer"):
         self.an = an
-        self.ev = Evaluation(an)
+
+    @property
+    def ev(self):
+        return self.an.evaluator
 
     def update_left_var(self, expr, rVal, operator, variables, callerObject=None, callerContext=None):
         # ── ① 글로벌이면 갱신 금지 ─────────────────────────

@@ -10,25 +10,36 @@ from Utils.Helper import VariableEnv
 from Domain.Variable import Variables, MappingVariable, ArrayVariable, StructVariable
 from Domain.IR import Expression
 from Domain.Interval import UnsignedIntegerInterval, IntegerInterval, BoolInterval
-from Interpreter.Engine import Engine
-from Interpreter.Semantics.Refine import Refine
-from Interpreter.Semantics.Evaluation import Evaluation
-from Interpreter.Semantics.Update import Update
+
 import copy
 from collections import deque
 
 class Runtime:
     def __init__(self, analyzer: "ContractAnalyzer"):
-        """
-        Semantics 인스턴스는 ContractAnalyzer 하나만 품고,
-        나머지 속성·헬퍼는 전부 위임(propagation)한다.
-        """
-        self.an = analyzer  # composition
-        self.rec = analyzer.recorder
-        self.ref = Refine(analyzer)
-        self.eval = Evaluation(analyzer)
-        self.up = Update(analyzer)
-        self.eng = Engine(analyzer)
+        # 별도 객체를 새로 만들지 않고 ContractAnalyzer 안의 싱글톤을
+        # 지연-참조(lazy) 합니다.
+        self.an = analyzer
+
+    # ── lazy properties ──────────────────────────────────────────────
+    @property
+    def rec(self):
+        return self.an.recorder
+
+    @property
+    def ref(self):
+        return self.an.refiner
+
+    @property
+    def eval(self):
+        return self.an.evaluator
+
+    @property
+    def up(self):
+        return self.an.updater
+
+    @property
+    def eng(self):
+        return self.an.engine
 
     def update_statement_with_variables(self, stmt, current_variables, ret_acc=None):
         if stmt.statement_type == 'variableDeclaration':

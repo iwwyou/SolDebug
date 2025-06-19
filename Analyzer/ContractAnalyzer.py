@@ -17,6 +17,7 @@ from Interpreter.Semantics.Evaluation import Evaluation
 from Interpreter.Semantics.Update import Update
 from Interpreter.Semantics.Refine import Refine
 from Interpreter.Semantics.Runtime import Runtime
+from Interpreter.Engine import Engine
 
 class ContractAnalyzer:
 
@@ -45,12 +46,13 @@ class ContractAnalyzer:
         # for Multiple Contract
         self.contract_cfgs = {} # name -> CFG
 
-        self.builder = DynamicCFGBuilder(self)
-        self.recorder = RecordManager()
         self.evaluator = Evaluation(self)
         self.updater = Update(self)
         self.refiner = Refine(self)
         self.runtime = Runtime(self)
+        self.engine = Engine()
+        self.builder = DynamicCFGBuilder(self)
+        self.recorder = RecordManager()
 
         self.analysis_per_line = self.recorder.ledger
 

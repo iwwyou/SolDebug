@@ -16,8 +16,11 @@ if TYPE_CHECKING:                                         # 타입 검사 전용
 
 class DynamicCFGBuilder:
     def __init__(self, an: "ContractAnalyzer"):
-        self.an = an
-        self.eng = Engine(an)
+        self.an = an                    # Engine 을 새로 만들지 않습니다.
+
+    @property
+    def eng(self):
+        return self.an.engine
 
     @staticmethod
     def splice_modifier(
