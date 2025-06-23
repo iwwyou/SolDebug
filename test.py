@@ -15,6 +15,7 @@ def simulate_inputs(records):
     for rec in records:
       code, s, e, ev = rec["code"], rec["startLine"], rec["endLine"], rec["event"]
       contract_analyzer.update_code(s, e, code, ev)  # solidity 소스 갱신
+      print("target code : ", code)
 
       stripped = code.lstrip()
 

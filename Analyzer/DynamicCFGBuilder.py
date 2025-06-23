@@ -3,7 +3,6 @@ from __future__ import annotations
 # Analyzer/CFGBuilder.py
 from Utils.CFG import CFGNode, FunctionCFG
 from Utils.Helper import VariableEnv
-from Interpreter.Engine import Engine
 from Domain.IR import Expression
 from Domain.Variable import Variables
 from collections import deque
@@ -130,7 +129,7 @@ class DynamicCFGBuilder:
             fcfg: FunctionCFG,
             brace_count: dict,
     ):
-        cur_block.add_assign_statement(expr, op_token, line_no)
+        cur_block.add_unary_statement(expr, op_token, line_no)
         fcfg.update_block(cur_block)
 
         bc = brace_count.setdefault(line_no, {"open": 0, "close": 0, "cfg_node": cast(Optional[CFGNode], None)})
@@ -761,7 +760,7 @@ class DynamicCFGBuilder:
             line_no: int,
             fcfg: FunctionCFG,
             brace_count: dict,
-    ) -> CFGNode:
+    ):
         """
         unchecked 키워드를 만나면
 
@@ -1116,16 +1115,15 @@ class DynamicCFGBuilder:
         leaf_nodes = self.collect_leaf_nodes(condition_node, stop_node_list)
 
         # ② 값 join --------------------------------------------------
-        joined = {}
+        joined_env = None
         for n in leaf_nodes:
             if n.function_exit_node:
                 continue
-            for k, v in n.variables.items():
-                joined[k] = VariableEnv.join_variables_simple(joined.get(k, v), v)
+            joined_env = VariableEnv.join_variables_simple(joined_env, n.variables)
 
         # 새로운 블록 생성 및 변수 정보 저장
         new_blk = CFGNode(f"JoinBlock_{self.an.current_start_line}")
-        new_blk.variables = joined
+        new_blk.variables = joined_env
         new_blk.join_point_node = True  # ★ join-블록 표식
         G.add_node(new_blk)
 

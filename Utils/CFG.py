@@ -66,6 +66,21 @@ class CFGNode:
         )
         self.statements.append(assignment_stmt)
 
+    def add_unary_statement(self, operand, operator, line_no):
+        """
+        ++x, --y, delete z 같은 단항 연산 전용 스테이트먼트를 블록에 추가.
+        ─ operand  : Expression (피연산자)
+        ─ operator : '++' | '--' | 'delete' …
+        ─ line_no  : 소스 코드 라인 번호
+        """
+        unary_stmt = Statement(
+            statement_type='unary',
+            operand=operand,
+            operator=operator,
+            src_line=line_no,
+        )
+        self.statements.append(unary_stmt)
+
         # 변수 정보 업데이트는 update_left_Var 관련 함수에서 수행
 
     def add_function_call_statement(self, function_expr: Expression, line_no):

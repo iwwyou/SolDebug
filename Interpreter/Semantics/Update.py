@@ -39,6 +39,13 @@ class Update :
         elif expr.context == "LiteralExpContext":
             return self.update_left_var_of_literal_context(expr, rVal, operator, variables,
                                                            callerObject, callerContext)
+        elif expr.context == "TestingIndexAccess":
+            return self.update_left_var_of_testing_index_access_context(expr, rVal, operator, variables,
+                                                                                 callerObject, callerContext)
+        elif expr.context == "TestingMemberAccess":
+            return self.update_left_var_of_testing_member_access_context(expr, rVal, operator, variables,
+                                                                                  callerObject, callerContext)
+
         elif expr.left is not None and expr.right is not None:
             return self.update_left_var_of_binary_exp_context(expr, rVal, operator, variables,
                                                               callerObject, callerContext)
@@ -74,6 +81,9 @@ class Update :
         # ── ② 확정 int ────────────────────────────────────────────────
         if isinstance(idx_val, int):
             target = self._touch_index_entry(caller_object, idx_val)
+            if r_val is None:
+                return target
+
             new_val = self.compound_assignment(target.value, r_val, operator)
             self._patch_var_with_new_value(target, new_val)
 
@@ -109,6 +119,9 @@ class Update :
                         f"Index [{l},{r}] out of range for static array "
                         f"'{caller_object.identifier}' (decl len={decl_len})"
                     )
+                if r_val is None:
+                    return caller_object
+
                 for i in range(l, r + 1):
                     elem = caller_object.get_or_create_element(i)
                     nv = self.compound_assignment(elem.value, r_val, operator)
@@ -124,6 +137,9 @@ class Update :
 
             # ---- 매핑(MappingVariable) ------------------------------
             if isinstance(caller_object, MappingVariable):
+                if r_val is None:
+                    return caller_object
+
                 for i in range(l, r + 1):
                     k = str(i)
                     if k in caller_object.mapping:
@@ -240,6 +256,9 @@ class Update :
 
         # ── elementary / enum ──────────────────────────────
         if isinstance(nested, (Variables, EnumVariable)):
+            if rVal is None:
+                return nested
+
             nested.value = self.compound_assignment(nested.value, rVal, operator)
             self.an.recorder.record_assignment(
                 line_no=self.an.current_start_line,
@@ -323,6 +342,9 @@ class Update :
 
             # ── (a) leaf 스칼라(elementary / enum) ────────────────────────
             if isinstance(elem, (Variables, EnumVariable)):
+                if r_val is None:
+                    return elem
+
                 new_iv = _to_interval(elem, lit_str)
                 elem.value = self.compound_assignment(elem.value, new_iv, operator)
 
@@ -349,6 +371,9 @@ class Update :
 
             # ── (a) leaf 스칼라 ───────────────────────────────────────────
             if isinstance(entry, (Variables, EnumVariable)):
+                if r_val is None:
+                    return entry
+
                 new_iv = _to_interval(entry, lit_str)
                 entry.value = self.compound_assignment(entry.value, new_iv, operator)
 
@@ -504,8 +529,72 @@ class Update :
         tgt = variables[ident]
         if not isinstance(tgt, (Variables, EnumVariable)):
             raise ValueError(f"Assignment to non-scalar '{ident}' requires member/index access.")
+        if r_val is None:
+            return tgt
+
         _apply_to_leaf(tgt, expr)
         return None
+
+    def update_left_var_of_testing_index_access_context(self, expr: Expression,
+                                                                 rVal,
+                                                                 operator,
+                                                                 variables: dict[str, Variables],
+                                                                 callerObject=None, callerContext=None):
+        # base
+        base_obj = self.update_left_var(
+            expr.base, rVal, operator, variables,
+            None, "TestingIndexAccess"
+        )
+        # index
+        return self.update_left_var(
+            expr.index, rVal, operator, variables, base_obj, "TestingIndexAccess"
+        )
+
+    def update_left_var_of_testing_member_access_context(self, expr: Expression,
+                                                                  rVal,
+                                                                  operator,
+                                                                  variables: dict[str, Variables],
+                                                                  callerObject=None, callerContext=None):
+
+        # ① 먼저 base 부분을 재귀-업데이트
+        base_obj = self.update_left_var(expr.base, rVal, operator,
+                                                 variables, None, "TestingMemberAccess")
+        member = expr.member
+
+        if member is not None:
+            if VariableEnv.is_global_expr(expr) and isinstance(callerObject, MappingVariable):
+                key = f"{expr.base.identifier}.{member}"  # "msg.sender"
+
+                # 엔트리가 없으면 새로 만든다
+                if key not in callerObject.mapping:
+                    callerObject.mapping[key] = callerObject.get_or_create(key)
+
+                entry = callerObject.mapping[key]
+
+                # ① 더 깊은 IndexAccess 가 이어질 때는 객체 그대로 반환
+                if callerContext == "TestingIndexAccess":
+                    return entry  # allowed[msg.sender] 의 결과
+
+                # ② leaf 읽기(Testing이므로 값 패치는 하지 않음)
+                return entry  # Variables / EnumVariable / Array…
+
+            if not isinstance(base_obj, StructVariable):
+                raise ValueError(f"[Warn] member access on non-struct '{base_obj.identifier}'")
+            m = base_obj.members.get(member)
+            if m is None:
+                raise ValueError(f"[Warn] struct '{base_obj.identifier}' has no member '{member}'")
+
+            nested = base_obj.members[member]
+
+            if isinstance(nested, (StructVariable, ArrayVariable, MappingVariable)):
+                # 더 깊은 member access가 이어질 수 있으므로 그대로 반환
+                return nested
+            elif isinstance(nested, (Variables, EnumVariable)):
+                if rVal is not None:
+                    self._patch_var_with_new_value(m, rVal)
+                return m
+
+        raise ValueError(f"Unexpected member-type '{member}'")
 
     # ---------------------------------------------------------------------------
     #  읽기-전용  LHS resolver
@@ -523,72 +612,7 @@ class Update :
     ):
         """纯粹히 ‘변수 객체’를 찾아서 돌려준다. (값 패치는 전혀 하지 않음)"""
 
-        # ── 글로벌 식별자는 LHS 에 올 수 없으므로 바로 None
-        if caller_object is None and caller_context is None and VariableEnv.is_global_expr(expr):
-            return None
-
-        ctx = expr.context
-        if ctx == "IndexAccessContext":
-            base = self.resolve_lhs_expr(expr.base, variables, None, "IndexAccessContext")
-            return self.resolve_lhs_expr(expr.index, variables, base, "IndexAccessContext")
-
-        if ctx == "MemberAccessContext":
-            base = self.resolve_lhs_expr(expr.base, variables, None, "MemberAccessContext")
-            member = expr.member
-
-            # (a) mapping + 글로벌-멤버   map[msg.sender] …
-            if VariableEnv.is_global_expr(expr) and isinstance(caller_object, MappingVariable):
-                key = f"{expr.base.identifier}.{member}"
-                return caller_object.mapping.get(key)
-
-            # (b) struct 멤버
-            if isinstance(base, StructVariable) and member in base.members:
-                return base.members[member]
-
-            # (c) array.length / .push 등은 LHS 로 오지 않음
-            if isinstance(base, ArrayVariable):
-                return None
-
-            return None  # fallback
-
-        if ctx == "IdentifierExpContext":
-            ident = expr.identifier
-
-            # caller_object 가 있는 경우 – Array / Struct / Mapping 의 내부
-            if caller_object is not None:
-                if isinstance(caller_object, ArrayVariable):
-                    # ident 가 인덱스를 담은 변수명인지 검사
-                    if ident in variables:
-                        idx_iv = variables[ident].value
-                        if VariableEnv.is_interval(idx_iv) and \
-                                idx_iv.min_value == idx_iv.max_value:
-                            idx = idx_iv.min_value
-                            if 0 <= idx < len(caller_object.elements):
-                                return caller_object.elements[idx]
-                    return None
-
-                if isinstance(caller_object, StructVariable):
-                    return caller_object.members.get(ident)
-
-                if isinstance(caller_object, MappingVariable):
-                    return caller_object.mapping.get(ident)
-
-                return None
-
-            # top-level identifier
-            return variables.get(ident)
-
-        if ctx == "LiteralExpContext":
-            lit = str(expr.literal)
-            if isinstance(caller_object, ArrayVariable) and lit.isdigit():
-                idx = int(lit)
-                return caller_object.elements[idx] if idx < len(caller_object.elements) else None
-            if isinstance(caller_object, MappingVariable):
-                return caller_object.mapping.get(lit)
-            return None
-
-        # (BinaryExp etc. – testing 전용 컨텍스트는 디버그 지시어에서 사용 안 함)
-        return None
+        return self.update_left_var(expr, None, None, variables, caller_object, caller_context)
 
     def _touch_index_entry(self, container, idx: int):
         """배열/매핑에서 idx 번째 엔트리를 가져오거나 필요 시 생성"""

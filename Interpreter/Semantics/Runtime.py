@@ -46,6 +46,8 @@ class Runtime:
             return self.interpret_variable_declaration_statement(stmt, current_variables)
         elif stmt.statement_type == 'assignment':
             return self.interpret_assignment_statement(stmt, current_variables)
+        elif stmt.statement_type == 'unary':  # 🔹 추가
+            return self.interpret_unary_statement(stmt, current_variables)
         elif stmt.statement_type == 'functionCall':
             return self.interpret_function_call_statement(stmt, current_variables)
         elif stmt.statement_type == 'return':
@@ -377,6 +379,41 @@ class Runtime:
 
         return variables
 
+    # ------------------------------------------------------------------
+    # 단항(++ / -- / delete) 스테이트먼트 해석
+    # ------------------------------------------------------------------
+    def interpret_unary_statement(self, stmt, variables):
+        """
+        stmt.operator : '++' | '--' | 'delete' | 'unary_prefix' | 'unary_suffix' …
+        stmt.operand  : Expression  (피연산자)
+
+        ▸ ++ / -- 는 handle_unary_incdec() 단계에서 이미
+          self.up.update_left_var() 로 값이 반영돼 있으므로
+          여기서는 delete 만 실제 값을 지우고,
+          나머지는 로그만 남겨 두면 된다.
+        """
+        op       = stmt.operator
+        operand  = stmt.operand
+        src_line = stmt.src_line
+
+        # ── delete x  -----------------------------------------------
+        if op == 'delete':
+            # elementary 면 0 / ⊥ , 복합이면 재귀 ⊥ 적용
+            self.up.update_left_var(operand, 0, '=', variables, None, None)
+
+        # ── Recorder 로그 -------------------------------------------
+        # (원한다면 RecordManager 에 단항 전용 메서드를 좀 더 추가해도 좋다)
+        if self._record_enabled:
+            self.rec.add_stmt_record(
+                line_no   = src_line,
+                stmt_type = 'unary',
+                detail    = {'op': op,
+                             'expr': operand}
+            )
+
+        return variables
+
+
     def interpret_function_call_statement(self, stmt, variables):
         function_expr = stmt.function_expr
         self.eval.evaluate_function_call_context(function_expr, variables, None, None)
@@ -482,36 +519,33 @@ class Runtime:
         # ④ 나머지(string, bytes, 심볼 등) → None
         v.value = None
 
-    def _force_join_before_exit(self, fcfg: FunctionCFG):
+    def _force_join_before_exit(self, fcfg: FunctionCFG) -> None:
         """
-        while/if 등을 모두 돌고 난 뒤, 아직 join 되지 않은 leaf 노드들을
-        exit-node 로 끌어모아 Interval 을 확정한다.
+        while/if 등을 모두 돈 뒤 아직 join 되지 않은 leaf-노드를
+        EXIT 노드로 끌어모아 변수 구간을 확정한다.
         """
 
         def _is_leaf(g, n) -> bool:
             succs = list(g.successors(n))
             return (
                     not n.condition_node  # 조건 블록이 아니고
-                    and len(succs) == 1  # successor 가 1 개뿐이며
+                    and len(succs) == 1  # successor 하나뿐이며
                     and succs[0].name == "EXIT"  # 그게 EXIT 노드
             )
 
         g = fcfg.graph
         exit_node = fcfg.get_exit_node()
-
-        # (1) leaf 수집  – out-degree == 0 이고 exit 자체는 제외
         leaves = [n for n in g.nodes if _is_leaf(g, n)]
 
-        # (2) 변수 join
-        joined = {}
+        # ─── (1) leaf 들의 변수환경을 통째로 join ──────────────────────
+        joined_env: dict[str, Variables] = {}
         for leaf in leaves:
-            for k, v in leaf.variables.items():
-                joined[k] = VariableEnv.join_variables_simple(joined.get(k, v), v)
+            joined_env = VariableEnv.join_variables_simple(joined_env, leaf.variables)
 
-        # (3) exit_node.variables 갱신
-        exit_node.variables = joined
+        # ─── (2) EXIT 노드에 반영 ─────────────────────────────────────
+        exit_node.variables = joined_env
 
-        # (4) 그래프 edge 재배선  (leaf → exit)
+        # ─── (3) 그래프 재배선 (leaf → EXIT) ──────────────────────────
         for leaf in leaves:
             g.add_edge(leaf, exit_node)
 
