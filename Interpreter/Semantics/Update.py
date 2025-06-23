@@ -405,14 +405,6 @@ class Update :
             # (b) 실제 값 패치
             var_obj.value = self.compound_assignment(var_obj.value, conv_val, operator)
 
-            # (c) 기록 – **최상위 assignment**(caller_context is None) 일 때만
-            if caller_context is None:
-                self.an.recorder.record_assignment(
-                    line_no=self.an.current_start_line,
-                    expr=record_expr,
-                    var_obj=var_obj,
-                    base_obj=var_obj,
-                )
 
         # ======================================================================
         # 1)  caller_object 가 **ArrayVariable** 인 경우  arr[i] = …

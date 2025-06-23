@@ -829,8 +829,8 @@ class ContractAnalyzer:
     def process_assignment_expression(self, expr: Expression) -> None:
         # 1. CFG 컨텍스트 --------------------------------------------------
         ccf = self.contract_cfgs[self.current_target_contract]
-        fcfg = ccf.get_function_cfg(self.current_target_function)
-        if fcfg is None:
+        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+        if self.current_target_function_cfg is None:
             raise ValueError("No active function CFG.")
 
         cur_blk = self.builder.get_current_block()
@@ -852,12 +852,12 @@ class ContractAnalyzer:
             cur_block=cur_blk,
             expr=expr,
             line_no=self.current_start_line,
-            fcfg=fcfg,
+            fcfg=self.current_target_function_cfg,
             brace_count=self.brace_count,
         )
 
         # 4. constructor 특수 처리 & 저장 -------------------------------
-        if fcfg.function_type == "constructor":
+        if self.current_target_function_cfg.function_type == "constructor":
             state_vars = ccf.state_variable_node.variables
 
             # ③ scope=='state' 인 항목을 그대로 복사해 덮어쓰기
@@ -866,7 +866,7 @@ class ContractAnalyzer:
                     continue
                 state_vars[name] = VariableEnv.copy_variables({name: var})[name]
 
-        ccf.functions[self.current_target_function] = fcfg
+        ccf.functions[self.current_target_function] = self.current_target_function_cfg
         self.contract_cfgs[self.current_target_contract] = ccf
 
     # --------------------------------------------------------------
@@ -876,8 +876,8 @@ class ContractAnalyzer:
                              op_sign: str,  # "+=" | "-="
                              stmt_kind: str):  # "unary_prefix" | "unary_suffix"
         ccf = self.contract_cfgs[self.current_target_contract]
-        fcfg = ccf.get_function_cfg(self.current_target_function)
-        if fcfg is None:
+        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+        if self.current_target_function_cfg is None:
             raise ValueError("active FunctionCFG not found")
 
         cur_blk = self.builder.get_current_block()
@@ -906,12 +906,12 @@ class ContractAnalyzer:
             expr=expr,
             op_token=stmt_kind,  # 기록용 토큰 – 원하면 '++' 등으로
             line_no=self.current_start_line,
-            fcfg=fcfg,
+            fcfg=self.current_target_function_cfg,
             brace_count=self.brace_count,
         )
 
         # ④ constructor 특수 처리 + 저장 ---------------------------
-        if fcfg.function_type == "constructor":
+        if self.current_target_function_cfg.function_type == "constructor":
             state_vars = ccf.state_variable_node.variables
 
             # ③ scope=='state' 인 항목을 그대로 복사해 덮어쓰기
@@ -920,8 +920,8 @@ class ContractAnalyzer:
                     continue
                 state_vars[name] = VariableEnv.copy_variables({name: var})[name]
 
-        fcfg.update_block(cur_blk)
-        ccf.functions[self.current_target_function] = fcfg
+        self.current_target_function_cfg.update_block(cur_blk)
+        ccf.functions[self.current_target_function] = self.current_target_function_cfg
         self.contract_cfgs[self.current_target_contract] = ccf
 
     # --------------------------------------------------------------
@@ -929,8 +929,8 @@ class ContractAnalyzer:
     # --------------------------------------------------------------
     def handle_delete(self, target_expr: Expression):
         ccf = self.contract_cfgs[self.current_target_contract]
-        fcfg = ccf.get_function_cfg(self.current_target_function)
-        if fcfg is None:
+        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+        if self.current_target_function_cfg is None:
             raise ValueError("active FunctionCFG not found")
 
         cur_blk = self.builder.get_current_block()
@@ -981,12 +981,12 @@ class ContractAnalyzer:
             expr=target_expr,
             op_token="delete",
             line_no=self.current_start_line,
-            fcfg=fcfg,
+            fcfg=self.current_target_function_cfg,
             brace_count=self.brace_count,
         )
 
-        fcfg.update_block(cur_blk)
-        ccf.functions[self.current_target_function] = fcfg
+        self.current_target_function_cfg.update_block(cur_blk)
+        ccf.functions[self.current_target_function] = self.current_target_function_cfg
         self.contract_cfgs[self.current_target_contract] = ccf
 
     # ───────────────────────────────────────────────────────────
@@ -1017,8 +1017,8 @@ class ContractAnalyzer:
     def process_function_call(self, expr: Expression) -> None:
         # ① CFG 컨텍스트 -------------------------------------------------
         ccf = self.contract_cfgs[self.current_target_contract]
-        fcfg = ccf.get_function_cfg(self.current_target_function)
-        if fcfg is None:
+        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+        if self.current_target_function_cfg is None:
             raise ValueError("No active function CFG.")
 
         cur_blk = self.builder.get_current_block()
@@ -1037,12 +1037,12 @@ class ContractAnalyzer:
             cur_block=cur_blk,
             expr=expr,
             line_no=self.current_start_line,
-            fcfg=fcfg,
+            fcfg=self.current_target_function_cfg,
             brace_count=self.brace_count,
         )
 
         # ④ constructor 특수 처리  -------------------------------------
-        if fcfg.function_type == "constructor":
+        if self.current_target_function_cfg.function_type == "constructor":
             state_vars = ccf.state_variable_node.variables
             # ‣ scope=='state' 인 항목만 deep-copy 로 덮어쓰기
             for name, var in state_vars.items():
@@ -1051,7 +1051,7 @@ class ContractAnalyzer:
                 state_vars[name] = VariableEnv.copy_variables({name: var})[name]
 
         # ⑤ CFG 저장  ---------------------------------------------------
-        ccf.functions[self.current_target_function] = fcfg
+        ccf.functions[self.current_target_function] = self.current_target_function_cfg
         self.contract_cfgs[self.current_target_contract] = ccf
 
     def process_payable_function_call(self, expr):
@@ -1065,8 +1065,8 @@ class ContractAnalyzer:
     def process_if_statement(self, condition_expr: Expression) -> None:
         # ── 1. CFG 컨텍스트 ─────────────────────────────────────────────
         ccf = self.contract_cfgs[self.current_target_contract]
-        fcfg = ccf.get_function_cfg(self.current_target_function)
-        if fcfg is None:
+        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+        if self.current_target_function_cfg is None:
             raise ValueError("No active function CFG.")
 
         cur_blk = self.builder.get_current_block()
@@ -1092,18 +1092,18 @@ class ContractAnalyzer:
             true_env=true_env,
             false_env=false_env,
             line_no=self.current_start_line,
-            fcfg=fcfg,
+            fcfg=self.current_target_function_cfg,
             brace_count=self.brace_count,
         )
 
         # ── 4. 저장 & 마무리 ───────────────────────────────────────────
-        ccf.functions[self.current_target_function] = fcfg
+        ccf.functions[self.current_target_function] = self.current_target_function_cfg
         self.contract_cfgs[self.current_target_contract] = ccf
 
     def process_else_if_statement(self, condition_expr: Expression) -> None:
         ccf = self.contract_cfgs[self.current_target_contract]
-        fcfg = ccf.get_function_cfg(self.current_target_function)
-        if fcfg is None:
+        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+        if self.current_target_function_cfg is None:
             raise ValueError("No active function CFG.")
         prev_cond = self.builder.find_corresponding_condition_node()
         if prev_cond is None:
@@ -1140,12 +1140,12 @@ class ContractAnalyzer:
             true_env=true_env,
             false_env=false_env,
             line_no=self.current_start_line,
-            fcfg=fcfg,
+            fcfg=self.current_target_function_cfg,
             brace_count=self.brace_count,
         )
 
         # 저장
-        ccf.functions[self.current_target_function] = fcfg
+        ccf.functions[self.current_target_function] = self.current_target_function_cfg
         self.contract_cfgs[self.current_target_contract] = ccf
 
     def process_else_statement(self) -> None:
