@@ -483,20 +483,35 @@ class Update :
         # 3)  caller_object 가 **MappingVariable**  – map[key] = …
         # ======================================================================
         if isinstance(caller_object, MappingVariable):
-            # ── key 결정 ─────────────────────────────────────────────────
-            if ident in variables:  # 식별자 → 변수값
-                key_iv_or_sym = variables[ident].value
-                if VariableEnv.is_interval(key_iv_or_sym):
-                    iv = key_iv_or_sym
-                    if iv.is_bottom() or iv.min_value != iv.max_value:
-                        return caller_object  # 범위 / ⊥  → 전체-쓰기
-                    key_str = str(iv.min_value)
-                else:
-                    key_str = ident  # 주소형 / 심볼릭
-            else:
-                key_str = ident  # 리터럴 식별자 그대로
+            if not caller_object.struct_defs or not caller_object.enum_defs:
+                ccf = self.an.contract_cfgs[self.an.current_target_contract]
+                caller_object.struct_defs = ccf.structDefs
+                caller_object.enum_defs = ccf.enumDefs
 
-            entry = caller_object.mapping.setdefault(key_str, caller_object.get_or_create(key_str))
+            # ── (1) ident 가 변수로 선언돼 있을 때 ──────────────────────────
+            if ident in variables:
+                key_var = variables[ident]
+                # --- address / bytes / symbolic => 그대로 식별자 사용 -------
+                et = getattr(key_var.typeInfo, "elementaryTypeName", "")
+                if et == "address" or et.startswith("bytes") or not VariableEnv.is_interval(key_var.value):
+                    key_str = ident
+
+                # --- int/uint singleton interval ----------------------------
+                elif VariableEnv.is_interval(key_var.value):
+                    iv = key_var.value
+
+                    if not iv.is_bottom() and iv.min_value == iv.max_value:
+                        key_str = str(iv.min_value)
+                    else:
+                        # 범위 / ⊥  → 전체-쓰기 추상화 유지
+                        return caller_object
+                else:
+                    key_str = ident  # fallback
+            # ── (2) ident 가 리터럴(바로 account처럼) ----------------------
+            else:
+                raise ValueError (f"Key '{ident}' not found.")
+
+            entry = caller_object.get_or_create(key_str)
             if isinstance(entry, (StructVariable, ArrayVariable, MappingVariable)):
                 return entry  # composite
             _apply_to_leaf(entry, expr)  # leaf + 기록

@@ -841,7 +841,7 @@ class ContractAnalyzer:
         )
         #   ⬇️ Update 내부에서   recorder.record_assignment(...) 호출
         self.updater.update_left_var(
-            expr,  # 좌변/우변을 통째로 넘김
+            expr.left,
             r_val,
             expr.operator,
             cur_blk.variables,

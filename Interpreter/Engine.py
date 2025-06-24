@@ -25,49 +25,48 @@ class Engine:
     def runtime(self):
         return self.an.runtime
 
-    def transfer_function(self, node: CFGNode,
-                          in_vars: Optional[dict[str, Variables]]) -> dict[str, Variables]:
+    def transfer_function(
+            self,
+            node: CFGNode,
+            in_vars: Optional[dict[str, Variables]],
+    ) -> dict[str, Variables]:
+        """
+        * 루프 헤더(φ-노드) -->  그대로 통과
+        * 조건 노드            -->  변수 쓰기 없이 통과
+        * branch dummy 노드    -->  조건식 pruning 후 통과
+        * 일반 / incr / body   -->  statement 해석
+        """
+        env_in = in_vars or {}
+        # ① φ-노드 : widening 대상이므로 그대로 반환
+        if node.fixpoint_evaluation_node:
+            node.variables = VariableEnv.copy_variables(env_in)
+            return env_in  # 변화 없음
 
-        in_vars = in_vars or {}
+        # ② out 복사본 준비
+        env_out = VariableEnv.copy_variables(env_in)
 
-        if not in_vars:
-            return {}
+        # ③ branch dummy 인 경우 → 직전 condition 찾아 pruning
+        if node.branch_node and not node.condition_node:
+            preds = [
+                p for p in self.an.current_target_function_cfg.graph.predecessors(node)
+                if getattr(p, "condition_node", False)
+            ]
+            if preds:
+                cond_node = preds[0]  # predecessor 는 하나뿐
+                self.ref.update_variables_with_condition(
+                    env_out,
+                    cond_node.condition_expr,
+                    node.is_true_branch,
+                )
 
-        out_vars = VariableEnv.copy_variables(in_vars)
-        changed = False
+        # ④ statement 해석 (조건 노드는 statement 없음)
+        if node.statements:
+            for st in node.statements:
+                self.runtime.update_statement_with_variables(st, env_out)
 
-        # ─ 1) 조건 노드 ───────────────────────────────────────
-        if node.condition_node:
-            # False-브랜치(dummy 노드) 에서만 cond ⊥ 적용
-            if node.branch_node:
-                preds = list(self.an.current_target_function_cfg.graph.predecessors(node))
-                cond_node = next((p for p in preds if getattr(p, "condition_node", False)), None)
-                if cond_node:
-                    before = VariableEnv.copy_variables(out_vars)
-                    self.ref.update_variables_with_condition(
-                        out_vars, cond_node.condition_expr, node.is_true_branch
-                    )
-                    if not VariableEnv.env_equal(before, out_vars):
-                        changed = True
-
-        # ─ 2) 일반/바디/증감 노드 ────────────────────────────
-        elif not node.fixpoint_evaluation_node:
-            if node.branch_node:
-                preds = list(self.an.current_target_function_cfg.graph.predecessors(node))
-                cond_node = next((p for p in preds if getattr(p, "condition_node", False)), None)
-                if cond_node:
-                    self.ref.update_variables_with_condition(
-                        out_vars, cond_node.condition_expr, node.is_true_branch
-                    )
-            for stmt in node.statements:
-                before = VariableEnv.copy_variables(out_vars)
-                self.runtime.update_statement_with_variables(stmt, out_vars)
-                if not VariableEnv.env_equal(before, out_vars):
-                    changed = True
-
-        # ─ 3) 노드 변수 동기화 & 결과 반환 ────────────────────
-        node.variables = VariableEnv.copy_variables(out_vars)
-        return out_vars if changed else in_vars
+        # ⑤ 노드 env 동기화 후 반환
+        node.variables = VariableEnv.copy_variables(env_out)
+        return env_out
 
     def fixpoint(self, head: CFGNode) -> CFGNode:
         """

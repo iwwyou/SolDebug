@@ -280,6 +280,7 @@ class MappingVariable(Variables):
         self.mapping: dict[str, Variables] = {}
         self.struct_defs = struct_defs or {}
         self.enum_defs   = enum_defs   or {}
+
     # ────────────────────────────────────────────────
     # 값-생성 전용 private 헬퍼
     # ────────────────────────────────────────────────
