@@ -187,6 +187,11 @@ class Evaluation :
 
             # 1-B) 매핑 키 – 문자열·hex·decimal 모두 허용
             if isinstance(callerObject, MappingVariable):
+                if not callerObject.struct_defs or not callerObject.enum_defs:
+                    ccf = self.an.contract_cfgs[self.an.current_target_contract]
+                    callerObject.struct_defs = ccf.structDefs
+                    callerObject.enum_defs = ccf.enumDefs
+
                 key = lit
                 if key not in callerObject.mapping:
                     # 새 엔트리 생성

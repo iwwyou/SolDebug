@@ -401,16 +401,6 @@ class Runtime:
             # elementary 면 0 / ⊥ , 복합이면 재귀 ⊥ 적용
             self.up.update_left_var(operand, 0, '=', variables, None, None)
 
-        # ── Recorder 로그 -------------------------------------------
-        # (원한다면 RecordManager 에 단항 전용 메서드를 좀 더 추가해도 좋다)
-        if self._record_enabled:
-            self.rec.add_stmt_record(
-                line_no   = src_line,
-                stmt_type = 'unary',
-                detail    = {'op': op,
-                             'expr': operand}
-            )
-
         return variables
 
 

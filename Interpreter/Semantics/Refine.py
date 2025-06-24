@@ -63,7 +63,7 @@ class Refine:
         if cond_expr.context == "LiteralExpContext":
             return
 
-        val = Evaluation.evaluate_expression(cond_expr, vars_, None, None)
+        val = self.an.evaluator.evaluate_expression(cond_expr, vars_, None, None)
         # ▸ bool interval로 강제 변환
         if not isinstance(val, BoolInterval):
             if VariableEnv.is_interval(val):  # 숫자/주소

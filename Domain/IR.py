@@ -1,33 +1,44 @@
 class Statement:
     def __init__(self, statement_type, **kwargs):
-        self.statement_type = statement_type  # 'assignment', 'if', 'while', 'for', 'return', 'require', 'assert' 등
+        self.statement_type = statement_type
+        self.src_line       = kwargs.get("src_line")
 
-        # 공통 속성
-        self.expressions = []  # 해당 문에서 사용하는 Expression 객체들
-        self.statements = []   # 블록 내에 포함된 Statement 객체들
+        # ───────────── statement-type별 전용 필드 ─────────────
+        if statement_type == "variableDeclaration":
+            self.type_obj  = kwargs.get("type_obj")
+            self.var_name  = kwargs.get("var_name")
+            self.init_expr = kwargs.get("init_expr")
 
-        # 각 statement_type별로 필요한 속성 설정
-        if statement_type == 'variableDeclaration' :
-            self.type_obj = kwargs.get('type_obj')  # SolType
-            self.var_name = kwargs.get('var_name')
-            self.init_expr = kwargs.get('init_expr')
-            self.src_line = kwargs.get('src_line')
-        elif statement_type == 'assignment':
-            self.left = kwargs.get('left')        # 좌변 Expression
-            self.operator = kwargs.get('operator')  # 할당 연산자 (예: '=', '+=', '-=' 등)
-            self.right = kwargs.get('right')      # 우변 Expression
-            self.src_line = kwargs.get('src_line')
-        elif statement_type == "functionCall" :
-            self.function_expr = kwargs.get('function_expr')
-            self.src_line = kwargs.get('src_line')
-        elif statement_type == 'return':
-            self.return_expr = kwargs.get('return_expr')
-            self.src_line = kwargs.get('src_line')
-        elif statement_type == 'revert' :
-            self.identifier = kwargs.get('identifier')
-            self.string_literal = kwargs.get('string_literal')
-            self.arguments = kwargs.get('arguments')
-            self.src_line = kwargs.get('src_line')
+        elif statement_type == "assignment":
+            self.left     = kwargs.get("left")
+            self.operator = kwargs.get("operator")   # '=', '+=', …
+            self.right    = kwargs.get("right")
+
+        elif statement_type == "functionCall":
+            self.function_expr = kwargs.get("function_expr")
+
+        elif statement_type == "return":
+            self.return_expr = kwargs.get("return_expr")
+
+        elif statement_type == "revert":
+            self.identifier     = kwargs.get("identifier")
+            self.string_literal = kwargs.get("string_literal")
+            self.arguments      = kwargs.get("arguments")
+
+        # ------ 단항(++x, --y, delete z)
+        elif statement_type == "unary":
+            self.operator = kwargs.get("operator")   # '++' | '--' | 'delete'
+            self.operand  = kwargs.get("operand")    # Expression
+
+        # ------ 흐름 제어(break / continue) ------
+        elif statement_type in {"break", "continue"}:
+            # 별도 데이터 필요 없음 – src_line 만 기록
+            pass
+
+        else:
+            raise ValueError(f"Unsupported statement_type '{statement_type}'")
+
+
 
 
 

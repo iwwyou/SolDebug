@@ -366,6 +366,11 @@ class Update :
         # 2) MappingVariable  ─ map[ literal ]
         # ========================================================================
         if isinstance(caller_object, MappingVariable):
+            if not caller_object.struct_defs or not caller_object.enum_defs:
+                ccf = self.an.contract_cfgs[self.an.current_target_contract]
+                caller_object.struct_defs = ccf.structDefs
+                caller_object.enum_defs = ccf.enumDefs
+
             key = lit_str  # 매핑 키는 문자열 그대로
             entry = caller_object.mapping.setdefault(key, caller_object.get_or_create(key))
 

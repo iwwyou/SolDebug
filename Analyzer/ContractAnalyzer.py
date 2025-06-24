@@ -1309,38 +1309,39 @@ class ContractAnalyzer:
             self.refiner.update_variables_with_condition(true_env, condition_expr, True)
             self.refiner.update_variables_with_condition(false_env, condition_expr, False)
 
-        # 4. ─────── increment-노드 (있을 때만) ----------------------------
         incr_node: CFGNode | None = None
         if increment_expr is not None:
-            incr_node = CFGNode(f"for_incr_{self.current_start_line}", is_for_increment=True)
-            incr_node.variables = VariableEnv.copy_variables(true_env)  # body-out env
+            incr_node = CFGNode(f"for_incr_{self.current_start_line}",
+                                is_for_increment=True)
+            incr_node.variables = VariableEnv.copy_variables(true_env)
 
-            # ++ / -- / += 1  같은 간단한 형태만 처리
-            op = increment_expr.operator
-            if op in {"++", "--"}:
-                one_iv = UnsignedIntegerInterval(1, 1, 256)
+            # ---- ++ / -- --------------------------------------
+            if increment_expr.operator in {"++", "--"}:
+                # (1) 변수 환경에 즉시 반영
+                one = UnsignedIntegerInterval(1, 1, 256)
                 self.updater.update_left_var(
-                    increment_expr.expression, one_iv,
-                    "+=" if op == "++" else "-=", incr_node.variables,
+                    increment_expr.expression,  # i
+                    one,
+                    "+=" if increment_expr.operator == "++" else "-=",
+                    incr_node.variables,
                 )
-                incr_node.add_assign_statement(
-                    increment_expr.expression,
-                    "+=" if op == "++" else "-=",
-                    Expression(literal="1", context="LiteralExpContext"),
-                    self.current_start_line,
+                # (2) **단항 스테이트먼트**로 기록
+                incr_node.add_unary_statement(
+                    operand=increment_expr,  # 전체 i++ 식
+                    operator=increment_expr.operator,  # '++' or '--'
+                    line_no=self.current_start_line,
                 )
+
+            # ---- 복합 대입( += n / -= n … ) --------------------
             else:
-                # += / -= …  (복합 대입) 그대로 사용
                 r_val = self.evaluator.evaluate_expression(
-                    increment_expr.right, incr_node.variables, None, None
-                )
+                    increment_expr.right, incr_node.variables)
+                op = increment_expr.operator
                 self.updater.update_left_var(
-                    increment_expr.left, r_val, op, incr_node.variables,
-                )
+                    increment_expr.left, r_val, op, incr_node.variables)
                 incr_node.add_assign_statement(
                     increment_expr.left, op, increment_expr.right,
-                    self.current_start_line,
-                )
+                    self.current_start_line)
 
         # 5. ─────── 그래프 구성은 Builder 에 위임 ------------------------
         self.builder.build_for_statement(
