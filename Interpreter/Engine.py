@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Optional
 
 if TYPE_CHECKING:                                         # 타입 검사 전용
      from Analyzer.ContractAnalyzer import ContractAnalyzer
@@ -13,201 +13,231 @@ from Utils.Helper import VariableEnv
 from collections import defaultdict, deque
 
 class Engine:
-    """
-    – CFG work-list, widen / narrow, fix-point.
-    – 실제 ‘한 줄 해석’은 Semantics 에게 위임.
-    """
 
-    class Engine:
-        """
-        – CFG work-list, widen / narrow, fix-point.
-        – 실제 ‘한 줄 해석’은 Semantics 에게 위임.
-        """
+    def __init__(self, an: "ContractAnalyzer"):
+        self.an = an
 
-        def __init__(self, an: "ContractAnalyzer"):
-            self.an = an
+    @property
+    def ref(self):
+        return self.an.refiner
 
-        @property
-        def ref(self):
-            return self.an.refiner
-
-        @property
-        def runtime(self):
-            return self.an.runtime
+    @property
+    def runtime(self):
+        return self.an.runtime
 
     def transfer_function(self, node: CFGNode,
-                          in_vars: dict[str, Variables]) -> dict[str, Variables]:
+                          in_vars: Optional[dict[str, Variables]]) -> dict[str, Variables]:
+
+        in_vars = in_vars or {}
+
+        if not in_vars:
+            return {}
 
         out_vars = VariableEnv.copy_variables(in_vars)
         changed = False
 
         # ─ 1) 조건 노드 ───────────────────────────────────────
         if node.condition_node:
-            if node.branch_node and not node.is_true_branch:
+            # False-브랜치(dummy 노드) 에서만 cond ⊥ 적용
+            if node.branch_node:
                 preds = list(self.an.current_target_function_cfg.graph.predecessors(node))
-
-                cond_node = next(
-                    (p for p in preds if getattr(p, "condition_node", False)),
-                    None  # ← 조건-노드가 없을 때는 None
-                )
-                self.ref.update_variables_with_condition(out_vars,
-                                                     cond_node.condition_expr,
-                                                     node.is_true_branch)
-            else:
-                return out_vars
+                cond_node = next((p for p in preds if getattr(p, "condition_node", False)), None)
+                if cond_node:
+                    before = VariableEnv.copy_variables(out_vars)
+                    self.ref.update_variables_with_condition(
+                        out_vars, cond_node.condition_expr, node.is_true_branch
+                    )
+                    if not VariableEnv.env_equal(before, out_vars):
+                        changed = True
 
         # ─ 2) 일반/바디/증감 노드 ────────────────────────────
         elif not node.fixpoint_evaluation_node:
             if node.branch_node:
                 preds = list(self.an.current_target_function_cfg.graph.predecessors(node))
-
-                cond_node = next(
-                    (p for p in preds if getattr(p, "condition_node", False)),
-                    None  # ← 조건-노드가 없을 때는 None
-                )
-                self.ref.update_variables_with_condition(out_vars,
-                                                     cond_node.condition_expr,
-                                                     node.is_true_branch)
-
+                cond_node = next((p for p in preds if getattr(p, "condition_node", False)), None)
+                if cond_node:
+                    self.ref.update_variables_with_condition(
+                        out_vars, cond_node.condition_expr, node.is_true_branch
+                    )
             for stmt in node.statements:
-                before = VariableEnv.copy_variables(out_vars)  # 🟢 깊은 사본
+                before = VariableEnv.copy_variables(out_vars)
                 self.runtime.update_statement_with_variables(stmt, out_vars)
-                if not VariableEnv.env_equal(before, out_vars):  # 🟢 깊이 비교
+                if not VariableEnv.env_equal(before, out_vars):
                     changed = True
-        # ─ 4) 결과 반환 ──────────────────────────────────────
+
+        # ─ 3) 노드 변수 동기화 & 결과 반환 ────────────────────
+        node.variables = VariableEnv.copy_variables(out_vars)
         return out_vars if changed else in_vars
 
-    def fixpoint(self, loop_condition_node: CFGNode) -> CFGNode:
+    def fixpoint(self, head: CFGNode) -> CFGNode:
         """
-        loop_condition_node : while / for / do-while 의 condition CFGNode
-        return              : 루프의 exit-node
+        head : while/for/do-while 의 조건-블록
+        반환 : 루프를 빠져나가는 exit-블록
         """
+        import pathlib, datetime
+        import networkx as nx
 
-        # ──────────────────────────────────────────────────────────────
-        def _need_widen(n: CFGNode, vc: dict[CFGNode, int]) -> bool:
-            """φ-node 이고 두 번째 방문부터 widen."""
-            return n.fixpoint_evaluation_node and vc[n] >= 2
+        def dump_cfg(fcfg, tag=""):
+            """
+            FunctionCFG → 그래프 구조/조건/변수 요약을 DEBUG/outputs/ 아래로 저장
+            * tag : "before_else", "after_else" 등 파일명에 꽂아 두면 비교가 쉬움
+            """
+            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            base = pathlib.Path("DEBUG/outputs")
+            base.mkdir(parents=True, exist_ok=True)
 
-        def _need_narrow(n: CFGNode) -> bool:
-            """φ-node 인가? (헤드만 narrow)"""
-            return n.fixpoint_evaluation_node
+            G = fcfg.graph
 
-        # ──────────────────────────────────────────────────────────────
+            # ──────────────────────────────────────────────────────────
+            # ③  pydot + PNG (가장 보기 편함)
+            try:
+                import pydot
+                dot_path = base / f"{fcfg.function_name}_{tag}_{ts}.dot"
+                png_path = base / f"{fcfg.function_name}_{tag}_{ts}.png"
 
-        # 0) exit-node
-        exit_nodes = self.find_loop_exit_nodes(loop_condition_node)
+                nx.nx_pydot.write_dot(G, dot_path)
+                (graph,) = pydot.graph_from_dot_file(str(dot_path))
+                graph.write_png(str(png_path))
+                print(f"[CFG-DUMP] PNG saved → {png_path}")
+                return
+            except Exception as e:
+                print(f"[CFG-DUMP] pydot unavailable ({e}); falling back to DOT/TXT")
+
+            # ──────────────────────────────────────────────────────────
+            # ②  DOT 파일만 (Graphviz 로 열어보기)
+            try:
+                dot_path = base / f"{fcfg.function_name}_{tag}_{ts}.dot"
+                nx.nx_pydot.write_dot(G, dot_path)
+                print(f"[CFG-DUMP] DOT saved  → {dot_path}")
+                return
+            except Exception:
+                pass
+
+            # ──────────────────────────────────────────────────────────
+            # ①  콘솔 텍스트
+            print("\n≡≡ CFG TEXT DUMP", tag, "≡≡")
+            for n in G.nodes:
+                succs = [
+                    f"{s.name}({G[n][s].get('condition')})"
+                    if G.has_edge(n, s) else s.name for s in G.successors(n)
+                ]
+                print(
+                    f"· {n.name:<20} | succs={succs} | "
+                    f"cond={n.condition_node_type or '-'} | src={getattr(n, 'src_line', None)}"
+                )
+            print("≡" * 50, "\n")
+
+        #dump_cfg(self.an.current_target_function_cfg)
+
+        # 0) exit 노드들 -------------------------------------------------
+        exit_nodes = self.find_loop_exit_nodes(head)
         if not exit_nodes:
-            raise ValueError("Loop without exit-node")
-        if len(exit_nodes) > 1:
-            print("[Warn] multiple exit-nodes – using the first one")
-        exit_node = exit_nodes[0]
+            raise ValueError("loop without exit-node")
 
-        # 1) 루프 내부 노드 집합
-        loop_nodes: set[CFGNode] = self.traverse_loop_nodes(loop_condition_node)
+        # 1) loop node 집합 ---------------------------------------------
+        loop_nodes: set[CFGNode] = self.traverse_loop_nodes(head)
 
-        # 2) 자료구조
+        # 2) in/out 테이블 준비 ------------------------------------------
         visit_cnt: defaultdict[CFGNode, int] = defaultdict(int)
-        in_vars: dict[CFGNode, dict | None] = {n: None for n in loop_nodes}
-        out_vars: dict[CFGNode, dict | None] = {n: None for n in loop_nodes}
+        in_vars: Dict[CFGNode, Optional[dict[str, Variables]]] = {
+            n: None for n in loop_nodes
+        }
+        out_vars: Dict[CFGNode, Optional[dict[str, Variables]]] = {
+            n: None for n in loop_nodes
+        }
 
+        # φ-노드의 초기 in = 노드 자체 snapshot
         for n in loop_nodes:
-            if n.fixpoint_evaluation_node and in_vars[n] is None:
+            if n.fixpoint_evaluation_node:
                 in_vars[n] = VariableEnv.copy_variables(n.variables)
 
-        # ───── 초기 in (헤드의 in = 외부 predecessor join) ─────
+        # 헤드 in = 외부 preds join
         start_env = None
-        for p in self.an.current_target_function_cfg.graph.predecessors(loop_condition_node):
-            start_env = (VariableEnv.join_variables_simple(start_env, p.variables)
-                         if start_env else VariableEnv.copy_variables(p.variables))
-        in_vars[loop_condition_node] = start_env
+        for p in self.an.current_target_function_cfg.graph.predecessors(head):
+            start_env = VariableEnv.join_variables_simple(start_env, p.variables)
+        in_vars[head] = start_env or {}
 
-        # ───────────────── 3-A. widening 패스 ─────────────────
-        WL, W_MAX = deque([loop_condition_node]), 30
-        while WL and (w_iter := visit_cnt[loop_condition_node]) < W_MAX:
+        # ─────────────────── widening 패스 ────────────────────
+        W_MAX = 30
+        WL    = deque([head])            # ★ 수정: 모든 노드 seed
+        while WL and max(visit_cnt.values(), default=0) < W_MAX:
             node = WL.popleft()
             visit_cnt[node] += 1
 
             out_old = out_vars[node]
             out_new = self.transfer_function(node, in_vars[node])
 
-            # φ-node + 2회차 이상이면 widen, 그 외엔 join
-            if _need_widen(node, visit_cnt):
-                new_out = VariableEnv.join_variables_with_widening(out_old, out_new)
-            else:
-                new_out = VariableEnv.join_variables_simple(out_old, out_new)
+            need_widen = node.fixpoint_evaluation_node and visit_cnt[node] >= 2
+            out_joined = (
+                VariableEnv.join_variables_with_widening(out_old, out_new)
+                if need_widen
+                else VariableEnv.join_variables_simple(out_old, out_new)
+            )
 
             if node.fixpoint_evaluation_node:
-                node.fixpoint_evaluation_node_vars = VariableEnv.copy_variables(new_out)
+                node.fixpoint_evaluation_node_vars = VariableEnv.copy_variables(out_joined)
 
-            if VariableEnv.variables_equal(out_old, new_out):
+            if VariableEnv.variables_equal(out_old, out_joined):
                 continue
-            out_vars[node] = new_out
+            out_vars[node] = out_joined
 
-            # 후속 노드 갱신
+            # succ 의 in 갱신
             for succ in self.an.current_target_function_cfg.graph.successors(node):
                 if succ not in loop_nodes:
                     continue
-
-                if _need_widen(succ, visit_cnt):
-                    in_new = VariableEnv.join_variables_with_widening(in_vars[succ], new_out)
-                else:
-                    in_new = VariableEnv.join_variables_simple(in_vars[succ], new_out)
-
+                need_widen_succ = succ.fixpoint_evaluation_node and visit_cnt[succ] >= 2
+                in_new = (
+                    VariableEnv.join_variables_with_widening(in_vars[succ], out_joined)
+                    if need_widen_succ
+                    else VariableEnv.join_variables_simple(in_vars[succ], out_joined)
+                )
                 if not VariableEnv.variables_equal(in_vars[succ], in_new):
                     in_vars[succ] = in_new
                     WL.append(succ)
 
-        # ── 3-B. narrowing 패스 ────────────────────────────
-        # ── 3-B. narrowing 패스 ───────────────────────────
-        WL = deque([loop_condition_node])  # (1) seed 전부
+        # ─────────────────── narrowing 패스 ───────────────────
+        WL    = deque(loop_nodes)      # 모든 φ-노드 seed
         N_MAX = 30
         while WL and N_MAX:
             N_MAX -= 1
             node = WL.popleft()
 
-            # 1) 새 in
+            # in 재계산 = preds out join
             new_in = None
             for p in self.an.current_target_function_cfg.graph.predecessors(node):
-                src = out_vars[p] if p in loop_nodes else p.variables
-                new_in = VariableEnv.join_variables_simple(new_in, src) if new_in else VariableEnv.copy_variables(src)
-
-            if not VariableEnv.variables_equal(new_in, in_vars[node]):
+                src = out_vars.get(p) or p.variables
+                new_in = VariableEnv.join_variables_simple(new_in, src)
+            if not VariableEnv.variables_equal(in_vars[node], new_in):
                 in_vars[node] = new_in
 
-            # 2) transfer  ─ 항상 실행
-            tmp_out = self.transfer_function(node, in_vars[node])
-
-            if _need_narrow(node):
+            tmp_out = self.transfer_function(node, new_in)
+            if node.fixpoint_evaluation_node:
                 narrowed = VariableEnv.narrow_variables(out_vars[node], tmp_out)
-                if VariableEnv.variables_equal(out_vars[node], narrowed):
-                    continue  # 변동 없으면 끝
             else:
                 narrowed = tmp_out
 
-            out_vars[node] = narrowed  # 갱신
+            if VariableEnv.variables_equal(out_vars[node], narrowed):
+                continue
+            out_vars[node] = narrowed
 
-            # 4) 후속 노드 enqueue
             for succ in self.an.current_target_function_cfg.graph.successors(node):
                 if succ in loop_nodes:
                     WL.append(succ)
 
-        # ── 4. exit-node 변수 반영 ─────────────────────────
+        # 3) exit-env 계산 (모든 exit 노드 join) -------------------------
         exit_env = None
-        for p in self.an.current_target_function_cfg.graph.predecessors(exit_node):
-            # 루프 안쪽 pred 는 out_vars 테이블에, 루프 밖 pred 는 CFG 노드에
-            src = out_vars[p] if p in out_vars else p.variables
-            exit_env = (VariableEnv.join_variables_simple(exit_env, src)
-                        if exit_env else VariableEnv.copy_variables(src))
+        for en in exit_nodes:
+            tmp_env = None
+            for p in self.an.current_target_function_cfg.graph.predecessors(en):
+                src = out_vars.get(p) or p.variables
+                tmp_env = VariableEnv.join_variables_simple(tmp_env, src)
+            # exit-블록 자체 transfer 적용(조건 부정 포함)
+            tmp_final = self.transfer_function(en, tmp_env or {})
+            en.variables = VariableEnv.copy_variables(tmp_final)
+            exit_env    = VariableEnv.join_variables_simple(exit_env, tmp_final)
 
-        # ① 조건·문장을 반영하기 위해 transfer_function 한 번 호출
-        #    (loop-exit 노드는 branch_node=True, is_true_branch=False 로 지정되어 있으므로
-        #     transfer_function 내부에서 ‘루프 조건의 부정’이 적용됩니다)
-        exit_final = self.transfer_function(exit_node, exit_env or {})
-
-        # ② 노드에 저장
-        exit_node.variables = exit_final
-
-        return exit_node
+        # 여러 exit 중 첫 번째 exit 블록을 반환 (노드를 따로 쓰려면 caller가 결정)
+        return exit_nodes[0]
 
     def find_loop_exit_nodes(self, while_node):
         exit_nodes = set()  # ← 1) set 으로 중복 차단

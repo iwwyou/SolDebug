@@ -407,6 +407,13 @@ class DynamicCFGBuilder:
         G = fcfg.graph
         pre = cur_block  # for 키워드 직전 블록
 
+        funcExit = None
+        for succ in list(G.successors(pre)):
+            if succ.name == "EXIT":  # 필요하면 추가 조건으로 더 안전하게
+                funcExit = succ
+                G.remove_edge(pre, succ)
+                break  # 하나만 있으면 바로 탈출
+
         # ── ① join ------------------------------------------
         join = CFGNode(f"for_join_{line_no}", fixpoint_evaluation_node=True)
         join.variables = VariableEnv.copy_variables(join_env)
@@ -456,6 +463,10 @@ class DynamicCFGBuilder:
             G.add_edge(incr_node, join)
         else:
             G.add_edge(body, join)
+
+        # exit_ → 함수 EXIT (있을 때만)
+        if funcExit:
+            G.add_edge(exit_, funcExit)
 
         # ── ⑤ brace_count ------------------------------------
         bc = brace_count.setdefault(line_no, {"open": 0, "close": 0, "cfg_node": cast(Optional[CFGNode], None)})

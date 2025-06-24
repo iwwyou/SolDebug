@@ -332,7 +332,7 @@ class MappingVariable(Variables):
                 defn = self.enum_defs[sol_t.enumTypeName]  # EnumDefinition
                 ev.members = {m: i for i, m in enumerate(defn.members)}
                 ev.valueIndex = 0
-                ev.value = 0  # 기본값 첫 멤버
+                ev.value = defn.members[0]            # ← 첫 멤버명 저장
 
             return ev
 
@@ -362,6 +362,7 @@ class MappingVariable(Variables):
         """
         키가 없으면 value_type 에 맞춰 **자동 생성** 후 반환
         """
+        key_val = str(key_val)
         if key_val not in self.mapping:
             sub_id = f"{self.identifier}[{key_val}]"
             new_var = self._make_value(sub_id, self.typeInfo.mappingValueType)

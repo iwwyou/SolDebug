@@ -50,7 +50,7 @@ class ContractAnalyzer:
         self.updater = Update(self)
         self.refiner = Refine(self)
         self.runtime = Runtime(self)
-        self.engine = Engine()
+        self.engine = Engine(self)
         self.builder = DynamicCFGBuilder(self)
         self.recorder = RecordManager()
 
