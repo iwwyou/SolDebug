@@ -92,6 +92,14 @@ class VariableEnv:
     """
     _GLOBAL_BASES = {"block", "msg", "tx"}
 
+    # public façade --------------------------------------------------------
+    join_variables_simple     = staticmethod(lambda l, r:
+        VariableEnv._merge_by_mode(l, r, "join"))
+    join_variables_with_widening = staticmethod(lambda l, r:
+        VariableEnv._merge_by_mode(l, r, "widen"))
+    narrow_variables          = staticmethod(lambda old, new:
+        VariableEnv._merge_by_mode(old, new, "narrow"))
+
     # ─────────────────────────────────────────── 복사 / 비교
     @staticmethod
     def copy_variables(src: Dict[str, "Variables"]) -> Dict[str, "Variables"]:
@@ -287,13 +295,29 @@ class VariableEnv:
                 res[name] = VariableEnv.copy_variables({name: r_var})[name]
         return res
 
-    # public façade --------------------------------------------------------
-    join_variables_simple     = staticmethod(lambda l, r:
-        VariableEnv._merge_by_mode(l, r, "join"))
-    join_variables_with_widening = staticmethod(lambda l, r:
-        VariableEnv._merge_by_mode(l, r, "widen"))
-    narrow_variables          = staticmethod(lambda old, new:
-        VariableEnv._merge_by_mode(old, new, "narrow"))
+    @staticmethod
+    def diff_changed(old_env: dict[str, Variables],
+                     new_env: dict[str, Variables]) -> dict[str, Variables]:
+
+        from Analyzer.RecordManager import RecordManager  # serialize 재사용
+        rm = RecordManager()  # helper only
+
+        def _flat(env: dict[str, Variables]) -> dict[str, str]:
+            out = {}
+            for v in env.values():
+                rm._flatten_var(v, v.identifier, out)
+            return out
+
+        old_flat = _flat(old_env)
+        new_flat = _flat(new_env)
+
+        changed = {}
+        for path, new_val in new_flat.items():
+            if path not in old_flat:
+                continue
+            if rm._serialize_val(old_flat[path]) != rm._serialize_val(new_val):
+                changed[path] = new_val  # path 는 "a[3].x" 같은 키
+        return changed
 
     @staticmethod
     def is_interval(x) -> bool:

@@ -1064,12 +1064,21 @@ class ContractAnalyzer:
 
         cur_blk = self.builder.get_current_block()
 
-        # ── 2. True / False 분기용 변수-환경 준비 ──────────────────────
-        true_env = VariableEnv.copy_variables(cur_blk.variables)
-        false_env = VariableEnv.copy_variables(cur_blk.variables)
+        base_env = VariableEnv.copy_variables(cur_blk.variables)
+        true_env   = VariableEnv.copy_variables(base_env)
+        false_env  = VariableEnv.copy_variables(base_env)
 
         self.refiner.update_variables_with_condition(true_env, condition_expr, True)
         self.refiner.update_variables_with_condition(false_env, condition_expr, False)
+
+        true_delta = VariableEnv.diff_changed(base_env, true_env)
+
+        if true_delta:  # 아무것도 안 바뀌면 기록 생략
+            self.recorder.add_env_record(
+                 line_no = self.current_start_line,
+                 stmt_type = "branchTrue",
+                 env = true_delta,
+            )
 
         # ── 3. 그래프에 if-구조 삽입  ➜ DynamicCFGBuilder 위임 ──────────
         self.builder.build_if_statement(
