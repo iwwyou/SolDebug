@@ -1111,24 +1111,27 @@ class ContractAnalyzer:
         )
 
         # --- 새 true/false env ------------------------------------
-        true_env = VariableEnv.copy_variables(false_base_env)
-        false_env = VariableEnv.copy_variables(false_base_env)
+        base_env = VariableEnv.copy_variables(false_base_env)
+        true_env = VariableEnv.copy_variables(base_env)
+        false_env = VariableEnv.copy_variables(base_env)
         self.refiner.update_variables_with_condition(true_env, condition_expr, True)
         self.refiner.update_variables_with_condition(false_env, condition_expr, False)
 
-        # branch-True interval 기록
-        self.recorder.add_env_record(
-            line_no=self.current_start_line,
-            stmt_type="branchTrue",
-            env=true_env,
-        )
+        true_delta = VariableEnv.diff_changed(base_env, true_env)
+
+        if true_delta:  # 아무것도 안 바뀌면 기록 생략
+            self.recorder.add_env_record(
+                line_no=self.current_start_line,
+                stmt_type="branchTrue",
+                env=true_delta,
+            )
 
         # --- 그래프 삽입 ------------------------------------------
         cur_blk_dummy = CFGNode("ELSE_FALSE_TMP")  # false-dummy 역할
         cur_blk_dummy.variables = false_base_env
         # (그래프에 넣진 않고 env 복사 용도로만 사용)
 
-        new_cond = self.builder.build_else_if_statement(
+        self.builder.build_else_if_statement(
             prev_cond=prev_cond,
             condition_expr=condition_expr,
             cur_block=cur_blk_dummy,
@@ -1156,17 +1159,20 @@ class ContractAnalyzer:
             raise ValueError("No preceding if/else-if for this 'else'.")
 
         # ── 3. else 분기용 변수-환경 생성 ------------------------------------
-        else_env = VariableEnv.copy_variables(cond_node.variables)
+        base_env = VariableEnv.copy_variables(cond_node.variables)
+        else_env = VariableEnv.copy_variables(base_env)
         self.refiner.update_variables_with_condition(
             else_env, cond_node.condition_expr, is_true_branch=False
         )
 
-        #   ▸ 디버깅/UI 용으로 env 기록
-        self.recorder.add_env_record(
-            line_no=self.current_start_line,
-            stmt_type="branchTrue",  # 기존 if/else-if 과 동일 태그 유지
-            env=else_env,
-        )
+        true_delta = VariableEnv.diff_changed(base_env, else_env)
+
+        if true_delta:  # 아무것도 안 바뀌면 기록 생략
+            self.recorder.add_env_record(
+                line_no=self.current_start_line,
+                stmt_type="branchTrue",
+                env=true_delta,
+            )
 
         # ── 4. 그래프 작업은 Builder 에 위임 -------------------------------
         self.builder.build_else_statement(
@@ -1198,13 +1204,6 @@ class ContractAnalyzer:
 
         self.refiner.update_variables_with_condition(true_env, condition_expr, True)
         self.refiner.update_variables_with_condition(false_env, condition_expr, False)
-
-        # True-분기 env 를 즉시 기록
-        self.recorder.add_env_record(
-            line_no=self.current_start_line,
-            stmt_type="branchTrue",
-            env=true_env,
-        )
 
         # 3. 그래프 구축은 Builder 에 위임 -------------------------------
         self.builder.build_while_statement(
@@ -1268,13 +1267,6 @@ class ContractAnalyzer:
                 # CFG Statement
                 init_node.add_variable_declaration_statement(
                     v_type, v_name, init_expr, self.current_start_line
-                )
-
-                # 기록
-                self.recorder.record_variable_declaration(
-                    line_no=self.current_start_line,
-                    var_name=v_name,
-                    var_obj=v_obj,
                 )
 
             elif ctx == "Expression":
@@ -1488,17 +1480,20 @@ class ContractAnalyzer:
         cur_blk = self.builder.get_current_block()
 
         # 2) True-branch 환경 ------------------------------------------------
-        true_env = VariableEnv.copy_variables(cur_blk.variables)
+        base_env = VariableEnv.copy_variables(cur_blk.variables)
+        true_env = VariableEnv.copy_variables(base_env)
         self.refiner.update_variables_with_condition(
             true_env, condition_expr, is_true_branch=True
         )
 
-        # 3) 분석 로그 -------------------------------------------------------
-        self.recorder.add_env_record(
-            line_no=self.current_start_line,
-            stmt_type="requireTrue",
-            env=true_env,
-        )
+        true_delta = VariableEnv.diff_changed(base_env, true_env)
+
+        if true_delta:  # 아무것도 안 바뀌면 기록 생략
+            self.recorder.add_env_record(
+                line_no=self.current_start_line,
+                stmt_type="branchTrue",
+                env=true_delta,
+            )
 
         # 4) 그래프 구성 → builder ------------------------------------------
         self.builder.build_require_statement(
@@ -1529,17 +1524,20 @@ class ContractAnalyzer:
         cur_blk = self.builder.get_current_block()
 
         # 2) True-branch 환경(조건이 만족되는 경로) ---------------------------
-        true_env = VariableEnv.copy_variables(cur_blk.variables)
+        base_env = VariableEnv.copy_variables(cur_blk.variables)
+        true_env = VariableEnv.copy_variables(base_env)
         self.refiner.update_variables_with_condition(
             true_env, condition_expr, is_true_branch=True
         )
 
-        # 3) 기록 (True-분기 snapshot) ----------------------------------------
-        self.recorder.add_env_record(
-            line_no=self.current_start_line,
-            stmt_type="assertTrue",
-            env=true_env,
-        )
+        true_delta = VariableEnv.diff_changed(base_env, true_env)
+
+        if true_delta:  # 아무것도 안 바뀌면 기록 생략
+            self.recorder.add_env_record(
+                line_no=self.current_start_line,
+                stmt_type="branchTrue",
+                env=true_delta,
+            )
 
         # 4) CFG 구성 ---------------------------------------------------------
         self.builder.build_assert_statement(

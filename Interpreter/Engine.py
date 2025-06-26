@@ -235,6 +235,24 @@ class Engine:
             en.variables = VariableEnv.copy_variables(tmp_final)
             exit_env    = VariableEnv.join_variables_simple(exit_env, tmp_final)
 
+        # (A) join 노드 잡기
+        join = next(n for n in loop_nodes if n.fixpoint_evaluation_node)
+
+        # (B) exit-env 구하기 (이미 계산됨)
+        exit_env = exit_env  # ← 함수 맨 아래에 만들어 둔 변수
+        base_env = getattr(join, "join_baseline_env", None)
+
+        # (C) diff
+        changed = VariableEnv.diff_changed(base_env, exit_env) if base_env else {}
+
+        # (D) 기록
+        if changed :
+            self.an.recorder.add_env_record(
+                line_no=getattr(join, "src_line", None),
+                stmt_type="loopDelta",
+                env=changed
+            )
+
         # 여러 exit 중 첫 번째 exit 블록을 반환 (노드를 따로 쓰려면 caller가 결정)
         return exit_nodes[0]
 

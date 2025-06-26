@@ -338,6 +338,7 @@ class DynamicCFGBuilder:
         # ── ① join-노드 --------------------------------------------------
         join = CFGNode(f"while_join_{line_no}", fixpoint_evaluation_node=True)
         join.variables = VariableEnv.copy_variables(join_env)
+        join.join_baseline_env = VariableEnv.copy_variables(join_env)
         join.fixpoint_evaluation_node_vars = VariableEnv.copy_variables(join_env)
 
         G.add_node(join)
@@ -417,6 +418,7 @@ class DynamicCFGBuilder:
         # ── ① join ------------------------------------------
         join = CFGNode(f"for_join_{line_no}", fixpoint_evaluation_node=True)
         join.variables = VariableEnv.copy_variables(join_env)
+        join.join_baseline_env = VariableEnv.copy_variables(join_env)
         join.fixpoint_evaluation_node_vars = VariableEnv.copy_variables(join_env)
 
         # ── ② condition --------------------------------------

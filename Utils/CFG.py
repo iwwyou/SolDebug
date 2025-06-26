@@ -29,6 +29,7 @@ class CFGNode:
         self.loop_exit_node = loop_exit_node
         self.is_loop_body = False
         self.fixpoint_evaluation_node_vars = {} # 고정점 분석을 위한 while문 진입 전에 var 상태, join 하면서 변하는 변수의 상태
+        self.join_baseline_env = None
 
         self.unchecked_block = unchecked_block
 
