@@ -21,34 +21,35 @@ class Update :
     def ev(self):
         return self.an.evaluator
 
-    def update_left_var(self, expr, rVal, operator, variables, callerObject=None, callerContext=None):
+    def update_left_var(self, expr, rVal, operator, variables, callerObject=None, callerContext=None,
+                        log:bool=False):
         # ── ① 글로벌이면 갱신 금지 ─────────────────────────
         if callerObject is None and callerContext is None and VariableEnv.is_global_expr(expr):
             return None
 
         if expr.context == "IndexAccessContext":
             return self.update_left_var_of_index_access_context(expr, rVal, operator, variables,
-                                                                callerObject, callerContext)
+                                                                callerObject, callerContext, log)
         elif expr.context == "MemberAccessContext":
             return self.update_left_var_of_member_access_context(expr, rVal, operator, variables,
-                                                                 callerObject, callerContext)
+                                                                 callerObject, callerContext, log)
 
         elif expr.context == "IdentifierExpContext":
             return self.update_left_var_of_identifier_context(expr, rVal, operator, variables,
-                                                              callerObject, callerContext)
+                                                              callerObject, callerContext, log)
         elif expr.context == "LiteralExpContext":
             return self.update_left_var_of_literal_context(expr, rVal, operator, variables,
-                                                           callerObject, callerContext)
+                                                           callerObject, callerContext. log)
         elif expr.context == "TestingIndexAccess":
             return self.update_left_var_of_testing_index_access_context(expr, rVal, operator, variables,
-                                                                                 callerObject, callerContext)
+                                                                                 callerObject, callerContext, log)
         elif expr.context == "TestingMemberAccess":
             return self.update_left_var_of_testing_member_access_context(expr, rVal, operator, variables,
-                                                                                  callerObject, callerContext)
+                                                                                  callerObject, callerContext, log)
 
         elif expr.left is not None and expr.right is not None:
             return self.update_left_var_of_binary_exp_context(expr, rVal, operator, variables,
-                                                              callerObject, callerContext)
+                                                              callerObject, callerContext, log)
 
         return None
 
@@ -60,6 +61,7 @@ class Update :
             variables: dict[str, Variables],
             caller_object=None,
             caller_context=None,
+            log:bool=False
     ):
         """
         rebalanceCount % 10 처럼 BinaryExp(%) 가 IndexAccess 의 인덱스로
@@ -87,13 +89,14 @@ class Update :
             new_val = self.compound_assignment(target.value, r_val, operator)
             self._patch_var_with_new_value(target, new_val)
 
-            # 🔸 즉시 기록
-            self.an.recorder.record_assignment(
-                line_no=self.an.current_start_line,
-                expr=expr,
-                var_obj=target,
-                base_obj=caller_object,
-            )
+            if log :
+                # 🔸 즉시 기록
+                self.an.recorder.record_assignment(
+                    line_no=self.an.current_start_line,
+                    expr=expr,
+                    var_obj=target,
+                    base_obj=caller_object,
+                )
             return None  # 더 내려갈 대상이 없으므로 None 반환
 
         # ── ③ Interval 범위 [l, r] ───────────────────────────────────
@@ -104,12 +107,13 @@ class Update :
             if isinstance(caller_object, ArrayVariable):
                 # (a) 동적 배열 – 전체-쓰기(<unk>)로 추상화
                 if caller_object.typeInfo.isDynamicArray:
-                    self.an.recorder.record_assignment(
-                        line_no=self.an.current_start_line,
-                        expr=expr,
-                        var_obj=caller_object,
-                        base_obj=caller_object,
-                    )
+                    if log :
+                        self.an.recorder.record_assignment(
+                            line_no=self.an.current_start_line,
+                            expr=expr,
+                            var_obj=caller_object,
+                            base_obj=caller_object,
+                        )
                     return None
 
                 # (b) 정적 배열 – l..r 패치
@@ -127,12 +131,13 @@ class Update :
                     nv = self.compound_assignment(elem.value, r_val, operator)
                     self._patch_var_with_new_value(elem, nv)
 
-                self.an.recorder.record_assignment(
-                    line_no=self.an.current_start_line,
-                    expr=expr,
-                    var_obj=caller_object,
-                    base_obj=caller_object,
-                )
+                if log :
+                    self.an.recorder.record_assignment(
+                        line_no=self.an.current_start_line,
+                        expr=expr,
+                        var_obj=caller_object,
+                        base_obj=caller_object,
+                    )
                 return None
 
             # ---- 매핑(MappingVariable) ------------------------------
@@ -147,32 +152,37 @@ class Update :
                         nv = self.compound_assignment(entry.value, r_val, operator)
                         self._patch_var_with_new_value(entry, nv)
 
-                self.an.recorder.record_assignment(
-                    line_no=self.an.current_start_line,
-                    expr=expr,
-                    var_obj=caller_object,
-                    base_obj=caller_object,
-                )
+                if log :
+                    self.an.recorder.record_assignment(
+                        line_no=self.an.current_start_line,
+                        expr=expr,
+                        var_obj=caller_object,
+                        base_obj=caller_object,
+                    )
                 return None
 
         # Interval 도 int 도 아니면 (아직 심볼릭) – 아무 것도 못 함
         return None
 
     def update_left_var_of_index_access_context(self, expr, rVal, operator, variables,
-                                                callerObject=None, callerContext=None):
+                                                callerObject=None, callerContext=None,
+                                                log:bool=False):
         # base expression에 대한 재귀
-        base_obj = self.update_left_var(expr.base, rVal, operator, variables, None, "IndexAccessContext")
+        base_obj = self.update_left_var(expr.base, rVal, operator, variables,
+                                        None, "IndexAccessContext",log)
 
         # index expression에 대한 재귀
-        return self.update_left_var(expr.index, rVal, operator, variables, base_obj, "IndexAccessContext")
+        return self.update_left_var(expr.index, rVal, operator, variables,
+                                    base_obj, "IndexAccessContext", log)
 
     def update_left_var_of_member_access_context(
             self, expr, rVal, operator, variables,
-            callerObject=None, callerContext=None):
+            callerObject=None, callerContext=None,
+            log:bool=False):
 
         # ① 먼저 base 부분을 재귀-업데이트
         base_obj = self.update_left_var(expr.base, rVal, operator,
-                                        variables, None, "MemberAccessContext")
+                                        variables, None, "MemberAccessContext", log)
         member = expr.member
 
         # ────────────────────────────────────────────────
@@ -198,13 +208,13 @@ class Update :
             if hasattr(entry, "value"):
                 entry.value = self.compound_assignment(entry.value, rVal, operator)
 
-            # 📜 기록
-            self.an.recorder.record_assignment(
-                line_no=self.an.current_start_line,
-                expr=expr,
-                var_obj=entry,
-                base_obj=callerObject,
-            )
+            if log :
+                self.an.recorder.record_assignment(
+                    line_no=self.an.current_start_line,
+                    expr=expr,
+                    var_obj=entry,
+                    base_obj=callerObject,
+                )
             return None
 
         if isinstance(base_obj, MappingVariable):
@@ -260,12 +270,14 @@ class Update :
                 return nested
 
             nested.value = self.compound_assignment(nested.value, rVal, operator)
-            self.an.recorder.record_assignment(
-                line_no=self.an.current_start_line,
-                expr=expr,
-                var_obj=nested,
-                base_obj=base_obj,
-            )
+
+            if log :
+                self.an.recorder.record_assignment(
+                    line_no=self.an.current_start_line,
+                    expr=expr,
+                    var_obj=nested,
+                    base_obj=base_obj,
+                )
             return None
 
         raise ValueError(f"Unexpected member-type '{type(nested).__name__}'")
@@ -281,6 +293,7 @@ class Update :
             variables: dict[str, Variables],
             caller_object: Variables | ArrayVariable | MappingVariable | None = None,
             caller_context=None,
+            log: bool = False
     ):
         # ───────────────────────────── 준비 ─────────────────────────────
         lit = expr.literal  # 예: 123, 0x1a, true …
@@ -348,13 +361,13 @@ class Update :
                 new_iv = _to_interval(elem, lit_str)
                 elem.value = self.compound_assignment(elem.value, new_iv, operator)
 
-                # 📜 record
-                self.an.recorder.record_assignment(
-                    line_no=self.an.current_start_line,
-                    expr=expr,
-                    var_obj=elem,
-                    base_obj=caller_object,
-                )
+                if log:
+                    self.an.recorder.record_assignment(
+                        line_no=self.an.current_start_line,
+                        expr=expr,
+                        var_obj=elem,
+                        base_obj=caller_object,
+                    )
                 return None  # 더 내려갈 대상 없음
 
             # ── (b) nested composite (struct/array/map) ──────────────────
@@ -382,13 +395,13 @@ class Update :
                 new_iv = _to_interval(entry, lit_str)
                 entry.value = self.compound_assignment(entry.value, new_iv, operator)
 
-                # 📜 record
-                self.an.recorder.record_assignment(
-                    line_no=self.an.current_start_line,
-                    expr=expr,
-                    var_obj=entry,
-                    base_obj=caller_object,
-                )
+                if log:
+                    self.an.recorder.record_assignment(
+                        line_no=self.an.current_start_line,
+                        expr=expr,
+                        var_obj=entry,
+                        base_obj=caller_object,
+                    )
                 return None
 
             # ── (b) nested composite ────────────────────────────────────
@@ -411,6 +424,7 @@ class Update :
             variables: dict[str, Variables],
             caller_object: Variables | ArrayVariable | StructVariable | MappingVariable | None = None,
             caller_context: str | None = None,
+            log: bool = False
     ):
         ident = expr.identifier
 
@@ -559,26 +573,28 @@ class Update :
                                                                  rVal,
                                                                  operator,
                                                                  variables: dict[str, Variables],
-                                                                 callerObject=None, callerContext=None):
+                                                                 callerObject=None, callerContext=None,
+                                                        log:bool=False):
         # base
         base_obj = self.update_left_var(
             expr.base, rVal, operator, variables,
-            None, "TestingIndexAccess"
+            None, "TestingIndexAccess", log
         )
         # index
         return self.update_left_var(
-            expr.index, rVal, operator, variables, base_obj, "TestingIndexAccess"
+            expr.index, rVal, operator, variables, base_obj, "TestingIndexAccess", log
         )
 
     def update_left_var_of_testing_member_access_context(self, expr: Expression,
                                                                   rVal,
                                                                   operator,
                                                                   variables: dict[str, Variables],
-                                                                  callerObject=None, callerContext=None):
+                                                                  callerObject=None, callerContext=None,
+                                                         log:bool=False):
 
         # ① 먼저 base 부분을 재귀-업데이트
         base_obj = self.update_left_var(expr.base, rVal, operator,
-                                                 variables, None, "TestingMemberAccess")
+                                                 variables, None, "TestingMemberAccess", log)
         member = expr.member
 
         if member is not None:
@@ -629,10 +645,11 @@ class Update :
             variables: dict[str, Variables],
             caller_object=None,
             caller_context: str | None = None,
+            log: bool = False
     ):
         """纯粹히 ‘변수 객체’를 찾아서 돌려준다. (값 패치는 전혀 하지 않음)"""
 
-        return self.update_left_var(expr, None, None, variables, caller_object, caller_context)
+        return self.update_left_var(expr, None, None, variables, caller_object, caller_context, log)
 
     def _touch_index_entry(self, container, idx: int):
         """배열/매핑에서 idx 번째 엔트리를 가져오거나 필요 시 생성"""

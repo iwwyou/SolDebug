@@ -375,7 +375,7 @@ class Runtime:
             r_val = rexpr
 
         # 1) LHS 에 반영
-        self.up.update_left_var(lexp, r_val, op, variables, None, None)
+        self.up.update_left_var(lexp, r_val, op, variables, None, None, True)
 
         return variables
 
@@ -399,7 +399,7 @@ class Runtime:
         # ── delete x  -----------------------------------------------
         if op == 'delete':
             # elementary 면 0 / ⊥ , 복합이면 재귀 ⊥ 적용
-            self.up.update_left_var(operand, 0, '=', variables, None, None)
+            self.up.update_left_var(operand, 0, '=', variables, None, None, True)
 
         return variables
 

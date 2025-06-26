@@ -131,7 +131,7 @@ class Refine:
         def _maybe_update(expr, variables, new_iv):
             if self._is_read_only_expr(expr, variables):
                 return  # read-only → 변수 상태 수정 X
-            self.up.update_left_var(expr, new_iv, '=', variables)
+            self.up.update_left_var(expr, new_iv, '=', variables, None, None, False)
 
         # ───── 준비 ─────────────────────────────────────────────
         op = cond_expr.operator

@@ -839,12 +839,13 @@ class ContractAnalyzer:
         r_val = self.evaluator.evaluate_expression(
             expr.right, cur_blk.variables, None, None
         )
-        #   ⬇️ Update 내부에서   recorder.record_assignment(...) 호출
+
         self.updater.update_left_var(
             expr.left,
             r_val,
             expr.operator,
             cur_blk.variables,
+            None, None, True
         )
 
         # 3. CFG 노드/엣지 정리  -----------------------------------------
@@ -897,7 +898,7 @@ class ContractAnalyzer:
 
         # ② 실제 값 패치 (+ Recorder 자동 기록) -----------------------
         self.updater.update_left_var(
-            expr, one, op_sign, cur_blk.variables
+            expr, one, op_sign, cur_blk.variables, None, None, True
         )
 
         # ③ CFG Statement 삽입 -------------------------------------
@@ -966,14 +967,6 @@ class ContractAnalyzer:
                     obj.value = f"symbolic_zero_{obj.identifier}"
 
         _wipe(var_obj)
-
-        # ③ Recorder 로그 -----------------------------------------
-        self.recorder.record_assignment(
-            line_no=self.current_start_line,
-            expr=target_expr,
-            var_obj=var_obj,
-            base_obj=None,
-        )
 
         # ④ CFG Statement 삽입 & 저장 ------------------------------
         self.builder.build_unary_statement(
@@ -1077,13 +1070,6 @@ class ContractAnalyzer:
 
         self.refiner.update_variables_with_condition(true_env, condition_expr, True)
         self.refiner.update_variables_with_condition(false_env, condition_expr, False)
-
-        # True-분기 환경을 바로 기록 (False 쪽도 필요하면 동일 방식 사용)
-        self.recorder.add_env_record(
-            line_no=self.current_start_line,
-            stmt_type="branchTrue",
-            env=true_env,
-        )
 
         # ── 3. 그래프에 if-구조 삽입  ➜ DynamicCFGBuilder 위임 ──────────
         self.builder.build_if_statement(
@@ -1289,7 +1275,7 @@ class ContractAnalyzer:
                 )
                 # Update 내부에서 기록까지 수행
                 self.updater.update_left_var(
-                    assn_expr, r_val, assn_expr.operator, init_node.variables
+                    assn_expr, r_val, assn_expr.operator, init_node.variables, None, None, False
                 )
                 # CFG Statement
                 init_node.add_assign_statement(
@@ -1323,7 +1309,7 @@ class ContractAnalyzer:
                     increment_expr.expression,  # i
                     one,
                     "+=" if increment_expr.operator == "++" else "-=",
-                    incr_node.variables,
+                    incr_node.variables, None, None, False
                 )
                 # (2) **단항 스테이트먼트**로 기록
                 incr_node.add_unary_statement(
@@ -1338,7 +1324,7 @@ class ContractAnalyzer:
                     increment_expr.right, incr_node.variables)
                 op = increment_expr.operator
                 self.updater.update_left_var(
-                    increment_expr.left, r_val, op, incr_node.variables)
+                    increment_expr.left, r_val, op, incr_node.variables, None, None, False)
                 incr_node.add_assign_statement(
                     increment_expr.left, op, increment_expr.right,
                     self.current_start_line)

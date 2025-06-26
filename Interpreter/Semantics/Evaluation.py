@@ -739,7 +739,7 @@ class Evaluation :
         r_val = self.evaluate_expression(expr.right, variables, None, None)
         # LHS 쪽 환경 업데이트
         self.up.update_left_var(expr.left, r_val, '=', variables,
-                             callerObject, callerContext)
+                             callerObject, callerContext, None, None, False)
         return r_val  # ← ‘값을 돌려주기’ 핵심!
 
     def evaluate_tuple_expression_context(self, expr, variables,
