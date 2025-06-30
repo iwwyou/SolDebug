@@ -128,11 +128,6 @@ class Engine:
 
         #dump_cfg(self.an.current_target_function_cfg)
 
-        # 0) exit 노드들 -------------------------------------------------
-        exit_nodes = self.find_loop_exit_nodes(head)
-        if not exit_nodes:
-            raise ValueError("loop without exit-node")
-
         # 1) loop node 집합 ---------------------------------------------
         loop_nodes: set[CFGNode] = self.traverse_loop_nodes(head)
 
@@ -157,7 +152,7 @@ class Engine:
         in_vars[head] = start_env or {}
 
         # ─────────────────── widening 패스 ────────────────────
-        W_MAX = 30
+        W_MAX = 300
         WL    = deque([head])            # ★ 수정: 모든 노드 seed
         while WL and max(visit_cnt.values(), default=0) < W_MAX:
             node = WL.popleft()
@@ -191,7 +186,7 @@ class Engine:
                     else VariableEnv.join_variables_simple(in_vars[succ], out_joined)
                 )
                 if not VariableEnv.variables_equal(in_vars[succ], in_new):
-                    in_vars[succ] = in_new
+                    in_vars[succ] = VariableEnv.copy_variables(in_new)
                     WL.append(succ)
 
         # ─────────────────── narrowing 패스 ───────────────────
@@ -223,23 +218,26 @@ class Engine:
                 if succ in loop_nodes:
                     WL.append(succ)
 
+        # 0) exit 노드
+        exit_node = self.find_loop_exit_node(head)
+        if not exit_node:
+            raise ValueError("loop without exit-node")
+
         # 3) exit-env 계산 (모든 exit 노드 join) -------------------------
         exit_env = None
-        for en in exit_nodes:
-            tmp_env = None
-            for p in self.an.current_target_function_cfg.graph.predecessors(en):
-                src = out_vars.get(p) or p.variables
-                tmp_env = VariableEnv.join_variables_simple(tmp_env, src)
-            # exit-블록 자체 transfer 적용(조건 부정 포함)
-            tmp_final = self.transfer_function(en, tmp_env or {})
-            en.variables = VariableEnv.copy_variables(tmp_final)
-            exit_env    = VariableEnv.join_variables_simple(exit_env, tmp_final)
+
+        for p in self.an.current_target_function_cfg.graph.predecessors(exit_node):
+            src = out_vars.get(p) or p.variables
+            exit_env = VariableEnv.join_variables_simple(exit_env, src)
+
+        # 🔹 exit_node 자체의 transfer 를 한 번 더 실행
+        #     (for-cond False 브랜치 pruning 포함)
+        exit_env = self.transfer_function(exit_node, exit_env or {})
+        exit_node.variables = VariableEnv.copy_variables(exit_env)
 
         # (A) join 노드 잡기
         join = next(n for n in loop_nodes if n.fixpoint_evaluation_node)
-
         # (B) exit-env 구하기 (이미 계산됨)
-        exit_env = exit_env  # ← 함수 맨 아래에 만들어 둔 변수
         base_env = getattr(join, "join_baseline_env", None)
 
         # (C) diff
@@ -254,12 +252,12 @@ class Engine:
             )
 
         # 여러 exit 중 첫 번째 exit 블록을 반환 (노드를 따로 쓰려면 caller가 결정)
-        return exit_nodes[0]
+        return exit_node
 
-    def find_loop_exit_nodes(self, while_node):
+    def find_loop_exit_node(self, loop_node):
         exit_nodes = set()  # ← 1) set 으로 중복 차단
         visited = set()
-        stack = [while_node]
+        stack = [loop_node]
 
         while stack:
             cur = stack.pop()
@@ -268,14 +266,17 @@ class Engine:
             visited.add(cur)
 
             for succ in self.an.current_target_function_cfg.graph.successors(cur):
-                if succ == while_node:
+                if succ == loop_node:
                     continue
-                if not self.is_node_in_loop(succ, while_node):
+                if not self.is_node_in_loop(succ, loop_node):
                     exit_nodes.add(succ)  # ← 2) add
                 else:
                     stack.append(succ)
 
-        return list(exit_nodes)  # ← 3) list 로 변환해 주면 기존 호출부 그대로
+        if len(exit_nodes) != 1:
+            raise ValueError("loop exit node not found or two many")
+
+        return next(iter(exit_nodes))
 
     def is_node_in_loop(self, node, while_node):
         """

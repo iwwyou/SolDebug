@@ -82,9 +82,7 @@ class RecordManager:
         base_obj=None,
     ) -> None:
 
-        # ① “루트” 표현식 문자열
-        root_expr = expr.left if var_obj is not base_obj else expr.left.base
-        key_prefix = self._expr_to_str(root_expr)
+        key_prefix = self._expr_to_str(expr)
 
         # ② payload 작성
         if isinstance(var_obj, (ArrayVariable, StructVariable, MappingVariable)):
@@ -168,49 +166,22 @@ class RecordManager:
     # Public API
     # ---------------------------------------------------------------------
 
-    def add_env_record(self, line_no: int, stmt_type: str, env: Dict[str, Variables]) -> None:
-        """Flatten **entire** variable environment and store it under *line_no*.
+    def add_env_record(
+            self,
+            line_no: int,
+            stmt_type: str,
+            env: Dict[str, Variables]
+    ) -> None:
+        """
+        Flatten *changed* variable environment and store it under line_no.
         """
         flat: Dict[str, Any] = {}
-        for v in env.values():
-            self._flatten_var(v, v.identifier, flat)
+        for name, var in env.items():  # 🔸 key(변수명) 사용
+            self._flatten_var(var, name, flat)  # v.identifier 대신 name
         self._append_or_replace(
             line_no,
             {"kind": stmt_type, "vars": flat},
             replace_rule=lambda old, new: old.get("kind") == new["kind"],
-        )
-
-    def add_single_var_record(
-        self,
-        line_no: int,
-        stmt_type: str,
-        expr: Expression,
-        var_obj: Union[Variables, StructVariable, ArrayVariable, MappingVariable, EnumVariable],
-    ) -> None:
-        """Record only *one* variable (or composite root) that the statement
-        just touched.
-        """
-        key_prefix: str = self._expr_to_str(expr)
-        record: Dict[str, Any] = {"kind": stmt_type}
-
-        # (A) Composite – flatten recursively ▾
-        if isinstance(var_obj, (StructVariable, ArrayVariable, MappingVariable)):
-            flat: Dict[str, Any] = {}
-            self._flatten_var(var_obj, key_prefix, flat)
-            record["vars"] = flat
-
-        # (B) Leaf (Variables / EnumVariable) – serialize directly
-        else:
-            val_ser = self._serialize_val(getattr(var_obj, "value", None))
-            record["vars"] = {key_prefix: val_ser}
-
-        self._append_or_replace(
-            line_no,
-            record,
-            replace_rule=lambda old, new: (
-                old.get("kind") == new["kind"]
-                and set(old.get("vars", {}).keys()) == set(new["vars"].keys())
-            ),
         )
 
     # ------------------------------------------------------------------

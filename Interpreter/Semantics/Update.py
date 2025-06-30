@@ -434,18 +434,27 @@ class Update :
             # (a) r_val → Interval 변환(필요 시)
             conv_val = r_val
             if not VariableEnv.is_interval(r_val) and isinstance(var_obj, Variables):
-                if isinstance(r_val, str) and (r_val.lstrip("-").isdigit() or r_val.startswith("0x")):
-                    et = var_obj.typeInfo.elementaryTypeName
-                    bit = var_obj.typeInfo.intTypeLength or 256
+                et = var_obj.typeInfo.elementaryTypeName
+                bits = var_obj.typeInfo.intTypeLength or 256
+
+                # ① 숫자(int, bool) ------------------------------------------------
+                if isinstance(r_val, bool):
+                    conv_val = BoolInterval(int(r_val), int(r_val))
+                elif isinstance(r_val, int):
                     conv_val = (
-                        IntegerInterval(int(r_val, 0), int(r_val, 0), bit)
-                        if et.startswith("int")
-                        else UnsignedIntegerInterval(int(r_val, 0), int(r_val, 0), bit)
-                        if et.startswith("uint")
-                        else BoolInterval(1, 1) if r_val == "true"
-                        else BoolInterval(0, 0) if r_val == "false"
-                        else r_val
+                        IntegerInterval(r_val, r_val, bits) if et.startswith("int")
+                        else UnsignedIntegerInterval(r_val, r_val, bits)
                     )
+
+                # ② 문자열 리터럴(hex, dec, true/false) ----------------------------
+                elif isinstance(r_val, str) and (r_val.lstrip("-").isdigit() or r_val.startswith("0x")):
+                    n = int(r_val, 0)
+                    conv_val = (
+                        IntegerInterval(n, n, bits) if et.startswith("int")
+                        else UnsignedIntegerInterval(n, n, bits)
+                    )
+                elif r_val in ("true", "false"):
+                    conv_val = BoolInterval(1, 1) if r_val == "true" else BoolInterval(0, 0)
             # (b) 실제 값 패치
             var_obj.value = self.compound_assignment(var_obj.value, conv_val, operator)
 

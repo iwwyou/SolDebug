@@ -384,25 +384,53 @@ class Runtime:
     # ------------------------------------------------------------------
     def interpret_unary_statement(self, stmt, variables):
         """
-        stmt.operator : '++' | '--' | 'delete' | 'unary_prefix' | 'unary_suffix' …
-        stmt.operand  : Expression  (피연산자)
-
-        ▸ ++ / -- 는 handle_unary_incdec() 단계에서 이미
-          self.up.update_left_var() 로 값이 반영돼 있으므로
-          여기서는 delete 만 실제 값을 지우고,
-          나머지는 로그만 남겨 두면 된다.
+        stmt.operator : '++' | '--' | 'delete' …
+        stmt.operand  : Expression
         """
-        op       = stmt.operator
-        operand  = stmt.operand
+        op = stmt.operator  # '++' / '--' / 'delete'
+        operand = stmt.operand
         src_line = stmt.src_line
 
-        # ── delete x  -----------------------------------------------
+        # ── ++ / --  ---------------------------------------------------
+        if op == '++':
+            # rVal=1, operator='+='  →  i = i + 1
+            self.up.update_left_var(
+                operand,  # LHS
+                1,  # rVal
+                '+=',  # compound-operator
+                variables,
+                None, None,
+                False  # log=True  → Recorder 기록
+            )
+            return variables
+
+        if op == '--':
+            # rVal=1, operator='-='  →  i = i - 1
+            self.up.update_left_var(
+                operand,
+                1,
+                '-=',
+                variables,
+                None, None,
+                False
+            )
+            return variables
+
+        # ── delete x  --------------------------------------------------
         if op == 'delete':
-            # elementary 면 0 / ⊥ , 복합이면 재귀 ⊥ 적용
-            self.up.update_left_var(operand, 0, '=', variables, None, None, True)
+            # elementary → 0 / ⊥ , composite → 재귀 ⊥
+            self.up.update_left_var(
+                operand,
+                0,  # 값 지우기
+                '=',  # 단순 대입
+                variables,
+                None, None,
+                True
+            )
+            return variables
 
+        # 기타 unary 연산(prefix !, ~ 등)은 값쓰기 없음 → 그대로 통과
         return variables
-
 
     def interpret_function_call_statement(self, stmt, variables):
         function_expr = stmt.function_expr

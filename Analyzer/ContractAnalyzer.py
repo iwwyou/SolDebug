@@ -1314,7 +1314,7 @@ class ContractAnalyzer:
                 )
                 # (2) **단항 스테이트먼트**로 기록
                 incr_node.add_unary_statement(
-                    operand=increment_expr,  # 전체 i++ 식
+                    operand=increment_expr.expression,  # 전체 i++ 식
                     operator=increment_expr.operator,  # '++' or '--'
                     line_no=self.current_start_line,
                 )

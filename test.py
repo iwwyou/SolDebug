@@ -59,7 +59,7 @@ def simulate_inputs(records):
 
         print("--------------------------------------------------------")
 
-"""
+
 test_inputs = [
   {
     "code": "contract AOC_BEP {\n}",
@@ -230,9 +230,9 @@ test_inputs = [
     "event": "add"
   }
 ]
-"""
-#start = time.time()
 
-#simulate_inputs(test_inputs)
-#end = time.time()
-#print(f"Analyze time : {end - start:.5f} sec")
+start = time.time()
+
+simulate_inputs(test_inputs)
+end = time.time()
+print(f"Analyze time : {end - start:.5f} sec")
