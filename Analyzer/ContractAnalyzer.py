@@ -230,14 +230,18 @@ class ContractAnalyzer:
                 pass
 
             parent_context = self.find_parent_context(start_line)
-            if parent_context == "contract" : # 시작 규칙 : interactiveSourceUnit
-                self.current_context_type = "stateVariableDeclaration"
+            if parent_context in ["contract", "library", "interface",
+                                  "abstract contract"]:  # 시작 규칙 : interactiveSourceUnit
+                if 'constant' in stripped_code or 'immutable' in stripped_code:
+                    self.current_context_type = "constantVariableDeclaration"
+                else:
+                    self.current_context_type = "stateVariableDeclaration"
                 self.current_target_contract = self.find_contract_context(start_line)
-            elif parent_context == "struct" : # 시작 규칙 : interactiveStructUnit
+            elif parent_context == "struct":  # 시작 규칙 : interactiveStructUnit
                 self.current_context_type = "structMember"
                 self.current_target_contract = self.find_contract_context(start_line)
                 self.current_target_struct = self.find_struct_context(start_line)
-            else : # constructor, function, --- # 시작 규칙 : interactiveBlockUnit
+            else:  # constructor, function, --- # 시작 규칙 : interactiveBlockUnit
                 self.current_context_type = "simpleStatement"
                 self.current_target_contract = self.find_contract_context(start_line)
                 self.current_target_function = self.find_function_context(start_line)
@@ -260,7 +264,7 @@ class ContractAnalyzer:
             self.current_context_type = self.determine_top_level_context(new_code)
             self.current_target_contract = self.find_contract_context(start_line)
 
-            if self.current_context_type == "contract" :
+            if self.current_context_type in ["contract", "library", "interface", "abstract contract"]:
                 return
 
             self.current_target_function = self.find_function_context(start_line)
@@ -561,21 +565,45 @@ class ContractAnalyzer:
         if contract_cfg is None:
             raise ValueError(f"Unable to find contract CFG for {self.current_target_contract}")
 
-        # 2. 반드시 초기화식이 있어야 함
+        # 2. 반드시 초기화식이 있어야 함 (constant 변수는 항상 초기화 필요)
         if init_expr is None:
             raise ValueError(f"Constant variable '{variable_obj.identifier}' must have an initializer.")
+
+        # 3. constant로 선언 불가능한 타입 검증
+        if isinstance(variable_obj, (ArrayVariable, StructVariable, MappingVariable)):
+            type_name = type(variable_obj).__name__.replace('Variable', '').lower()
+            raise ValueError(
+                f"{type_name.capitalize()} variables cannot be declared as constant: '{variable_obj.identifier}'")
 
         if not contract_cfg.state_variable_node:
             contract_cfg.initialize_state_variable_node()
 
-        #    평가 컨텍스트는 현재까지의 state-variable 노드 변수들
+        # 4. 평가 컨텍스트는 현재까지의 state-variable 노드 변수들
         state_vars = contract_cfg.state_variable_node.variables
-        value = self.evaluator.evaluate_expression(init_expr, state_vars, None, None)
-        if value is None:
-            raise ValueError(f"Unable to evaluate constant expression for '{variable_obj.identifier}'")
 
-        variable_obj.value = value
-        variable_obj.isConstant = True  # (안전용 중복 설정)
+        # 5. constant 표현식 평가 (value types와 string만 지원)
+        if isinstance(variable_obj, EnumVariable):
+            # 열거형도 value type이므로 지원
+            value = self.evaluator.evaluate_expression(init_expr, state_vars, None, None)
+            if value is None:
+                raise ValueError(f"Unable to evaluate constant enum expression for '{variable_obj.identifier}'")
+            variable_obj.value = value
+        elif variable_obj.typeInfo.typeCategory == "elementary":
+            # value types (int, uint, bool, address 등)과 string 지원
+            et = variable_obj.typeInfo.elementaryTypeName
+            if et in ["string", "bytes"] or et.startswith(("int", "uint", "bool")) or et == "address":
+                value = self.evaluator.evaluate_expression(init_expr, state_vars, None, None)
+                if value is None:
+                    raise ValueError(f"Unable to evaluate constant expression for '{variable_obj.identifier}'")
+                variable_obj.value = value
+            else:
+                raise ValueError(f"Type '{et}' cannot be declared as constant: '{variable_obj.identifier}'")
+        else:
+            # 기타 지원되지 않는 타입
+            raise ValueError(
+                f"Type category '{variable_obj.typeInfo.typeCategory}' cannot be declared as constant: '{variable_obj.identifier}'")
+
+        variable_obj.isConstant = True  # constant 플래그 설정
 
         self.register_var(variable_obj)
 

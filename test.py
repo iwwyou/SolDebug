@@ -19,12 +19,12 @@ def simulate_inputs(records):
         stripped = code.lstrip()
 
         # ① BEGIN / END ---------------------------------------------------
-        if stripped.startswith("// @TestCase BEGIN"):
+        if stripped.startswith("// @Debugging BEGIN"):
             batch_mgr.reset()  # ★ 새 TC 시작
             in_testcase = True
             continue
 
-        if stripped.startswith("// @TestCase END"):
+        if stripped.startswith("// @Debugging END"):
             batch_mgr.flush()  # TC 완성 → 1 회 해석
             in_testcase = False
             continue

@@ -1116,65 +1116,77 @@ class DynamicCFGBuilder:
         return self.branch_block(n, False)
 
     def join_leaf_nodes(self, condition_node, stop_node_list):
-        """
-        주어진 조건 노드의 하위 그래프를 탐색하여 리프 노드들을 수집하고 변수 정보를 조인합니다.
-        :param condition_node: 최상위 조건 노드 (if 노드)
-        :return: 조인된 변수 정보를 가진 새로운 블록
-        """
-        # 리프 노드 수집
         G = self.an.current_target_function_cfg.graph
 
-        # ① leaf 수집 ------------------------------------------------
         leaf_nodes = self.collect_leaf_nodes(condition_node, stop_node_list)
 
-        # ② 값 join --------------------------------------------------
         joined_env = None
         for n in leaf_nodes:
             if n.function_exit_node:
                 continue
             joined_env = VariableEnv.join_variables_simple(joined_env, n.variables)
 
-        # 새로운 블록 생성 및 변수 정보 저장
         new_blk = CFGNode(f"JoinBlock_{self.an.current_start_line}")
         new_blk.variables = joined_env
-        new_blk.join_point_node = True  # ★ join-블록 표식
+        new_blk.join_point_node = True
         G.add_node(new_blk)
 
-        # ④ leaf-succ 재배선 ----------------------------------------
         for leaf in leaf_nodes:
             succs = list(G.successors(leaf))
-            # leaf 자체는 조건 블록이 아님(collect 단계에서 필터링)
             if not succs:
                 G.add_edge(leaf, new_blk)
                 continue
 
             for s in succs:
-                # succ 이 ‘메타’(join, for-incr, loop-exit, fixpoint) 면 edge 교체
-                if s.join_point_node or s.is_for_increment or s.name == "EXIT":
+                if (
+                        getattr(s, "join_point_node", False) or
+                        getattr(s, "is_for_increment", False) or
+                        getattr(s, "fixpoint_evaluation_node", False) or  # ★ 추가
+                        getattr(s, "function_exit_node", False) or
+                        getattr(s, "name", "") == "EXIT"
+                ):
                     G.remove_edge(leaf, s)
                     G.add_edge(leaf, new_blk)
                     G.add_edge(new_blk, s)
                 else:
-                    raise ValueError(f"This should never happen")
-
+                    # 여기에 걸리면 보통 설계상 메타에 연결된 것이 아닌데,
+                    # if 체인 내부가 아닌 다른 경로가 섞였다는 뜻 → 디버그 로그 추천
+                    raise ValueError(f"This should never happen: succ={s.name}")
         return new_blk
 
     def collect_leaf_nodes(self, root_if: CFGNode,
                            stop_nodes: set[CFGNode]) -> list[CFGNode]:
+        """
+        leaf = stop-node 들의 predecessor 중에서
+               (1) if-헤더에 의해 지배(dominated)되고,
+               (2) 메타 노드가 아니고(조건/for-incr/join/loop-exit/fixpoint/EXIT),
+               (3) 여전히 if-체인 내부에 있는 노드
+        """
+        fcfg = self.an.current_target_function_cfg
+        G = fcfg.graph
+        idom = self._compute_idom(fcfg)
 
-        """
-        leaf = stop-node 들의 모든 predecessor 중
-               (a) if-조건 블록이 아니고
-               (b) still-in-if-chain 인 노드
-        """
-        G = self.an.current_target_function_cfg.graph
-        leaf = []
+        leaf: list[CFGNode] = []
 
         for s in stop_nodes:
             for p in G.predecessors(s):
-                # if-체인에 속하지 않는 블록이면 제외
-                if not p.condition_node:
-                    leaf.append(p)
+                # ① if-헤더가 p를 지배하는가? (루프 preheader 같은 바깥 노드 제외)
+                if not self._dominates(idom, root_if, p):
+                    continue
+
+                # ② 메타 노드 배제
+                if getattr(p, "condition_node", False):
+                    continue
+                if getattr(p, "join_point_node", False):
+                    continue
+                if getattr(p, "fixpoint_evaluation_node", False):
+                    continue
+                if getattr(p, "is_for_increment", False):
+                    continue
+                if getattr(p, "function_exit_node", False) or getattr(p, "name", "") == "EXIT":
+                    continue
+
+                leaf.append(p)
 
         return leaf
 
@@ -1230,3 +1242,26 @@ class DynamicCFGBuilder:
                 return n
             stk.extend(G.predecessors(n))
         return None
+
+    # DynamicCFGBuilder 내부에 추가
+    def _compute_idom(self, fcfg: FunctionCFG):
+        import networkx as nx
+        G = fcfg.graph
+        entry = fcfg.get_entry_node()
+        # immediate dominators: map[node] = its immediate dominator; entry maps to itself
+        return nx.immediate_dominators(G, entry)
+
+    def _dominates(self, idom_map: dict, a: CFGNode, b: CFGNode) -> bool:
+        """
+        a dominates b ?  (walk b -> entry along idom chain)
+        """
+        n = b
+        while True:
+            if n is a:
+                return True
+            # entry 의 idom 은 자기 자신
+            parent = idom_map.get(n, None)
+            if parent is None or parent is n:
+                break
+            n = parent
+        return False
