@@ -1,4 +1,6 @@
 # SolidityGuardian/Analyzers/ContractAnalyzer.py
+from collections import deque
+from typing import Iterable
 from Utils.CFG import *
 from solcx import (
     install_solc,
@@ -690,6 +692,7 @@ class ContractAnalyzer:
         contract_cfg.functions[function_name] = fcfg
         self.contract_cfgs[self.current_target_contract] = contract_cfg
         self.brace_count[self.current_start_line]["cfg_node"] = fcfg.get_entry_node()
+        self.brace_count[self.current_end_line]["cfg_node"] = fcfg.get_exit_node()
 
     def process_variable_declaration(
             self,
@@ -1712,6 +1715,141 @@ class ContractAnalyzer:
         )
 
         self._batch_targets.add(self.current_target_function_cfg)
+
+    # ContractAnalyzer 클래스 내부에 추가
+
+    # ContractAnalyzer 클래스 내부에 추가
+    from collections import deque
+
+    def reinterpret_from(self, fcfg: "FunctionCFG", seed_or_seeds) -> None:
+        """
+        Re-interpret downstream from the given seed node(s).
+        - succ 중심 전파(선행자는 해석/정제만 수행; 재큐잉의 트리거는 변화 발생 시).
+        - cond 선행자 → edge 방향(True/False)로 pruning
+        - 그 외 선행자(더미/일반블록) → transfer_function 한 번 태워 최신 out 확보
+        - 루프 헤드 → 필요 시 fixpoint, false-exit의 후속 노드만 큐잉
+        """
+
+        G = fcfg.graph
+        eng = self.engine
+        ref = self.refiner
+
+        # ───────────────────────────── helpers ─────────────────────────────
+        def _is_loop_head(n):
+            return getattr(n, "condition_node", False) and \
+                getattr(n, "condition_node_type", None) in {"while", "for", "doWhile"}
+
+        def _false_succs(n):
+            return [s for s in G.successors(n) if G[n][s].get("condition") is False]
+
+        def _is_sink(n):
+            # 기존 EXIT + (있다면) 분리된 sink 들을 모두 포괄
+            if getattr(n, "function_exit_node", False):
+                return True
+            if getattr(n, "error_exit_node", False):
+                return True
+            if getattr(n, "return_exit_node", False):
+                return True
+            # 이름 기반 방어 (구현체마다 다를 수 있어 느슨히)
+            nm = getattr(n, "name", "")
+            return nm in {"EXIT", "ERROR", "RETURN"}
+
+        def _branch_feasible(env, cond_expr, want_true):
+            # Runtime._branch_feasible 재사용
+            return self.runtime._branch_feasible(env, cond_expr, want_true)
+
+        def _edge_env_from_pred(pred, succ):
+            """
+            pred → succ edge 기준으로 pred의 out을 준비해 반환.
+            - pred가 condition-node면 edge 라벨(True/False)로 refine
+            - pred가 그 외(더미/일반)면 transfer_function 한 번 태워 최신 out 확보
+            - infeasible이면 None
+            반환: dict[str, Variables] | None
+            """
+            base = VariableEnv.copy_variables(getattr(pred, "variables", {}) or {})
+
+            # (A) condition-node → refine by edge condition
+            if getattr(pred, "condition_node", False):
+                cond_expr = getattr(pred, "condition_expr", None)
+                ed = G.get_edge_data(pred, succ, default=None)
+                if cond_expr is not None and ed and "condition" in ed:
+                    want_true = bool(ed["condition"])
+                    ref.update_variables_with_condition(base, cond_expr, want_true)
+                    if not _branch_feasible(base, cond_expr, want_true):
+                        return None
+                # 조건 노드는 값 쓰기 없이 통과하므로 base 그대로 out
+                return base
+
+            # (B) 그 외(브랜치 더미/일반 블록) → transfer 한 번
+            out_env = eng.transfer_function(pred, base)
+            return out_env
+
+        def _compute_in(n):
+            acc = None
+            for p in G.predecessors(n):
+                env_p = _edge_env_from_pred(p, n)
+                if env_p is None:  # infeasible edge
+                    continue
+                acc = VariableEnv.join_variables_simple(acc, env_p)
+            return acc or {}
+
+        # out 스냅샷(변화 감지) – 첫 방문은 무조건 변한 것으로 간주하도록 None
+        out_snapshot = {}
+
+        # ───────────────────────── worklist init ──────────────────────────
+        if isinstance(seed_or_seeds, list):
+            seeds = list(seed_or_seeds)
+        else:
+            seeds = [seed_or_seeds]
+
+        WL = deque()
+        in_queue = set()
+
+        for s in seeds:
+            WL.append(s)
+            in_queue.add(s)
+
+        # ───────────────────────── main loop ──────────────────────────────
+        while WL:
+            n = WL.popleft()
+            in_queue.discard(n)
+
+            # 1) in[n] 계산 (선행자 별 edge-의미 반영)
+            in_env = _compute_in(n)
+
+            # 2) 루프 헤드라면 필요 시 고정점
+            if _is_loop_head(n):
+                false_s = _false_succs(n)
+                only_exit = (len(false_s) == 1 and _is_sink(false_s[0]))
+                if not only_exit:
+                    exit_node = eng.fixpoint(n)  # 내부에서 widen→narrow, join 등 처리
+                    for s in G.successors(exit_node):
+                        if not _is_sink(s) and s not in in_queue:
+                            WL.append(s)
+                            in_queue.add(s)
+                else:
+                    # false-exit이 곧 함수 종료면 굳이 fixpoint 돌리지 않음
+                    for s in false_s:
+                        if not _is_sink(s) and s not in in_queue:
+                            WL.append(s)
+                            in_queue.add(s)
+                continue
+
+            # 3) 일반 노드 – 전이 적용 (여기서 n.variables 동기화됨)
+            new_out = eng.transfer_function(n, in_env)
+
+            # 4) 변화 감지 (처음이면 무조건 True)
+            changed = not VariableEnv.variables_equal(out_snapshot.get(n), new_out)
+            out_snapshot[n] = VariableEnv.copy_variables(new_out)
+
+            # 5) 변화가 있어야만 후속 큐잉
+            if changed:
+                for s in G.successors(n):
+                    if not _is_sink(s) and s not in in_queue:
+                        WL.append(s)
+                        in_queue.add(s)
+
+        # 끝. sink(RETURN/ERROR/EXIT)는 succ이 없으니 자연 종료됨.
 
     def get_line_analysis(self, start_ln: int, end_ln: int) -> dict[int, list[dict]]:
         """

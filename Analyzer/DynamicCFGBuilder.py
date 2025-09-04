@@ -798,119 +798,104 @@ class DynamicCFGBuilder:
         bc = brace_count.setdefault(line_no, {"open": 0, "close": 0, "cfg_node": cast(Optional[CFGNode], None)})
         bc['cfg_node'] = unchecked
 
+    # Analyzer/DynamicCFGBuilder.py  (클래스 내부에 교체/추가)
 
     def get_current_block(self) -> CFGNode:
         """
-        커서가 위치한 소스-라인에 대응하는 CFG 블록을 반환한다.
-        - 한 줄 코드 삽입 : 해당 블록 반환
-        - '}' 로 블록-아웃  : process_flow_join 에게 위임
+        Successor-first anchor selection.
+        현재 삽입 라인 L 이후 '처음 실행될 CFG 노드(succ)'를 기준으로
+        succ 의 정상 전임자들을 수집하여
+          - 0개: dead 위치 → 오류
+          - 1개: 그 전임자를 앵커(단, 메타 노드면 NEW 블록을 끼움)
+          - 2개+: JOIN 블록을 만들어 (preds→JOIN→succ)로 재배선
+        한 뒤, 앵커 블록(=문장을 기록할 블록)을 반환한다.
         """
+        an = self.an
+        fcfg = an.current_target_function_cfg
+        if fcfg is None:
+            raise ValueError("Active FunctionCFG not found.")
 
-        close_brace_queue: list[int] = []
+        G = fcfg.graph
+        L = an.current_start_line
 
-        # ── 위에서 ↓ 아래로 탐색 (직전 라인부터)
-        for line in range(self.an.current_start_line - 1, 0, -1):
-            brace_info = self.an.brace_count.get(
-                line,
-                {"open": 0, "close": 0, "cfg_node": None},
-            )
+        # 1) succ 찾기: L 이후 텍스트상 첫 CFG 노드 (동일 함수 소속만)
+        succ = self._next_node_in_function_at_or_after_line(fcfg, L)
 
-            txt = self.an.full_code_lines.get(line, "").strip()
-            if txt == "" or txt.startswith("//"):  # ← 공백 + 주석 모두 건너뜀
+        # 2) succ 의 전임자 분류 (sink 경로 전임자는 우회/제외)
+        preds = list(G.predecessors(succ))
+
+        # 3) 앵커 결정
+        if len(preds) <= 0:
+            # 정상 경로가 모두 sink → 이 위치는 실행 불가
+            raise ValueError("No normal predecessor to attach new statement (dead insertion point).")
+
+        # ── case: 전임자 1개 ─────────────────────────────────────────────
+        elif len(preds) == 1:
+            pred = preds[0]
+
+            if getattr(pred, "loop_exit_node", False) :
+                temp_nodes = list(G.predecessors(pred)) # temp_nodes[0] : loop condition node
+                pred = self.eng.fixpoint(temp_nodes[0])
+
+                new_blk = CFGNode(f"Block_{self.an.current_start_line}")
+
+                G.add_node(new_blk)
+                if G.has_edge(pred, succ):
+                    G.remove_edge(pred, succ)
+                G.add_edge(pred, new_blk)
+                G.add_edge(pred, succ)
+                return new_blk
+
+            elif getattr(pred, "name","") == "ENTRY" :
+                new_blk = CFGNode(f"Block_{self.an.current_start_line}")
+
+                G.add_node(new_blk)
+                if G.has_edge(pred, succ):
+                    G.remove_edge(pred, succ)
+                G.add_edge(pred, new_blk)
+                G.add_edge(pred, succ)
+                return new_blk
+
+            else : # 일반 블록
+                return pred
+
+        else :
+            # ── case: 전임자 2개 이상 → JOIN 생성 ─────────────────────────────
+            join_blk = CFGNode(f"JoinBlock_{self.an.current_start_line}")
+
+            # env = 정상 전임자들의 out join
+            env = None
+            for p in preds:
+                env = VariableEnv.join_variables_simple(env, getattr(p, "variables", {}) or {})
+            join_blk.variables = VariableEnv.copy_variables(env or {})
+
+            # 그래프 재배선 (정상 전임자 → JOIN → succ)
+            G.add_node(join_blk)
+            for p in preds:
+                if G.has_edge(p, succ):
+                    G.remove_edge(p, succ)
+                G.add_edge(p, join_blk)
+
+            return join_blk
+
+    def _next_node_in_function_at_or_after_line(self, fcfg: FunctionCFG, L: int) -> CFGNode | None:
+        an = self.an
+        G = fcfg.graph
+        # 함수 범위 힌트
+        start = getattr(getattr(fcfg, "meta", {}), "start_line", None)
+        end = getattr(getattr(fcfg, "meta", {}), "end_line", None)
+
+        scan_start = L
+        scan_end = end if end is not None else (max(an.full_code_lines) if an.full_code_lines else L)
+
+        for ln in range(scan_start, scan_end + 1):
+            info = an.brace_count.get(ln)
+            if not info:
                 continue
-
-            # 공백/주석 전용 라인 스킵
-            if brace_info["open"] == brace_info["close"] == 0 and brace_info["cfg_node"] is None:
-                # 원본 라인 텍스트 직접 확인 (whitespace - only?)
-                if self.an.full_code_lines.get(line, "").strip() == "":
-                    continue
-
-            # ────────── CASE 1. 아직 close_brace_queue가 비어 있음 ──────────
-            if not close_brace_queue:
-                # 1-a) 일반 statement 라인 → 그 cfg_node 반환
-                if brace_info["cfg_node"] and brace_info["open"] == brace_info["close"] == 0:
-                    cfg_node: CFGNode = brace_info["cfg_node"]
-                    if cfg_node.condition_node:
-                        ctype = cfg_node.condition_node_type
-                        if ctype in ("require", "assert"):
-                            return self.get_true_block(cfg_node)
-                    else:
-                        return cfg_node
-
-                # 1-b) 막 열린 '{' (open==1, close==0)
-                if brace_info["cfg_node"] and brace_info["open"] == 1 and brace_info["close"] == 0:
-                    cfg_node: CFGNode = brace_info["cfg_node"]
-
-                    # ENTRY 블록 직후 새 블록 삽입
-                    if cfg_node.name == "ENTRY":
-                        if self.an.current_target_function_cfg is None:
-                            raise ValueError("No active function CFG found.")
-                        entry_node = cfg_node
-                        new_block = CFGNode(f"Block_{self.an.current_start_line}")
-
-                        # variables = 함수 related 변수 deep-copy
-                        new_block.variables = VariableEnv.copy_variables(self.an.current_target_function_cfg.related_variables)
-
-                        g = self.an.current_target_function_cfg.graph
-                        # ENTRY 의 기존 successor 기억 후 재연결
-                        old_succs = list(g.successors(entry_node))
-                        g.add_node(new_block)
-                        g.add_edge(entry_node, new_block)
-                        for s in old_succs:
-                            g.remove_edge(entry_node, s)
-                            g.add_edge(new_block, s)
-                        return new_block
-
-                    if cfg_node.name.startswith("else"):
-                        return cfg_node
-
-                    # 조건-노드의 서브블록 결정
-                    if cfg_node.condition_node:
-                        ctype = cfg_node.condition_node_type
-                        if ctype in ("if", "else if"):
-                            return self.get_true_block(cfg_node)
-                        if ctype in ("while", "for", "doWhile"):
-                            return self.get_true_block(cfg_node)
-
-                    # 그 외 – 바로 반환
-                    return cfg_node
-
-                # 1-c) '}' 발견 → close 큐에 push
-                if brace_info["open"] == 0 and brace_info["close"] == 1 and brace_info["cfg_node"] is None:
-                    open_brace = self.match_open_brace(line)
-                    if open_brace is None:
-                        continue
-                    _, open_brace_info = open_brace
-                    if open_brace_info['cfg_node'] is not None and open_brace_info[
-                        'cfg_node'].unchecked_block == True:  # unchecked indicator or general curly brace
-                        continue
-                    else:
-                        close_brace_queue.append(line)
-
-            # ────────── CASE 2. close_brace_queue가 이미 존재 ──────────
-            else:
-                # 연속 '}' 누적
-                if brace_info["open"] == 0 and brace_info["close"] == 1 and brace_info["cfg_node"] is None:
-                    open_brace = self.match_open_brace(line)
-                    if open_brace is None:
-                        continue
-                    _, open_brace_info = open_brace
-                    if open_brace_info['cfg_node'].unchecked_block:  # unchecked indicator or general curly brace
-                        continue
-                    else:
-                        close_brace_queue.append(line)
-                        continue
-                # 블록 아웃 탐색 종료 조건
-                break
-
-        # ── close_brace_queue 가 채워졌다면 블록-아웃 처리 ──
-        if close_brace_queue:
-            blk = self.process_flow_join(close_brace_queue)
-            if blk:
-                return blk
-            raise ValueError("Flow-join 처리 후에도 유효 블록을 결정하지 못했습니다.")
-
-        raise ValueError("No active function CFG found.")
+            n = info.get("cfg_node")
+            if n and n in G.nodes:
+                return n
+        return None
 
     # ---------------------------------------------------------------------------
     # ② process_flow_join – '}' 를 만나 블록을 빠져나갈 때 합류/고정점 처리
