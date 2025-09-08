@@ -201,13 +201,13 @@ class ContractAnalyzer:
     def update_brace_count(self, line_number, code):
         open_braces = code.count('{')
         close_braces = code.count('}')
-
-        # brace_count 업데이트
-        self.line_info[line_number] = {
-            'open': open_braces,
-            'close': close_braces,
-            'cfg_node': None
-        }
+        info = self.line_info.get(line_number, {})
+        info['open'] = open_braces
+        info['close'] = close_braces
+        # 호환성 필드들 보장
+        info.setdefault('cfg_nodes', [])
+        info.setdefault('cfg_node', None)
+        self.line_info[line_number] = info
 
     def analyze_context(self, start_line, new_code):
         stripped_code = new_code.strip()
@@ -1632,6 +1632,33 @@ class ContractAnalyzer:
         # ── 3. 저장 ------------------------------------------------------
         ccf.functions[self.current_target_function] = self.current_target_function_cfg
         self.contract_cfgs[self.current_target_contract] = ccf
+
+    def process_do_statement(self):
+        ccf = self.contract_cfgs[self.current_target_contract]
+        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+        fcfg = self.current_target_function_cfg
+        if not fcfg:
+            raise ValueError("No current target function to attach do-while.")
+        cur_block = self.builder.get_current_block() # cur block is prev
+        self.builder.build_do_statement(cur_block=cur_block,
+                                        line_no=self.current_start_line,
+                                        fcfg=fcfg,
+                                        line_info=self.line_info)
+
+    def process_do_while_statement(self, condition_expr):
+        ccf = self.contract_cfgs[self.current_target_contract]
+        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+        fcfg = self.current_target_function_cfg
+        if not fcfg:
+            raise ValueError("No current target function to attach do-while.")
+        cur_block = self.builder.get_current_block() # cur block is do entry
+
+        self.builder.build_do_while_statement(do_entry=cur_block,
+                                        while_line=self.current_start_line,
+                                        fcfg=fcfg,
+                                        condition_expr=condition_expr,
+                                        line_info=self.line_info)
+
 
     def process_global_var_for_debug(self, gv_obj: GlobalVariable):
         """

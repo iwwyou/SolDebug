@@ -1268,26 +1268,28 @@ class EnhancedSolidityVisitor(SolidityVisitor):
 
     # Visit a parse tree produced by SolidityParser#interactiveDoWhileDoStatement.
     def visitInteractiveDoWhileDoStatement(self, ctx:SolidityParser.InteractiveDoWhileDoStatementContext):
-        return self.visitChildren(ctx)
+        self.contract_analyzer.process_do_statement()
+        return None
 
     # Visit a parse tree produced by SolidityParser#interactiveDoWhileWhileStatement.
     def visitInteractiveDoWhileWhileStatement(self, ctx:SolidityParser.InteractiveDoWhileWhileStatementContext):
-        return self.visitChildren(ctx)
+        cond_expr = self.visitExpression(ctx.expression())
+        self.contract_analyzer.process_do_while_statement(cond_expr)
+        return None
 
     # Visit a parse tree produced by SolidityParser#interactiveTryStatement.
     def visitInteractiveTryStatement(self, ctx:SolidityParser.InteractiveTryStatementContext):
-        return self.visitChildren(ctx)
+        fn_expr = self.visitExpression(ctx.expression())
+        returns = self.visitParameterList(ctx.parameterList()) if ctx.parameterList() else []
+        self.contract_analyzer.process_try_statement(fn_expr, returns)
+        return None
 
     # Visit a parse tree produced by SolidityParser#interactiveCatchClause.
     def visitInteractiveCatchClause(self, ctx:SolidityParser.InteractiveCatchClauseContext):
-        catch_node = f"Catch_{ctx.start.line}"
-        self.contract_analyzer.add_control_flow_node(catch_node, ctx)
-
-        # Catch 블록 내의 매개변수 목록 처리
-        if ctx.parameterList():
-            self.visit(ctx.parameterList())
-
-        return self.visitChildren(ctx)
+        catch_ident = ctx.identifier().getText() if ctx.identifier() else None
+        params = self.visitParameterList(ctx.parameterList()) if ctx.parameterList() else []
+        self.contract_analyzer.process_catch_clause(catch_ident, params)
+        return None
 
     # Visit a parse tree produced by SolidityParser#elementaryTypeName.
     def visitElementaryTypeName(self, ctx:SolidityParser.ElementaryTypeNameContext):

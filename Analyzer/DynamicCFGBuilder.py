@@ -798,6 +798,78 @@ class DynamicCFGBuilder:
         bc = line_info.setdefault(line_no, {"open": 0, "close": 0, "cfg_node": cast(Optional[CFGNode], None)})
         bc['cfg_node'] = unchecked
 
+    def build_do_statement(self,
+                           *,
+                           cur_block: CFGNode,
+                           line_no:int,
+                           fcfg: FunctionCFG,
+                           line_info:dict) -> None:
+        G = fcfg.graph
+        do_entry = CFGNode(f"do_body_{line_no}", src_line=line_no)
+        do_entry.variables = VariableEnv.copy_variables(cur_block.variables)
+
+        do_end = CFGNode(f"do_end_{line_no}", src_line=line_no)
+        do_end.variables = VariableEnv.copy_variables(cur_block.variables)
+
+        G.add_node(do_entry)
+        G.add_node(do_end)
+
+        # ③ prev → DO_ENTRY → DO_END 로 재배선
+        old_succs = list(G.successors(cur_block))
+        for s in old_succs:
+            G.remove_edge(cur_block, s)
+
+        G.add_edge(cur_block, do_entry)
+        G.add_edge(do_entry, do_end)
+
+        # ④ 당장은 직렬 통과를 유지 (while이 오면 제거할 예정)
+        for s in old_succs:
+            G.add_edge(do_end, s)
+
+        line_info[line_no]['cfg_node'].append(do_entry)
+        line_info[line_no+1]['cfg_node'].append(do_end)
+
+    def build_do_while_statement(self, *,
+                                 do_entry: CFGNode,
+                           while_line:int,
+                           fcfg: FunctionCFG,
+                           condition_expr,
+                           line_info:dict):
+        G = fcfg.graph
+
+        do_end = list(G.successors(do_entry))[0]
+
+        post_succs = list(G.successors(do_end))
+        for s in post_succs:
+            G.remove_edge(do_end, s)
+
+        # ② φ / cond / exit 노드
+        phi = CFGNode(f"do_while_phi_{while_line}", fixpoint_evaluation_node=True, src_line=while_line)
+        # do-첫-회전 결과로 초기화 (엔진이 재평가하므로 카피만)
+        phi.variables = VariableEnv.copy_variables(do_end.variables)
+        phi.join_baseline_env = VariableEnv.copy_variables(do_end.variables)
+        phi.fixpoint_evaluation_node_vars = VariableEnv.copy_variables(do_end.variables)
+
+        cond = CFGNode(f"do_while_cond_{while_line}", condition_node=True,
+                       condition_node_type="do_while", src_line=while_line)
+        cond.condition_expr = condition_expr
+        cond.variables = VariableEnv.copy_variables(phi.variables)
+
+        exit_ = CFGNode(f"do_while_exit_{while_line}", loop_exit_node=True, src_line=while_line)
+
+        G.add_nodes_from([phi, cond, exit_])
+
+        # ③ 배선
+        G.add_edge(do_end, phi)
+        G.add_edge(phi, cond)
+        G.add_edge(cond, do_entry, condition=True)
+        G.add_edge(cond, exit_, condition=False)
+        for s in post_succs:
+            G.add_edge(exit_, s)
+
+        line_info[while_line]['cfg_node'].append(exit_)
+
+
     # Analyzer/DynamicCFGBuilder.py  (클래스 내부에 교체/추가)
 
     def get_current_block(self) -> CFGNode:
