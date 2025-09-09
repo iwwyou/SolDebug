@@ -1633,32 +1633,178 @@ class ContractAnalyzer:
         ccf.functions[self.current_target_function] = self.current_target_function_cfg
         self.contract_cfgs[self.current_target_contract] = ccf
 
+    # Analyzer/ContractAnalyzer.py  내부 메소드들 추가/교체
+
     def process_do_statement(self):
         ccf = self.contract_cfgs[self.current_target_contract]
         self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
         fcfg = self.current_target_function_cfg
         if not fcfg:
             raise ValueError("No current target function to attach do-while.")
-        cur_block = self.builder.get_current_block() # cur block is prev
-        self.builder.build_do_statement(cur_block=cur_block,
-                                        line_no=self.current_start_line,
-                                        fcfg=fcfg,
-                                        line_info=self.line_info)
+
+        # prev 기준 앵커
+        cur_block = self.builder.get_current_block()
+
+        # do-entry / do-end 스켈레톤 (배선만)
+        self.builder.build_do_statement(
+            cur_block=cur_block,
+            line_no=self.current_start_line,
+            fcfg=fcfg,
+            line_info=self.line_info
+        )
 
     def process_do_while_statement(self, condition_expr):
+        """
+        while 라인이 곧바로 do 다음 라인으로 들어온다는 전제 하에,
+        get_current_block()이 삽입한 임시 블록의 pred를 타고 올라가
+        do_end → do_entry를 역추적한 뒤 CFG를 완성한다.
+        """
         ccf = self.contract_cfgs[self.current_target_contract]
         self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
         fcfg = self.current_target_function_cfg
         if not fcfg:
             raise ValueError("No current target function to attach do-while.")
-        cur_block = self.builder.get_current_block() # cur block is do entry
 
-        self.builder.build_do_while_statement(do_entry=cur_block,
-                                        while_line=self.current_start_line,
-                                        fcfg=fcfg,
-                                        condition_expr=condition_expr,
-                                        line_info=self.line_info)
+        # while 라인 기준 앵커(보통 do_end → EXIT 사이에 NEW 가 하나 들어감)
+        cur_block = self.builder.get_current_block()
+        G = fcfg.graph
 
+        # 1) NEW 의 유일한 predecessor 가 do_end_* 여야 함
+        preds = list(G.predecessors(cur_block))
+        if not preds:
+            raise ValueError("do-while: cannot locate predecessor of while anchor.")
+        # do_end_* 후보 선택
+        do_end = None
+        for p in preds:
+            if getattr(p, "name", "").startswith("do_end_"):
+                do_end = p
+                break
+        if do_end is None:
+            raise ValueError("`while (...)` arrived but preceding `do {}` was not found.")
+
+        # 2) do_entry는 do_end의 predecessor
+        do_entry = None
+        for pp in G.predecessors(do_end):
+            if getattr(pp, "name", "").startswith("do_body_"):
+                do_entry = pp
+                break
+        if do_entry is None:
+            raise ValueError("do-while: do_entry could not be found behind do_end.")
+
+        # 3) 루프 배선 완성
+        self.builder.build_do_while_statement(
+            do_entry=do_entry,
+            while_line=self.current_start_line,
+            fcfg=fcfg,
+            condition_expr=condition_expr,
+            line_info=self.line_info
+        )
+
+    def process_try_statement(self, function_expr, returns):
+        """
+        try <function_expr> ('returns' (...))? '{' '}'
+        - returns 변수는 여기서 선언(⊥)하고
+        - CFG 배선은 빌더가 처리
+        - true-블록 env 에 returns 로컬을 심어준다
+        """
+        ccf = self.contract_cfgs[self.current_target_contract]
+        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+        fcfg = self.current_target_function_cfg
+        if not fcfg:
+            raise ValueError("No current target function for try.")
+
+        def _mk_return_local(ty, nm, fcfg):
+            """
+            try ... returns (...) 에서 반환 로컬을 생성한다.
+            값은 타입에 맞는 ⊥(bottom)으로 초기화.
+            """
+            vname = nm if nm else f"_ret{len(getattr(fcfg, 'ret_locals', []))}"
+            vobj = Variables(identifier=vname, scope="local")
+            vobj.typeInfo = ty
+
+            # 타입별 bottom 초기화
+            if getattr(ty, "typeCategory", None) == "elementary":
+                et = getattr(ty, "elementaryTypeName", "")
+                bits = getattr(ty, "intTypeLength", 256) or 256
+                if et.startswith("uint"):
+                    from Domain.Interval import UnsignedIntegerInterval
+                    vobj.value = UnsignedIntegerInterval.bottom(bits)
+                elif et.startswith("int"):
+                    from Domain.Interval import IntegerInterval
+                    vobj.value = IntegerInterval.bottom(bits)
+                elif et == "bool":
+                    from Domain.Interval import BoolInterval
+                    vobj.value = BoolInterval.bottom()
+                else:
+                    vobj.value = None
+            else:
+                vobj.value = None
+
+            fcfg.add_related_variable(vobj)
+            return vobj
+
+        # 앵커(이전 블록 기준)
+        cur_block = self.builder.get_current_block()
+
+        # returns → 로컬 변수들 준비
+        ret_locals = []
+        for ty, nm in returns:
+            ret_locals.append(_mk_return_local(ty, nm, fcfg))
+
+        # CFG 스켈레톤 생성 (cond / true / false-stub / join 반환)
+        cond, true_blk, false_stub, join = self.builder.build_try_skeleton(
+            cur_block=cur_block,
+            function_expr=function_expr,
+            line_no=self.current_start_line,
+            fcfg=fcfg,
+            line_info=self.line_info
+        )
+
+        # true 블록 환경에 returns 로컬 심기
+        for v in ret_locals:
+            true_blk.variables[v.identifier] = v
+
+    def process_catch_clause(self, catch_ident, params):
+        """
+        catch (...) '{' '}'
+        - 직전(가까운) ‘catch 미부착 try’를 CFG에서 찾아 부착
+        - catch 파라미터 로컬을 entry-env 에 심어준다
+        """
+        ccf = self.contract_cfgs[self.current_target_contract]
+        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+        fcfg = self.current_target_function_cfg
+        if not fcfg:
+            raise ValueError("No current target function for catch.")
+
+        # 1) ‘열려 있는’ try 를 찾는다(가장 가까운 것)
+        found = self.builder.find_open_try_for_catch(
+            line_no=self.current_start_line,
+            fcfg=fcfg
+        )
+        if found is None:
+            raise ValueError("`catch` without preceding `try`.")
+
+        cond, false_stub, join = found
+
+        # 2) catch 블록 배선
+        c_entry, c_end = self.builder.attach_catch_clause(
+            cond=cond,
+            false_stub=false_stub,
+            join=join,
+            line_no=self.current_start_line,
+            fcfg=fcfg,
+            line_info=self.line_info
+        )
+
+        # 3) catch 파라미터 로컬 심기
+        for ty, nm in (params or []):
+            if not nm:
+                continue
+            v = Variables(identifier=nm, scope="local")
+            v.typeInfo = ty
+            v.value = None
+            c_entry.variables[nm] = v
+            fcfg.add_related_variable(v)
 
     def process_global_var_for_debug(self, gv_obj: GlobalVariable):
         """
@@ -1742,177 +1888,6 @@ class ContractAnalyzer:
 
         self._batch_targets.add(self.current_target_function_cfg)
 
-    def reinterpret_from(self, fcfg: "FunctionCFG", seed_or_seeds) -> None:
-        """
-        Re-interpret downstream from the given seed node(s).
-        BFS worklist + in_queue(중복 삽입 방지) + change-driven 재큐잉.
-          - 조건 선행자: edge 라벨(True/False) 기준 prune
-          - 그 외 선행자: pred.variables 그대로 사용 (재해석 금지)
-          - 루프 헤더: 필요 시 fixpoint; false-exit이 곧 함수 종료면 스킵
-          - 종료 조건: WL 비면 끝 (sink 분리 가정)
-        """
-        G = fcfg.graph
-        eng = self.engine
-        ref = self.refiner
-
-        # ---------- helpers ----------
-        def _is_loop_head(n):
-            return getattr(n, "condition_node", False) and \
-                getattr(n, "condition_node_type", None) in {"while", "for", "doWhile"}
-
-        def _false_succs(n):
-            return [s for s in G.successors(n) if G[n][s].get("condition") is False]
-
-        def _is_sink(n):
-            if getattr(n, "function_exit_node", False): return True
-            if getattr(n, "error_exit_node", False):    return True
-            if getattr(n, "return_exit_node", False):   return True
-            nm = getattr(n, "name", "")
-            return nm in {"EXIT", "ERROR", "RETURN"}
-
-        def _branch_feasible(env, cond_expr, want_true):
-            return self.runtime._branch_feasible(env, cond_expr, want_true)
-
-        def _edge_env_from_pred(pred, succ):
-            """
-            pred→succ 경계에서 쓸 pred의 out 준비.
-            - 조건 pred: edge 라벨로 prune (infeasible면 None)
-            - 그 외: pred.variables 그대로 사용 (재해석 금지)
-            """
-            base = VariableEnv.copy_variables(getattr(pred, "variables", {}) or {})
-
-            if getattr(pred, "condition_node", False):
-                cond_expr = getattr(pred, "condition_expr", None)
-                ed = G.get_edge_data(pred, succ, default=None)
-                if cond_expr is not None and ed and "condition" in ed:
-                    want_true = bool(ed["condition"])
-                    ref.update_variables_with_condition(base, cond_expr, want_true)
-                    if not _branch_feasible(base, cond_expr, want_true):
-                        return None
-                return base
-
-            # 기본/더미/JOIN/기타: out 그대로 사용
-            return base
-
-        def _compute_in(n):
-            acc = None
-            for p in G.predecessors(n):
-                env_p = _edge_env_from_pred(p, n)
-                if env_p is None:  # infeasible edge
-                    continue
-                acc = VariableEnv.join_variables_simple(acc, env_p)
-            return acc or {}
-
-        # (선택) seed 보정: 루프 본문에 NEW가 있으면 헤더도 seed에 추가
-        def _augment_seeds_with_loop_headers(seeds):
-            out = list(seeds)
-            for s in seeds:
-                try:
-                    hdr = self.find_enclosing_loop_header(s, fcfg)
-                except Exception:
-                    hdr = None
-                if hdr is not None:
-                    out.append(hdr)
-            return list(dict.fromkeys(out))
-
-        # (선택) seed 정규화: 지배 시드 제거 (상위에서 하위 도달 가능하면 하위 제거)
-        def _dominant_seeds(seeds):
-            seeds = list(dict.fromkeys(seeds))
-            seed_set = set(seeds)
-            dominated = set()
-            for a in seeds:
-                q = deque([a])
-                seen = {a}
-                while q:
-                    u = q.popleft()
-                    for v in G.successors(u):
-                        if v in seen or _is_sink(v): continue
-                        seen.add(v)
-                        q.append(v)
-                        if v in seed_set and v != a:
-                            dominated.add(v)
-            return [s for s in seeds if s not in dominated]
-
-        # ---------- worklist init ----------
-        if isinstance(seed_or_seeds, (list, tuple, set)):
-            seeds = list(seed_or_seeds)
-        else:
-            seeds = [seed_or_seeds]
-
-        # 너와 합의한 보정(옵션) 적용
-        seeds = _augment_seeds_with_loop_headers(seeds)
-        seeds = _dominant_seeds(seeds)
-
-        WL = deque()
-        in_queue = set()  # "큐에 이미 있음"만 추적 (visited 금지)
-        out_snapshot = {}  # 변화 감지용 (처음은 항상 변한 것으로 처리됨)
-
-        for s in seeds:
-            if not _is_sink(s) and s not in in_queue:
-                WL.append(s)
-                in_queue.add(s)
-
-        # ---------- main loop (BFS) ----------
-        while WL:
-            n = WL.popleft()
-            in_queue.discard(n)  # <- 여기서 반드시 풀어줘야 재큐잉 가능
-
-            # 1) in[n]
-            in_env = _compute_in(n)
-
-            # 2) loop head → 필요 시 fixpoint
-            if _is_loop_head(n):
-                false_s = _false_succs(n)
-                only_exit = (len(false_s) == 1 and _is_sink(false_s[0]))
-                if not only_exit:
-                    exit_node = eng.fixpoint(n)  # widen→narrow 포함
-                    for s in G.successors(exit_node):
-                        if not _is_sink(s) and s not in in_queue:
-                            WL.append(s)
-                            in_queue.add(s)
-                else:
-                    # false-exit이 곧 종료면 fixpoint 생략
-                    for s in false_s:
-                        if not _is_sink(s) and s not in in_queue:
-                            WL.append(s)
-                            in_queue.add(s)
-                continue
-
-            # 3) 전이 적용 (여기서 n.variables가 out으로 동기화)
-            new_out = eng.transfer_function(n, in_env)
-            n.variables = VariableEnv.copy_variables(new_out)
-
-            # 4) 변화 감지
-            changed = not VariableEnv.variables_equal(out_snapshot.get(n), new_out)
-            out_snapshot[n] = VariableEnv.copy_variables(new_out)
-
-            # 5) 변화 있을 때만 후속 큐잉
-            if changed:
-                for s in G.successors(n):
-                    if not _is_sink(s) and s not in in_queue:
-                        WL.append(s)
-                        in_queue.add(s)
-
-        # 끝. (sink는 succ이 없으므로 자연 종료)
-
-    def find_enclosing_loop_header(self, node: CFGNode, fcfg: "FunctionCFG") -> CFGNode | None:
-        G = fcfg.graph
-        # 가까운 것 우선: src_line 차이가 작을수록 우선 (없으면 BFS 깊이)
-        from collections import deque
-        q = deque([node]);
-        seen = {node}
-        while q:
-            u = q.popleft()
-            for p in G.predecessors(u):
-                if p in seen:
-                    continue
-                seen.add(p)
-                # 루프 헤더 판정: condition_node & type in {while, for, doWhile}
-                if getattr(p, "condition_node", False) and \
-                        getattr(p, "condition_node_type", None) in {"while", "for", "doWhile"}:
-                    return p
-                q.append(p)
-        return None
 
     def get_line_analysis(self, start_ln: int, end_ln: int) -> dict[int, list[dict]]:
         """
@@ -1971,7 +1946,7 @@ class ContractAnalyzer:
         if not self._batch_targets:
             return
         fcfg = self._batch_targets.pop()
-        self.runtime.interpret_function_cfg(fcfg, None)
+        self.engine.interpret_function_cfg(fcfg, None)
 
         ln_set = {st.src_line
                   for blk in fcfg.graph.nodes

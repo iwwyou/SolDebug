@@ -929,7 +929,7 @@ class Evaluation :
             function_cfg.related_variables.setdefault(k, v)
 
         # 6) 실제 함수 CFG 해석
-        return_value = self.runtime.interpret_function_cfg(function_cfg, variables)  # ← caller env 전달
+        return_value = self.an.engine.interpret_function_cfg(function_cfg, variables)  # ← caller env 전달
 
         # 7) 함수 컨텍스트 복원
         self.an.current_target_function = saved_function

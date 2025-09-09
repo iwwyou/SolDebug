@@ -5,9 +5,11 @@ from typing import TYPE_CHECKING, Dict, Optional
 if TYPE_CHECKING:                                         # 타입 검사 전용
      from Analyzer.ContractAnalyzer import ContractAnalyzer
 
-from Domain.Variable import Variables
+from Domain.Variable import Variables, MappingVariable, ArrayVariable, StructVariable
+from Domain.IR import Expression
+from Domain.Interval import UnsignedIntegerInterval, IntegerInterval, BoolInterval
 
-from Utils.CFG import CFGNode
+from Utils.CFG import CFGNode, FunctionCFG
 from Utils.Helper import VariableEnv
 
 from collections import defaultdict, deque
@@ -24,6 +26,10 @@ class Engine:
     @property
     def runtime(self):
         return self.an.runtime
+    
+    @property
+    def rec(self):
+        return self.an.recorder
 
     def transfer_function(
             self,
@@ -253,6 +259,360 @@ class Engine:
 
         # 여러 exit 중 첫 번째 exit 블록을 반환 (노드를 따로 쓰려면 caller가 결정)
         return exit_node
+
+    def interpret_function_cfg(self, fcfg: FunctionCFG, caller_env: dict[str, Variables] | None = None):
+        an = self.an
+        rt = self.runtime
+        rec = self.rec
+
+        # ─── ① 호출 이전 컨텍스트 백업 ─────────────────────────
+        _old_func = an.current_target_function
+        _old_fcfg = an.current_target_function_cfg
+
+        # ─── ② 현재 해석 대상 함수로 설정 ─────────────────────
+        an.current_target_function = fcfg.function_name
+        an.current_target_function_cfg = fcfg
+
+        # Recorder/reset
+        rt._record_enabled = True
+        an._seen_stmt_ids.clear()
+        for blk in fcfg.graph.nodes:
+            for st in blk.statements:
+                ln = getattr(st, "src_line", None)
+                if ln is not None and ln in an.analysis_per_line:
+                    an.analysis_per_line[ln].clear()
+
+        entry = fcfg.get_entry_node()
+        (start_block,) = fcfg.graph.successors(entry)
+        start_block.variables = VariableEnv.copy_variables(fcfg.related_variables)
+
+        # caller_env → callee entry merge (동명 키 overwrite 허용)
+        if caller_env is not None:
+            for k, v in caller_env.items():
+                start_block.variables[k] = v
+
+        from collections import deque
+        work = deque([start_block])
+        visited: set[CFGNode] = set()
+        return_values = []
+
+        while work:
+            node = work.popleft()
+            if node in visited:
+                continue
+            visited.add(node)
+
+            # preds join → node.variables
+            preds = list(fcfg.graph.predecessors(node))
+            if preds:
+                joined = None
+                for p in preds:
+                    if not p.variables:
+                        continue
+                    joined = (VariableEnv.copy_variables(p.variables)
+                              if joined is None else
+                              VariableEnv.join_variables_simple(joined, p.variables))
+                if joined is not None:
+                    node.variables = joined
+
+            cur_vars = node.variables
+            node.evaluated = True
+
+            # ───────── 조건 노드 ─────────
+            if node.condition_node:
+                condition_expr = node.condition_expr
+                ln = getattr(node, "src_line", None)
+
+                if node.condition_node_type in ["if", "else if"]:
+                    true_succs  = [s for s in fcfg.graph.successors(node) if fcfg.graph.edges[node, s].get('condition') is True]
+                    false_succs = [s for s in fcfg.graph.successors(node) if fcfg.graph.edges[node, s].get('condition') is False]
+                    if len(true_succs) != 1 or len(false_succs) != 1:
+                        raise ValueError("if/else-if node must have exactly one true and one false successor.")
+
+                    true_variables  = VariableEnv.copy_variables(cur_vars)
+                    false_variables = VariableEnv.copy_variables(cur_vars)
+                    self.ref.update_variables_with_condition(true_variables,  condition_expr, True)
+                    self.ref.update_variables_with_condition(false_variables, condition_expr, False)
+
+                    can_true  = rt._branch_feasible(true_variables,  condition_expr, True)
+                    can_false = rt._branch_feasible(false_variables, condition_expr, False)
+
+                    if not can_true and not can_false:
+                        continue
+
+                    if rt._record_enabled and ln is not None:
+                        rec.add_env_record(ln, "branchTrue", true_variables)
+
+                    t = true_succs[0]; f = false_succs[0]
+                    if can_true:
+                        t.variables = true_variables;  work.append(t)
+                    else:
+                        rt._set_bottom_env(t.variables)
+                    if can_false:
+                        f.variables = false_variables; work.append(f)
+                    else:
+                        rt._set_bottom_env(f.variables)
+                    continue
+
+                elif node.condition_node_type in ["require", "assert"]:
+                    (t,) = [s for s in fcfg.graph.successors(node) if fcfg.graph.edges[node, s].get('condition') is True]
+                    true_variables = VariableEnv.copy_variables(cur_vars)
+                    self.ref.update_variables_with_condition(true_variables, condition_expr, True)
+                    can_true = rt._branch_feasible(true_variables, condition_expr, True)
+                    if ln is not None:
+                        rec.add_env_record(ln, "requireTrue", true_variables)
+                    if can_true:
+                        t.variables = true_variables; work.append(t)
+                    else:
+                        rt._set_bottom_env(t.variables)
+                    continue
+
+                elif node.condition_node_type in ["while", "for", "do_while"]:
+                    exit_node = self.fixpoint(node)
+                    succs = list(fcfg.graph.successors(exit_node))
+                    if len(succs) == 1:
+                        nxt = succs[0]
+                        nxt.variables = VariableEnv.copy_variables(exit_node.variables)
+                        work.append(nxt)
+                    elif len(succs) == 0:
+                        pass
+                    else:
+                        raise ValueError("while exit node must have exactly one successor.")
+                    continue
+
+                elif node.fixpoint_evaluation_node:
+                    continue
+
+                else:
+                    raise ValueError(f"Unknown condition node type: {node.condition_node_type}")
+
+            # for-increment 노드
+            elif node.is_for_increment:
+                for stmt in node.statements:
+                    cur_vars = rt.update_statement_with_variables(stmt, cur_vars, return_values)
+                for succ in fcfg.graph.successors(node):
+                    succ.variables = VariableEnv.copy_variables(node.variables)
+                    work.append(succ)
+                continue
+
+            # 일반 블록
+            else:
+                for stmt in node.statements:
+                    cur_vars = rt.update_statement_with_variables(stmt, cur_vars, return_values)
+                    if "__STOP__" in return_values:
+                        break
+
+                succs = list(fcfg.graph.successors(node))
+                if len(succs) == 1:
+                    nxt = succs[0]
+                    nxt.variables = VariableEnv.copy_variables(cur_vars)
+                    work.append(nxt)
+                elif len(succs) > 1:
+                    raise ValueError("Non-condition, non-join node should not have multiple successors.")
+
+        # EXIT 전 합류 및 named returns 동기화
+        rt._force_join_before_exit(fcfg)
+        rt._sync_named_return_vars(fcfg)
+
+        # 컨텍스트 복원
+        an.current_target_function = _old_func
+        an.current_target_function_cfg = _old_fcfg
+
+        # caller_env 로 역반영 (스토리지 구조체/배열은 객체 공유)
+        if caller_env is not None:
+            exit_env = fcfg.get_exit_node().variables
+            for k, v in exit_env.items():
+                if k in caller_env:
+                    if hasattr(caller_env[k], "value"):
+                        caller_env[k].value = v.value
+                    else:
+                        caller_env[k] = v
+                elif isinstance(v, (MappingVariable, ArrayVariable)):
+                    caller_env[k] = v
+
+        # 반환값 결정
+        def _log_implicit_return(var_objs: list[Variables]):
+            if not rt._record_enabled:
+                return
+            ln = rt._last_executable_line(fcfg)
+            if ln is None:
+                return
+            if len(var_objs) == 1:
+                rec.record_return(line_no=ln, return_expr=None, return_val=var_objs[0].value, fn_cfg=fcfg)
+            else:
+                flat = {v.identifier: rec._serialize_val(v.value) for v in var_objs}
+                rec.add_env_record(ln, "implicitReturn", flat)
+
+        if len(return_values) == 0:
+            if fcfg.return_vars:
+                _log_implicit_return(fcfg.return_vars)
+                rt._record_enabled = False
+                if len(fcfg.return_vars) == 1:
+                    return fcfg.return_vars[0].value
+                else:
+                    return [rv.value for rv in fcfg.return_vars]
+            else:
+                exit_retvals = list(fcfg.get_exit_node().return_vals.values())
+                if exit_retvals:
+                    joined = exit_retvals[0]
+                    for v in exit_retvals[1:]:
+                        joined = joined.join(v)
+                    return joined
+                return None
+        elif len(return_values) == 1:
+            rt._record_enabled = False
+            return return_values[0]
+        else:
+            rt._record_enabled = False
+            joined_ret = return_values[0]
+            for rv in return_values[1:]:
+                joined_ret = joined_ret.join(rv)
+            return joined_ret
+
+    def reinterpret_from(self, fcfg: "FunctionCFG", seed_or_seeds) -> None:
+        """
+        Change-driven 재해석. (이전과 동작 동일)
+        - 조건 선행자: edge 라벨(True/False) 기준 prune
+        - 비조건: pred.variables 사용
+        - 루프 헤더: 필요시 fixpoint
+        """
+        G = fcfg.graph
+        ref = self.ref
+        rt  = self.runtime
+
+        # ---------- helpers ----------
+        def _is_loop_head(n):
+            return (getattr(n, "condition_node", False) and
+                    getattr(n, "condition_node_type", None) in {"while", "for", "doWhile", "do_while"})
+
+        def _false_succs(n):
+            return [s for s in G.successors(n) if G[n][s].get("condition") is False]
+
+        def _is_sink(n):
+            if getattr(n, "function_exit_node", False): return True
+            if getattr(n, "error_exit_node", False):    return True
+            if getattr(n, "return_exit_node", False):   return True
+            nm = getattr(n, "name", "")
+            return nm in {"EXIT", "ERROR", "RETURN"}
+
+        def _branch_feasible(env, cond_expr, want_true):
+            return rt._branch_feasible(env, cond_expr, want_true)
+
+        def _edge_env_from_pred(pred, succ):
+            base = VariableEnv.copy_variables(getattr(pred, "variables", {}) or {})
+            if getattr(pred, "condition_node", False):
+                cond_expr = getattr(pred, "condition_expr", None)
+                ed = G.get_edge_data(pred, succ, default=None)
+                if cond_expr is not None and ed and "condition" in ed:
+                    want_true = bool(ed["condition"])
+                    ref.update_variables_with_condition(base, cond_expr, want_true)
+                    if not _branch_feasible(base, cond_expr, want_true):
+                        return None
+                return base
+            return base
+
+        def _compute_in(n):
+            acc = None
+            for p in G.predecessors(n):
+                env_p = _edge_env_from_pred(p, n)
+                if env_p is None:
+                    continue
+                acc = VariableEnv.join_variables_simple(acc, env_p)
+            return acc or {}
+
+        # (선택) seed 보정: 루프 본문이라면 헤더도 seed에 포함
+        def _augment_seeds_with_loop_headers(seeds):
+            out = list(seeds)
+            for s in seeds:
+                hdr = self.find_enclosing_loop_header(s, fcfg)
+                if hdr is not None:
+                    out.append(hdr)
+            return list(dict.fromkeys(out))
+
+        # (선택) seed 정규화: 지배 시드 제거
+        def _dominant_seeds(seeds):
+            seeds = list(dict.fromkeys(seeds))
+            seed_set = set(seeds)
+            dominated = set()
+            for a in seeds:
+                q = deque([a])
+                seen = {a}
+                while q:
+                    u = q.popleft()
+                    for v in G.successors(u):
+                        if v in seen or _is_sink(v): continue
+                        seen.add(v)
+                        q.append(v)
+                        if v in seed_set and v != a:
+                            dominated.add(v)
+            return [s for s in seeds if s not in dominated]
+
+        # ---------- worklist init ----------
+        seeds = list(seed_or_seeds) if isinstance(seed_or_seeds, (list, tuple, set)) else [seed_or_seeds]
+        seeds = _augment_seeds_with_loop_headers(seeds)
+        seeds = _dominant_seeds(seeds)
+
+        WL = deque()
+        in_queue = set()
+        out_snapshot = {}
+
+        for s in seeds:
+            if not _is_sink(s) and s not in in_queue:
+                WL.append(s)
+                in_queue.add(s)
+
+        # ---------- main loop ----------
+        while WL:
+            n = WL.popleft()
+            in_queue.discard(n)
+
+            in_env = _compute_in(n)
+
+            # 2) loop head → fixpoint (false-exit이 바로 종료면 생략)
+            if _is_loop_head(n):
+                false_s = _false_succs(n)
+                only_exit = (len(false_s) == 1 and _is_sink(false_s[0]))
+                if not only_exit:
+                    exit_node = self.fixpoint(n)
+                    for s in G.successors(exit_node):
+                        if not _is_sink(s) and s not in in_queue:
+                            WL.append(s); in_queue.add(s)
+                else:
+                    for s in false_s:
+                        if not _is_sink(s) and s not in in_queue:
+                            WL.append(s); in_queue.add(s)
+                continue
+
+            # 3) 전이
+            new_out = self.transfer_function(n, in_env)
+            n.variables = VariableEnv.copy_variables(new_out)
+
+            # 4) 변화 검출
+            changed = not VariableEnv.variables_equal(out_snapshot.get(n), new_out)
+            out_snapshot[n] = VariableEnv.copy_variables(new_out)
+
+            # 5) 변화 있을 때만 후속 큐잉
+            if changed:
+                for s in G.successors(n):
+                    if not _is_sink(s) and s not in in_queue:
+                        WL.append(s); in_queue.add(s)
+
+    def find_enclosing_loop_header(self, node: CFGNode, fcfg: "FunctionCFG") -> CFGNode | None:
+        """역-DFS로 가장 가까운 while/for/do-while 헤더를 찾는다."""
+        G = fcfg.graph
+        q = deque([node])
+        seen = {node}
+        while q:
+            u = q.popleft()
+            for p in G.predecessors(u):
+                if p in seen:
+                    continue
+                seen.add(p)
+                if (getattr(p, "condition_node", False) and
+                    getattr(p, "condition_node_type", None) in {"while", "for", "doWhile", "do_while"}):
+                    return p
+                q.append(p)
+        return None
 
     def find_loop_exit_node(self, loop_node):
         exit_nodes = set()  # ← 1) set 으로 중복 차단
