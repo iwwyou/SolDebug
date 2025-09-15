@@ -5,14 +5,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:                                         # 타입 검사 전용
      from Analyzer.ContractAnalyzer import ContractAnalyzer
 
-from Utils.CFG import CFGNode, FunctionCFG
-from Utils.Helper import VariableEnv
-from Domain.Variable import Variables, MappingVariable, ArrayVariable, StructVariable
+from Domain.Variable import Variables, ArrayVariable
 from Domain.IR import Expression
 from Domain.Interval import UnsignedIntegerInterval, IntegerInterval, BoolInterval
-
-import copy
-from collections import deque
 
 class Runtime:
     def __init__(self, analyzer: "ContractAnalyzer"):

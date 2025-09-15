@@ -5,8 +5,6 @@ from Utils.CFG import CFGNode, FunctionCFG
 from Utils.Helper import VariableEnv
 from Domain.IR import Expression
 from Domain.Variable import Variables
-from collections import deque
-from typing import cast, Optional
 
 from typing import TYPE_CHECKING
 
@@ -61,8 +59,8 @@ class DynamicCFGBuilder:
                 for s in succs:
                     g_fn.add_edge(exit_, s)
 
-    @staticmethod
     def build_variable_declaration(
+            self,
             *,
             cur_block: CFGNode,
             var_obj,
@@ -77,7 +75,7 @@ class DynamicCFGBuilder:
         New strategy: Always create a new block between cur_block and its successors.
         """
         # 1) Create new statement block
-        new_block = DynamicCFGBuilder.insert_new_statement_block(
+        new_block = self.insert_new_statement_block(
             pred_block=cur_block,
             fcfg=fcfg,
             line_no=line_no,
@@ -96,8 +94,8 @@ class DynamicCFGBuilder:
         
         return new_block
 
-    @staticmethod
     def build_assignment_statement(
+            self,
             *,
             cur_block: CFGNode,
             expr: Expression,  # a = b, a[i] += 1 …
@@ -110,7 +108,7 @@ class DynamicCFGBuilder:
         New strategy: Always create a new block between cur_block and its successors.
         """
         # 1) Create new statement block
-        new_block = DynamicCFGBuilder.insert_new_statement_block(
+        new_block = self.insert_new_statement_block(
             pred_block=cur_block,
             fcfg=fcfg,
             line_no=line_no,
@@ -123,8 +121,8 @@ class DynamicCFGBuilder:
         
         return new_block
 
-    @staticmethod
     def build_unary_statement(
+            self,
             *,
             cur_block: CFGNode,
             expr: Expression,  # ++x  /  delete y 등
@@ -138,7 +136,7 @@ class DynamicCFGBuilder:
         New strategy: Always create a new block between cur_block and its successors.
         """
         # 1) Create new statement block
-        new_block = DynamicCFGBuilder.insert_new_statement_block(
+        new_block = self.insert_new_statement_block(
             pred_block=cur_block,
             fcfg=fcfg,
             line_no=line_no,
@@ -151,8 +149,8 @@ class DynamicCFGBuilder:
         
         return new_block
 
-    @staticmethod
     def build_function_call_statement(
+        self,
         *,
         cur_block: CFGNode,
         expr: Expression,          # foo(a,b)   전체 Expression
@@ -165,7 +163,7 @@ class DynamicCFGBuilder:
         New strategy: Always create a new block between cur_block and its successors.
         """
         # 1) Create new statement block
-        new_block = DynamicCFGBuilder.insert_new_statement_block(
+        new_block = self.insert_new_statement_block(
             pred_block=cur_block,
             fcfg=fcfg,
             line_no=line_no,
@@ -181,8 +179,8 @@ class DynamicCFGBuilder:
 
         return new_block
 
-    @staticmethod
     def build_if_statement(
+            self,
             *,
             cur_block: CFGNode,
             condition_expr: Expression,
@@ -236,8 +234,8 @@ class DynamicCFGBuilder:
 
         return join
 
-    @staticmethod
     def build_else_if_statement(
+            self,
             *,
             prev_cond: CFGNode,
             condition_expr: Expression,
@@ -287,9 +285,9 @@ class DynamicCFGBuilder:
         G.add_edge(f_blk, local_join)
 
         # ③ outer-join: 헤딩 라인에서 '위로' 첫 join을 찾되, 현재 라인은 건너뜀
-        outer_join = DynamicCFGBuilder.find_outer_join_near(anchor_line=line_no, fcfg=fcfg,
+        outer_join = self.find_outer_join_near(anchor_line=line_no, fcfg=fcfg,
                                                direction="backward", include_anchor=False) \
-                     or DynamicCFGBuilder._outer_join_from_graph(prev_cond, fcfg)
+                     or self._outer_join_from_graph(prev_cond, fcfg)
         if outer_join is None:
             raise ValueError("else-if: outer join not found via line-scan/graph")
 
@@ -311,8 +309,8 @@ class DynamicCFGBuilder:
 
         return local_join
 
-    @staticmethod
     def build_else_statement(
+            self,
             *,
             cond_node: CFGNode,
             else_env: dict[str, Variables],
@@ -336,9 +334,9 @@ class DynamicCFGBuilder:
             G.remove_node(old_false)
 
         # ② target-join: 헤딩 라인 기준으로 위로 첫 join
-        target_join = DynamicCFGBuilder.find_outer_join_near(anchor_line=line_no, fcfg=fcfg,
+        target_join = self.find_outer_join_near(anchor_line=line_no, fcfg=fcfg,
                                                 direction="backward", include_anchor=True) \
-                      or DynamicCFGBuilder._outer_join_from_graph(cond_node, fcfg)
+                      or self._outer_join_from_graph(cond_node, fcfg)
         if target_join is None:
             raise ValueError("else: target join not found via line-scan/graph")
 
@@ -366,8 +364,8 @@ class DynamicCFGBuilder:
         return target_join
 
     # DynamicCFGBuilder.py (시그니처/본문/리턴 변경)
-    @staticmethod
     def build_while_statement(
+            self,
             *,
             cur_block: CFGNode,
             condition_expr: Expression,
@@ -451,8 +449,8 @@ class DynamicCFGBuilder:
         return exit_  # ★ seed 용으로 exit 반환
 
     # DynamicCFGBuilder.py (시그니처/본문/리턴 변경)
-    @staticmethod
     def build_for_statement(
+            self,
             *,
             cur_block: CFGNode,
             init_node: CFGNode | None,
@@ -549,9 +547,12 @@ class DynamicCFGBuilder:
 
         # ── ⑤ line_info ------------------------------------------------
         # 시작 라인: 조건 노드 매핑
-        bc = line_info.setdefault(line_no, {"open": 0, "close": 0, "cfg_node": cast(Optional[CFGNode], None)})
+        bc = line_info.setdefault(line_no, {"open": 0, "close": 0, "cfg_node": cast(Optional[CFGNode], None), "cfg_nodes": []})
         bc["cfg_node"] = cond
-        bc.setdefault("cfg_nodes", []).append(cond)
+        if isinstance(bc.get("cfg_nodes"), list):
+            bc["cfg_nodes"].append(cond)
+        else:
+            bc["cfg_nodes"] = [cond]
 
         # 끝 라인: loop-exit 노드 매핑
         if end_line is not None:
@@ -560,8 +561,8 @@ class DynamicCFGBuilder:
 
         return exit_  # ★ seed 용으로 exit 반환
 
-    @staticmethod
     def build_continue_statement(
+            self,
             *,
             cur_block: CFGNode,
             line_no: int,
@@ -572,7 +573,7 @@ class DynamicCFGBuilder:
         cur_block.add_continue_statement(line_no)
 
         # ── join(고정점)으로 점프 (기존 동작 유지)
-        join = DynamicCFGBuilder.find_loop_join(cur_block, fcfg)
+        join = self.find_loop_join(cur_block, fcfg)
         if join is None:
             raise ValueError("continue: loop join(fixpoint) node not found.")
 
@@ -582,7 +583,7 @@ class DynamicCFGBuilder:
         G.add_edge(cur_block, join)
 
         # ── loop-exit 찾기 (cond False-분기 중 loop_exit_node=True)
-        cond = DynamicCFGBuilder.find_loop_condition(cur_block, fcfg)
+        cond = self.find_loop_condition(cur_block, fcfg)
         if cond is None:
             raise ValueError("continue: loop condition node not found.")
 
@@ -602,8 +603,8 @@ class DynamicCFGBuilder:
 
         return exit_node  # ★ seed 용
 
-    @staticmethod
     def build_return_statement(
+            self,
             *,
             cur_block: CFGNode,
             return_expr: Expression | None,
@@ -635,8 +636,8 @@ class DynamicCFGBuilder:
 
         return old_succs  # ★ seed
 
-    @staticmethod
     def build_break_statement(
+            self,
             *,
             cur_block: CFGNode,
             line_no: int,
@@ -646,7 +647,7 @@ class DynamicCFGBuilder:
 
         cur_block.add_break_statement(line_no)
 
-        cond = DynamicCFGBuilder.find_loop_condition(cur_block, fcfg)
+        cond = self.find_loop_condition(cur_block, fcfg)
         if cond is None:
             raise ValueError("break: loop condition node not found.")
 
@@ -671,8 +672,8 @@ class DynamicCFGBuilder:
 
         return exit_node  # ★ seed 용
 
-    @staticmethod
     def build_revert_statement(
+            self,
             *,
             cur_block: CFGNode,
             revert_id: str | None,
@@ -705,8 +706,8 @@ class DynamicCFGBuilder:
 
         return old_succs  # ★ seed
 
-    @staticmethod
     def build_require_statement(
+            self,
             *,
             cur_block: CFGNode,
             condition_expr: Expression,
@@ -742,7 +743,7 @@ class DynamicCFGBuilder:
         for s in old_succ:
             G.remove_edge(cur_block, s)
 
-        G.add_node(cond);
+        G.add_node(cond)
         G.add_edge(cur_block, cond)
 
         # False → ERROR
@@ -750,7 +751,7 @@ class DynamicCFGBuilder:
         G.add_edge(cond, error_exit_n, condition=False)
 
         # True → t_blk
-        G.add_node(t_blk);
+        G.add_node(t_blk)
         G.add_edge(cond, t_blk, condition=True)
 
         # t_blk → 원래 succ (없으면 EXIT)
@@ -769,8 +770,8 @@ class DynamicCFGBuilder:
         #  (EXIT는 sink라 seed에 넣어도 자동 필터링됨)
         return true_succs
 
-    @staticmethod
     def build_assert_statement(
+            self,
             *,
             cur_block: CFGNode,
             condition_expr: Expression,
@@ -806,7 +807,7 @@ class DynamicCFGBuilder:
         for s in old_succ:
             G.remove_edge(cur_block, s)
 
-        G.add_node(cond);
+        G.add_node(cond)
         G.add_edge(cur_block, cond)
 
         # False → ERROR
@@ -814,7 +815,7 @@ class DynamicCFGBuilder:
         G.add_edge(cond, exit_n, condition=False)
 
         # True → t_blk
-        G.add_node(t_blk);
+        G.add_node(t_blk)
         G.add_edge(cond, t_blk, condition=True)
 
         # t_blk → 원래 succ (없으면 EXIT)
@@ -829,8 +830,8 @@ class DynamicCFGBuilder:
 
         return true_succs  # ★ seed
 
-    @staticmethod
     def build_modifier_placeholder(
+            self,
             *,
             cur_block: CFGNode,
             fcfg: FunctionCFG,
@@ -862,8 +863,8 @@ class DynamicCFGBuilder:
         bc = line_info.setdefault(line_no, {"open": 0, "close": 0, "cfg_nodes": []})
         bc["cfg_nodes"].append(ph)
 
-    @staticmethod
     def build_unchecked_block(
+            self,
             *,
             cur_block: CFGNode,
             line_no: int,
@@ -909,7 +910,7 @@ class DynamicCFGBuilder:
         do_entry.variables = VariableEnv.copy_variables(cur_block.variables)
         do_end.variables = VariableEnv.copy_variables(cur_block.variables)
 
-        G.add_node(do_entry);
+        G.add_node(do_entry)
         G.add_node(do_end)
 
         # prev → do_entry → do_end
@@ -1046,7 +1047,7 @@ class DynamicCFGBuilder:
         f_stub = None
         for s in G.successors(cond):
             if G[cond][s].get("condition") is False:
-                f_stub = s;
+                f_stub = s
                 break
         if f_stub is None:
             return None
@@ -1079,7 +1080,7 @@ class DynamicCFGBuilder:
         c_entry.variables = VariableEnv.copy_variables(cond.variables)
         c_end.variables = VariableEnv.copy_variables(cond.variables)
 
-        G.add_node(c_entry);
+        G.add_node(c_entry)
         G.add_node(c_end)
         G.add_edge(cond, c_entry, condition=False)
         G.add_edge(c_entry, c_end)
@@ -1095,8 +1096,8 @@ class DynamicCFGBuilder:
 
     # Analyzer/DynamicCFGBuilder.py  (클래스 내부에 교체/추가)
 
-    @staticmethod
     def insert_new_statement_block(
+            self,
             *,
             pred_block: CFGNode,
             fcfg: FunctionCFG,
@@ -1318,8 +1319,7 @@ class DynamicCFGBuilder:
                         return cfg_node
         return None
 
-    @staticmethod
-    def find_loop_join(start: CFGNode, fcfg: FunctionCFG) -> CFGNode | None:
+    def find_loop_join(self, start: CFGNode, fcfg: FunctionCFG) -> CFGNode | None:
         """
         역-DFS 로 가장 가까운 `fixpoint_evaluation_node`(while/for join) 반환.
         """
@@ -1335,8 +1335,7 @@ class DynamicCFGBuilder:
             stk.extend(G.predecessors(n))
         return None
 
-    @staticmethod
-    def find_loop_condition(start: CFGNode, fcfg: FunctionCFG) -> CFGNode | None:
+    def find_loop_condition(self, start: CFGNode, fcfg: FunctionCFG) -> CFGNode | None:
         G = fcfg.graph
         stk, seen = [start], set()
         while stk:
@@ -1366,15 +1365,15 @@ class DynamicCFGBuilder:
                 out.append(n)
         return out
 
-    @staticmethod
-    def _pick_first_join(nodes: list["CFGNode"]) -> "CFGNode | None":
+    def _pick_first_join(self, nodes: list["CFGNode"]) -> "CFGNode | None":
         for n in nodes:
             if getattr(n, "join_point_node", False):
                 return n
         return nodes[0] if nodes else None
 
     def find_outer_join_near(
-            self, *,
+            self,
+            *,
             anchor_line: int,
             fcfg: FunctionCFG,
             direction: str = "backward",  # "backward" | "forward" | "both"

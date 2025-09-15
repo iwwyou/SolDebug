@@ -1,5 +1,4 @@
 # SolidityGuardian/Analyzers/ContractAnalyzer.py
-from collections import deque
 from Utils.CFG import *
 from solcx import (
     install_solc,
@@ -19,6 +18,8 @@ from Interpreter.Semantics.Update import Update
 from Interpreter.Semantics.Refine import Refine
 from Interpreter.Semantics.Runtime import Runtime
 from Interpreter.Engine import Engine
+
+import re
 
 class ContractAnalyzer:
 
@@ -67,11 +68,13 @@ class ContractAnalyzer:
     def _shift_meta(self, old_ln: int, new_ln: int):
         """
         소스 라인 이동(old_ln → new_ln)에 맞춰
-        brace_count / analysis_per_line / Statement.src_line  를 모두 동기화
+        line_info / recorder.ledger / Statement.src_line 동기화
         """
-        # ① brace_count · analysis_per_line
-        for d in (self.line_info, self.analysis_per_line):
+        # ① line_info & recorder.ledger 이동
+        dicts_to_shift = (self.line_info, self.recorder.ledger)
+        for d in dicts_to_shift:
             if old_ln in d:
+                # (간단버전) 덮어쓰기. 이미 new_ln 에 값이 있으면 합치고 싶다면 merge 로직을 쓰세요.
                 d[new_ln] = d.pop(old_ln)
 
         # ② 이미 생성된 CFG-Statement 들의 src_line 보정
@@ -83,100 +86,98 @@ class ContractAnalyzer:
                             st.src_line = new_ln
 
     def _insert_lines(self, start: int, new_lines: list[str]):
+        # 0) 정규화 (줄 쪼개기)
+        new_lines = self.normalize_compound_control_lines(new_lines)
+
         offset = len(new_lines)
 
         # ① 뒤 라인 밀기 (내림차순)
-        for old_ln in sorted([ln for ln in self.full_code_lines if ln >= start],
-                             reverse=True):
+        for old_ln in sorted([ln for ln in self.full_code_lines if ln >= start], reverse=True):
             self.full_code_lines[old_ln + offset] = self.full_code_lines.pop(old_ln)
-            self._shift_meta(old_ln, old_ln + offset)  # ★
+            self._shift_meta(old_ln, old_ln + offset)
 
-        # ② 새 코드 삽입
+        # ② 새 코드 삽입 + 즉시 분석
         for i, ln in enumerate(range(start, start + offset)):
             self.full_code_lines[ln] = new_lines[i]
-            self.update_brace_count(ln, new_lines[i])
+            # 기존 update_brace_count 대신 analyze_context 로 통일
+            self.analyze_context(ln, new_lines[i])
 
-    def update_code(self,
-                    start_line: int,
-                    end_line: int,
-                    new_code: str,
-                    event: str):
-        """
-        event ∈  {"add", "modify", "delete"}
-
-        • add     :  기존 로직 (뒤를 밀고 새 줄 삽입)
-        • modify  :  같은 줄 범위를 *덮어쓰기*  (라인 수는 유지)
-        • delete  :  먼저  analyse_context → 그 다음 완전히 없애고 뒤를 당김
-        """
-
-        # ──────────────────────────────────────────────────────────
-        # ① 사전 준비
-        # ----------------------------------------------------------
+    def update_code(self, start_line: int, end_line: int, new_code: str, event: str):
         self.current_start_line = start_line
         self.current_end_line = end_line
         self.current_edit_event = event
-        lines = new_code.split("\n")  # add / modify 용
 
         if event not in {"add", "modify", "delete"}:
             raise ValueError(f"unknown event '{event}'")
 
-        # ──────────────────────────────────────────────────────────
-        # ② event별 분기
-        # ----------------------------------------------------------
         if event == "add":
-            self._insert_lines(start_line, lines)  # ← 종전 알고리즘
+            lines = new_code.split("\n")
+            self._insert_lines(start_line, lines)  # _insert_lines 내부에서 정규화
 
         elif event == "modify":
-            # (1) 새 코드 줄 리스트
-            new_lines = new_code.split("\n")
-            # (2) ① 줄 수가 같지 않다면 → delete + add 로 fallback
-            if (end_line - start_line + 1) != len(new_lines):
+            raw_lines = new_code.split("\n")
+            norm_lines = self.normalize_compound_control_lines(raw_lines)
+
+            # 길이가 달라지면 delete+add 로 폴백
+            if (end_line - start_line + 1) != len(norm_lines):
                 self.update_code(start_line, end_line, "", event="delete")
-                # add (line 수가 달라졌으므로 뒤쪽을 밀어냄)
-                self.update_code(start_line, start_line + len(new_lines) - 1,
-                                 new_code, event="add")
+                self.update_code(start_line, start_line + len(norm_lines) - 1,
+                                 "\n".join(norm_lines), event="add")
                 return
 
-            # (3) ② 줄 수가 동일 → **덮어쓰기** 만 수행
+            # 길이가 같으면 제자리 덮어쓰기 + 분석
             ln = start_line
-            for line in new_lines:
-                # full-code 버퍼 교체
+            for line in norm_lines:
                 self.full_code_lines[ln] = line
-                # 바로 context 분석
                 self.analyze_context(ln, line)
                 ln += 1
 
         elif event == "delete":
             offset = end_line - start_line + 1
-            # A.  삭제 전 rollback (종전 그대로)  …
-            # B-1.  메타데이터 pop
+
+            # 기존 라인 제거
             for ln in range(start_line, end_line + 1):
                 self.full_code_lines.pop(ln, None)
                 self.line_info.pop(ln, None)
-                self.analysis_per_line.pop(ln, None)
-            # B-2.  뒤쪽 라인을 앞으로 당김
-            keys_to_shift = sorted(
-                [ln for ln in self.full_code_lines if ln > end_line]
-            )
+                self.recorder.ledger.pop(ln, None)  # ← recorder 같이 비움
 
+            # 뒤쪽 라인 당기기
+            keys_to_shift = sorted([ln for ln in self.full_code_lines if ln > end_line])
             for old_ln in keys_to_shift:
                 new_ln = old_ln - offset
                 self.full_code_lines[new_ln] = self.full_code_lines.pop(old_ln)
-                self._shift_meta(old_ln, new_ln)  # ★
+                self._shift_meta(old_ln, new_ln)
 
-        # ──────────────────────────────────────────────────────────
-        # ③ full-code 재조합 & optional compile check
-        # ----------------------------------------------------------
-        self.full_code = "\n".join(
-            self.full_code_lines[ln] for ln in sorted(self.full_code_lines)
-        )
+        # full-code 재조합
+        self.full_code = "\n".join(self.full_code_lines[ln] for ln in sorted(self.full_code_lines))
 
-        # add / modify 는 새 코드를 바로 분석
-        if event in {"add", "modify"} and new_code.strip():
-            self.analyze_context(start_line, new_code)
+        # add/modify 는 새 코드 전체 재분석(이미 라인별 analyze_context 호출했으므로 아래는 선택)
+        # if event in {"add", "modify"} and new_code.strip():
+        #     self.analyze_context(start_line, new_code)
 
-        # 실험 코드라면 컴파일 생략 가능
-        # self.compile_check()
+    def normalize_compound_control_lines(self, lines: list[str]) -> list[str]:
+        """
+        한 물리 라인에 '} else if', '} else', '} while' 이 붙어있는 경우
+        '}' 과 그 뒤 토큰을 서로 다른 라인으로 나눠
+        [논리] 라인 배열로 정규화한다.
+        """
+        out: list[str] = []
+        # '}' 바로 뒤에 else/while 이 오는 모든 케이스를 split
+        pat = re.compile(r'}\s*(?=else\b|while\b)')
+
+        for s in lines:
+            rest = s
+            while True:
+                m = pat.search(rest)
+                if not m:
+                    out.append(rest)
+                    break
+                # '}' 까지를 앞라인, 그 뒤(else|while...)를 다음 라인으로
+                left = rest[:m.start()] + "}"
+                right = rest[m.end():].lstrip()
+                out.append(left)
+                rest = right
+        return out
 
     def compile_check(self) -> None:
         wanted = '0.8.0'

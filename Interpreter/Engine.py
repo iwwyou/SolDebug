@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:                                         # 타입 검사 전용
      from Analyzer.ContractAnalyzer import ContractAnalyzer
@@ -12,7 +12,7 @@ from Domain.Interval import UnsignedIntegerInterval, IntegerInterval, BoolInterv
 from Utils.CFG import CFGNode, FunctionCFG
 from Utils.Helper import VariableEnv
 
-from collections import defaultdict, deque
+from collections import deque
 
 class Engine:
 
@@ -101,8 +101,8 @@ class Engine:
 
         # 2) in/out 테이블
         visit_cnt: defaultdict[CFGNode, int] = defaultdict(int)
-        in_vars = {n: None for n in loop_nodes}
-        out_vars = {n: None for n in loop_nodes}
+        in_vars: dict[CFGNode, dict[str, Variables] | None] = {n: None for n in loop_nodes}
+        out_vars: dict[CFGNode, dict[str, Variables] | None] = {n: None for n in loop_nodes}
 
         # φ-노드 초기 in = 노드 snapshot
         for n in loop_nodes:
@@ -381,7 +381,7 @@ class Engine:
                         rec.add_env_record(ln, tag, true_variables)
 
                     if can_true:
-                        t.variables = true_variables;
+                        t.variables = true_variables
                         work.append(t)
                     else:
                         self._set_bottom_env(t.variables)

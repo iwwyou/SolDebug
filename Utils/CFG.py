@@ -245,7 +245,8 @@ class ContractCFG(CFG):
             self.graph.add_node(self.state_variable_node)
 
         # 상수 변수 정보를 노드에 추가
-        self.state_variable_node.variables[variable.identifier] = {'variable' : variable, 'expression' : expr}
+        variable.constant_expression = expr  # Store expression as attribute
+        self.state_variable_node.variables[variable.identifier] = variable
 
     def add_constructor_to_cfg(self, constructor_cfg):
         # 1. 상태변수 노드의 successor가 생성자가 되도록 설정
