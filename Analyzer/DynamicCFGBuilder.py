@@ -197,18 +197,21 @@ class DynamicCFGBuilder:
             G.remove_edge(cur_block, s)
 
         cond = CFGNode(f"if_condition_{line_no}", condition_node=True,
-                       condition_node_type="if", src_line=line_no)
+                       condition_node_type="if", src_line=line_no, is_loop_body=cur_block.is_loop_body)
         cond.condition_expr = condition_expr
         cond.variables = VariableEnv.copy_variables(cur_block.variables)
 
-        t_blk = CFGNode(f"if_true_{line_no}", branch_node=True, is_true_branch=True, src_line=line_no)
+        t_blk = CFGNode(f"if_true_{line_no}", branch_node=True, is_true_branch=True, src_line=line_no,
+                        is_loop_body=cur_block.is_loop_body)
         t_blk.variables = VariableEnv.copy_variables(true_env)
 
-        f_blk = CFGNode(f"if_false_{line_no}", branch_node=True, is_true_branch=False, src_line=line_no)
+        f_blk = CFGNode(f"if_false_{line_no}", branch_node=True, is_true_branch=False, src_line=line_no,
+                        is_loop_body=cur_block.is_loop_body)
         f_blk.variables = VariableEnv.copy_variables(false_env)
 
         join_env = VariableEnv.join_variables_simple(true_env, false_env)
-        join = CFGNode(f"if_join_{line_no}", join_point_node=True, src_line=line_no)
+        join = CFGNode(f"if_join_{line_no}", join_point_node=True, src_line=line_no,
+                       is_loop_body=cur_block.is_loop_body)
         join.variables = VariableEnv.copy_variables(join_env)
 
         for n in (cond, t_blk, f_blk, join):
@@ -261,18 +264,22 @@ class DynamicCFGBuilder:
 
         # ② 새 cond / t / f / local-join
         cond = CFGNode(f"else_if_condition_{line_no}", condition_node=True,
-                       condition_node_type="else if", src_line=line_no)
+                       condition_node_type="else if", src_line=line_no,
+                       is_loop_body=prev_cond.is_loop_body)
         cond.condition_expr = condition_expr
         cond.variables = VariableEnv.copy_variables(false_base_env)
 
-        t_blk = CFGNode(f"else_if_true_{line_no}", branch_node=True, is_true_branch=True, src_line=line_no)
+        t_blk = CFGNode(f"else_if_true_{line_no}", branch_node=True, is_true_branch=True, src_line=line_no,
+                        is_loop_body=prev_cond.is_loop_body)
         t_blk.variables = VariableEnv.copy_variables(true_env)
 
-        f_blk = CFGNode(f"else_if_false_{line_no}", branch_node=True, is_true_branch=False, src_line=line_no)
+        f_blk = CFGNode(f"else_if_false_{line_no}", branch_node=True, is_true_branch=False, src_line=line_no,
+                        is_loop_body=prev_cond.is_loop_body)
         f_blk.variables = VariableEnv.copy_variables(false_env)
 
         local_join_env = VariableEnv.join_variables_simple(true_env, false_env)
-        local_join = CFGNode(f"else_if_join_{line_no}", join_point_node=True, src_line=line_no)
+        local_join = CFGNode(f"else_if_join_{line_no}", join_point_node=True, src_line=line_no,
+                             is_loop_body=prev_cond.is_loop_body)
         local_join.variables = VariableEnv.copy_variables(local_join_env)
 
         for n in (cond, t_blk, f_blk, local_join):
@@ -341,7 +348,8 @@ class DynamicCFGBuilder:
             raise ValueError("else: target join not found via line-scan/graph")
 
         # ③ else 블록 생성 및 연결
-        else_blk = CFGNode(f"else_block_{line_no}", branch_node=True, is_true_branch=False, src_line=line_no)
+        else_blk = CFGNode(f"else_block_{line_no}", branch_node=True, is_true_branch=False, src_line=line_no
+                           ,is_loop_body=cond_node.is_loop_body)
         else_blk.variables = VariableEnv.copy_variables(else_env)
 
         G.add_node(else_blk)
@@ -382,7 +390,6 @@ class DynamicCFGBuilder:
                               │                    │
                               └──▶ false(exit) ────┘
         """
-        from typing import cast, Optional
 
         G = fcfg.graph
 
@@ -568,22 +575,33 @@ class DynamicCFGBuilder:
             line_no: int,
             fcfg: FunctionCFG,
             line_info: dict,
-    ) -> CFGNode:  # ★ 반환: 해당 루프의 loop-exit 노드
+    ) -> CFGNode:  # 반환: 해당 루프의 loop-exit 노드 (seed 용)
 
-        cur_block.add_continue_statement(line_no)
+        G = fcfg.graph
 
-        # ── join(고정점)으로 점프 (기존 동작 유지)
-        join = self.find_loop_join(cur_block, fcfg)
+        # 1) pred(cur_block)과 그 후속 사이에 새 블록 삽입
+        new_block = self.insert_new_statement_block(
+            pred_block=cur_block,
+            fcfg=fcfg,
+            line_no=line_no,
+            line_info=line_info,
+            tag="Continue"
+        )
+        # 2) 새 블록에 statement 추가
+        new_block.add_continue_statement(line_no)
+
+        # 3) join(φ) 찾기 → new_block 의 모든 후속을 제거하고 φ로 재배선
+        join = self.find_loop_join(new_block, fcfg)
         if join is None:
             raise ValueError("continue: loop join(fixpoint) node not found.")
 
-        G = fcfg.graph
-        for succ in list(G.successors(cur_block)):
-            G.remove_edge(cur_block, succ)
-        G.add_edge(cur_block, join)
+        old_succs = list(G.successors(new_block))  # insert가 붙여 놓은 원래 후속들
+        for s in old_succs:
+            G.remove_edge(new_block, s)
+        G.add_edge(new_block, join)
 
-        # ── loop-exit 찾기 (cond False-분기 중 loop_exit_node=True)
-        cond = self.find_loop_condition(cur_block, fcfg)
+        # 4) loop-exit 찾기(헤더 False-분기, loop_exit_node=True)
+        cond = self.find_loop_condition(new_block, fcfg)
         if cond is None:
             raise ValueError("continue: loop condition node not found.")
 
@@ -595,13 +613,8 @@ class DynamicCFGBuilder:
         if exit_node is None:
             raise ValueError("continue: loop exit node not found.")
 
-        # ── ★ 현재 env 를 loop-exit 에 ‘반영’(over-approx) — 요청사항 반영
-        exit_node.variables = VariableEnv.join_variables_simple(exit_node.variables, cur_block.variables)
-
-        bc = line_info.setdefault(line_no, {"open": 0, "close": 0, "cfg_nodes": []})
-        bc["cfg_nodes"].append(cur_block)
-
-        return exit_node  # ★ seed 용
+        # line_info 는 insert_new_statement_block 에서 이미 추가됨
+        return exit_node  # seed
 
     def build_return_statement(
             self,
@@ -612,29 +625,35 @@ class DynamicCFGBuilder:
             line_no: int,
             fcfg: FunctionCFG,
             line_info: dict,
-    ) -> list[CFGNode]:  # ★ 변경: 이전 succ 들을 반환
+    ) -> list[CFGNode]:  # 반환: 재배선 전 ‘원래 후속’(seed 용)
 
-        # ① STATEMENT
-        cur_block.add_return_statement(return_expr, line_no)
-
-        # ★ seed 용으로 ‘재배선 전’ succ 보관
         G = fcfg.graph
-        old_succs = list(G.successors(cur_block))
 
-        # ② RETURN_EXIT 로 재배선
+        # 1) 새 블록 삽입
+        new_block = self.insert_new_statement_block(
+            pred_block=cur_block,
+            fcfg=fcfg,
+            line_no=line_no,
+            line_info=line_info,
+            tag="Return"
+        )
+        # 2) statement 추가
+        new_block.add_return_statement(return_expr, line_no)
+
+        # 3) seed 용으로 현재(new_block) 후속 = “원래 cur_block 의 후속” 확보
+        old_succs = list(G.successors(new_block))
+
+        # 4) RETURN_EXIT 로 재배선
         return_exit_n = fcfg.get_return_exit_node()
         for s in old_succs:
-            G.remove_edge(cur_block, s)
-        G.add_edge(cur_block, return_exit_n)
+            G.remove_edge(new_block, s)
+        G.add_edge(new_block, return_exit_n)
 
-        # ③ 반환 값 보관
+        # 5) 반환 값 기록(RETURN_EXIT에)
         return_exit_n.return_vals[line_no] = return_val
 
-        # ④ line_info
-        bc = line_info.setdefault(line_no, {"open": 0, "close": 0, "cfg_nodes": []})
-        bc["cfg_nodes"].append(cur_block)
-
-        return old_succs  # ★ seed
+        # line_info 는 insert 헬퍼가 이미 등록
+        return old_succs  # seed
 
     def build_break_statement(
             self,
@@ -643,15 +662,26 @@ class DynamicCFGBuilder:
             line_no: int,
             fcfg: FunctionCFG,
             line_info: dict,
-    ) -> CFGNode:  # ★ 반환: loop-exit
+    ) -> CFGNode:  # 반환: loop-exit (seed 용)
 
-        cur_block.add_break_statement(line_no)
+        G = fcfg.graph
 
-        cond = self.find_loop_condition(cur_block, fcfg)
+        # 1) 새 블록 삽입
+        new_block = self.insert_new_statement_block(
+            pred_block=cur_block,
+            fcfg=fcfg,
+            line_no=line_no,
+            line_info=line_info,
+            tag="Break"
+        )
+        # 2) statement 추가
+        new_block.add_break_statement(line_no)
+
+        # 3) loop-exit 찾기
+        cond = self.find_loop_condition(new_block, fcfg)
         if cond is None:
             raise ValueError("break: loop condition node not found.")
 
-        G = fcfg.graph
         exit_node = None
         for succ in G.successors(cond):
             if (G[cond][succ].get("condition") is False) and getattr(succ, "loop_exit_node", False):
@@ -660,17 +690,13 @@ class DynamicCFGBuilder:
         if exit_node is None:
             raise ValueError("break: loop exit node not found.")
 
-        for succ in list(G.successors(cur_block)):
-            G.remove_edge(cur_block, succ)
-        G.add_edge(cur_block, exit_node)
+        # 4) new_block 의 기본 후속 제거 → loop-exit 으로 재배선
+        old_succs = list(G.successors(new_block))
+        for s in old_succs:
+            G.remove_edge(new_block, s)
+        G.add_edge(new_block, exit_node)
 
-        # ── ★ 현재 env 를 loop-exit 에 반영
-        exit_node.variables = VariableEnv.join_variables_simple(exit_node.variables, cur_block.variables)
-
-        bc = line_info.setdefault(line_no, {"open": 0, "close": 0, "cfg_nodes": []})
-        bc["cfg_nodes"].append(cur_block)
-
-        return exit_node  # ★ seed 용
+        return exit_node  # seed
 
     def build_revert_statement(
             self,
@@ -725,6 +751,7 @@ class DynamicCFGBuilder:
             condition_node=True,
             condition_node_type="require",
             src_line=line_no,
+            is_loop_body=cur_block.is_loop_body
         )
         cond.condition_expr = condition_expr
         cond.variables = VariableEnv.copy_variables(cur_block.variables)
@@ -735,6 +762,7 @@ class DynamicCFGBuilder:
             branch_node=True,
             is_true_branch=True,
             src_line=line_no,
+            is_loop_body=cur_block.is_loop_body
         )
         t_blk.variables = true_env
 
@@ -789,6 +817,7 @@ class DynamicCFGBuilder:
             condition_node=True,
             condition_node_type="assert",
             src_line=line_no,
+            is_loop_body=cur_block.is_loop_body
         )
         cond.condition_expr = condition_expr
         cond.variables = VariableEnv.copy_variables(cur_block.variables)
@@ -799,6 +828,7 @@ class DynamicCFGBuilder:
             branch_node=True,
             is_true_branch=True,
             src_line=line_no,
+            is_loop_body=cur_block.is_loop_body
         )
         t_blk.variables = true_env
 
@@ -878,7 +908,7 @@ class DynamicCFGBuilder:
 
         로 그래프를 재배선한다. 생성된 노드를 반환.
         """
-        unchecked = CFGNode(f"unchecked_{line_no}", unchecked_block=True)
+        unchecked = CFGNode(f"unchecked_{line_no}", unchecked_block=True, is_loop_body=cur_block.is_loop_body)
         unchecked.variables = VariableEnv.copy_variables(cur_block.variables)
 
         G = fcfg.graph
@@ -901,9 +931,9 @@ class DynamicCFGBuilder:
             self, *, cur_block: CFGNode, line_no: int, fcfg: FunctionCFG, line_info: dict
     ) -> None:
         G = fcfg.graph
-        do_entry = CFGNode(f"do_body_{line_no}", src_line=line_no)
+        do_entry = CFGNode(f"do_body_{line_no}", src_line=line_no, is_loop_body=True)
         do_entry.is_do_entry = True
-        do_end = CFGNode(f"do_end_{line_no}", src_line=line_no)
+        do_end = CFGNode(f"do_end_{line_no}", src_line=line_no, is_loop_body=False)
         do_end.is_do_end = True
 
         # env
@@ -1126,7 +1156,7 @@ class DynamicCFGBuilder:
         old_succs = list(G.successors(pred_block))
         
         # 2. Create new block with pred's environment
-        new_block = CFGNode(f"{tag}_{line_no}")
+        new_block = CFGNode(f"{tag}_{line_no}", is_loop_body=pred_block.is_loop_body)
         new_block.variables = VariableEnv.copy_variables(pred_block.variables or {})
         new_block.src_line = line_no
         

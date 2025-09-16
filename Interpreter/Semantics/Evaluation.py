@@ -28,8 +28,8 @@ class Evaluation :
         return self.an.updater          # Update 싱글톤
 
     @property
-    def runtime(self):
-        return self.an.runtime          # Runtime 싱글톤
+    def engine(self):
+        return self.an.engine          # Engine 싱글톤
 
     def evaluate_expression(self, expr: Expression, variables, callerObject=None, callerContext=None):
         if expr.context == "LiteralExpContext":

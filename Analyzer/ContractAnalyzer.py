@@ -16,7 +16,6 @@ from Analyzer.StaticCFGFactory import StaticCFGFactory
 from Interpreter.Semantics.Evaluation import Evaluation
 from Interpreter.Semantics.Update import Update
 from Interpreter.Semantics.Refine import Refine
-from Interpreter.Semantics.Runtime import Runtime
 from Interpreter.Engine import Engine
 
 import re
@@ -44,6 +43,7 @@ class ContractAnalyzer:
         self.current_edit_event = None
         self._record_enabled = False
         self._seen_stmt_ids: set[int] = set()
+        self._last_touched_lines = None
 
         # for Multiple Contract
         self.contract_cfgs = {} # name -> CFG
@@ -51,7 +51,6 @@ class ContractAnalyzer:
         self.evaluator = Evaluation(self)
         self.updater = Update(self)
         self.refiner = Refine(self)
-        self.runtime = Runtime(self)
         self.engine = Engine(self)
         self.builder = DynamicCFGBuilder(self)
         self.recorder = RecordManager()
@@ -855,14 +854,14 @@ class ContractAnalyzer:
                 fcfg=self.current_target_function_cfg,
                 line_info=self.line_info,  # ← builder가 필요하다면 전달
             )
+            if stmt_blk.is_loop_body :
+                self.recorder.record_variable_declaration(
+                    line_no=self.current_start_line,
+                    var_name=var_name,
+                    var_obj=v,
+                )
 
             self.engine.reinterpret_from(fcfg, stmt_blk)
-
-            self.recorder.record_variable_declaration(
-                line_no=self.current_start_line,
-                var_name=var_name,
-                var_obj=v,
-            )
 
             # ────────────────── ④ 저장 & 정리 ────────────────────
             ccf.functions[self.current_target_function] = self.current_target_function_cfg
@@ -1531,14 +1530,6 @@ class ContractAnalyzer:
             line_info=self.line_info,
         )
 
-        # ── 3. analysis record ----------------------------------------------
-        self.recorder.record_revert(
-            line_no=self.current_start_line,
-            revert_id=revert_identifier,
-            string_literal=string_literal,
-            call_args=call_argument_list,
-        )
-
         # ★ reinterpret seed = 연결하기 ‘전’ succ(들)
         if succ_before:
             self.engine.reinterpret_from(self.current_target_function_cfg, succ_before)
@@ -1567,15 +1558,6 @@ class ContractAnalyzer:
         self.refiner.update_variables_with_condition(
             true_env, condition_expr, is_true_branch=True
         )
-
-        true_delta = VariableEnv.diff_changed(base_env, true_env)
-
-        if true_delta:  # 아무것도 안 바뀌면 기록 생략
-            self.recorder.add_env_record(
-                line_no=self.current_start_line,
-                stmt_type="branchTrue",
-                env=true_delta,
-            )
 
         # ★ 빌더가 true-분기 succ 들을 반환
         true_succs = self.builder.build_require_statement(
@@ -1615,15 +1597,6 @@ class ContractAnalyzer:
         self.refiner.update_variables_with_condition(
             true_env, condition_expr, is_true_branch=True
         )
-
-        true_delta = VariableEnv.diff_changed(base_env, true_env)
-
-        if true_delta:  # 아무것도 안 바뀌면 기록 생략
-            self.recorder.add_env_record(
-                line_no=self.current_start_line,
-                stmt_type="branchTrue",
-                env=true_delta,
-            )
 
         # ★ 빌더가 true-분기 succ 들을 반환
         true_succs = self.builder.build_assert_statement(
@@ -1896,35 +1869,33 @@ class ContractAnalyzer:
 
         self._batch_targets.add(self.current_target_function_cfg)
 
+    # ContractAnalyzer.py (일부)
 
-    def get_line_analysis(self, start_ln: int, end_ln: int) -> dict[int, list[dict]]:
-        """
-        [start_ln, end_ln] 구간에 대해
-        { line_no: [ {kind: ..., vars:{...}}, ... ], ... }  형태 반환
-        (구간 안에 기록이 없으면 key 자체가 없다)
-        """
-        return {
-            ln: self.analysis_per_line[ln]
-            for ln in range(start_ln, end_ln + 1)
-            if ln in self.analysis_per_line
-        }
+    def get_line_analysis(self, start_ln: int, end_ln: int,
+                          kinds: set[str] | None = None) -> dict[int, list[dict]]:
+        kinds = kinds or {"varDeclaration", "assignment", "return", "implicitReturn", "loopDelta"}
+        # RecordManager 로 대체
+        out: dict[int, list[dict]] = {}
+        for ln in range(start_ln, end_ln + 1):
+            if ln not in self.recorder.ledger:
+                continue
+            # kind 필터
+            filtered = [rec for rec in self.recorder.ledger[ln] if rec.get("kind") in kinds]
+            if filtered:
+                out[ln] = filtered
+        return out
 
-    def send_report_to_front(
-            self,
-            patched_lines: list[tuple[str, int, int]] | None = None
-    ) -> None:
-
-        # 0) ‘어떤 라인을 보여줄지’ 결정 ---------------------------
+    def send_report_to_front(self,
+                             patched_lines: list[tuple[str, int, int]] | None = None) -> None:
+        # 0) 보여줄 라인 결정
         touched: set[int] = set()
 
-        # (A) 호출 측에서 주석 라인을 넘겨준 경우
         if patched_lines:
             for _code, s, e in patched_lines:
                 touched.update(range(s, e + 1))
-
-        # (B) 주석 라인을 안 받았거나, 비어 있다면
-        #     ⇢ 방금 재-해석한 함수 전체 라인 사용
-        if not touched and getattr(self, "_last_func_lines", None):
+        elif getattr(self, "_last_touched_lines", None):
+            touched |= set(self._last_touched_lines)
+        elif getattr(self, "_last_func_lines", None):
             s, e = self._last_func_lines
             touched.update(range(s, e + 1))
 
@@ -1932,9 +1903,9 @@ class ContractAnalyzer:
             print("※ send_report_to_front : 보여줄 라인이 없습니다.")
             return
 
-        # 1) 라인별 분석 결과 수집 -------------------------------
         lmin, lmax = min(touched), max(touched)
-        payload = self.get_line_analysis(lmin, lmax)
+        kinds = {"varDeclaration", "assignment", "return", "implicitReturn", "loopDelta"}
+        payload = self.get_line_analysis(lmin, lmax, kinds=kinds)
 
         if not payload:
             print("※ 분석 결과가 없습니다.")
@@ -1945,7 +1916,7 @@ class ContractAnalyzer:
             for rec in payload[ln]:
                 kind = rec.get("kind", "?")
                 vars_ = rec.get("vars", {})
-                print(f"{ln:4} │ {kind:<12} │ {vars_}")
+                print(f"{ln:4} │ {kind:<14} │ {vars_}")
         print("==========================\n")
 
     # ContractAnalyzer.py  (클래스 내부)

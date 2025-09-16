@@ -28,6 +28,13 @@ class RecordManager:
     def get_range(self, start: int, end: int) -> Dict[int, List[Dict[str, Any]]]:
         return {ln: self.ledger[ln] for ln in range(start, end + 1) if ln in self.ledger}
 
+    def clear_line(self, line_no: int) -> None:
+        self.ledger.pop(line_no, None)
+
+    def clear_lines(self, lines: list[int] | set[int] | tuple[int, ...]) -> None:
+        for ln in lines:
+            self.ledger.pop(ln, None)
+
     # ─────────────────────────────────────────────────────
     # 지역변수 선언 기록
     # ─────────────────────────────────────────────────────
