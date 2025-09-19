@@ -1,6 +1,4 @@
-contract GovStakingStorage {
-    uint256 totalLockedGogo;
-    uint256 totalRewardRates;
+contract GovStakingStorage {    
     uint256 totalRewardMultiplier;
     
     struct UserInfo {
@@ -15,8 +13,7 @@ contract GovStakingStorage {
         uint256 index;
     }
 
-    mapping(address => UserInfo) public userInfo;
-    address[] public userList;
+    mapping(address => UserInfo) public userInfo;    
     mapping(address => bool) public allowed;
 
     modifier isAllowed() {
@@ -24,24 +21,22 @@ contract GovStakingStorage {
         _;
     }
 
-    function removeUser(address user) external isAllowed {
-        require(userInfo[user].index != 0, "user does not exist");
-        if (userList.length > 1) {
-            address lastAddress = userList[userList.length - 1];
-            uint256 oldIndex = userInfo[user].index;
-            userList[oldIndex] = lastAddress;
-            userInfo[lastAddress].index = oldIndex;
-        }
-        userList.pop();
-        totalRewardMultiplier -= userInfo[user].rewardMultiplier;
-        delete userInfo[user];
-    }
-
-    function updateRewardMultiplier(address user, uint256 oldRate, uint256 newRate, uint256 passedTime, uint256 oldLockPeriod, uint256 newLockPeriod, uint256 oldAmount, uint256 newAmount) external isAllowed {
+    function updateRewardMultiplier(
+        address user,
+        uint256 oldRate,
+        uint256 newRate,
+        uint256 passedTime,
+        uint256 oldLockPeriod,
+        uint256 newLockPeriod,
+        uint256 oldAmount,
+        uint256 newAmount
+    ) external isAllowed {
         UserInfo storage info = userInfo[user];
-        uint256 toRemove = ((((oldLockPeriod - passedTime) / 1 weeks) * oldRate) * oldAmount) / 100000;
-        uint256 toAdd = (((newLockPeriod / 1 weeks) * newRate) * newAmount) / 100000;
+        uint256 toRemove = ((((oldLockPeriod - passedTime) / 1 weeks) *
+            oldRate) * oldAmount) / 100000;
+        uint256 toAdd = (((newLockPeriod / 1 weeks) * newRate) * newAmount) /
+            100000;
         info.rewardMultiplier = info.rewardMultiplier + toAdd - toRemove;
         totalRewardMultiplier = totalRewardMultiplier + toAdd - toRemove;
-    } 
+    }
 }

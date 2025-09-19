@@ -5,11 +5,6 @@ contract Dai {
     mapping (address => uint) public balanceOf;
     mapping (address => mapping (address => uint)) public allowance;    
     
-    modifier auth {
-        require(wards[msg.sender] == 1, "Dai/not-authorized");
-        _;
-    }
-
     function add(uint x, uint y) internal pure returns (uint z) {
         require((z = x + y) >= x);
     }
@@ -27,14 +22,5 @@ contract Dai {
         balanceOf[dst] = add(balanceOf[dst], wad);
        
         return true;
-    }
-
-    function transfer(address dst, uint wad) external returns (bool) {
-        return transferFrom(msg.sender, dst, wad);
-    }    
-
-    function mint(address usr, uint wad) external auth {
-        balanceOf[usr] = add(balanceOf[usr], wad);
-        totalSupply    = add(totalSupply, wad);        
     }
 }

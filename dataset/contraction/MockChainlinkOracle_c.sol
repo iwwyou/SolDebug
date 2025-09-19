@@ -1,0 +1,52 @@
+contract MockChainlinkOracle {
+    uint80 public roundId = 0;    
+
+    struct Entry {
+        uint80 roundId;
+        int256 answer;
+        uint256 startedAt;
+        uint256 updatedAt;
+        uint80 answeredInRound;
+    }
+
+    mapping(uint256 => Entry) public entries;
+
+    bool public latestRoundDataShouldRevert;
+
+
+    function getRoundData(uint80 _roundId)
+        public
+        view
+        override
+        returns (
+            uint80,
+            int256,
+            uint256,
+            uint256,
+            uint80
+        )
+    {
+        Entry memory entry = entries[_roundId];
+        // Emulate a Chainlink aggregator
+        require(entry.updatedAt > 0, "No data present");
+        return (entry.roundId, entry.answer, entry.startedAt, entry.updatedAt, entry.answeredInRound);
+    }
+    
+    function latestRoundData()
+        external
+        view
+        override
+        returns (
+            uint80,
+            int256,
+            uint256,
+            uint256,
+            uint80
+        )
+    {
+        if (latestRoundDataShouldRevert) {
+            revert("latestRoundData reverted");
+        }
+        return getRoundData(uint80(roundId));
+    }
+}
