@@ -85,21 +85,37 @@ class ContractAnalyzer:
                             st.src_line = new_ln
 
     def _insert_lines(self, start: int, new_lines: list[str]):
-        # 0) 정규화 (줄 쪼개기)
         new_lines = self.normalize_compound_control_lines(new_lines)
-
         offset = len(new_lines)
 
-        # ① 뒤 라인 밀기 (내림차순)
+        # 뒤 라인 밀기
         for old_ln in sorted([ln for ln in self.full_code_lines if ln >= start], reverse=True):
             self.full_code_lines[old_ln + offset] = self.full_code_lines.pop(old_ln)
             self._shift_meta(old_ln, old_ln + offset)
 
-        # ② 새 코드 삽입 + 즉시 분석
+        # 삽입
         for i, ln in enumerate(range(start, start + offset)):
-            self.full_code_lines[ln] = new_lines[i]
-            # 기존 update_brace_count 대신 analyze_context 로 통일
-            self.analyze_context(ln, new_lines[i])
+            line = new_lines[i]
+            self.full_code_lines[ln] = line
+            self.update_brace_count(ln, line)  # ★ 항상 카운트
+            if self._should_trigger_analysis(line):  # ★ 트리거 라인만 분석
+                self.analyze_context(ln, line)
+
+    # ContractAnalyzer.py (클래스 내부)
+    def _should_trigger_analysis(self, code_line: str) -> bool:
+        s = (code_line or "").strip()
+        if not s:
+            return False
+        if s == "}":  # 단독 '}'는 분석 스킵(괄호 카운트만)
+            return False
+        if s.startswith("//"):
+            return s.startswith("// @")  # 디버그 주석만 분석
+        if s.endswith(";"):
+            return True  # 일반 문장
+        # 블록 헤더 키워드
+        return bool(re.match(
+            r"^(abstract\s+contract|contract|library|interface|function|constructor|modifier|"
+            r"struct|enum|event|if|else(\s+if)?\b|for|while|do\b|try|catch|unchecked|assembly)\b", s))
 
     def update_code(self, start_line: int, end_line: int, new_code: str, event: str):
         self.current_start_line = start_line
@@ -113,22 +129,22 @@ class ContractAnalyzer:
             lines = new_code.split("\n")
             self._insert_lines(start_line, lines)  # _insert_lines 내부에서 정규화
 
+
         elif event == "modify":
             raw_lines = new_code.split("\n")
             norm_lines = self.normalize_compound_control_lines(raw_lines)
-
-            # 길이가 달라지면 delete+add 로 폴백
             if (end_line - start_line + 1) != len(norm_lines):
                 self.update_code(start_line, end_line, "", event="delete")
                 self.update_code(start_line, start_line + len(norm_lines) - 1,
                                  "\n".join(norm_lines), event="add")
                 return
 
-            # 길이가 같으면 제자리 덮어쓰기 + 분석
             ln = start_line
             for line in norm_lines:
                 self.full_code_lines[ln] = line
-                self.analyze_context(ln, line)
+                self.update_brace_count(ln, line)  # ★ 추가
+                if self._should_trigger_analysis(line):  # ★ 추가
+                    self.analyze_context(ln, line)
                 ln += 1
 
         elif event == "delete":
@@ -210,7 +226,11 @@ class ContractAnalyzer:
         self.line_info[line_number] = info
 
     def analyze_context(self, start_line, new_code):
-        stripped_code = new_code.strip()
+        stripped_code = (new_code or "").strip()
+
+        # 단독 '}'는 컨텍스트 분석 불필요 (괄호 정보만으로 충분)
+        if stripped_code == "}":
+            return
 
         if stripped_code.startswith('// @'):
             self.current_context_type = "debugUnit"

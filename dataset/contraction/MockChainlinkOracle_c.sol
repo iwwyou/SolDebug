@@ -13,7 +13,6 @@ contract MockChainlinkOracle {
 
     bool public latestRoundDataShouldRevert;
 
-
     function getRoundData(uint80 _roundId)
         public
         view
@@ -26,8 +25,7 @@ contract MockChainlinkOracle {
             uint80
         )
     {
-        Entry memory entry = entries[_roundId];
-        // Emulate a Chainlink aggregator
+        Entry memory entry = entries[_roundId];        
         require(entry.updatedAt > 0, "No data present");
         return (entry.roundId, entry.answer, entry.startedAt, entry.updatedAt, entry.answeredInRound);
     }
