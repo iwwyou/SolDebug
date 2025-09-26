@@ -190,6 +190,9 @@ class StaticCFGFactory:
 
         fcfg = FunctionCFG(function_type="function", function_name=name)
 
+        # Get ENTRY node to add parameters to its variables
+        entry_node = fcfg.get_entry_node()
+
         for p_type, p_name in params:
             if p_name:  # 이름이 있는 것만 변수화
                 var = StaticCFGFactory.make_param_variable(
@@ -200,6 +203,8 @@ class StaticCFGFactory:
                 )
                 fcfg.add_related_variable(var)
                 fcfg.parameters.append(p_name)
+                # Add parameter to ENTRY block's variables so it can be propagated
+                entry_node.variables[p_name] = var
 
         for m_name in modifiers:
             an.process_modifier_invocation(fcfg, m_name)
@@ -214,6 +219,8 @@ class StaticCFGFactory:
                 )
                 fcfg.add_related_variable(rv)
                 fcfg.return_vars.append(rv)
+                # Add return variable to ENTRY block's variables so it can be propagated
+                entry_node.variables[r_name] = rv
             else:
                 fcfg.return_types.append(r_type)
 
@@ -221,8 +228,12 @@ class StaticCFGFactory:
         if ccf.state_variable_node:
             for v in ccf.state_variable_node.variables.values():
                 fcfg.add_related_variable(v)
+                # Add state variables to ENTRY block's variables so they can be propagated
+                entry_node.variables[v.identifier] = v
         for gv in ccf.globals.values():
             fcfg.add_related_variable(gv)
+            # Add global variables to ENTRY block's variables so they can be propagated
+            entry_node.variables[gv.identifier] = gv
 
         return fcfg
 

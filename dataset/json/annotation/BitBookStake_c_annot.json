@@ -1,0 +1,56 @@
+[
+  {
+    "code": "contract BitBookStake {\n}",
+    "startLine": 1,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    mapping(uint256 => mapping(uint256 => uint256)) private getPercentage;",
+    "startLine": 2,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 3,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "    function viewFeePercentage(uint256 _from,uint256 _to)public view returns(uint256){\n}",
+    "startLine": 4,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "        require((_from == 1 && _to == 3) || (_from == 3 && _to == 10) || (_from == 10 && _to == 30) || (_from == 30 && _to == 90) ,\"BitBook stake :: give correct days pair\" );",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "        return getPercentage[_from][_to];",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "//@StateVar getPercentage = [1,1];",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "//@LocalVar _from = [1,1];",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "//@LocalVar _to = [1,1];",
+    "startLine": 9,
+    "endLine": 9,
+    "event": "add"
+  }
+]

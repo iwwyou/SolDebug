@@ -1,0 +1,110 @@
+[
+  {
+    "code": "contract WASTLR {\n}",
+    "startLine": 1,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    mapping (address => uint256) public override balanceOf;",
+    "startLine": 2,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    mapping (address => mapping (address => uint256)) public override allowance;",
+    "startLine": 3,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 4,
+    "endLine": 4,
+    "event": "add"
+  },
+  {
+    "code": "    function withdrawFrom(address from, address payable to, uint256 value) external override {\n}",
+    "startLine": 5,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "        if (from != msg.sender) {         \n}",
+    "startLine": 6,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "            uint256 allowed = allowance[from][msg.sender];",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "            if (allowed != type(uint256).max) {\n}",
+    "startLine": 8,
+    "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "                require(allowed >= value, \"WASTR: request exceeds allowance\");",
+    "startLine": 9,
+    "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "                uint256 reduced = allowed - value;",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "                allowance[from][msg.sender] = reduced;             ",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 balance = balanceOf[from];",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "        require(balance >= value, \"WASTR: burn amount exceeds balance\");",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  },
+  {
+    "code": "        balanceOf[from] = balance - value; ",
+    "startLine": 17,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 18,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "        (bool success, ) = to.call{value: value}(\"\");",
+    "startLine": 19,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "        require(success, \"WASTR: Ether transfer failed\");",
+    "startLine": 20,
+    "endLine": 20,
+    "event": "add"
+  }
+]

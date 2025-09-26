@@ -1,0 +1,80 @@
+[
+  {
+    "code": "contract CoreVoting {\n}",
+    "startLine": 1,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    uint256 public baseQuorum;",
+    "startLine": 2,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    mapping(address => mapping(bytes4 => uint256)) private _quorums;",
+    "startLine": 3,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 4,
+    "endLine": 4,
+    "event": "add"
+  },
+  {
+    "code": "    function quorums(address target, bytes4 functionSelector)\n        public\n        view\n        returns (uint256)\n    {\n}",
+    "startLine": 5,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 storedQuorum = _quorums[target][functionSelector];",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "        if (storedQuorum == 0) {\n}",
+    "startLine": 12,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "            return baseQuorum;",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "else {\n}",
+    "startLine": 15,
+    "endLine": 16,
+    "event": "add"
+  },
+  {
+    "code": "            return storedQuorum;",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  },
+  {
+    "code": "//@StateVar baseQuorum = [1,1];",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "//@StateVar _quroms = [1,1];",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  }
+]

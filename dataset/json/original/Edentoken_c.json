@@ -1,0 +1,128 @@
+[
+  {
+    "code": "contract EdenToken {    \n}",
+    "startLine": 1,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    mapping (address => mapping (address => uint256)) public override allowance;",
+    "startLine": 2,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 3,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "    mapping (address => uint256) public override balanceOf;",
+    "startLine": 4,
+    "endLine": 4,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "    function _transferTokens(address from, address to, uint256 value) internal {\n}",
+    "startLine": 6,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "        require(to != address(0), \"Eden::_transferTokens: cannot transfer to the zero address\");",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "        balanceOf[from] = balanceOf[from] - value;",
+    "startLine": 9,
+    "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "        balanceOf[to] = balanceOf[to] + value;        ",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "    function transferFrom(address src, address dst, uint256 amount) external override returns (bool) {\n}",
+    "startLine": 13,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "        address spender = msg.sender;",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 spenderAllowance = allowance[src][spender];",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  },
+  {
+    "code": "        if (spender != src && spenderAllowance != type(uint256).max) {\n}",
+    "startLine": 17,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "            uint256 newAllowance = spenderAllowance - amount;",
+    "startLine": 18,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "            allowance[src][spender] = newAllowance;            ",
+    "startLine": 19,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 21,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "        _transferTokens(src, dst, amount);",
+    "startLine": 22,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "        return true;",
+    "startLine": 23,
+    "endLine": 23,
+    "event": "add"
+  }
+]

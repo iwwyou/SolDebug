@@ -1,0 +1,74 @@
+[
+  {
+    "code": "contract OptimisitcRewards {    \n}",
+    "startLine": 1,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    bytes32 public pendingRoot;",
+    "startLine": 2,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    uint256 public proposalTime;",
+    "startLine": 3,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "    address public proposer;",
+    "startLine": 4,
+    "endLine": 4,
+    "event": "add"
+  },
+  {
+    "code": "    uint256 public challengePeriod = 60 * 60 * 24 * 7;",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "    function proposeRewards(bytes32 newRoot) external {       \n}",
+    "startLine": 7,
+    "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "        require(msg.sender == proposer, \"Not proposer\");     ",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "        if (           \n            pendingRoot != bytes32(0) &&\n            proposalTime != 0 &&        \n            block.timestamp > proposalTime + challengePeriod\n        ) {          \n}",
+    "startLine": 9,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "            rewardsRoot = pendingRoot;",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "        pendingRoot = newRoot;",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  },
+  {
+    "code": "        proposalTime = block.timestamp;",
+    "startLine": 17,
+    "endLine": 17,
+    "event": "add"
+  }
+]

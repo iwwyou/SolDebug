@@ -721,7 +721,12 @@ class ContractAnalyzer:
         contract_cfg.functions[function_name] = fcfg
         self.contract_cfgs[self.current_target_contract] = contract_cfg
         self.line_info[self.current_start_line]["cfg_nodes"] = [fcfg.get_entry_node()]
-        self.line_info[self.current_end_line]["cfg_nodes"] = [fcfg.get_exit_node()]
+        # Don't overwrite existing nodes in line_info for end_line, just add EXIT if not present
+        if self.current_end_line not in self.line_info:
+            self.line_info[self.current_end_line] = {"open": 0, "close": 0, "cfg_nodes": []}
+        exit_node = fcfg.get_exit_node()
+        if exit_node not in self.line_info[self.current_end_line]["cfg_nodes"]:
+            self.line_info[self.current_end_line]["cfg_nodes"].append(exit_node)
 
     def process_variable_declaration(
             self,
