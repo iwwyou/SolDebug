@@ -102,27 +102,39 @@
     "event": "add"
   },
   {
-    "code": "//@StateVar maintenanceBudget0 = [100,100];",
-    "startLine": 7,
-    "endLine": 7,
-    "event": "add"
-  },
-  {
-    "code": "//@StateVar maintenanceBudget1 = [100,100];",
+    "code": "// @Debugging BEGIN",
     "startLine": 8,
     "endLine": 8,
     "event": "add"
   },
   {
-    "code": "//@LocalVar earned0 = [50,50];",
+    "code": "// @StateVar maintenanceBudget0 = [100,100];",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar maintenanceBudget1 = [100,100];",
     "startLine": 9,
     "endLine": 9,
     "event": "add"
   },
   {
-    "code": "//@LocalVar earned1 = [50,50];",
+    "code": "// @LocalVar earned0 = [50,50];",
     "startLine": 10,
     "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar earned1 = [50,50];",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 8,
+    "endLine": 8,
     "event": "add"
   }
 ]

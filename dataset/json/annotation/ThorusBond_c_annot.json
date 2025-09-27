@@ -78,21 +78,33 @@
     "event": "add"
   },
   {
-    "code": "//@StateVar info.lastInteractionSecond = [1,1];",
+    "code": "// @Debugging BEGIN",
     "startLine": 7,
     "endLine": 7,
     "event": "add"
   },
   {
-    "code": "//@StateVar info.remainingVestingSeconds = [1,1];",
+    "code": "// @StateVar info.lastInteractionSecond = [1,1];",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar info.remainingVestingSeconds = [1,1];",
     "startLine": 8,
     "endLine": 8,
     "event": "add"
   },
   {
-    "code": "//@StateVar info.remainingPayout = [1,1];",
+    "code": "// @StateVar info.remainingPayout = [1,1];",
     "startLine": 9,
     "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 7,
+    "endLine": 7,
     "event": "add"
   }
 ]

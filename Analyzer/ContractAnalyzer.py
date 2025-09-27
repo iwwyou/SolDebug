@@ -8,6 +8,7 @@ from solcx import (
 )
 from solcx.exceptions import SolcError
 from Domain.Address import *
+from Domain.Interval import IntegerInterval, UnsignedIntegerInterval, BoolInterval
 from Utils.Helper import *
 from Utils.Snapshot import *
 from Analyzer.DynamicCFGBuilder import DynamicCFGBuilder
@@ -522,11 +523,11 @@ class ContractAnalyzer:
         if init_expr is None: # 초기화가 없으면
             if isinstance(variable_obj, ArrayVariable) :
                 if variable_obj.typeInfo.arrayBaseType.elementaryTypeName.startswith("int") :
-                    variable_obj.initialize_elements(IntegerInterval.bottom())
+                    variable_obj.initialize_elements(IntegerInterval(0, 0, 256))
                 elif variable_obj.typeInfo.arrayBaseType.elementaryTypeName.startswith("uint") :
-                    variable_obj.initialize_elements(UnsignedIntegerInterval.bottom())
+                    variable_obj.initialize_elements(UnsignedIntegerInterval(0, 0, 256))
                 elif variable_obj.typeInfo.arrayBaseType.elementaryTypeName.startswith("bool") :
-                    variable_obj.initialize_elements(BoolInterval.bottom())
+                    variable_obj.initialize_elements(BoolInterval(0, 0))
                 elif variable_obj.typeInfo.arrayBaseType.elementaryTypeName in ["address", "address payable", "string", "bytes", "Byte", "Fixed", "Ufixed"] :
                     variable_obj.initialize_not_abstracted_type()
             elif isinstance(variable_obj, StructVariable) :
@@ -792,12 +793,14 @@ class ContractAnalyzer:
                     et = bt.elementaryTypeName
                     if et and et.startswith("int"):
                         bits = bt.intTypeLength or 256
-                        v.initialize_elements(IntegerInterval.bottom(bits))
+                        temp_interval = IntegerInterval(type_length=bits)
+                        v.initialize_elements(temp_interval.top())
                     elif et and et.startswith("uint"):
                         bits = bt.intTypeLength or 256
-                        v.initialize_elements(UnsignedIntegerInterval.bottom(bits))
+                        temp_interval = UnsignedIntegerInterval(type_length=bits)
+                        v.initialize_elements(temp_interval.top())
                     elif et == "bool":
-                        v.initialize_elements(BoolInterval.bottom())
+                        v.initialize_elements(BoolInterval.top())
                     else:
                         v.initialize_not_abstracted_type()
 
@@ -818,11 +821,15 @@ class ContractAnalyzer:
             elif isinstance(v, Variables):
                 et = v.typeInfo.elementaryTypeName
                 if et.startswith("int"):
-                    v.value = IntegerInterval.bottom(v.typeInfo.intTypeLength or 256)
+                    type_len = v.typeInfo.intTypeLength or 256
+                    temp_interval = IntegerInterval(type_length=type_len)
+                    v.value = temp_interval.top()
                 elif et.startswith("uint"):
-                    v.value = UnsignedIntegerInterval.bottom(v.typeInfo.intTypeLength or 256)
+                    type_len = v.typeInfo.intTypeLength or 256
+                    temp_interval = UnsignedIntegerInterval(type_length=type_len)
+                    v.value = temp_interval.top()
                 elif et == "bool":
-                    v.value = BoolInterval.bottom()
+                    v.value = BoolInterval.top()
                 elif et == "address":
                     v.value = AddressSymbolicManager.top_interval()
                 else:  # bytes/string
@@ -867,31 +874,31 @@ class ContractAnalyzer:
                 elif isinstance(v, StructVariable) and isinstance(resolved, StructVariable):
                     v.copy_from(resolved)
 
-            # ────────────────── ③ CFG-빌더 / 레코더 위임 ─────────
-            #    · 그래프/노드 업데이트는 cfg_builder에게
-            #    · 분석 기록은 rec_mgr 에게
-            stmt_blk = self.builder.build_variable_declaration(
-                cur_block=cur_blk,
-                var_obj=v,
-                type_obj=type_obj,
-                init_expr=init_expr,
+        # ────────────────── ③ CFG-빌더 / 레코더 위임 ─────────
+        #    · 그래프/노드 업데이트는 cfg_builder에게
+        #    · 분석 기록은 rec_mgr 에게
+        stmt_blk = self.builder.build_variable_declaration(
+            cur_block=cur_blk,
+            var_obj=v,
+            type_obj=type_obj,
+            init_expr=init_expr,
+            line_no=self.current_start_line,
+            fcfg=self.current_target_function_cfg,
+            line_info=self.line_info,  # ← builder가 필요하다면 전달
+        )
+        if stmt_blk.is_loop_body :
+            self.recorder.record_variable_declaration(
                 line_no=self.current_start_line,
-                fcfg=self.current_target_function_cfg,
-                line_info=self.line_info,  # ← builder가 필요하다면 전달
+                var_name=var_name,
+                var_obj=v,
             )
-            if stmt_blk.is_loop_body :
-                self.recorder.record_variable_declaration(
-                    line_no=self.current_start_line,
-                    var_name=var_name,
-                    var_obj=v,
-                )
 
-            self.engine.reinterpret_from(fcfg, stmt_blk)
+        self.engine.reinterpret_from(fcfg, stmt_blk)
 
-            # ────────────────── ④ 저장 & 정리 ────────────────────
-            ccf.functions[self.current_target_function] = self.current_target_function_cfg
-            self.contract_cfgs[self.current_target_contract] = ccf
-            self.current_target_function_cfg = None
+        # ────────────────── ④ 저장 & 정리 ────────────────────
+        ccf.functions[self.current_target_function] = self.current_target_function_cfg
+        self.contract_cfgs[self.current_target_contract] = ccf
+        self.current_target_function_cfg = None
 
     # Analyzer/ContractAnalyzer.py
     def process_assignment_expression(self, expr: Expression) -> None:
@@ -1763,14 +1770,13 @@ class ContractAnalyzer:
                 et = getattr(ty, "elementaryTypeName", "")
                 bits = getattr(ty, "intTypeLength", 256) or 256
                 if et.startswith("uint"):
-                    from Domain.Interval import UnsignedIntegerInterval
-                    vobj.value = UnsignedIntegerInterval.bottom(bits)
+                    temp_interval = UnsignedIntegerInterval(type_length=bits)
+                    vobj.value = temp_interval.top()
                 elif et.startswith("int"):
-                    from Domain.Interval import IntegerInterval
-                    vobj.value = IntegerInterval.bottom(bits)
+                    temp_interval = IntegerInterval(type_length=bits)
+                    vobj.value = temp_interval.top()
                 elif et == "bool":
-                    from Domain.Interval import BoolInterval
-                    vobj.value = BoolInterval.bottom()
+                    vobj.value = BoolInterval.top()
                 else:
                     vobj.value = None
             else:

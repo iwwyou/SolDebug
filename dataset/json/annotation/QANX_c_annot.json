@@ -204,27 +204,39 @@
     "event": "add"
   },
   {
-    "code": "//@StateVar _locks.tokenAmount = [10,10];",
+    "code": "// @Debugging BEGIN",
     "startLine": 7,
     "endLine": 7,
     "event": "add"
   },
   {
-    "code": "//@StateVar _locks.hardLockUntil = [1,1];",
+    "code": "// @StateVar _locks.tokenAmount = [10,10];",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar _locks.hardLockUntil = [1,1];",
     "startLine": 8,
     "endLine": 8,
     "event": "add"
   },
   {
-    "code": "//@StateVar _locks.tokenAmount = [10,10];",
+    "code": "// @StateVar _locks.tokenAmount = [10,10];",
     "startLine": 9,
     "endLine": 9,
     "event": "add"
   },
   {
-    "code": "//@StateVar _balances = [1000,1000];",
+    "code": "// @StateVar _balances = [1000,1000];",
     "startLine": 10,
     "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 7,
+    "endLine": 7,
     "event": "add"
   }
 ]

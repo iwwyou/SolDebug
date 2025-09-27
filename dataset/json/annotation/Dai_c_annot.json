@@ -126,27 +126,39 @@
     "event": "add"
   },
   {
-    "code": "//@StateVar balancesOf = [1000,1000];",
+    "code": "// @Debugging BEGIN",
     "startLine": 7,
     "endLine": 7,
     "event": "add"
   },
   {
-    "code": "//@StateVar allowance = [1,1];",
+    "code": "// @StateVar balancesOf = [1000,1000];",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar allowance = [1,1];",
     "startLine": 8,
     "endLine": 8,
     "event": "add"
   },
   {
-    "code": "//@StateVar balancesOf = [1000,1000];",
+    "code": "// @StateVar balancesOf = [1000,1000];",
     "startLine": 9,
     "endLine": 9,
     "event": "add"
   },
   {
-    "code": "//@LocalVar wad = [1,1];",
+    "code": "// @LocalVar wad = [1,1];",
     "startLine": 10,
     "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 7,
+    "endLine": 7,
     "event": "add"
   }
 ]

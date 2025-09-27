@@ -514,7 +514,11 @@ class Engine:
                 if exit_retvals:
                     joined = exit_retvals[0]
                     for v in exit_retvals[1:]:
-                        joined = joined.join(v)
+                        if hasattr(joined, 'join') and hasattr(v, 'join'):
+                            joined = joined.join(v)
+                        else:
+                            # Handle tuples or other types that don't have join method
+                            return joined
                     return joined
                 return None
         elif len(return_values) == 1:
@@ -522,9 +526,19 @@ class Engine:
             return return_values[0]
         else:
             self._record_enabled = False
-            joined_ret = return_values[0]
-            for rv in return_values[1:]:
-                joined_ret = joined_ret.join(rv)
+            # Filter out "__STOP__" strings from return_values
+            filtered_values = [rv for rv in return_values if rv != "__STOP__"]
+            if not filtered_values:
+                return None
+
+            joined_ret = filtered_values[0]
+            for rv in filtered_values[1:]:
+                if hasattr(joined_ret, 'join') and hasattr(rv, 'join'):
+                    joined_ret = joined_ret.join(rv)
+                else:
+                    # Handle tuples or other types that don't have join method
+                    # For now, just return the first valid return value
+                    return joined_ret
             return joined_ret
 
     # =================================================================

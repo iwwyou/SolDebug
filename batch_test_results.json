@@ -1,144 +1,144 @@
 {
   "summary": {
     "total_files": 30,
-    "successful": 0,
-    "errors": 30,
-    "total_time": 2.598292112350464,
-    "avg_time": 0.08660973707834879
+    "successful": 4,
+    "errors": 26,
+    "total_time": 2.085057020187378,
+    "avg_time": 0.06950190067291259
   },
   "results": [
     {
       "filename": "AloeBlend_c_annot.json",
-      "status": "ERROR",
-      "execution_time": 1.394730806350708,
-      "error_message": "ValueError: This 'earned0' is may be elementary variable but may not be declared",
-      "num_records": 21,
-      "analysis_count": 0
+      "status": "SUCCESS",
+      "execution_time": 0.13544201850891113,
+      "error_message": "",
+      "num_records": 23,
+      "analysis_count": 1
     },
     {
       "filename": "Amoss_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.3540232181549072,
-      "error_message": "ValueError: This 'account' is may be elementary variable but may not be declared",
-      "num_records": 20,
+      "execution_time": 0.12977290153503418,
+      "error_message": "ValueError: Variable 'balances' not declared.",
+      "num_records": 22,
       "analysis_count": 0
     },
     {
       "filename": "AOC_BEP_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.12130165100097656,
-      "error_message": "ValueError: This '_balances' is may be elementary variable but may not be declared",
+      "execution_time": 0.5770862102508545,
+      "error_message": "ValueError: This 'i' is may be elementary variable but may not be declared",
       "num_records": 27,
       "analysis_count": 0
     },
     {
       "filename": "ATIDStaking_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.08285784721374512,
-      "error_message": "ValueError: This 'nextLockedStakeIDMap' is may be elementary variable but may not be declared",
-      "num_records": 53,
+      "execution_time": 0.08701181411743164,
+      "error_message": "KeyError: 'LockedStake'",
+      "num_records": 55,
       "analysis_count": 0
     },
     {
       "filename": "AvatarArtMarketPlace_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.033739566802978516,
-      "error_message": "ValueError: This '_tokens' is may be array or struct but may not be declared",
-      "num_records": 16,
+      "execution_time": 0.0317234992980957,
+      "error_message": "ValueError: There is no function name in function call context",
+      "num_records": 18,
       "analysis_count": 0
     },
     {
       "filename": "Balancer_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.038004398345947266,
-      "error_message": "ValueError: This 'actionBuilders' is may be array or struct but may not be declared",
-      "num_records": 13,
-      "analysis_count": 0
-    },
-    {
-      "filename": "BitBookStake_c_annot.json",
-      "status": "ERROR",
-      "execution_time": 0.05009293556213379,
-      "error_message": "ValueError: This '_from' is may be elementary variable but may not be declared",
-      "num_records": 9,
-      "analysis_count": 0
-    },
-    {
-      "filename": "CitrusToken_c_annot.json",
-      "status": "ERROR",
-      "execution_time": 0.05216670036315918,
-      "error_message": "ValueError: This 'balances' is may be elementary variable but may not be declared",
+      "execution_time": 0.0930781364440918,
+      "error_message": "ValueError: member 'push' is not a recognised global-member.",
       "num_records": 15,
       "analysis_count": 0
     },
     {
+      "filename": "BitBookStake_c_annot.json",
+      "status": "SUCCESS",
+      "execution_time": 0.02349257469177246,
+      "error_message": "",
+      "num_records": 11,
+      "analysis_count": 1
+    },
+    {
+      "filename": "CitrusToken_c_annot.json",
+      "status": "SUCCESS",
+      "execution_time": 0.1109011173248291,
+      "error_message": "",
+      "num_records": 17,
+      "analysis_count": 2
+    },
+    {
       "filename": "Claim_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.03982996940612793,
+      "execution_time": 0.10469174385070801,
       "error_message": "ValueError: This 'claimedOnce' is may be elementary variable but may not be declared",
-      "num_records": 17,
+      "num_records": 19,
       "analysis_count": 0
     },
     {
       "filename": "CoreVoting_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.020152807235717773,
+      "execution_time": 0.009003877639770508,
       "error_message": "ValueError: Function context not found for simple statement at line 10",
-      "num_records": 13,
+      "num_records": 15,
       "analysis_count": 0
     },
     {
       "filename": "Core_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.01724982261657715,
+      "execution_time": 0.007004976272583008,
       "error_message": "ValueError: This 'governorMap' is may be elementary variable but may not be declared",
-      "num_records": 23,
+      "num_records": 25,
       "analysis_count": 0
     },
     {
       "filename": "Dai_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.029938220977783203,
-      "error_message": "ValueError: This 'x' is may be elementary variable but may not be declared",
-      "num_records": 25,
+      "execution_time": 0.010000944137573242,
+      "error_message": "TypeError: Update.update_left_var() takes from 5 to 8 positional arguments but 10 were given",
+      "num_records": 27,
       "analysis_count": 0
     },
     {
       "filename": "DapiServer_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.07573318481445312,
-      "error_message": "ValueError: This 'updatedValue' is may be elementary variable but may not be declared",
-      "num_records": 13,
+      "execution_time": 0.1278679370880127,
+      "error_message": "ValueError: Variable 'initalValue' not declared.",
+      "num_records": 15,
       "analysis_count": 0
     },
     {
       "filename": "DeltaNeutralPancakeWorker02_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.024335145950317383,
-      "error_message": "ValueError: This 'reinvestPath' is may be array or struct but may not be declared",
-      "num_records": 18,
+      "execution_time": 0.03889966011047363,
+      "error_message": "AttributeError: 'NoneType' object has no attribute 'startswith'",
+      "num_records": 20,
       "analysis_count": 0
     },
     {
       "filename": "Dripper_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.010060310363769531,
+      "execution_time": 0.006001472473144531,
       "error_message": "ValueError: Function context not found for simple statement at line 12",
-      "num_records": 12,
+      "num_records": 14,
       "analysis_count": 0
     },
     {
       "filename": "Edentoken_c_annot.json",
-      "status": "ERROR",
-      "execution_time": 0.01410055160522461,
-      "error_message": "ValueError: This 'to' is may be elementary variable but may not be declared",
+      "status": "SUCCESS",
+      "execution_time": 0.12645506858825684,
+      "error_message": "",
       "num_records": 21,
-      "analysis_count": 0
+      "analysis_count": 4
     },
     {
       "filename": "GovStakingStorage_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.02280712127685547,
+      "execution_time": 0.011564970016479492,
       "error_message": "ValueError: This 'allowed' is may be elementary variable but may not be declared",
       "num_records": 27,
       "analysis_count": 0
@@ -146,39 +146,39 @@
     {
       "filename": "GreenHouse_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.01840066909790039,
+      "execution_time": 0.013596773147583008,
       "error_message": "ValueError: Contract context not found for line 8",
-      "num_records": 15,
+      "num_records": 17,
       "analysis_count": 0
     },
     {
       "filename": "LockupContract_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.019452333450317383,
-      "error_message": "ValueError: This 'deploymentStartTime' is may be elementary variable but may not be declared",
-      "num_records": 23,
+      "execution_time": 0.028005361557006836,
+      "error_message": "ValueError: This 'unlockTimestamp' is may be elementary variable but may not be declared",
+      "num_records": 25,
       "analysis_count": 0
     },
     {
       "filename": "Lock_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.014450311660766602,
-      "error_message": "ValueError: This 'data' is may be elementary variable but may not be declared",
-      "num_records": 30,
+      "execution_time": 0.01938772201538086,
+      "error_message": "AttributeError: 'NoneType' object has no attribute 'startswith'",
+      "num_records": 32,
       "analysis_count": 0
     },
     {
       "filename": "Meter_flat_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.009514570236206055,
-      "error_message": "ValueError: This 'sender' is may be elementary variable but may not be declared",
-      "num_records": 18,
+      "execution_time": 0.01900172233581543,
+      "error_message": "KeyError: '_beforeTokenTransfer'",
+      "num_records": 20,
       "analysis_count": 0
     },
     {
       "filename": "MockChainlinkOracle_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.009498834609985352,
+      "execution_time": 0.019677162170410156,
       "error_message": "ValueError: Contract context not found for line 16",
       "num_records": 23,
       "analysis_count": 0
@@ -186,97 +186,99 @@
     {
       "filename": "OptimisticRewards_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.01522684097290039,
-      "error_message": "ValueError: There is no global variable in function",
+      "execution_time": 0.013997793197631836,
+      "error_message": "ValueError: Contract context not found for line 9",
       "num_records": 12,
       "analysis_count": 0
     },
     {
       "filename": "PercentageFeeModel_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.010535001754760742,
+      "execution_time": 0.01326608657836914,
       "error_message": "ValueError: Contract context not found for line 12",
-      "num_records": 29,
+      "num_records": 31,
       "analysis_count": 0
     },
     {
       "filename": "PoolKeeper_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.01249384880065918,
-      "error_message": "ValueError: There is no global variable in function",
-      "num_records": 17,
+      "execution_time": 0.08571815490722656,
+      "error_message": "ValueError: This 'keeperTip' is may be elementary variable but may not be declared",
+      "num_records": 19,
       "analysis_count": 0
     },
     {
       "filename": "PrivateSale_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.020557165145874023,
+      "execution_time": 0.010045766830444336,
       "error_message": "ValueError: Type 'TokenVestingGroup' is not defined as struct or enum in contract 'PrivateSale'.",
-      "num_records": 34,
+      "num_records": 36,
       "analysis_count": 0
     },
     {
       "filename": "QANX_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.015315771102905273,
+      "execution_time": 0.06848573684692383,
       "error_message": "ValueError: There is no global variable in function",
-      "num_records": 38,
+      "num_records": 40,
       "analysis_count": 0
     },
     {
       "filename": "ThorusBond_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.00751495361328125,
-      "error_message": "ValueError: This 'userInfo' is may be elementary variable but may not be declared",
-      "num_records": 16,
+      "execution_time": 0.012340545654296875,
+      "error_message": "AttributeError: 'NoneType' object has no attribute 'startswith'",
+      "num_records": 18,
       "analysis_count": 0
     },
     {
       "filename": "TimeLockPool_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.04953455924987793,
-      "error_message": "ValueError: This 'depositsOf' is may be elementary variable but may not be declared",
+      "execution_time": 0.05806303024291992,
+      "error_message": "AttributeError: 'NoneType' object has no attribute 'startswith'",
       "num_records": 14,
       "analysis_count": 0
     },
     {
       "filename": "WASTR_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.014672994613647461,
-      "error_message": "ValueError: This 'from' is may be elementary variable but may not be declared",
-      "num_records": 21,
+      "execution_time": 0.09347224235534668,
+      "error_message": "AttributeError: 'NoneType' object has no attribute 'typeName'",
+      "num_records": 23,
       "analysis_count": 0
     }
   ],
   "error_categories": {
     "ValueError": [
-      "AloeBlend_c_annot.json",
       "Amoss_c_annot.json",
       "AOC_BEP_c_annot.json",
-      "ATIDStaking_c_annot.json",
       "AvatarArtMarketPlace_c_annot.json",
       "Balancer_c_annot.json",
-      "BitBookStake_c_annot.json",
-      "CitrusToken_c_annot.json",
       "Claim_c_annot.json",
       "CoreVoting_c_annot.json",
       "Core_c_annot.json",
-      "Dai_c_annot.json",
       "DapiServer_c_annot.json",
-      "DeltaNeutralPancakeWorker02_c_annot.json",
       "Dripper_c_annot.json",
-      "Edentoken_c_annot.json",
       "GovStakingStorage_c_annot.json",
       "GreenHouse_c_annot.json",
       "LockupContract_c_annot.json",
-      "Lock_c_annot.json",
-      "Meter_flat_c_annot.json",
       "MockChainlinkOracle_c_annot.json",
       "OptimisticRewards_c_annot.json",
       "PercentageFeeModel_c_annot.json",
       "PoolKeeper_c_annot.json",
       "PrivateSale_c_annot.json",
-      "QANX_c_annot.json",
+      "QANX_c_annot.json"
+    ],
+    "KeyError": [
+      "ATIDStaking_c_annot.json",
+      "Meter_flat_c_annot.json"
+    ],
+    "TypeError": [
+      "Dai_c_annot.json"
+    ],
+    "AttributeError": [
+      "DeltaNeutralPancakeWorker02_c_annot.json",
+      "Lock_c_annot.json",
       "ThorusBond_c_annot.json",
       "TimeLockPool_c_annot.json",
       "WASTR_c_annot.json"

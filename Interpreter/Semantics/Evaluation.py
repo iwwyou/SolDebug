@@ -1178,19 +1178,19 @@ class Evaluation :
 
     @staticmethod
     def calculate_default_interval(var_type):
-        # 1. int 타입 처리
+        # 1. int 타입 처리 - 상태변수 기본값은 0
         if var_type.startswith("int"):
             length = int(var_type[3:]) if var_type != "int" else 256  # int 타입의 길이 (기본값은 256)
-            return IntegerInterval.bottom(length)  # int의 기본 범위 반환
+            return IntegerInterval(0, 0, length)  # int의 기본값 0
 
-        # 2. uint 타입 처리
+        # 2. uint 타입 처리 - 상태변수 기본값은 0
         elif var_type.startswith("uint"):
             length = int(var_type[4:]) if var_type != "uint" else 256  # uint 타입의 길이 (기본값은 256)
-            return UnsignedIntegerInterval.bottom(length)  # uint의 기본 범위 반환
+            return UnsignedIntegerInterval(0, 0, length)  # uint의 기본값 0
 
-        # 3. bool 타입 처리
+        # 3. bool 타입 처리 - 상태변수 기본값은 false (0)
         elif var_type == "bool":
-            return BoolInterval()  # bool은 항상 0 또는 1
+            return BoolInterval(0, 0)  # bool의 기본값 false (0)
 
         # 4. 기타 처리 (필요시 확장 가능)
         else:

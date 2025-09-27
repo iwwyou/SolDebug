@@ -904,7 +904,7 @@ class DynamicCFGBuilder:
         """
         unchecked 키워드를 만나면
 
-            cur_block ─▶ unchecked ─▶ (기존 succ …)
+            cur_block ─▶ unchecked ─▶ (기존 succcl …)
 
         로 그래프를 재배선한다. 생성된 노드를 반환.
         """

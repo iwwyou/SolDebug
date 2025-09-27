@@ -54,21 +54,33 @@
     "event": "add"
   },
   {
-    "code": "//@LocalVar _balance = [1000,1000];",
+    "code": "// @Debugging BEGIN",
     "startLine": 7,
     "endLine": 7,
     "event": "add"
   },
   {
-    "code": "//@LocalVar _drip.lastCollect = [1,1];",
+    "code": "// @LocalVar _balance = [1000,1000];",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar _drip.lastCollect = [1,1];",
     "startLine": 8,
     "endLine": 8,
     "event": "add"
   },
   {
-    "code": "//@LocalVar _drip.perBlock = [1,1];",
+    "code": "// @LocalVar _drip.perBlock = [1,1];",
     "startLine": 9,
     "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 7,
+    "endLine": 7,
     "event": "add"
   }
 ]

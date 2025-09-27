@@ -102,21 +102,33 @@
     "event": "add"
   },
   {
-    "code": "//@StateVar _totalSupply = [500,500];",
+    "code": "// @Debugging BEGIN",
     "startLine": 7,
     "endLine": 7,
     "event": "add"
   },
   {
-    "code": "//@StateVar balances = [1000,1000];",
+    "code": "// @StateVar _totalSupply = [500,500];",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar balances = [1000,1000];",
     "startLine": 8,
     "endLine": 8,
     "event": "add"
   },
   {
-    "code": "//@LocalVar amount = [10,10];",
+    "code": "// @LocalVar amount = [10,10];",
     "startLine": 9,
     "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 7,
+    "endLine": 7,
     "event": "add"
   }
 ]

@@ -84,7 +84,19 @@
     "event": "add"
   },
   {
-    "code": "//@LocalVar amount = [10,10];",
+    "code": "// @Debugging BEGIN",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar amount = [10,10];",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
     "startLine": 7,
     "endLine": 7,
     "event": "add"

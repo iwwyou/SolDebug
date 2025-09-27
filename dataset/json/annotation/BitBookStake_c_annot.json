@@ -36,21 +36,33 @@
     "event": "add"
   },
   {
-    "code": "//@StateVar getPercentage = [1,1];",
+    "code": "// @Debugging BEGIN",
     "startLine": 7,
     "endLine": 7,
     "event": "add"
   },
   {
-    "code": "//@LocalVar _from = [1,1];",
+    "code": "// @StateVar getPercentage = [1,1];",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar _from = [1,1];",
     "startLine": 8,
     "endLine": 8,
     "event": "add"
   },
   {
-    "code": "//@LocalVar _to = [1,1];",
+    "code": "// @LocalVar _to = [1,1];",
     "startLine": 9,
     "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 7,
+    "endLine": 7,
     "event": "add"
   }
 ]
