@@ -264,25 +264,25 @@
     "event": "add"
   },
   {
-    "code": "// @StateVar nextLockedStakeIDMap = [1,1];",
+    "code": "// @StateVar nextLockedStakeIDMap[_stakerAddress] = [1,1];",
     "startLine": 7,
     "endLine": 7,
     "event": "add"
   },
   {
-    "code": "// @StateVar tailLockedStakeIDMap = [1,1];",
+    "code": "// @StateVar tailLockedStakeIDMap[_stakerAddress] = [1,1];",
     "startLine": 8,
     "endLine": 8,
     "event": "add"
   },
   {
-    "code": "// @StateVar headLockedStakeIDMap = [1,1];",
+    "code": "// @StateVar headLockedStakeIDMap[_stakerAddress] = [1,1];",
     "startLine": 9,
     "endLine": 9,
     "event": "add"
   },
   {
-    "code": "// @StateVar weightedStakes = [1,1];",
+    "code": "// @StateVar weightedStakes[_stakerAddress] = [1,1];",
     "startLine": 10,
     "endLine": 10,
     "event": "add"
@@ -294,7 +294,7 @@
     "event": "add"
   },
   {
-    "code": "// @StateVar unweightedStakes = [1,1];",
+    "code": "// @StateVar unweightedStakes[_stakerAddress] = [1,1];",
     "startLine": 12,
     "endLine": 12,
     "event": "add"
@@ -325,8 +325,8 @@
   },
   {
     "code": "// @Debugging END",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 17,
+    "endLine": 17,
     "event": "add"
   }
 ]

@@ -239,9 +239,11 @@ class ArrayVariable(Variables):
                 )
                 # recursion – baseT.arrayBaseType 에 따라 분기
                 if self._is_abstractable(baseT.arrayBaseType):
-                    dummy = IntegerInterval.bottom() \
-                        if str(baseT.arrayBaseType.elementaryTypeName).startswith("int") \
-                        else UnsignedIntegerInterval.bottom()
+                    base_elem = baseT.arrayBaseType
+                    bits = getattr(base_elem, 'intTypeLength', 256) or 256
+                    dummy = IntegerInterval.top(bits) \
+                        if str(base_elem.elementaryTypeName).startswith("int") \
+                        else UnsignedIntegerInterval.top(bits)
                     sub_arr.initialize_elements(dummy)
                 else:
                     sub_arr.initialize_not_abstracted_type()
@@ -344,12 +346,12 @@ class MappingVariable(Variables):
 
         if et.startswith("int"):
             bits = sol_t.intTypeLength or 256
-            v.value = IntegerInterval.bottom(bits)           # ⊥ interval
+            v.value = IntegerInterval.top(bits)           # ⊤ interval
         elif et.startswith("uint"):
             bits = sol_t.intTypeLength or 256
-            v.value = UnsignedIntegerInterval.bottom(bits)   # 0 ~ 2ᵇⁱᵗˢ-1
+            v.value = UnsignedIntegerInterval.top(bits)   # 0 ~ 2ᵇⁱᵗˢ-1
         elif et == "bool":
-            v.value = BoolInterval.bottom()
+            v.value = BoolInterval.top()
         elif et == "address":
             v.value = UnsignedIntegerInterval(0, 2**160 - 1, 160)   # TOP 주소
         else:                               # string / bytes 등
@@ -447,12 +449,12 @@ class StructVariable(Variables):
                     # 주소 / string / bytes / bool / int 등 판단
                     if bt.elementaryTypeName in ("int",) or bt.elementaryTypeName.startswith("int"):
                         bits = bt.intTypeLength or 256
-                        arr.initialize_elements(IntegerInterval.bottom(bits))
+                        arr.initialize_elements(IntegerInterval.top(bits))
                     elif bt.elementaryTypeName in ("uint",) or bt.elementaryTypeName.startswith("uint"):
                         bits = bt.intTypeLength or 256
-                        arr.initialize_elements(UnsignedIntegerInterval.bottom(bits))
+                        arr.initialize_elements(UnsignedIntegerInterval.top(bits))
                     elif bt.elementaryTypeName == "bool":
-                        arr.initialize_elements(BoolInterval.bottom())
+                        arr.initialize_elements(BoolInterval.top())
                     else:          # address / bytes / string 등
                         arr.initialize_not_abstracted_type()
                 else:
@@ -489,12 +491,12 @@ class StructVariable(Variables):
             et = sol_t.elementaryTypeName
             if et.startswith("int"):
                 bits = sol_t.intTypeLength or 256
-                v.value = IntegerInterval.bottom(bits)
+                v.value = IntegerInterval.top(bits)
             elif et.startswith("uint"):
                 bits = sol_t.intTypeLength or 256
-                v.value = UnsignedIntegerInterval.bottom(bits)
+                v.value = UnsignedIntegerInterval.top(bits)
             elif et == "bool":
-                v.value = BoolInterval.bottom()
+                v.value = BoolInterval.top()
             elif et == "address":
                 v.value = UnsignedIntegerInterval(0, 2**160 - 1, 160)
             else:

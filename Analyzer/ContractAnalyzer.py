@@ -793,12 +793,10 @@ class ContractAnalyzer:
                     et = bt.elementaryTypeName
                     if et and et.startswith("int"):
                         bits = bt.intTypeLength or 256
-                        temp_interval = IntegerInterval(type_length=bits)
-                        v.initialize_elements(temp_interval.top())
+                        v.initialize_elements(IntegerInterval.top(bits))
                     elif et and et.startswith("uint"):
                         bits = bt.intTypeLength or 256
-                        temp_interval = UnsignedIntegerInterval(type_length=bits)
-                        v.initialize_elements(temp_interval.top())
+                        v.initialize_elements(UnsignedIntegerInterval.top(bits))
                     elif et == "bool":
                         v.initialize_elements(BoolInterval.top())
                     else:
@@ -822,12 +820,10 @@ class ContractAnalyzer:
                 et = v.typeInfo.elementaryTypeName
                 if et.startswith("int"):
                     type_len = v.typeInfo.intTypeLength or 256
-                    temp_interval = IntegerInterval(type_length=type_len)
-                    v.value = temp_interval.top()
+                    v.value = IntegerInterval.top(type_len)
                 elif et.startswith("uint"):
                     type_len = v.typeInfo.intTypeLength or 256
-                    temp_interval = UnsignedIntegerInterval(type_length=type_len)
-                    v.value = temp_interval.top()
+                    v.value = UnsignedIntegerInterval.top(type_len)
                 elif et == "bool":
                     v.value = BoolInterval.top()
                 elif et == "address":
@@ -1770,11 +1766,9 @@ class ContractAnalyzer:
                 et = getattr(ty, "elementaryTypeName", "")
                 bits = getattr(ty, "intTypeLength", 256) or 256
                 if et.startswith("uint"):
-                    temp_interval = UnsignedIntegerInterval(type_length=bits)
-                    vobj.value = temp_interval.top()
+                    vobj.value = UnsignedIntegerInterval.top(bits)
                 elif et.startswith("int"):
-                    temp_interval = IntegerInterval(type_length=bits)
-                    vobj.value = temp_interval.top()
+                    vobj.value = IntegerInterval.top(bits)
                 elif et == "bool":
                     vobj.value = BoolInterval.top()
                 else:

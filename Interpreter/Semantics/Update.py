@@ -455,8 +455,9 @@ class Update :
                     )
                 elif r_val in ("true", "false"):
                     conv_val = BoolInterval(1, 1) if r_val == "true" else BoolInterval(0, 0)
-            # (b) 실제 값 패치
-            var_obj.value = self.compound_assignment(var_obj.value, conv_val, operator)
+            # (b) 실제 값 패치 (operator가 None이 아닐 때만)
+            if operator is not None:
+                var_obj.value = self.compound_assignment(var_obj.value, conv_val, operator)
 
 
         # ======================================================================

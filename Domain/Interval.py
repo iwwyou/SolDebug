@@ -79,14 +79,15 @@ class IntegerInterval(Interval):
             return a.__class__(None, None, a.type_length)
         return fn(a, b)
 
-    def top(self):
+    @staticmethod
+    def top(type_len: int = 256):
         """
         signed int의 top = [-2^(bits-1), 2^(bits-1) - 1]
         내부적으로는 '이론적 -∞, +∞' 대신 실제 비트 범위를 사용합니다.
         """
-        min_value = -2 ** (self.type_length - 1)
-        max_value = 2 ** (self.type_length - 1) - 1
-        return IntegerInterval(min_value, max_value, self.type_length)
+        min_value = -2 ** (type_len - 1)
+        max_value = 2 ** (type_len - 1) - 1
+        return IntegerInterval(min_value, max_value, type_len)
 
     def theoretical_top(self):
         """
@@ -431,10 +432,11 @@ class UnsignedIntegerInterval(Interval):
         return (self.min_value == 0 and
                 self.max_value == 2 ** self.type_length - 1)
 
-    def top(self):
+    @staticmethod
+    def top(type_len: int = 256):
         min_val = 0
-        max_val = 2 ** self.type_length - 1
-        return UnsignedIntegerInterval(min_val, max_val, self.type_length)
+        max_val = 2 ** type_len - 1
+        return UnsignedIntegerInterval(min_val, max_val, type_len)
 
     def theoretical_top(self):
         """
@@ -757,7 +759,7 @@ class BoolInterval(Interval):
 
     def widen(self):
         # bool에선 widen => top
-        return self.top()
+        return BoolInterval.top()
 
     def narrow(self, new_interval):
         if self.is_bottom():

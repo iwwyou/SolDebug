@@ -265,11 +265,11 @@ class StaticCFGFactory:
             if isinstance(base_t, SolType):  # 1-D 배열
                 et = base_t.elementaryTypeName
                 if et and et.startswith("int"):
-                    arr.initialize_elements(IntegerInterval.bottom(base_t.intTypeLength or 256))
+                    arr.initialize_elements(IntegerInterval.top(base_t.intTypeLength or 256))
                 elif et and et.startswith("uint"):
-                    arr.initialize_elements(UnsignedIntegerInterval.bottom(base_t.intTypeLength or 256))
+                    arr.initialize_elements(UnsignedIntegerInterval.top(base_t.intTypeLength or 256))
                 elif et == "bool":
-                    arr.initialize_elements(BoolInterval.bottom())
+                    arr.initialize_elements(BoolInterval.top())
                 else:  # address / bytes / string / struct 등
                     arr.initialize_not_abstracted_type()
             else:  # 다차원
@@ -304,11 +304,11 @@ class StaticCFGFactory:
             et = sol_type.elementaryTypeName
 
             if et.startswith("int"):
-                v.value = IntegerInterval.bottom(sol_type.intTypeLength or 256)
+                v.value = IntegerInterval.top(sol_type.intTypeLength or 256)
             elif et.startswith("uint"):
-                v.value = UnsignedIntegerInterval.bottom(sol_type.intTypeLength or 256)
+                v.value = UnsignedIntegerInterval.top(sol_type.intTypeLength or 256)
             elif et == "bool":
-                v.value = BoolInterval.bottom()
+                v.value = BoolInterval.top()
             elif et == "address":
                 v.value = AddressSymbolicManager.top_interval()
             else:  # bytes / string …

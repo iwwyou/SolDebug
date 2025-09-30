@@ -62,141 +62,135 @@ def simulate_inputs(records):
 
 test_inputs = [
   {
-    "code": "contract AloeBlend {\n}",
+    "code": "contract Amoss {\n}",
     "startLine": 1,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "    uint8 public constant MAINTENANCE_FEE = 10;",
+    "code": "    uint256 private _totalSupply = 1*10**(9+18);    ",
     "startLine": 2,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "    uint256 public maintenanceBudget0;",
+    "code": "    mapping(address => uint256) private _balances;    ",
     "startLine": 3,
     "endLine": 3,
     "event": "add"
   },
   {
-    "code": "    uint256 public maintenanceBudget1;    ",
+    "code": "\n",
     "startLine": 4,
     "endLine": 4,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "    function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual {        \n}",
     "startLine": 5,
-    "endLine": 5,
+    "endLine": 6,
     "event": "add"
   },
   {
-    "code": "    function _earmarkSomeForMaintenance(uint256 earned0, uint256 earned1) private returns (uint256, uint256) {\n}",
-    "startLine": 6,
-    "endLine": 7,
-    "event": "add"
-  },
-  {
-    "code": "        uint256 toMaintenance;",
+    "code": "\n",
     "startLine": 7,
     "endLine": 7,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "    function _afterTokenTransfer(address from, address to, uint256 amount) internal virtual {        \n}",
     "startLine": 8,
-    "endLine": 8,
+    "endLine": 9,
     "event": "add"
   },
   {
-    "code": "        unchecked {            \n}",
-    "startLine": 9,
-    "endLine": 10,
-    "event": "add"
-  },
-  {
-    "code": "            toMaintenance = earned0 / MAINTENANCE_FEE;",
+    "code": "\n",
     "startLine": 10,
     "endLine": 10,
     "event": "add"
   },
   {
-    "code": "            earned0 -= toMaintenance;",
+    "code": "    function _burn(address account, uint256 amount) internal virtual {\n}",
     "startLine": 11,
-    "endLine": 11,
+    "endLine": 12,
     "event": "add"
   },
   {
-    "code": "            maintenanceBudget0 += toMaintenance;            ",
+    "code": "        require(account != address(0), \"ERC20: burn from the zero address\");",
     "startLine": 12,
     "endLine": 12,
     "event": "add"
   },
   {
-    "code": "            toMaintenance = earned1 / MAINTENANCE_FEE;",
+    "code": "        _beforeTokenTransfer(account, address(0), amount);",
     "startLine": 13,
     "endLine": 13,
     "event": "add"
   },
   {
-    "code": "            earned1 -= toMaintenance;",
+    "code": "        uint256 accountBalance = _balances[account];",
     "startLine": 14,
     "endLine": 14,
     "event": "add"
   },
   {
-    "code": "            maintenanceBudget1 += toMaintenance;",
+    "code": "        require(accountBalance >= amount, \"ERC20: burn amount exceeds balance\");",
     "startLine": 15,
     "endLine": 15,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "        unchecked {\n}",
+    "startLine": 16,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "            _balances[account] = accountBalance - amount;",
     "startLine": 17,
     "endLine": 17,
     "event": "add"
   },
   {
-    "code": "        return (earned0, earned1);",
-    "startLine": 18,
-    "endLine": 18,
+    "code": "        _totalSupply -= amount;",
+    "startLine": 19,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "        _afterTokenTransfer(account, address(0), amount);",
+    "startLine": 20,
+    "endLine": 20,
     "event": "add"
   },
   {
     "code": "// @Debugging BEGIN",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 12,
+    "endLine": 12,
     "event": "add"
   },
   {
-    "code": "// @StateVar maintenanceBudget0 = [100,100];",
-    "startLine": 8,
-    "endLine": 8,
+    "code": "// @StateVar _totalSupply = [500,500];",
+    "startLine": 13,
+    "endLine": 13,
     "event": "add"
   },
   {
-    "code": "// @StateVar maintenanceBudget1 = [100,100];",
-    "startLine": 9,
-    "endLine": 9,
+    "code": "// @StateVar _balances[account] = [1000,1000];",
+    "startLine": 14,
+    "endLine": 14,
     "event": "add"
   },
   {
-    "code": "// @LocalVar earned0 = [50,50];",
-    "startLine": 10,
-    "endLine": 10,
-    "event": "add"
-  },
-  {
-    "code": "// @LocalVar earned1 = [50,50];",
-    "startLine": 11,
-    "endLine": 11,
+    "code": "// @LocalVar amount = [10,10];",
+    "startLine": 15,
+    "endLine": 15,
     "event": "add"
   },
   {
     "code": "// @Debugging END",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 16,
+    "endLine": 16,
     "event": "add"
   }
 ]
