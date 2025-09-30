@@ -16,6 +16,7 @@ from Analyzer.RecordManager import RecordManager
 from Analyzer.StaticCFGFactory import StaticCFGFactory
 from Interpreter.Semantics.Evaluation import Evaluation
 from Interpreter.Semantics.Update import Update
+from Interpreter.Semantics.DebugInitializer import DebugInitializer
 from Interpreter.Semantics.Refine import Refine
 from Interpreter.Engine import Engine
 
@@ -51,6 +52,7 @@ class ContractAnalyzer:
 
         self.evaluator = Evaluation(self)
         self.updater = Update(self)
+        self.debug_initializer = DebugInitializer(self)
         self.refiner = Refine(self)
         self.engine = Engine(self)
         self.builder = DynamicCFGBuilder(self)
@@ -78,12 +80,17 @@ class ContractAnalyzer:
                 d[new_ln] = d.pop(old_ln)
 
         # ② 이미 생성된 CFG-Statement 들의 src_line 보정
+        stmt_count = 0
         for ccf in self.contract_cfgs.values():
             for fcfg in ccf.functions.values():
                 for blk in fcfg.graph.nodes:
                     for st in blk.statements:
                         if getattr(st, "src_line", None) == old_ln:
                             st.src_line = new_ln
+                            stmt_count += 1
+        if stmt_count > 0:
+            pass
+            # print(f"DEBUG _shift_meta: Shifted {stmt_count} statements from line {old_ln} to {new_ln}")
 
     def _insert_lines(self, start: int, new_lines: list[str]):
         new_lines = self.normalize_compound_control_lines(new_lines)
@@ -1859,21 +1866,31 @@ class ContractAnalyzer:
 
     # ─────────────────────────────────────────────────────────────
     def process_state_var_for_debug(self, lhs_expr: Expression, value):
-        ccf  = self.contract_cfgs[self.current_target_contract]
-        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
-        if self.current_target_function_cfg is None:
-            raise ValueError("@StateVar must be inside a function.")
 
-        self.updater.apply_debug_directive(
-            scope="state",
-            lhs_expr=lhs_expr,
-            value=value,
-            variables=self.current_target_function_cfg.related_variables,
-            edit_event=self.current_edit_event,
-        )
+        try:
+            ccf  = self.contract_cfgs[self.current_target_contract]
+            self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+            if self.current_target_function_cfg is None:
+                raise ValueError("@StateVar must be inside a function.")
 
-        # 함수 다시 해석하도록 배치
-        self._batch_targets.add(self.current_target_function_cfg)
+            # print(f"DEBUG: Processing @StateVar, current_target_function: {self.current_target_function}")
+            # print(f"DEBUG: lhs_expr: {lhs_expr}, value: {value}")
+
+            self.debug_initializer.apply_debug_directive_enhanced(
+                scope="state",
+                lhs_expr=lhs_expr,
+                value=value,
+                variables=self.current_target_function_cfg.related_variables,
+                edit_event=self.current_edit_event,
+            )
+
+            # 함수 다시 해석하도록 배치
+            self._batch_targets.add(self.current_target_function_cfg)
+            # print(f"DEBUG: Added to batch_targets, now has {len(self._batch_targets)} items")
+        except Exception as e:
+            print(f"ERROR in process_state_var_for_debug: {e}")
+            import traceback
+            traceback.print_exc()
 
     # ------------------------------------------------------------------
     #  @LocalVar   debug 주석
@@ -1884,7 +1901,7 @@ class ContractAnalyzer:
         if self.current_target_function_cfg is None:
             raise ValueError("@LocalVar must be inside a function.")
 
-        self.updater.apply_debug_directive(
+        self.debug_initializer.apply_debug_directive_enhanced(
             scope="local",
             lhs_expr=lhs_expr,
             value=value,
@@ -1918,11 +1935,14 @@ class ContractAnalyzer:
         if patched_lines:
             for _code, s, e in patched_lines:
                 touched.update(range(s, e + 1))
-        elif getattr(self, "_last_touched_lines", None):
-            touched |= set(self._last_touched_lines)
+            # print(f"DEBUG send_report: Using patched_lines, touched={touched}")
         elif getattr(self, "_last_func_lines", None):
             s, e = self._last_func_lines
             touched.update(range(s, e + 1))
+            # print(f"DEBUG send_report: Using _last_func_lines ({s}, {e}), touched={touched}")
+        elif getattr(self, "_last_touched_lines", None):
+            touched |= set(self._last_touched_lines)
+            # print(f"DEBUG send_report: Using _last_touched_lines, touched={touched}")
 
         if not touched:
             print("※ send_report_to_front : 보여줄 라인이 없습니다.")
@@ -1930,6 +1950,7 @@ class ContractAnalyzer:
 
         lmin, lmax = min(touched), max(touched)
         kinds = {"varDeclaration", "assignment", "return", "implicitReturn", "loopDelta"}
+        # print(f"DEBUG send_report: Searching lines {lmin}-{lmax}, ledger has keys: {list(self.recorder.ledger.keys())}")
         payload = self.get_line_analysis(lmin, lmax, kinds=kinds)
 
         if not payload:

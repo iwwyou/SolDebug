@@ -35,6 +35,7 @@ class RecordManager:
         for ln in lines:
             self.ledger.pop(ln, None)
 
+
     # ─────────────────────────────────────────────────────
     # 지역변수 선언 기록
     # ─────────────────────────────────────────────────────
@@ -108,6 +109,7 @@ class RecordManager:
 
         # ③ line_no → rec_list 가져오기
         rec_list = self.ledger[line_no]          #   self._acc  == defaultdict(list)
+        # print(f"DEBUG RecordManager: Adding record to line {line_no}, current ledger size: {len(self.ledger)}")
 
         # ④ “같은 루트-키” 기록이 이미 있으면 **교체**, 없으면 append
         new_keys = set(payload["vars"].keys())

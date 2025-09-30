@@ -25,7 +25,11 @@ def simulate_inputs(records):
             continue
 
         if stripped.startswith("// @Debugging END"):
+            print(f"DEBUG: batch_targets before flush: {len(contract_analyzer._batch_targets)}")
+            print(f"DEBUG: recorder ledger before flush: {len(contract_analyzer.recorder.ledger)}")
             batch_mgr.flush()  # TC 완성 → 1 회 해석
+            print(f"DEBUG: _last_func_lines after flush: {getattr(contract_analyzer, '_last_func_lines', None)}")
+            print(f"DEBUG: recorder ledger after flush: {len(contract_analyzer.recorder.ledger)}")
             in_testcase = False
             continue
 

@@ -98,9 +98,13 @@ class Engine:
         lexp, rexpr, op = stmt.left, stmt.right, stmt.operator
         r_val = (self.eval.evaluate_expression(rexpr, variables, None, None)
                  if isinstance(rexpr, Expression) else rexpr)
-        # 마지막 인자는 기록 여부
-        self.up.update_left_var(lexp, r_val, op, variables, None, None,
-                                (self._record_enabled and not self._suppress_stmt_records))
+
+        should_record = self._record_enabled and not self._suppress_stmt_records
+        line_num = getattr(stmt, 'src_line', None)
+        # print(f"DEBUG Assignment L{line_num}: record={should_record}")
+
+        # stmt.src_line을 line_no로 전달
+        self.up.update_left_var(lexp, r_val, op, variables, None, None, should_record, line_num)
         return variables
 
     def _interpret_unary(self, stmt, variables):
@@ -329,6 +333,8 @@ class Engine:
         # 기록 초기화
         self._record_enabled = True
         an._seen_stmt_ids.clear()
+        # print(f"DEBUG Engine: Starting function interpretation for {fcfg.function_name}")
+        # print(f"DEBUG Engine: _record_enabled = {self._record_enabled}")
         for blk in fcfg.graph.nodes:
             for st in blk.statements:
                 ln = getattr(st, "src_line", None)
@@ -477,6 +483,8 @@ class Engine:
         self._sync_named_return_vars(fcfg)
 
         # 컨텍스트 복원
+        # print(f"DEBUG Engine: Finished function interpretation for {fcfg.function_name}")
+        # print(f"DEBUG Engine: Recorder ledger size after: {len(self.rec.ledger)}")
         an.current_target_function = _old_func
         an.current_target_function_cfg = _old_fcfg
 

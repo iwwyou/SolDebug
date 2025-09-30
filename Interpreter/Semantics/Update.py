@@ -22,24 +22,37 @@ class Update :
         return self.an.evaluator
 
     def update_left_var(self, expr, rVal, operator, variables, callerObject=None, callerContext=None,
-                        log:bool=False):
+                        log:bool=False, line_no:int=None, top_expr=None):
+        """
+        log: True이면 recording 활성화
+        line_no: recording할 라인 번호 (None이면 self.an.current_start_line 사용)
+        top_expr: recording할 때 사용할 최상위 LHS expression (None이면 expr 사용)
+        """
+        # 최상위 호출에서는 top_expr이 None이므로 expr을 사용
+        if top_expr is None:
+            top_expr = expr
+
+        if log:
+            actual_line = line_no if line_no is not None else self.an.current_start_line
+            # print(f"DEBUG Update: update_left_var called with log=True for expr context: {expr.context}, line_no={actual_line}")
+
         # ── ① 글로벌이면 갱신 금지 ─────────────────────────
         if callerObject is None and callerContext is None and VariableEnv.is_global_expr(expr):
             return None
 
         if expr.context == "IndexAccessContext":
             return self.update_left_var_of_index_access_context(expr, rVal, operator, variables,
-                                                                callerObject, callerContext, log)
+                                                                callerObject, callerContext, log, line_no, top_expr)
         elif expr.context == "MemberAccessContext":
             return self.update_left_var_of_member_access_context(expr, rVal, operator, variables,
-                                                                 callerObject, callerContext, log)
+                                                                 callerObject, callerContext, log, line_no, top_expr)
 
         elif expr.context == "IdentifierExpContext":
             return self.update_left_var_of_identifier_context(expr, rVal, operator, variables,
-                                                              callerObject, callerContext, log)
+                                                              callerObject, callerContext, log, line_no, top_expr)
         elif expr.context == "LiteralExpContext":
             return self.update_left_var_of_literal_context(expr, rVal, operator, variables,
-                                                           callerObject, callerContext. log)
+                                                           callerObject, callerContext, log, line_no, top_expr)
         elif expr.context == "TestingIndexAccess":
             return self.update_left_var_of_testing_index_access_context(expr, rVal, operator, variables,
                                                                                  callerObject, callerContext, log)
@@ -90,9 +103,11 @@ class Update :
             self._patch_var_with_new_value(target, new_val)
 
             if log :
+                line_no = self.an.current_start_line
+                # print(f"DEBUG Update: Recording assignment, line_no={line_no}")
                 # 🔸 즉시 기록
                 self.an.recorder.record_assignment(
-                    line_no=self.an.current_start_line,
+                    line_no=line_no,
                     expr=expr,
                     var_obj=target,
                     base_obj=caller_object,
@@ -166,23 +181,23 @@ class Update :
 
     def update_left_var_of_index_access_context(self, expr, rVal, operator, variables,
                                                 callerObject=None, callerContext=None,
-                                                log:bool=False):
+                                                log:bool=False, line_no:int=None, top_expr=None):
         # base expression에 대한 재귀
         base_obj = self.update_left_var(expr.base, rVal, operator, variables,
-                                        None, "IndexAccessContext",log)
+                                        None, "IndexAccessContext", log, line_no, top_expr)
 
         # index expression에 대한 재귀
         return self.update_left_var(expr.index, rVal, operator, variables,
-                                    base_obj, "IndexAccessContext", log)
+                                    base_obj, "IndexAccessContext", log, line_no, top_expr)
 
     def update_left_var_of_member_access_context(
             self, expr, rVal, operator, variables,
             callerObject=None, callerContext=None,
-            log:bool=False):
+            log:bool=False, line_no:int=None, top_expr=None):
 
         # ① 먼저 base 부분을 재귀-업데이트
         base_obj = self.update_left_var(expr.base, rVal, operator,
-                                        variables, None, "MemberAccessContext", log)
+                                        variables, None, "MemberAccessContext", log, line_no, top_expr)
         member = expr.member
 
         # ────────────────────────────────────────────────
@@ -293,7 +308,9 @@ class Update :
             variables: dict[str, Variables],
             caller_object: Variables | ArrayVariable | MappingVariable | None = None,
             caller_context=None,
-            log: bool = False
+            log: bool = False,
+            line_no: int = None,
+            top_expr = None
     ):
         # ───────────────────────────── 준비 ─────────────────────────────
         lit = expr.literal  # 예: 123, 0x1a, true …
@@ -424,9 +441,14 @@ class Update :
             variables: dict[str, Variables],
             caller_object: Variables | ArrayVariable | StructVariable | MappingVariable | None = None,
             caller_context: str | None = None,
-            log: bool = False
+            log: bool = False,
+            line_no: int = None,
+            top_expr = None
     ):
         ident = expr.identifier
+
+        # line_no를 헬퍼 함수에서 접근하기 위해 미리 결정
+        actual_line_no = line_no if line_no is not None else self.an.current_start_line
 
         # ────────────────────────── 내부 헬퍼 ──────────────────────────
         def _apply_to_leaf(var_obj: Variables | EnumVariable, record_expr: Expression):
@@ -458,6 +480,18 @@ class Update :
             # (b) 실제 값 패치 (operator가 None이 아닐 때만)
             if operator is not None:
                 var_obj.value = self.compound_assignment(var_obj.value, conv_val, operator)
+
+            # (c) 기록 (log가 True이고 operator가 None이 아닐 때)
+            if log and operator is not None:
+                # top_expr을 사용하여 최상위 LHS expression 기록
+                actual_record_expr = top_expr if top_expr is not None else record_expr
+                # print(f"DEBUG Update: _apply_to_leaf calling record_assignment, line_no={actual_line_no}, expr={self.an.recorder._expr_to_str(actual_record_expr)}")
+                self.an.recorder.record_assignment(
+                    line_no=actual_line_no,
+                    expr=actual_record_expr,
+                    var_obj=var_obj,
+                    base_obj=caller_object,
+                )
 
 
         # ======================================================================
@@ -895,11 +929,6 @@ class Update :
         # ③ 주소-ID 바인딩 ---------------------------------------------------
         self._bind_if_address(target)
 
-        # ④ Recorder 기록 ---------------------------------------------------
-        #   – ‘주석’ 이므로 kind 를 별도로 “debugAssign” 으로
-        self.an.recorder.record_assignment(
-            line_no=self.an.current_start_line,
-            expr=lhs_expr,
-            var_obj=target,
-            base_obj=None,
-        )
+        # ④ Recorder 기록 제거 -----------------------------------------------
+        #   디버그 주석은 초기값 설정이므로 기록 불필요
+        #   실제 assignment는 재해석 시 자동으로 기록됨

@@ -39,13 +39,14 @@ class DebugBatchManager:
                 tree = ParserHelpers.generate_parse_tree(code, "debugUnit")
                 EnhancedSolidityVisitor(self.analyzer).visit(tree)
 
-            # 선택된 한 함수만 재-해석
+            # 선택된 한 함수만 재-해석 (스냅샷 복원 전에 실행)
             self.analyzer.flush_reinterpret_target()
-
-            # 결과 전송
-            self.analyzer.send_report_to_front(None)
         finally:
+            # 스냅샷 복원 후에 결과 전송
             self.snapman.restore_from_snap(snap)
+
+        # 결과 전송 (스냅샷 복원 후)
+        self.analyzer.send_report_to_front(None)
 
     # ── 테스트-케이스 새로 시작할 때 호출 ──────────────────
     def reset(self):
