@@ -121,7 +121,8 @@ def test_single_annotation_file(json_file_path: str) -> Dict[str, Any]:
             'execution_time': execution_time,
             'error_message': error_message,
             'num_records': len(test_inputs),
-            'analysis_count': len(analysis_result) if analysis_result else 0
+            'analysis_count': len(analysis_result) if analysis_result else 0,
+            'analysis_result': analysis_result
         }
 
     except Exception as e:
@@ -249,6 +250,20 @@ def main():
 
         # Print immediate result
         status_icon = "OK" if result['status'] == 'SUCCESS' else "ERROR"
+
+        # Print analysis results if successful
+        if result['status'] == 'SUCCESS' and result.get('analysis_result'):
+            print("\n=======  ANALYSIS  =======")
+            for analysis_item in result['analysis_result']:
+                line_range = analysis_item['line_range']
+                analysis = analysis_item['analysis']
+                for ln, records in analysis.items():
+                    for rec in records:
+                        kind = rec.get("kind", "?")
+                        vars_ = rec.get("vars", {})
+                        print(f"{ln:4} │ {kind:<14} │ {vars_}")
+            print("==========================\n")
+
         print(f"  {status_icon} {result['status']} - {result['execution_time']:.3f}s")
         if result['error_message']:
             print(f"    Error: {result['error_message']}")

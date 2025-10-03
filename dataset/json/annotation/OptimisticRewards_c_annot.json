@@ -70,5 +70,35 @@
     "startLine": 17,
     "endLine": 17,
     "event": "add"
+  },
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "// @GlobalVar block.timestamp = [100,200];",
+    "startLine": 9,
+    "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar proposalTime = [0,10];",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar challengePeriod = [80,95];",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
   }
 ]

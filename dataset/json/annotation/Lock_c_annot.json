@@ -145,50 +145,56 @@
   },
   {
     "code": "// @Debugging BEGIN",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 15,
+    "endLine": 15,
     "event": "add"
   },
   {
-    "code": "// @StateVar _data.total = [500,500];",
-    "startLine": 7,
-    "endLine": 7,
+    "code": "// @GlobalVar block.timsetamp = [1000,1500];",
+    "startLine": 16,
+    "endLine": 16,
     "event": "add"
   },
   {
-    "code": "// @StateVar _data.UnlockedAmounts = [10,10];",
-    "startLine": 8,
-    "endLine": 8,
+    "code": "// @StateVar _data.total = [700,800];",
+    "startLine": 17,
+    "endLine": 17,
     "event": "add"
   },
   {
-    "code": "// @StateVar _data.pending = [1,1];",
-    "startLine": 9,
-    "endLine": 9,
+    "code": "// @StateVar _data.UnlockedAmounts = [10,20];",
+    "startLine": 18,
+    "endLine": 18,
     "event": "add"
   },
   {
-    "code": "// @StateVar startLock = [1,1];",
-    "startLine": 10,
-    "endLine": 10,
+    "code": "// @StateVar _data.pending = [30,50];",
+    "startLine": 19,
+    "endLine": 19,
     "event": "add"
   },
   {
-    "code": "// @StateVar unlockDuration = [1,1];",
-    "startLine": 11,
-    "endLine": 11,
+    "code": "// @StateVar startLock = [300,400];",
+    "startLine": 20,
+    "endLine": 20,
     "event": "add"
   },
   {
-    "code": "// @StateVar lockedTime = [1,1];",
-    "startLine": 12,
-    "endLine": 12,
+    "code": "// @StateVar unlockDuration = [1,3];",
+    "startLine": 21,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar lockedTime = [600,700];",
+    "startLine": 22,
+    "endLine": 22,
     "event": "add"
   },
   {
     "code": "// @Debugging END",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 23,
+    "endLine": 23,
     "event": "add"
   }
 ]

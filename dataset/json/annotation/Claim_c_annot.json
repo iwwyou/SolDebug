@@ -79,38 +79,44 @@
   },
   {
     "code": "// @Debugging BEGIN",
-    "startLine": 7,
-    "endLine": 7,
-    "event": "add"
-  },
-  {
-    "code": "// @StateVar claimedOnce = [1,1];",
-    "startLine": 7,
-    "endLine": 7,
-    "event": "add"
-  },
-  {
-    "code": "// @StateVar startTime = [1,1];",
-    "startLine": 8,
-    "endLine": 8,
-    "event": "add"
-  },
-  {
-    "code": "// @StateVar locktime = [1,1];",
     "startLine": 9,
     "endLine": 9,
     "event": "add"
   },
   {
-    "code": "// @StateVar claimable = [1,1];",
+    "code": "// @GlobalVar block.timestamp = [300,400];",
     "startLine": 10,
     "endLine": 10,
+    "event": "add"  },
+  
+  {
+    "code": "// @StateVar claimedOnce[user] = any;",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar startTime = [200,300];",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar locktime = [50,150];",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar claimable[user] = [3,30];",
+    "startLine": 14,
+    "endLine": 14,
     "event": "add"
   },
   {
     "code": "// @Debugging END",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 15,
+    "endLine": 15,
     "event": "add"
   }
 ]

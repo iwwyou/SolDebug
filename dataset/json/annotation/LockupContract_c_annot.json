@@ -115,38 +115,44 @@
   },
   {
     "code": "// @Debugging BEGIN",
-    "startLine": 7,
-    "endLine": 7,
-    "event": "add"
-  },
-  {
-    "code": "// @StateVar initialAmount = [10,10];",
-    "startLine": 7,
-    "endLine": 7,
-    "event": "add"
-  },
-  {
-    "code": "// @StateVar deploymentStartTime = [1,1];",
-    "startLine": 8,
-    "endLine": 8,
-    "event": "add"
-  },
-  {
-    "code": "// @StateVar monthsToWaitBeforeUnlock = [1,1];",
     "startLine": 9,
     "endLine": 9,
     "event": "add"
   },
   {
-    "code": "// @StateVar releaseSchedule = [1,1];",
+    "code": "// @GlobalVar block.timestamp = [100,200];",
     "startLine": 10,
     "endLine": 10,
     "event": "add"
   },
   {
+    "code": "// @StateVar initialAmount = [50,60];",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar deploymentStartTime = [8,10];",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar monthsToWaitBeforeUnlock = [5,6];",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar releaseSchedule = [2,3];",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
     "code": "// @Debugging END",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 15,
+    "endLine": 15,
     "event": "add"
   }
 ]

@@ -67,26 +67,26 @@
   },
   {
     "code": "// @Debugging BEGIN",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 10,
+    "endLine": 10,
     "event": "add"
   },
   {
-    "code": "// @StateVar baseQuorum = [1,1];",
-    "startLine": 7,
-    "endLine": 7,
+    "code": "// @StateVar baseQuorum = [100,200];",
+    "startLine": 11,
+    "endLine": 11,
     "event": "add"
   },
   {
-    "code": "// @StateVar _quroms = [1,1];",
-    "startLine": 8,
-    "endLine": 8,
+    "code": "// @StateVar _quroms[target][functionSelector] = [0,50];",
+    "startLine": 12,
+    "endLine": 12,
     "event": "add"
   },
   {
     "code": "// @Debugging END",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 13,
+    "endLine": 13,
     "event": "add"
   }
 ]

@@ -48,6 +48,8 @@ class Evaluation :
             return self.evaluate_inline_array_expression_context(expr, variables, callerObject, callerContext)
         elif expr.context == "FunctionCallContext":
             return self.evaluate_function_call_context(expr, variables, callerObject, callerContext)
+        elif expr.context == "FunctionCallOptionContext":
+            return self.evaluate_function_call_option_context(expr, variables, callerObject, callerContext)
         elif expr.context == "TupleExpressionContext":
             return self.evaluate_tuple_expression_context(expr, variables,
                                                           callerObject, callerContext)
@@ -872,6 +874,28 @@ class Evaluation :
         if not contract_cfg:
             raise ValueError(f"Unable to find contract CFG for {self.an.current_target_contract}")
 
+        # 2-A) 구조체 생성자인지 확인
+        if function_name in contract_cfg.structDefs:
+            # 구조체 생성자: StructName({ field1: val1, ... })
+            struct_def = contract_cfg.structDefs[function_name]
+            new_struct = StructVariable(
+                identifier=f"temp_{function_name}_{id(expr)}",
+                struct_type=function_name,
+                scope="memory"
+            )
+            new_struct.initialize_struct(struct_def)
+
+            # named_arguments로 필드 초기화
+            named_args = expr.named_arguments if expr.named_arguments else {}
+            for field_name, field_expr in named_args.items():
+                if field_name in new_struct.members:
+                    field_value = self.evaluate_expression(field_expr, variables, None, None)
+                    field_var = new_struct.members[field_name]
+                    if isinstance(field_var, Variables):
+                        field_var.value = field_value
+
+            return new_struct
+
         # 3) 함수 CFG 가져오기
         function_cfg = contract_cfg.get_function_cfg(function_name)
         if not function_cfg:
@@ -1195,6 +1219,50 @@ class Evaluation :
         # 4. 기타 처리 (필요시 확장 가능)
         else:
             raise ValueError(f"Unsupported type for default interval: {var_type}")
+
+    def evaluate_function_call_option_context(self, expr, variables, callerObject=None, callerContext=None):
+        """
+        FunctionCallOptions: expr.function { option1: val1, option2: val2, ... }
+
+        두 가지 경우:
+        1) 구조체 생성자: StructName({ field1: val1, field2: val2 })
+        2) 함수 호출 옵션: contract.func{value: 1 ether, gas: 5000}(args)
+        """
+        # expr.function이 구조체 타입 이름인지 확인
+        if expr.function and expr.function.context == "IdentifierExpContext":
+            struct_name = expr.function.identifier
+
+            # 구조체인지 확인
+            if struct_name in self.an.structs:
+                # 구조체 생성자: 새 StructVariable 생성
+                struct_def = self.an.structs[struct_name]
+                ccf = self.an.contract_cfgs[self.an.current_target_contract]
+
+                new_struct = StructVariable(
+                    identifier=f"temp_{struct_name}_{id(expr)}",
+                    struct_type=struct_name,
+                    scope="memory"
+                )
+                new_struct.typeInfo = SolType(typeCategory="struct", structTypeName=struct_name)
+
+                # 구조체 초기화
+                new_struct.initialize_struct(struct_def)
+
+                # options에서 필드 값 설정
+                if expr.options:
+                    for field_name, field_expr in expr.options.items():
+                        if field_name in new_struct.members:
+                            field_value = self.evaluate_expression(field_expr, variables, None, None)
+                            field_var = new_struct.members[field_name]
+                            if isinstance(field_var, Variables):
+                                field_var.value = field_value
+                            # 중첩 구조체/배열의 경우 추가 처리 필요할 수 있음
+
+                return new_struct
+
+        # 함수 호출 옵션 (예: {value: 1 ether, gas: 5000})
+        # 현재는 symbolic으로 처리
+        return f"symbolicFunctionCallOptions({expr.function})"
 
     @staticmethod
     def compare_intervals(left_interval, right_interval, operator):

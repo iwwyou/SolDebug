@@ -91,26 +91,32 @@
   },
   {
     "code": "// @Debugging BEGIN",
-    "startLine": 7,
-    "endLine": 7,
-    "event": "add"
-  },
-  {
-    "code": "// @LocalVar _savedPreviousUpdatedTimestamp = [1,1];",
-    "startLine": 7,
-    "endLine": 7,
-    "event": "add"
-  },
-  {
-    "code": "// @LocalVar _poolInterval = [1,1];",
     "startLine": 8,
     "endLine": 8,
     "event": "add"
   },
   {
+    "code": "// @GlobalVar block.timestamp = [100,200];",
+    "startLine": 9,
+    "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar _savedPreviousUpdatedTimestamp = [10,20];",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar _poolInterval = [5,10];",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
     "code": "// @Debugging END",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 12,
+    "endLine": 12,
     "event": "add"
   }
 ]

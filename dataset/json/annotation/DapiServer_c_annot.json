@@ -67,26 +67,26 @@
   },
   {
     "code": "// @Debugging BEGIN",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 5,
+    "endLine": 5,
     "event": "add"
   },
   {
-    "code": "// @LocalVar initalValue = [1,1];",
-    "startLine": 7,
-    "endLine": 7,
+    "code": "// @LocalVar initalValue = [300,350];",
+    "startLine": 6,
+    "endLine": 6,
     "event": "add"
   },
   {
-    "code": "// @LocalVar updatedValue = [1,1];",
-    "startLine": 8,
-    "endLine": 8,
+    "code": "// @LocalVar updatedValue = [500,550];",
+    "startLine": 7,
+    "endLine": 7,
     "event": "add"
   },
   {
     "code": "// @Debugging END",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 8,
+    "endLine": 8,
     "event": "add"
   }
 ]

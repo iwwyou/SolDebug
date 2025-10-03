@@ -625,23 +625,16 @@ class Engine:
             in_env = _compute_in(n)
 
             if _is_loop_head(n):
-                false_s = _false_succs(n)
-                only_exit = (len(false_s) == 1 and _is_sink(false_s[0]))
-
                 # ★ loopDelta 가 찍힐 cond 라인도 미리 clear (중복 방지)
                 ln_head = getattr(n, "src_line", None)
                 _clear_line_once(ln_head)
                 if ln_head is not None: touched_lines.add(ln_head)
 
-                if not only_exit:
-                    exit_node = self.fixpoint(n)
-                    for s in G.successors(exit_node):
-                        if not _is_sink(s) and s not in in_queue:
-                            WL.append(s); in_queue.add(s)
-                else:
-                    for s in false_s:
-                        if not _is_sink(s) and s not in in_queue:
-                            WL.append(s); in_queue.add(s)
+                exit_node = self.fixpoint(n)
+                for s in G.successors(exit_node):
+                    if not _is_sink(s) and s not in in_queue:
+                        WL.append(s); in_queue.add(s)
+
                 continue
 
             new_out = self.transfer_function(n, in_env)
@@ -721,7 +714,6 @@ class Engine:
         for ln, info in (self.an.line_info or {}).items():
             nodes = []
             if isinstance(info.get("cfg_nodes"), list): nodes.extend(info["cfg_nodes"])
-            elif info.get("cfg_node") is not None:     nodes.append(info["cfg_node"])
             if entry in nodes: return ln
         return None
 

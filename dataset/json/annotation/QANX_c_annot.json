@@ -205,38 +205,56 @@
   },
   {
     "code": "// @Debugging BEGIN",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 27,
+    "endLine": 27,
     "event": "add"
   },
   {
-    "code": "// @StateVar _locks.tokenAmount = [10,10];",
-    "startLine": 7,
-    "endLine": 7,
+    "code": "// @GlobalVar block.timestamp = [2000,3000];",
+    "startLine": 28,
+    "endLine": 28,
     "event": "add"
   },
   {
-    "code": "// @StateVar _locks.hardLockUntil = [1,1];",
-    "startLine": 8,
-    "endLine": 8,
+    "code": "// @StateVar _locks[account].tokenAmount = [500,600];",
+    "startLine": 29,
+    "endLine": 29,
     "event": "add"
   },
   {
-    "code": "// @StateVar _locks.tokenAmount = [10,10];",
-    "startLine": 9,
-    "endLine": 9,
+    "code": "// @StateVar _locks[account].hardLockUntil = [100,200];",
+    "startLine": 30,
+    "endLine": 30,
     "event": "add"
   },
   {
-    "code": "// @StateVar _balances = [1000,1000];",
-    "startLine": 10,
-    "endLine": 10,
+    "code": "// @StateVar _locks[account].softLockUntil = [2500,3200];",
+    "startLine": 31,
+    "endLine": 31,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar _locks[account].lastUnlock = [50,80];",
+    "startLine": 32,
+    "endLine": 32,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar _locks[account].unlockPerSec = [10,15];",
+    "startLine": 33,
+    "endLine": 33,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar _balances[account] = [1000,1000];",
+    "startLine": 34,
+    "endLine": 34,
     "event": "add"
   },
   {
     "code": "// @Debugging END",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 35,
+    "endLine": 35,
     "event": "add"
   }
 ]

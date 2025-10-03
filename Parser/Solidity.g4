@@ -78,7 +78,7 @@ inheritanceSpecifier
 callArgumentList
   : '(' (
         (expression (',' expression)*)
-      | '{' (identifier ':' expression) (',' identifier ':' expression)* '}'
+      | '{' ((identifier ':' expression) (',' identifier ':' expression)*)? '}'
     )? ')';
 
 identifierPath

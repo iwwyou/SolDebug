@@ -42,81 +42,99 @@
     "event": "add"
   },
   {
-    "code": "        if (reinvestPath.length != 0) return reinvestPath;\n        address[] memory path;\n        if (baseToken == wNative) {\n}",
+    "code": "        if (reinvestPath.length != 0) {\n}",
     "startLine": 8,
-    "endLine": 11,
+    "endLine": 9,
     "event": "add"
   },
   {
-    "code": "            path = new address[](2);",
+    "code": "        return reinvestPath;",
+    "startLine": 9,
+    "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "           address[] memory path;",
     "startLine": 11,
     "endLine": 11,
     "event": "add"
   },
   {
-    "code": "            path[0] = address(cake);",
+    "code": "           if (baseToken == wNative) {\n}",
     "startLine": 12,
-    "endLine": 12,
+    "endLine": 13,
     "event": "add"
   },
   {
-    "code": "            path[1] = address(wNative);",
+    "code": "           path = new address[](2);",
     "startLine": 13,
     "endLine": 13,
     "event": "add"
   },
   {
-    "code": "else {\n}",
+    "code": "            path[0] = address(cake);",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "            path[1] = address(wNative);",
     "startLine": 15,
-    "endLine": 16,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "else {\n}",
+    "startLine": 16,
+    "endLine": 17,
     "event": "add"
   },
   {
     "code": "            path = new address[](3);",
-    "startLine": 16,
-    "endLine": 16,
-    "event": "add"
-  },
-  {
-    "code": "            path[0] = address(cake);",
     "startLine": 17,
     "endLine": 17,
     "event": "add"
   },
   {
-    "code": "            path[1] = address(wNative);",
+    "code": "            path[0] = address(cake);",
     "startLine": 18,
     "endLine": 18,
     "event": "add"
   },
   {
-    "code": "            path[2] = address(baseToken);",
+    "code": "            path[1] = address(wNative);",
     "startLine": 19,
     "endLine": 19,
     "event": "add"
   },
   {
+    "code": "            path[2] = address(baseToken);",
+    "startLine": 20,
+    "endLine": 20,
+    "event": "add"
+  },
+  {
     "code": "        return path;",
-    "startLine": 21,
-    "endLine": 21,
+    "startLine": 22,
+    "endLine": 22,
     "event": "add"
   },
   {
     "code": "// @Debugging BEGIN",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 8,
+    "endLine": 8,
     "event": "add"
   },
   {
-    "code": "// @StateVar reinvestPath = [1,1];",
-    "startLine": 7,
-    "endLine": 7,
+    "code": "// @StateVar reinvestPath = arrayAddress[];",
+    "startLine": 9,
+    "endLine": 9,
     "event": "add"
   },
   {
     "code": "// @Debugging END",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 10,
+    "endLine": 10,
     "event": "add"
   }
 ]

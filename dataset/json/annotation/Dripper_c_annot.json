@@ -55,32 +55,38 @@
   },
   {
     "code": "// @Debugging BEGIN",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 12,
+    "endLine": 12,
     "event": "add"
   },
   {
-    "code": "// @LocalVar _balance = [1000,1000];",
-    "startLine": 7,
-    "endLine": 7,
+    "code": "// @GlobalVar block.timestamp = [1000,1500];",
+    "startLine": 13,
+    "endLine": 13,
     "event": "add"
   },
   {
-    "code": "// @LocalVar _drip.lastCollect = [1,1];",
-    "startLine": 8,
-    "endLine": 8,
+    "code": "// @LocalVar _balance = [100,200];",
+    "startLine": 14,
+    "endLine": 14,
     "event": "add"
   },
   {
-    "code": "// @LocalVar _drip.perBlock = [1,1];",
-    "startLine": 9,
-    "endLine": 9,
+    "code": "// @LocalVar _drip.lastCollect = [10,20];",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar _drip.perBlock = [5,5];",
+    "startLine": 16,
+    "endLine": 16,
     "event": "add"
   },
   {
     "code": "// @Debugging END",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 17,
+    "endLine": 17,
     "event": "add"
   }
 ]

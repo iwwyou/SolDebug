@@ -40,13 +40,7 @@
     "startLine": 7,
     "endLine": 7,
     "event": "add"
-  },
-  {
-    "code": "// @StateVar getPercentage = [1,1];",
-    "startLine": 7,
-    "endLine": 7,
-    "event": "add"
-  },
+  },  
   {
     "code": "// @LocalVar _from = [1,1];",
     "startLine": 8,
@@ -54,15 +48,21 @@
     "event": "add"
   },
   {
-    "code": "// @LocalVar _to = [1,1];",
+    "code": "// @LocalVar _to = [3,3];",
     "startLine": 9,
     "endLine": 9,
     "event": "add"
   },
   {
+    "code": "// @StateVar getPercentage[_from][_to] = [20,30];",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
     "code": "// @Debugging END",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 11,
+    "endLine": 11,
     "event": "add"
   }
 ]

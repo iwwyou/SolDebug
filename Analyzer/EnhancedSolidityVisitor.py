@@ -1548,6 +1548,9 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         )
 
     def visitFunctionCallOptions(self, ctx):
+        # DEBUG: 구조체 생성자 확인
+        # print(f"[DEBUG] visitFunctionCallOptions called: {ctx.getText()[:100]}")
+
         # 1. 베이스 표현식 방문
         base_expr = self.visitExpression(ctx.expression())
 

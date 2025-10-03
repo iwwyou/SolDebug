@@ -127,38 +127,38 @@
   },
   {
     "code": "// @Debugging BEGIN",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 16,
+    "endLine": 16,
     "event": "add"
   },
   {
-    "code": "// @StateVar balancesOf = [1000,1000];",
-    "startLine": 7,
-    "endLine": 7,
+    "code": "// @StateVar balancesOf[src] = [1000,1000];",
+    "startLine": 17,
+    "endLine": 17,
     "event": "add"
   },
   {
-    "code": "// @StateVar allowance = [1,1];",
-    "startLine": 8,
-    "endLine": 8,
+    "code": "// @StateVar allowance[src][msg.sender] = [100,100];",
+    "startLine": 18,
+    "endLine": 18,
     "event": "add"
   },
   {
-    "code": "// @StateVar balancesOf = [1000,1000];",
-    "startLine": 9,
-    "endLine": 9,
+    "code": "// @StateVar balancesOf[dst] = [500,500];",
+    "startLine": 19,
+    "endLine": 19,
     "event": "add"
   },
   {
-    "code": "// @LocalVar wad = [1,1];",
-    "startLine": 10,
-    "endLine": 10,
+    "code": "// @LocalVar wad = [50,70];",
+    "startLine": 20,
+    "endLine": 20,
     "event": "add"
   },
   {
     "code": "// @Debugging END",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 21,
+    "endLine": 21,
     "event": "add"
   }
 ]

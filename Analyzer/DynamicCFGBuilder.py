@@ -225,12 +225,11 @@ class DynamicCFGBuilder:
         for s in old_succs:
             G.add_edge(join, s)
 
-        # line_info: 같은 라인에 cond와 join 둘 다 매핑 (멀티 노드)
+        # line_info: start line에는 cond만, end line에는 join만
         bc = line_info.setdefault(line_no, {"open": 0, "close": 0, "cfg_nodes": []})
-        # program-order 보존: cond 먼저, join 나중
-        bc["cfg_nodes"].extend([cond, join])
+        bc["cfg_nodes"].append(cond)
 
-        # 선택: end_line에도 join을 걸고 싶으면
+        # end_line에 join 추가
         if end_line is not None:
             bc_end = line_info.setdefault(end_line, {"open": 0, "close": 0, "cfg_nodes": []})
             bc_end["cfg_nodes"].append(join)
@@ -306,9 +305,9 @@ class DynamicCFGBuilder:
             new_outer_env = VariableEnv.join_variables_simple(new_outer_env, getattr(p, "variables", {}) or {})
         outer_join.variables = VariableEnv.copy_variables(new_outer_env or {})
 
-        # ⑤ line_info: 헤딩 라인에 cond/로컬 join 둘 다 매핑 (멀티 노드)
+        # ⑤ line_info: start line에는 cond만, end line에는 local_join만
         bc = line_info.setdefault(line_no, {"open": 0, "close": 0, "cfg_nodes": []})
-        bc["cfg_nodes"].extend([cond, local_join])
+        bc["cfg_nodes"].append(cond)
 
         if end_line is not None:
             bc_end = line_info.setdefault(end_line, {"open": 0, "close": 0, "cfg_nodes": []})
@@ -444,11 +443,11 @@ class DynamicCFGBuilder:
             G.add_edge(exit_, s)
 
         # ── ④ line_info ------------------------------------------------
-        # 시작 라인: 조건 노드 매핑
+        # 시작 라인: 조건 노드만 매핑
         bc = line_info.setdefault(line_no, {"open": 0, "close": 0, "cfg_nodes": []})
         bc["cfg_nodes"].append(cond)
 
-        # 끝 라인: loop-exit 노드 매핑
+        # 끝 라인: loop-exit 노드만 매핑
         if end_line is not None:
             bc_end = line_info.setdefault(end_line, {"open": 0, "close": 0, "cfg_nodes": []})
             bc_end["cfg_nodes"].append(exit_)
@@ -553,15 +552,11 @@ class DynamicCFGBuilder:
             G.add_edge(exit_, funcExit)
 
         # ── ⑤ line_info ------------------------------------------------
-        # 시작 라인: 조건 노드 매핑
-        bc = line_info.setdefault(line_no, {"open": 0, "close": 0, "cfg_node": cast(Optional[CFGNode], None), "cfg_nodes": []})
-        bc["cfg_node"] = cond
-        if isinstance(bc.get("cfg_nodes"), list):
-            bc["cfg_nodes"].append(cond)
-        else:
-            bc["cfg_nodes"] = [cond]
+        # 시작 라인: 조건 노드만 매핑
+        bc = line_info.setdefault(line_no, {"open": 0, "close": 0, "cfg_nodes": []})
+        bc["cfg_nodes"].append(cond)
 
-        # 끝 라인: loop-exit 노드 매핑
+        # 끝 라인: loop-exit 노드만 매핑
         if end_line is not None:
             bc_end = line_info.setdefault(end_line, {"open": 0, "close": 0, "cfg_nodes": []})
             bc_end["cfg_nodes"].append(exit_)
@@ -954,10 +949,10 @@ class DynamicCFGBuilder:
         for s in old_succs:
             G.add_edge(do_end, s)
 
-        # line_info (cfg_nodes 리스트 사용)
+        # line_info: do 시작 라인에는 do_entry만 추가
+        # do_end는 while 조건 라인에서 찾을 수 있도록 그래프 구조로만 연결
         bc = line_info.setdefault(line_no, {"open": 0, "close": 0, "cfg_nodes": []})
         bc["cfg_nodes"].append(do_entry)
-        bc["cfg_nodes"].append(do_end)
 
     def build_do_while_statement(
             self, *, do_entry: CFGNode, while_line: int, fcfg: FunctionCFG,
@@ -999,9 +994,12 @@ class DynamicCFGBuilder:
         for s in post_succs:
             G.add_edge(exit_, s)
 
-        # line_info
+        # line_info: while 라인에는 cond만 추가
         bc = line_info.setdefault(while_line, {"open": 0, "close": 0, "cfg_nodes": []})
-        bc["cfg_nodes"].extend([cond, exit_])
+        bc["cfg_nodes"].append(cond)
+
+        # exit은 별도 end_line이 있다면 거기에 추가되어야 하지만,
+        # do-while은 보통 } while (cond); 형태로 한 줄이므로 여기서는 추가 안함
 
         return exit_
 
@@ -1052,9 +1050,9 @@ class DynamicCFGBuilder:
         # 4) 표시
         cond.__catch_attached = False
 
-        # 5) line_info
+        # 5) line_info: start line에는 cond만 추가
         bc = line_info.setdefault(line_no, {"open": 0, "close": 0, "cfg_nodes": []})
-        bc["cfg_nodes"].extend([cond, t_blk, f_stub, join])
+        bc["cfg_nodes"].append(cond)
 
         return cond, t_blk, f_stub, join
 
@@ -1118,9 +1116,9 @@ class DynamicCFGBuilder:
 
         cond.__catch_attached = True
 
-        # line_info
+        # line_info: catch 시작 라인에는 c_entry만 추가
         bc = line_info.setdefault(line_no, {"open": 0, "close": 0, "cfg_nodes": []})
-        bc["cfg_nodes"].extend([c_entry, c_end])
+        bc["cfg_nodes"].append(c_entry)
 
         return c_entry, c_end
 
@@ -1208,16 +1206,12 @@ class DynamicCFGBuilder:
         # ---------- helpers ----------
         def _line_nodes(line: int) -> list[CFGNode]:
             info = an.line_info.get(line, None)
+            info = an.line_info.get(line, None)
             if not info:
                 return []
             out = []
             if isinstance(info.get("cfg_nodes"), list) and info["cfg_nodes"]:
                 out.extend([n for n in info["cfg_nodes"] if n in G.nodes])
-            else:
-                # Check for old single cfg_node format for backward compatibility
-                n = info.get("cfg_node")
-                if n and n in G.nodes:
-                    out.append(n)
             return out
 
         def _line_first(line: int) -> CFGNode | None:
@@ -1343,10 +1337,9 @@ class DynamicCFGBuilder:
                 # target_brace가 0이 되면 대응되는 블록을 찾은 것
                 if target_brace == 0:
                     cfg_nodes = brace_info.get('cfg_nodes', [])
-                    cfg_node = cfg_nodes[0] if cfg_nodes else brace_info.get('cfg_node')
-                    if cfg_node is not None and \
-                            cfg_node.condition_node_type in ['if', 'else if']:
-                        return cfg_node
+                    if cfg_nodes and \
+                            cfg_nodes[0].condition_node_type in ['if', 'else if']:
+                        return cfg_nodes[0]
         return None
 
     def find_loop_join(self, start: CFGNode, fcfg: FunctionCFG) -> CFGNode | None:
@@ -1388,11 +1381,9 @@ class DynamicCFGBuilder:
         if isinstance(info.get("cfg_nodes"), list) and info["cfg_nodes"]:
             out.extend([n for n in info["cfg_nodes"] if n in G.nodes])
         else:
-            # Check for old single cfg_node format for backward compatibility
             cfg_nodes = info.get("cfg_nodes", [])
-            n = cfg_nodes[0] if cfg_nodes else info.get("cfg_node")
-            if n and n in G.nodes:
-                out.append(n)
+            if cfg_nodes and cfg_nodes[0] in G.nodes:
+                out.append(cfg_nodes[0])
         return out
 
     def _pick_first_join(self, nodes: list["CFGNode"]) -> "CFGNode | None":

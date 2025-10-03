@@ -76,47 +76,35 @@
     "startLine": 13,
     "endLine": 13,
     "event": "add"
-  },
-  {
-    "code": "\n",
-    "startLine": 14,
-    "endLine": 14,
-    "event": "add"
-  },
-  {
-    "code": "        emit Transfer(sender, recipient, amount);",
-    "startLine": 15,
-    "endLine": 15,
-    "event": "add"
-  },
+  },   
   {
     "code": "// @Debugging BEGIN",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar _balances[sender] = [1000,1000];",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar _balances[recipient] = [100,200];",
     "startLine": 7,
     "endLine": 7,
     "event": "add"
   },
   {
-    "code": "// @StateVar _balances = [1000,1000];",
-    "startLine": 7,
-    "endLine": 7,
-    "event": "add"
-  },
-  {
-    "code": "// @StateVar _balances = [1000,1000];",
+    "code": "// @LocalVar amount = [10,10];",
     "startLine": 8,
     "endLine": 8,
     "event": "add"
   },
   {
-    "code": "// @LocalVar amount = [10,10];",
+    "code": "// @Debugging END",
     "startLine": 9,
     "endLine": 9,
-    "event": "add"
-  },
-  {
-    "code": "// @Debugging END",
-    "startLine": 7,
-    "endLine": 7,
     "event": "add"
   }
 ]

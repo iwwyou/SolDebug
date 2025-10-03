@@ -5,7 +5,9 @@ contract DeltaNeutralPancakeWorker02 {
     address[] public reinvestPath;
     
     function getReinvestPath() public view returns (address[] memory) {
-        if (reinvestPath.length != 0) return reinvestPath;
+        if (reinvestPath.length != 0) {
+            return reinvestPath;
+        }
         address[] memory path;
         if (baseToken == wNative) {
             path = new address[](2);

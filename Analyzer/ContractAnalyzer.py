@@ -230,7 +230,6 @@ class ContractAnalyzer:
         info['close'] = close_braces
         # 호환성 필드들 보장
         info.setdefault('cfg_nodes', [])
-        info.setdefault('cfg_node', None)
         self.line_info[line_number] = info
 
     def analyze_context(self, start_line, new_code):
@@ -290,8 +289,14 @@ class ContractAnalyzer:
                     self.current_target_contract = self.find_contract_context(start_line)
 
         elif '{' in stripped_code: # definition 및 block 관련
-            self.current_context_type = self.determine_top_level_context(new_code)
-            self.current_target_contract = self.find_contract_context(start_line)
+            # statement 라인 (변수 선언, 대입 등)은 top-level context가 아님
+            if '=' in stripped_code and not stripped_code.startswith(('function', 'constructor', 'modifier')):
+                # function/constructor 내부의 statement로 처리
+                # current_context_type/contract/function은 그대로 유지
+                return  # 더 이상 진행하지 않음
+            else:
+                self.current_context_type = self.determine_top_level_context(new_code)
+                self.current_target_contract = self.find_contract_context(start_line)
 
             if self.current_context_type in ["contract", "library", "interface", "abstract contract"]:
                 return
@@ -330,8 +335,7 @@ class ContractAnalyzer:
         for line in range(line_number, 0, -1):
             brace_info = self.line_info.get(line, {'open': 0, 'close': 0, 'cfg_nodes': []})
             cfg_nodes = brace_info.get('cfg_nodes', [])
-            cfg_node = cfg_nodes[0] if cfg_nodes else brace_info.get('cfg_node')
-            if brace_info['open'] > 0 and cfg_node:
+            if brace_info['open'] > 0 and cfg_nodes:
                 context_type = self.determine_top_level_context(self.full_code_lines[line])
                 if context_type == "contract":
                     return self.full_code_lines[line].split()[1]  # contract 이름 반환
@@ -342,8 +346,7 @@ class ContractAnalyzer:
         for line in range(line_number, 0, -1):
             brace_info = self.line_info.get(line, {'open': 0, 'close': 0, 'cfg_nodes': []})
             cfg_nodes = brace_info.get('cfg_nodes', [])
-            cfg_node = cfg_nodes[0] if cfg_nodes else brace_info.get('cfg_node')
-            if brace_info['open'] > 0 and cfg_node:
+            if brace_info['open'] > 0 and cfg_nodes:
                 context_type = self.determine_top_level_context(self.full_code_lines[line])
                 if context_type in ["function", "modifier"] :
                     # 함수 이름 뒤에 붙은 '('를 기준으로 함수 이름만 추출
@@ -359,8 +362,7 @@ class ContractAnalyzer:
         for line in range(line_number, 0, -1):
             brace_info = self.line_info.get(line, {'open': 0, 'close': 0, 'cfg_nodes': []})
             cfg_nodes = brace_info.get('cfg_nodes', [])
-            cfg_node = cfg_nodes[0] if cfg_nodes else brace_info.get('cfg_node')
-            if brace_info['open'] > 0 and cfg_node:
+            if brace_info['open'] > 0 and cfg_nodes:
                 context_type = self.determine_top_level_context(self.full_code_lines[line])
                 if context_type == "struct":
                     return self.full_code_lines[line].split()[1]
@@ -470,12 +472,10 @@ class ContractAnalyzer:
         for line in reversed(range(self.current_start_line + 1)):
             context = self.line_info.get(line)
             if context:
-                # Check cfg_nodes list first, then fallback to cfg_node
                 cfg_nodes = context.get('cfg_nodes', [])
-                cfg_node = cfg_nodes[0] if cfg_nodes else context.get('cfg_node')
-                if isinstance(cfg_node, EnumDefinition):
-                    enum_def = cfg_node
-                break
+                if cfg_nodes and isinstance(cfg_nodes[0], EnumDefinition):
+                    enum_def = cfg_nodes[0]
+                    break
 
         if enum_def is not None:
             # EnumDefinition에 아이템 추가
@@ -1180,6 +1180,7 @@ class ContractAnalyzer:
             line_no=self.current_start_line,
             fcfg=fcfg,
             line_info=self.line_info,
+            end_line=self.current_end_line,
         )
 
         self.engine.reinterpret_from(fcfg, join)
@@ -1273,6 +1274,7 @@ class ContractAnalyzer:
             line_no=self.current_start_line,
             fcfg=fcfg,
             line_info=self.line_info,
+            end_line=self.current_end_line,
         )
 
         self.engine.reinterpret_from(fcfg, join)
