@@ -65,24 +65,45 @@ class Engine:
         init_expr = stmt.init_expr
 
         if var_name not in variables:
-            vobj = Variables(identifier=var_name, scope="local")
-            vobj.typeInfo = var_type
-            et = var_type.elementaryTypeName
-            if et.startswith("uint"):
-                bits = var_type.intTypeLength or 256
-                vobj.value = UnsignedIntegerInterval.bottom(bits)
-            elif et.startswith("int"):
-                bits = var_type.intTypeLength or 256
-                vobj.value = IntegerInterval.bottom(bits)
-            elif et == "bool":
-                vobj.value = BoolInterval.bottom()
+            # 구조체/배열/매핑 타입은 초기화식에서 처리
+            if var_type.typeCategory in ("struct", "array", "mapping"):
+                if init_expr is not None:
+                    # 초기화식 평가 (구조체 생성자 등)
+                    vobj = self.eval.evaluate_expression(init_expr, variables, None, None)
+                    if isinstance(vobj, (StructVariable, ArrayVariable, MappingVariable)):
+                        vobj.identifier = var_name
+                        variables[var_name] = vobj
+                    else:
+                        # 평가 결과가 예상과 다르면 기본 객체 생성
+                        vobj = Variables(identifier=var_name, scope="local")
+                        vobj.typeInfo = var_type
+                        vobj.value = vobj
+                        variables[var_name] = vobj
+                else:
+                    # 초기화식 없으면 기본 객체 생성
+                    vobj = Variables(identifier=var_name, scope="local")
+                    vobj.typeInfo = var_type
+                    variables[var_name] = vobj
             else:
-                vobj.value = f"symbol_{var_name}"
-            variables[var_name] = vobj
+                # Elementary 타입 처리
+                vobj = Variables(identifier=var_name, scope="local")
+                vobj.typeInfo = var_type
+                et = var_type.elementaryTypeName
+                if et and et.startswith("uint"):
+                    bits = var_type.intTypeLength or 256
+                    vobj.value = UnsignedIntegerInterval.bottom(bits)
+                elif et and et.startswith("int"):
+                    bits = var_type.intTypeLength or 256
+                    vobj.value = IntegerInterval.bottom(bits)
+                elif et == "bool":
+                    vobj.value = BoolInterval.bottom()
+                else:
+                    vobj.value = f"symbol_{var_name}"
+                variables[var_name] = vobj
         else:
             vobj = variables[var_name]
 
-        if init_expr is not None:
+        if init_expr is not None and var_type.typeCategory not in ("struct", "array", "mapping"):
             # ArrayVariable 등 특수 케이스가 아니면 값 평가
             if not isinstance(vobj, ArrayVariable):
                 vobj.value = self.eval.evaluate_expression(init_expr, variables, None, None)

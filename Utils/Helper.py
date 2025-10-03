@@ -9,6 +9,7 @@ from antlr4.error.ErrorListener import ErrorListener, ConsoleErrorListener
 from Domain.Variable import (Variables, ArrayVariable,
                              StructVariable, MappingVariable, EnumVariable)
 from Domain.Interval import *   # ← 딱 이 정도만 있으면 됨
+from Domain.AddressSet import AddressSet
 from Domain.Type import SolType
 from Domain.IR import Expression
 
@@ -102,6 +103,48 @@ class VariableEnv:
 
     # ─────────────────────────────────────────── 복사 / 비교
     @staticmethod
+    def copy_single_variable(v: "Variables") -> "Variables":
+        """
+        단일 변수를 deep-copy (Array / Struct / Mapping 서브-클래스 유지)
+        """
+        if isinstance(v, ArrayVariable):
+            new_arr = ArrayVariable(
+                identifier=v.identifier,
+                base_type=copy.deepcopy(v.typeInfo.arrayBaseType),
+                array_length=v.typeInfo.arrayLength,
+                is_dynamic=v.typeInfo.isDynamicArray,
+                scope=v.scope
+            )
+            new_arr.elements = [
+                VariableEnv.copy_single_variable(e) for e in v.elements
+            ]
+            return new_arr
+
+        if isinstance(v, StructVariable):
+            new_st = StructVariable(
+                identifier=v.identifier,
+                struct_type=v.typeInfo.structTypeName,
+                scope=v.scope
+            )
+            new_st.members = VariableEnv.copy_variables(v.members)
+            return new_st
+
+        if isinstance(v, MappingVariable):
+            new_mp = MappingVariable(
+                identifier=v.identifier,
+                key_type=copy.deepcopy(v.typeInfo.mappingKeyType),
+                value_type=copy.deepcopy(v.typeInfo.mappingValueType),
+                scope=v.scope,
+                struct_defs=v.struct_defs,
+                enum_defs=v.enum_defs
+            )
+            new_mp.mapping = VariableEnv.copy_variables(v.mapping)
+            return new_mp
+
+        # Variables / EnumVariable
+        return copy.deepcopy(v)
+
+    @staticmethod
     def copy_variables(src: Dict[str, "Variables"]) -> Dict[str, "Variables"]:
         """
         deep-copy 하되 Array / Struct / Mapping 의 서브-클래스를 유지한다.
@@ -110,45 +153,7 @@ class VariableEnv:
         dst: Dict[str, "Variables"] = {}
 
         for name, v in src.items():
-            if isinstance(v, ArrayVariable):
-                new_arr = ArrayVariable(
-                    identifier=v.identifier,
-                    base_type=copy.deepcopy(v.typeInfo.arrayBaseType),
-                    array_length=v.typeInfo.arrayLength,
-                    is_dynamic=v.typeInfo.isDynamicArray,
-                    scope=v.scope
-                )
-                new_arr.elements = [
-                    VariableEnv.copy_variables({e.identifier: e})[e.identifier] for e in v.elements
-                ]
-                dst[name] = new_arr
-                continue
-
-            # StructVariable ------------------------------------
-            if isinstance(v, StructVariable):
-                new_st = StructVariable(
-                    identifier=v.identifier,
-                    struct_type=v.typeInfo.structTypeName,
-                    scope=v.scope
-                )
-                new_st.members = VariableEnv.copy_variables(v.members)
-                dst[name] = new_st
-                continue
-
-            # MappingVariable -----------------------------------
-            if isinstance(v, MappingVariable):
-                new_mp = MappingVariable(
-                    identifier=v.identifier,
-                    key_type=copy.deepcopy(v.typeInfo.mappingKeyType),
-                    value_type=copy.deepcopy(v.typeInfo.mappingValueType),
-                    scope=v.scope
-                )
-                new_mp.mapping = VariableEnv.copy_variables(v.mapping)
-                dst[name] = new_mp
-                continue
-
-            # Variables / EnumVariable --------------------------
-            dst[name] = copy.deepcopy(v)
+            dst[name] = VariableEnv.copy_single_variable(v)
 
         return dst
 
@@ -321,7 +326,7 @@ class VariableEnv:
 
     @staticmethod
     def is_interval(x) -> bool:
-        """Integer / UnsignedInteger 계열인지 판단"""
+        """Integer / UnsignedInteger 계열인지 판단 (AddressSet은 제외)"""
         return isinstance(x, (IntegerInterval, UnsignedIntegerInterval))
 
     @staticmethod
@@ -347,7 +352,8 @@ class VariableEnv:
         if et == "bool":
             return BoolInterval.bottom()
         if et == "address":
-            return UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
+            # ★ AddressSet bottom 반환
+            return AddressSet.bot()
         return f"symbolic_{et}"
 
     @staticmethod

@@ -108,75 +108,81 @@
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "    uint public totalUnweightedATIDStaked;",
     "startLine": 20,
     "endLine": 20,
     "event": "add"
   },
   {
-    "code": "    function _insertLockedStake(address _stakerAddress, uint _ATIDamount, uint _stakeWeight, uint _lockedUntil) internal returns (uint newLockedStakeID) {\n}",
+    "code": "\n",
     "startLine": 21,
-    "endLine": 22,
+    "endLine": 21,
     "event": "add"
   },
   {
-    "code": "        if (nextLockedStakeIDMap[_stakerAddress] == 0) {\n}",
+    "code": "    function _insertLockedStake(address _stakerAddress, uint _ATIDamount, uint _stakeWeight, uint _lockedUntil) internal returns (uint newLockedStakeID) {\n}",
     "startLine": 22,
     "endLine": 23,
     "event": "add"
   },
   {
-    "code": "            nextLockedStakeIDMap[_stakerAddress] = 1;",
+    "code": "        if (nextLockedStakeIDMap[_stakerAddress] == 0) {\n}",
     "startLine": 23,
-    "endLine": 23,
+    "endLine": 24,
+    "event": "add"
+  },
+  {
+    "code": "            nextLockedStakeIDMap[_stakerAddress] = 1;",
+    "startLine": 24,
+    "endLine": 24,
     "event": "add"
   },
   {
     "code": "        uint nextLockedStateID = nextLockedStakeIDMap[_stakerAddress];",
-    "startLine": 25,
-    "endLine": 25,
-    "event": "add"
-  },
-  {
-    "code": "        nextLockedStakeIDMap[_stakerAddress]++;",
     "startLine": 26,
     "endLine": 26,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "        nextLockedStakeIDMap[_stakerAddress]++;",
     "startLine": 27,
     "endLine": 27,
     "event": "add"
   },
   {
-    "code": "        LockedStake memory newLockedStake = LockedStake({\n            active: true,\n\n            ID: nextLockedStateID,\n            prevID: tailLockedStakeIDMap[_stakerAddress],  \n            nextID: 0,  \n\n            amount: _ATIDamount,\n            lockedUntil: _lockedUntil,\n            stakeWeight: _stakeWeight\n        });",
+    "code": "\n",
     "startLine": 28,
-    "endLine": 38,
+    "endLine": 28,
     "event": "add"
   },
   {
-    "code": "        lockedStakeMap[_stakerAddress][newLockedStake.ID] = newLockedStake;",
-    "startLine": 39,
+    "code": "        LockedStake memory newLockedStake = LockedStake({\n            active: true,\n\n            ID: nextLockedStateID,\n            prevID: tailLockedStakeIDMap[_stakerAddress],  \n            nextID: 0,  \n\n            amount: _ATIDamount,\n            lockedUntil: _lockedUntil,\n            stakeWeight: _stakeWeight\n        });",
+    "startLine": 29,
     "endLine": 39,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "        lockedStakeMap[_stakerAddress][newLockedStake.ID] = newLockedStake;",
     "startLine": 40,
     "endLine": 40,
     "event": "add"
   },
   {
-    "code": "        if (headLockedStakeIDMap[_stakerAddress] == 0) {           \n}",
+    "code": "\n",
     "startLine": 41,
-    "endLine": 42,
+    "endLine": 41,
+    "event": "add"
+  },
+  {
+    "code": "        if (headLockedStakeIDMap[_stakerAddress] == 0) {           \n}",
+    "startLine": 42,
+    "endLine": 43,
     "event": "add"
   },
   {
     "code": "            headLockedStakeIDMap[_stakerAddress] = newLockedStake.ID;",
-    "startLine": 42,
-    "endLine": 42,
+    "startLine": 43,
+    "endLine": 43,
     "event": "add"
   },
   {
@@ -259,74 +265,74 @@
   },
   {
     "code": "// @Debugging BEGIN",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 23,
+    "endLine": 23,
     "event": "add"
   },
   {
     "code": "// @StateVar nextLockedStakeIDMap[_stakerAddress] = [1,1];",
-    "startLine": 7,
-    "endLine": 7,
+    "startLine": 24,
+    "endLine": 24,
     "event": "add"
   },
   {
     "code": "// @StateVar tailLockedStakeIDMap[_stakerAddress] = [1,1];",
-    "startLine": 8,
-    "endLine": 8,
+    "startLine": 25,
+    "endLine": 25,
     "event": "add"
   },
   {
     "code": "// @StateVar headLockedStakeIDMap[_stakerAddress] = [1,1];",
-    "startLine": 9,
-    "endLine": 9,
+    "startLine": 26,
+    "endLine": 26,
     "event": "add"
   },
   {
     "code": "// @StateVar weightedStakes[_stakerAddress] = [1,1];",
-    "startLine": 10,
-    "endLine": 10,
+    "startLine": 27,
+    "endLine": 27,
     "event": "add"
   },
   {
     "code": "// @StateVar totalWeightedATIDStaked = [500,500];",
-    "startLine": 11,
-    "endLine": 11,
+    "startLine": 28,
+    "endLine": 28,
     "event": "add"
   },
   {
     "code": "// @StateVar unweightedStakes[_stakerAddress] = [1,1];",
-    "startLine": 12,
-    "endLine": 12,
+    "startLine": 29,
+    "endLine": 29,
     "event": "add"
   },
   {
     "code": "// @StateVar totalUnweightedATIDStaked = [500,500];",
-    "startLine": 13,
-    "endLine": 13,
+    "startLine": 30,
+    "endLine": 30,
     "event": "add"
   },
   {
     "code": "// @LocalVar _ATIDamount = [10,10];",
-    "startLine": 14,
-    "endLine": 14,
+    "startLine": 31,
+    "endLine": 31,
     "event": "add"
   },
   {
     "code": "// @LocalVar _stakeWeight = [1,1];",
-    "startLine": 15,
-    "endLine": 15,
+    "startLine": 32,
+    "endLine": 32,
     "event": "add"
   },
   {
     "code": "// @LocalVar _lockedUntil = [1,1];",
-    "startLine": 16,
-    "endLine": 16,
+    "startLine": 33,
+    "endLine": 33,
     "event": "add"
   },
   {
     "code": "// @Debugging END",
-    "startLine": 17,
-    "endLine": 17,
+    "startLine": 34,
+    "endLine": 34,
     "event": "add"
   }
 ]

@@ -339,10 +339,11 @@ class DynamicCFGBuilder:
                 G.remove_edge(old_false, nxt)
             G.remove_node(old_false)
 
-        # ② target-join: 헤딩 라인 기준으로 위로 첫 join
-        target_join = self.find_outer_join_near(anchor_line=line_no, fcfg=fcfg,
-                                                direction="backward", include_anchor=True) \
-                      or self._outer_join_from_graph(cond_node, fcfg)
+        # ② target-join: 그래프 기반 검색을 우선, 실패 시 라인 스캔
+        # shift로 인해 join이 앞/뒤로 이동했을 수 있으므로 both 방향 검색
+        target_join = self._outer_join_from_graph(cond_node, fcfg) \
+                      or self.find_outer_join_near(anchor_line=line_no, fcfg=fcfg,
+                                                   direction="both", include_anchor=True)
         if target_join is None:
             raise ValueError("else: target join not found via line-scan/graph")
 
@@ -1176,9 +1177,10 @@ class DynamicCFGBuilder:
         
         return new_block
 
-    def get_current_block(self) -> CFGNode:
+    def get_current_block(self, context: str = "statement") -> CFGNode:
         """
-        Return the *predecessor anchor* where a new statement-block will be inserted.
+        Return the *predecessor anchor* where a new statement-block will be inserted,
+        or the condition node for else/else-if contexts.
         - NEVER mutates the CFG here (no new nodes, no edge rewiring, no fixpoint).
         - Selection rules:
             * succ := first node at (L+1), fallback to EXIT
@@ -1190,7 +1192,11 @@ class DynamicCFGBuilder:
                 - else pick nearest predecessor
             * else (basic / others):
                 - expect exactly one pred (skeleton already makes joins)
-                - if not, fallback to “nearest” pred – but DO NOT create any join here
+                - if not, fallback to "nearest" pred – but DO NOT create any join here
+
+        Args:
+            context: Analysis context - "statement" (default), "else", or "else_if"
+                    When "else" or "else_if", returns the condition node instead of branch
         """
         an = self.an
         fcfg = an.current_target_function_cfg
@@ -1286,6 +1292,19 @@ class DynamicCFGBuilder:
         if _is_join(succ):
             preds = list(G.predecessors(succ))
 
+            # Special case: else/else-if needs the condition node
+            if context in ["else", "else_if"]:
+                # Find condition node by traversing back through graph
+                cond = _cond_of_join_by_graph(succ)
+                if cond is not None and getattr(cond, "condition_node_type", None) in ['if', 'else if']:
+                    return cond
+                # Fallback: check same line
+                guard = _line_last(succ_line)
+                if guard is not None and _is_cond(guard) and getattr(guard, "condition_node_type", None) in ['if', 'else if']:
+                    return guard
+                # No condition found
+                raise ValueError(f"No condition node found for {context} at line {an.current_start_line}")
+
             # (A) do-while 마무리: do_end_* 를 최우선
             do_end_preds = [p for p in preds if getattr(p, "is_do_end", False)]
             if do_end_preds:
@@ -1310,8 +1329,18 @@ class DynamicCFGBuilder:
             # (D) 폴백: 가장 가까운 pred
             return _nearest(preds, succ_line) if preds else fcfg.get_entry_node()
 
-        # ---------- 4) BASIC / 기타 ----------
+        # ---------- 4) BASIC / 기타 (EXIT 포함) ----------
         preds = list(G.predecessors(succ))
+
+        # Special case: else/else-if context에서 EXIT의 pred가 join이면 condition 찾기
+        if context in ["else", "else_if"] and preds:
+            # EXIT의 predecessor가 join일 수 있음
+            for pred in preds:
+                if _is_join(pred):
+                    cond = _cond_of_join_by_graph(pred)
+                    if cond is not None and getattr(cond, "condition_node_type", None) in ['if', 'else if']:
+                        return cond
+
         # 기대상황: skeleton 덕에 항상 단일 pred
         if len(preds) == 1:
             return preds[0]
@@ -1322,25 +1351,6 @@ class DynamicCFGBuilder:
             return _nearest(preds, succ_line)
         return fcfg.get_entry_node()
 
-    def find_corresponding_condition_node(self):  # else if, else에 대한 처리
-        # 현재 라인부터 위로 탐색하면서 대응되는 조건 노드를 찾음
-        target_brace = 0
-        for line in range(self.an.current_start_line - 1, 0, -1):
-            brace_info = self.an.line_info[line]
-            if brace_info:
-                # '{'와 '}'의 개수 확인
-                if brace_info['open'] == 1:
-                    target_brace -= 1
-                elif brace_info['close'] == 1:
-                    target_brace += 1
-
-                # target_brace가 0이 되면 대응되는 블록을 찾은 것
-                if target_brace == 0:
-                    cfg_nodes = brace_info.get('cfg_nodes', [])
-                    if cfg_nodes and \
-                            cfg_nodes[0].condition_node_type in ['if', 'else if']:
-                        return cfg_nodes[0]
-        return None
 
     def find_loop_join(self, start: CFGNode, fcfg: FunctionCFG) -> CFGNode | None:
         """

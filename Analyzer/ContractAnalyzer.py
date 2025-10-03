@@ -70,20 +70,32 @@ class ContractAnalyzer:
     def _shift_meta(self, old_ln: int, new_ln: int):
         """
         소스 라인 이동(old_ln → new_ln)에 맞춰
-        line_info / recorder.ledger / Statement.src_line 동기화
+        line_info / recorder.ledger / Statement.src_line / CFGNode.src_line 동기화
         """
-        # ① line_info & recorder.ledger 이동
+        # ① line_info에 등록된 cfg_nodes들의 src_line 보정 (먼저 수행)
+        if old_ln in self.line_info:
+            info = self.line_info[old_ln]
+            if isinstance(info.get("cfg_nodes"), list):
+                for node in info["cfg_nodes"]:
+                    if hasattr(node, "src_line") and node.src_line == old_ln:
+                        node.src_line = new_ln
+
+        # ② line_info & recorder.ledger 이동
         dicts_to_shift = (self.line_info, self.recorder.ledger)
         for d in dicts_to_shift:
             if old_ln in d:
                 # (간단버전) 덮어쓰기. 이미 new_ln 에 값이 있으면 합치고 싶다면 merge 로직을 쓰세요.
                 d[new_ln] = d.pop(old_ln)
 
-        # ② 이미 생성된 CFG-Statement 들의 src_line 보정
+        # ③ 이미 생성된 CFG-Statement 들의 src_line 보정
         stmt_count = 0
         for ccf in self.contract_cfgs.values():
             for fcfg in ccf.functions.values():
                 for blk in fcfg.graph.nodes:
+                    # CFGNode 자체의 src_line도 업데이트
+                    if getattr(blk, "src_line", None) == old_ln:
+                        blk.src_line = new_ln
+                    # Statement들의 src_line 업데이트
                     for st in blk.statements:
                         if getattr(st, "src_line", None) == old_ln:
                             st.src_line = new_ln
@@ -96,8 +108,36 @@ class ContractAnalyzer:
         new_lines = self.normalize_compound_control_lines(new_lines)
         offset = len(new_lines)
 
-        # 뒤 라인 밀기
-        for old_ln in sorted([ln for ln in self.full_code_lines if ln >= start], reverse=True):
+        # start 라인에 control flow 노드가 있고, 새 코드가 연속되는 control flow인지 체크
+        skip_shift_at_start = False
+        if start in self.line_info:
+            cfg_nodes = self.line_info[start].get('cfg_nodes', [])
+            first_new_line = new_lines[0].strip() if new_lines else ""
+
+            # 같은 control flow의 연속인 경우:
+            # 1. if/else-if의 join + else/else-if
+            # 2. do의 끝 + while
+            # 3. try의 stub + catch
+            for node in cfg_nodes:
+                # if/else-if join + else/else-if
+                if (getattr(node, 'join_point_node', False) and
+                    (first_new_line.startswith('else if') or first_new_line.startswith('else'))):
+                    skip_shift_at_start = True
+                    break
+                # do end + while
+                if (getattr(node, 'is_do_end', False) and
+                    first_new_line.startswith('while')):
+                    skip_shift_at_start = True
+                    break
+                # try false_stub + catch
+                if (node.name.startswith('try_false_stub') and
+                    first_new_line.startswith('catch')):
+                    skip_shift_at_start = True
+                    break
+
+        # 뒤 라인 밀기 (skip_shift_at_start이면 start+1부터)
+        shift_from = start + 1 if skip_shift_at_start else start
+        for old_ln in sorted([ln for ln in self.full_code_lines if ln >= shift_from], reverse=True):
             self.full_code_lines[old_ln + offset] = self.full_code_lines.pop(old_ln)
             self._shift_meta(old_ln, old_ln + offset)
 
@@ -225,12 +265,12 @@ class ContractAnalyzer:
     def update_brace_count(self, line_number, code):
         open_braces = code.count('{')
         close_braces = code.count('}')
-        info = self.line_info.get(line_number, {})
+        # 기존 정보 보존하면서 업데이트
+        if line_number not in self.line_info:
+            self.line_info[line_number] = {"open": 0, "close": 0, "cfg_nodes": []}
+        info = self.line_info[line_number]
         info['open'] = open_braces
         info['close'] = close_braces
-        # 호환성 필드들 보장
-        info.setdefault('cfg_nodes', [])
-        self.line_info[line_number] = info
 
     def analyze_context(self, start_line, new_code):
         stripped_code = (new_code or "").strip()
@@ -289,13 +329,21 @@ class ContractAnalyzer:
                     self.current_target_contract = self.find_contract_context(start_line)
 
         elif '{' in stripped_code: # definition 및 block 관련
+            # Determine context type first
+            ctx = self.determine_top_level_context(new_code)
+
             # statement 라인 (변수 선언, 대입 등)은 top-level context가 아님
-            if '=' in stripped_code and not stripped_code.startswith(('function', 'constructor', 'modifier')):
-                # function/constructor 내부의 statement로 처리
+            # BUT control flow (if/else/for/while etc) should be processed
+            if ctx == 'simpleStatement':
+                # function/constructor 내부의 일반 statement
                 # current_context_type/contract/function은 그대로 유지
                 return  # 더 이상 진행하지 않음
+            elif '=' in stripped_code and ctx not in ['if', 'else_if', 'else', 'for', 'while', 'do_while', 'try', 'catch'] \
+                    and not stripped_code.startswith(('function', 'constructor', 'modifier')):
+                # 기타 assignment가 있는 statement
+                return  # 더 이상 진행하지 않음
             else:
-                self.current_context_type = self.determine_top_level_context(new_code)
+                self.current_context_type = ctx
                 self.current_target_contract = self.find_contract_context(start_line)
 
             if self.current_context_type in ["contract", "library", "interface", "abstract contract"]:
@@ -417,7 +465,9 @@ class ContractAnalyzer:
             elif stripped_code.startswith("return") :
                 return "return"
             else:
-                raise ValueError(f"Unknown context type for line: {code_line}")
+                # User-defined type 변수 선언 또는 일반 statement
+                # (예: LockedStake memory x = ..., mapping assignment 등)
+                return "simpleStatement"
 
         except ValueError as e:
             print(f"Error: {e}")
@@ -1196,7 +1246,7 @@ class ContractAnalyzer:
             raise ValueError("No active function CFG.")
         self.current_target_function_cfg = fcfg
 
-        prev_cond = self.builder.find_corresponding_condition_node()
+        prev_cond = self.builder.get_current_block(context="else_if")
         if prev_cond is None:
             raise ValueError("else-if used without a preceding if/else-if.")
 
@@ -1247,7 +1297,7 @@ class ContractAnalyzer:
         fcfg = self.current_target_function_cfg
 
         # ── 2. 직전 if / else-if 노드 찾기 -----------------------------------
-        cond_node = self.builder.find_corresponding_condition_node()
+        cond_node = self.builder.get_current_block(context="else")
         if cond_node is None:
             raise ValueError("No preceding if/else-if for this 'else'.")
 

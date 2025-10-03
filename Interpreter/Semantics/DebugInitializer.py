@@ -296,7 +296,39 @@ class DebugInitializer:
     ):
         """
         개선된 디버깅 지시어 적용. mapping entry가 없어도 강제로 생성함.
+
+        특별 처리:
+        - `array.length = [N, N]` → 동적 배열의 크기를 N개로 초기화
         """
+
+        # ★ 특별 케이스: 동적 배열의 .length 설정
+        if (lhs_expr.context == "MemberAccessContext" and
+            lhs_expr.member == "length"):
+
+            # base 객체 찾기
+            base_obj = self.resolve_lhs_expr_for_debug(lhs_expr.base, variables)
+
+            if isinstance(base_obj, ArrayVariable) and base_obj.typeInfo.isDynamicArray:
+                # ① 스냅샷 먼저 생성 (복원을 위해)
+                self._snapshot_once_for_debug(base_obj)
+
+                if edit_event == "delete":
+                    # 삭제: 원래 상태로 복원
+                    self.an.snapman.restore(base_obj, self.an.de)
+                    return
+                elif edit_event not in ("add", "modify"):
+                    raise ValueError(f"unknown edit_event {edit_event!r}")
+
+                # value에서 크기 추출
+                target_length = self._extract_array_length_from_value(value)
+                if target_length is not None:
+                    # ② 동적 배열을 target_length 크기로 초기화
+                    self._initialize_dynamic_array_to_length(base_obj, target_length)
+                    return
+                else:
+                    raise ValueError(f"Invalid length value for dynamic array: {value}")
+
+        # 일반적인 변수 처리
         target = self.resolve_lhs_expr_for_debug(lhs_expr, variables)
         if target is None:
             raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
@@ -382,3 +414,97 @@ class DebugInitializer:
             except AttributeError:
                 # record_debug_variable_usage 메서드가 없으면 무시
                 pass
+
+    def _extract_array_length_from_value(self, value) -> int | None:
+        """
+        value에서 배열 길이를 추출
+        - [N, N] → N
+        - N (int) → N
+        """
+        if isinstance(value, list) and len(value) == 2:
+            # [N, N] 형태
+            if value[0] == value[1] and isinstance(value[0], int):
+                return value[0]
+        elif isinstance(value, int):
+            return value
+        return None
+
+    def _initialize_dynamic_array_to_length(self, arr: ArrayVariable, target_length: int):
+        """
+        동적 배열을 target_length 크기로 초기화
+        - 현재 크기보다 크면 bottom 값으로 채움
+        - 현재 크기보다 작으면 뒤쪽 요소 제거
+        """
+        current_length = len(arr.elements)
+
+        if target_length > current_length:
+            # 부족한 만큼 bottom 값으로 채우기
+            base_type = arr.typeInfo.arrayBaseType
+            for i in range(current_length, target_length):
+                elem = self._create_array_element_with_bottom(arr, i, base_type)
+                arr.elements.append(elem)
+        elif target_length < current_length:
+            # 뒤쪽 요소 제거
+            arr.elements = arr.elements[:target_length]
+        # target_length == current_length이면 아무것도 안 함
+
+    def _create_array_element_with_bottom(self, arr: ArrayVariable, index: int, base_type: SolType) -> Variables:
+        """
+        배열 요소를 bottom 값으로 생성
+        """
+        elem_id = f"{arr.identifier}[{index}]"
+
+        # elementary type인 경우
+        if base_type.typeCategory == "elementary":
+            et = base_type.elementaryTypeName
+            bits = base_type.intTypeLength or 256
+
+            if et.startswith("uint"):
+                from Domain.Interval import UnsignedIntegerInterval
+                bottom_val = UnsignedIntegerInterval.bottom(bits)
+            elif et.startswith("int"):
+                from Domain.Interval import IntegerInterval
+                bottom_val = IntegerInterval.bottom(bits)
+            elif et == "bool":
+                from Domain.Interval import BoolInterval
+                bottom_val = BoolInterval.bottom()
+            elif et == "address":
+                from Domain.AddressSet import AddressSet
+                bottom_val = AddressSet.bot()
+            else:
+                # bytes, string 등
+                bottom_val = f"symbolic_{elem_id}"
+
+            return Variables(
+                identifier=elem_id,
+                value=bottom_val,
+                scope=arr.scope,
+                typeInfo=base_type
+            )
+
+        # struct type인 경우
+        elif base_type.typeCategory == "struct":
+            return StructVariable(
+                identifier=elem_id,
+                struct_type=base_type.structTypeName,
+                scope=arr.scope
+            )
+
+        # nested array인 경우
+        elif base_type.typeCategory == "array":
+            return ArrayVariable(
+                identifier=elem_id,
+                base_type=base_type.arrayBaseType,
+                array_length=base_type.arrayLength,
+                is_dynamic=base_type.isDynamicArray,
+                scope=arr.scope
+            )
+
+        # mapping인 경우 (배열의 요소로는 불가능하지만 방어적 처리)
+        else:
+            return Variables(
+                identifier=elem_id,
+                value=f"symbolic_{elem_id}",
+                scope=arr.scope,
+                typeInfo=base_type
+            )

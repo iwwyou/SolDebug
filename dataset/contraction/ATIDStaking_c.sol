@@ -17,6 +17,7 @@ contract ATIDStaking {
     mapping(address => uint) public unweightedStakes;
 
     uint public totalWeightedATIDStaked;
+    uint public totalUnWeightedATIDStaked;
     
     function _insertLockedStake(address _stakerAddress, uint _ATIDamount, uint _stakeWeight, uint _lockedUntil) internal returns (uint newLockedStakeID) {
         if (nextLockedStakeIDMap[_stakerAddress] == 0) {

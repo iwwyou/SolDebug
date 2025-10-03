@@ -6,6 +6,7 @@ if TYPE_CHECKING:                                         # 타입 검사 전용
      from Analyzer.ContractAnalyzer import ContractAnalyzer
 
 from Domain.Interval import *
+from Domain.AddressSet import AddressSet
 from Domain.Variable import Variables, ArrayVariable, MappingVariable, StructVariable, EnumVariable
 from Domain.Address import AddressSymbolicManager
 from Domain.IR import Expression
@@ -157,6 +158,22 @@ class Update :
 
             # ---- 매핑(MappingVariable) ------------------------------
             if isinstance(caller_object, MappingVariable):
+                print(f"DEBUG Mapping: interval=[{l},{r}], mapping_keys={list(caller_object.mapping.keys())}")
+                # Top interval인 경우: symbolic key로 entry 반환
+                if l == 0 and r >= 2**255:  # Top interval
+                    print(f"DEBUG: Top interval detected, mapping size={len(caller_object.mapping)}")
+                    # 단일 entry가 있으면 반환
+                    if len(caller_object.mapping) == 1:
+                        entry = list(caller_object.mapping.values())[0]
+                        print(f"DEBUG: Returning single entry: {type(entry).__name__}")
+                        return entry
+                    # 없으면 symbolic key로 생성
+                    symbolic_key = f"symbolic_index_{id(expr)}"
+                    print(f"DEBUG: Creating symbolic entry with key={symbolic_key}")
+                    if symbolic_key not in caller_object.mapping:
+                        caller_object.mapping[symbolic_key] = caller_object.get_or_create(symbolic_key)
+                    return caller_object.mapping[symbolic_key]
+
                 if r_val is None:
                     return caller_object
 
@@ -236,24 +253,54 @@ class Update :
             # ① base expression 이 IndexAccess 면 → index 식에서 키 추출
             key = None
             base_exp = expr.base  # levels[i]   에서   expr.base == IndexAccess
+            print(f"DEBUG: base_obj={base_obj.identifier}, base_exp.context={getattr(base_exp, 'context', 'NO_CONTEXT')}")
             if getattr(base_exp, "context", "") == "IndexAccessExpContext":
                 idx_exp = base_exp.index
+                print(f"DEBUG: idx_exp.context={getattr(idx_exp, 'context', 'NO_CONTEXT')}")
                 # 식별자 인덱스  (levels[i]  →  "i")
                 if getattr(idx_exp, "context", "") == "IdentifierExpContext":
                     key = idx_exp.identifier
+                    print(f"DEBUG: Identifier key={key}")
                 # 숫자 / 주소 literal 인덱스
                 elif getattr(idx_exp, "context", "") == "LiteralExpContext":
                     key = str(idx_exp.literal)
+                    print(f"DEBUG: Literal key={key}")
+                # MemberAccess 인덱스 (newLockedStake.prevID → evaluate해서 값 추출)
+                elif getattr(idx_exp, "context", "") == "MemberAccessContext":
+                    print(f"DEBUG: MemberAccess index: {idx_exp.base.identifier}.{idx_exp.member}")
+                    eval_result = self.ev.evaluate_expression(idx_exp, variables, None, None)
+                    print(f"DEBUG: eval_result={eval_result}, type={type(eval_result)}")
+                    if isinstance(eval_result, (IntegerInterval, UnsignedIntegerInterval)):
+                        if eval_result.min_value == eval_result.max_value:
+                            key = str(eval_result.min_value)
+                            print(f"DEBUG: Singleton interval key={key}")
+                        else:
+                            # Top interval: symbolic key 사용
+                            key = f"{idx_exp.base.identifier}.{idx_exp.member}"
+                            print(f"DEBUG: Top interval, using symbolic key={key}")
+                    # Fallback: identifier로 사용
+                    if key is None:
+                        key = f"{idx_exp.base.identifier}.{idx_exp.member}"
+                        print(f"DEBUG: Fallback key={key}")
 
             # ② ①에서 못 뽑았고, 매핑에 엔트리 하나뿐이면 그걸 그대로 사용
             if key is None and len(base_obj.mapping) == 1:
                 key, _ = next(iter(base_obj.mapping.items()))
+                print(f"DEBUG: Single entry key={key}")
+
+            print(f"DEBUG: Final key={key}, mapping keys={list(base_obj.mapping.keys())}")
+
+            # ③ key를 여전히 못 찾았으면 에러
+            if key is None:
+                raise ValueError(f"Cannot resolve mapping key from expression")
 
             # ── 엔트리 가져오거나 생성
             if key not in base_obj.mapping:
                 base_obj.mapping[key] = base_obj.get_or_create(key)
+                print(f"DEBUG: Created new entry for key={key}")
 
             nested = base_obj.mapping[key]
+            print(f"DEBUG: nested type={type(nested).__name__}, nested={nested}")
             base_obj = nested  # 이후 Struct 처리로 fall-through
 
         if isinstance(base_obj, ArrayVariable):
@@ -281,6 +328,31 @@ class Update :
 
         # ── elementary / enum ──────────────────────────────
         if isinstance(nested, (Variables, EnumVariable)):
+            # IndexAccessContext에서 호출되었으면 mapping key로 사용
+            if callerContext == "IndexAccessContext" and isinstance(callerObject, MappingVariable):
+                idx_val = nested.value
+                # Interval → key 변환
+                if isinstance(idx_val, (IntegerInterval, UnsignedIntegerInterval)):
+                    if idx_val.min_value == idx_val.max_value:
+                        key = str(idx_val.min_value)
+                    else:
+                        # Top interval: 단일 entry 반환 또는 symbolic key 생성
+                        if len(callerObject.mapping) == 1:
+                            return list(callerObject.mapping.values())[0]
+                        key = f"symbolic_{nested.identifier}"
+                else:
+                    # Non-interval: symbolic key
+                    key = f"symbolic_{nested.identifier}"
+
+                # Entry 가져오거나 생성
+                if key not in callerObject.mapping:
+                    callerObject.mapping[key] = callerObject.get_or_create(key)
+                return callerObject.mapping[key]
+
+            # 일반 IndexAccessContext (Array 등)
+            if callerContext == "IndexAccessContext":
+                return nested
+
             if rVal is None:
                 return nested
 
@@ -575,8 +647,27 @@ class Update :
                 raise ValueError (f"Key '{ident}' not found.")
 
             entry = caller_object.get_or_create(key_str)
+
+            # ── composite 타입 처리 ────────────────────────────────────
             if isinstance(entry, (StructVariable, ArrayVariable, MappingVariable)):
-                return entry  # composite
+                # r_val이 같은 타입의 composite이면 복사
+                if r_val is not None and type(r_val) == type(entry):
+                    if isinstance(entry, StructVariable) and isinstance(r_val, StructVariable):
+                        # Struct 멤버별 복사
+                        for member_name, member_val in r_val.members.items():
+                            if member_name in entry.members:
+                                entry.members[member_name] = VariableEnv.copy_single_variable(member_val)
+
+                        if log:
+                            self.an.recorder.record_assignment(
+                                line_no=actual_line_no,
+                                expr=top_expr if top_expr is not None else expr,
+                                var_obj=entry,
+                                base_obj=caller_object,
+                            )
+                        return None
+                return entry  # composite (deep access가 이어질 경우)
+
             _apply_to_leaf(entry, expr)  # leaf + 기록
             return None
 
@@ -775,10 +866,9 @@ class Update :
             # symbolicAddress …
             if isinstance(raw, str) and raw.startswith("symbolicAddress"):
                 nid = int(raw.split()[1])
-                self.an.sm.register_fixed_id(nid)
-                iv = self.an.sm.get_interval(nid)
-                self.an.sm.bind_var(eid, nid)
-                return Variables(eid, iv, scope=arr.scope, typeInfo=baseT)
+                # ★ AddressSet으로 처리
+                addr_set = AddressSet(ids={nid})
+                return Variables(eid, addr_set, scope=arr.scope, typeInfo=baseT)
 
             # 숫자  /  Bool  → Interval
             if isinstance(raw, (int, bool)):
@@ -851,18 +941,24 @@ class Update :
 
         # ---- address ------------------------------------------------------
         elif etype == "address":
-            if isinstance(new_value, UnsignedIntegerInterval):
-                var_obj.value = AddressSymbolicManager.top_interval()
-
+            # ★ AddressSet 기반 처리
+            if isinstance(new_value, AddressSet):
+                var_obj.value = new_value
+            elif isinstance(new_value, UnsignedIntegerInterval):
+                # Interval → AddressSet 변환
+                if new_value.is_bottom():
+                    var_obj.value = AddressSet.bot()
+                elif new_value.min_value == new_value.max_value:
+                    var_obj.value = AddressSet(ids={new_value.min_value})
+                else:
+                    var_obj.value = AddressSet.top()
             elif isinstance(new_value, str) and new_value.startswith("symbolicAddress"):
                 nid = int(new_value.split()[1])
-                self.an.sm.register_fixed_id(nid)
-                iv = self.an.sm.get_interval(nid)
-                var_obj.value = iv
-                self.an.sm.bind_var(var_obj.identifier, nid)
-
-            else:  # 임의 문자열 → symbol 처리
-                var_obj.value = f"symbol_{new_value}"
+                var_obj.value = AddressSet(ids={nid})
+            elif isinstance(new_value, int):
+                var_obj.value = AddressSet(ids={new_value})
+            else:  # 임의 문자열 → TOP
+                var_obj.value = AddressSet.top()
 
         # ---- fallback -----------------------------------------------------
         else:
@@ -889,13 +985,14 @@ class Update :
 
     def _bind_if_address(self, var_obj):
         """address 형이면 심볼릭-ID ↔ 변수 바인딩."""
-        if getattr(var_obj.typeInfo, "elementaryTypeName", None) == "address" and \
-           isinstance(var_obj.value, UnsignedIntegerInterval):
-            iv = var_obj.value
-            if iv.min_value == iv.max_value:
-                nid = iv.min_value
-                self.an.sm.register_fixed_id(nid, iv)
-                self.an.sm.bind_var(var_obj.identifier, nid)
+        if getattr(var_obj.typeInfo, "elementaryTypeName", None) == "address":
+            # ★ AddressSet 기반 바인딩
+            if isinstance(var_obj.value, AddressSet):
+                if var_obj.value.is_singleton():
+                    nid = var_obj.value.get_singleton_id()
+                    # 필요시 AddressSymbolicManager에 등록
+                    # self.an.sm.register_fixed_id(nid)
+                    # self.an.sm.bind_var(var_obj.identifier, nid)
 
     # -------------- public API ---------------------------------------------
     def apply_debug_directive(

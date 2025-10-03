@@ -8,6 +8,7 @@ if TYPE_CHECKING:                                         # 타입 검사 전용
 from Domain.Variable import Variables, ArrayVariable, StructVariable, MappingVariable, EnumVariable, EnumDefinition
 from Domain.Type import SolType
 from Domain.Interval import Interval, IntegerInterval, BoolInterval, UnsignedIntegerInterval
+from Domain.AddressSet import AddressSet
 from Domain.IR import Expression
 
 from Utils.Helper import VariableEnv
@@ -121,9 +122,8 @@ class Evaluation :
 
         # ── (D) 컨트랙트 new Foo()  → 심볼릭 address ───────────────
         if sol_t.typeCategory == "userDefined" :
-            # “fresh address”를 160-bit Interval TOP 로 두고,
-            # 필요하면 AddressSymbolicManager 로 별도 관리
-            return UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
+            # "fresh address"를 set domain TOP 으로
+            return AddressSet.top()
 
         # ── (E) 기본형 new uint[](...) 처럼 size 없는 array 등
         #        또는 new bytes(...) – 메모리 상 동적 할당
@@ -231,7 +231,8 @@ class Evaluation :
             if not _literal_is_address(lit):
                 raise ValueError(f"Malformed address literal '{lit}'")
             val_int = int(lit, 16)
-            return UnsignedIntegerInterval(val_int, val_int, 160)  # 160-bit 고정
+            # ★ Set domain 사용: 구체적 address ID로 singleton set 생성
+            return AddressSet(ids={val_int})
 
         if ety in ("string", "bytes"):
             maybe_int = _parse_maybe_int(lit)
@@ -427,9 +428,11 @@ class Evaluation :
                     # ---- address ------------------------------------------------------
                 if inner == "address":
                     if m == "max":
-                        return UnsignedIntegerInterval(2 ** 160 - 1, 2 ** 160 - 1, 160)
+                        # ★ address의 max는 모든 주소 가능 → TOP
+                        return AddressSet.top()
                     if m == "min":
-                        return UnsignedIntegerInterval(0, 0, 160)
+                        # ★ address의 min은 0 주소
+                        return AddressSet(ids={0})
 
                     # ---- bytes<M>  (고정 길이) ----------------------------------------
                 if inner.startswith("bytes") and inner != "bytes":
@@ -451,7 +454,7 @@ class Evaluation :
             # address.code / address.code.length
             if baseVal == "code":
                 if member == "length":
-                    # 코드 사이즈 – 예시로 고정 상수
+                    # 코드 사이즈 – 예시로 고정 상수 (uint256)
                     return UnsignedIntegerInterval(0, 24_000, 256)
                 return member  # address.code → 다음 단계에서 .length 접근
 
@@ -652,9 +655,20 @@ class Evaluation :
             return self.convert_to_bool(sub_val)
 
         elif type_name == "address":
-            # sub_val이 Interval이면 "address( interval )" → symbolic?
-            # sub_val이 string "0x..." -> parse or symbolic
-            return sub_val
+            # ★ address 타입 변환
+            if isinstance(sub_val, AddressSet):
+                return sub_val  # 이미 AddressSet이면 그대로
+            if isinstance(sub_val, (UnsignedIntegerInterval, IntegerInterval)):
+                # uint → address: singleton이면 구체적 ID, 아니면 TOP
+                if sub_val.is_bottom():
+                    return AddressSet.bot()
+                if sub_val.min_value == sub_val.max_value:
+                    return AddressSet(ids={sub_val.min_value})
+                return AddressSet.top()
+            if isinstance(sub_val, str) and sub_val.startswith("0x"):
+                addr_int = int(sub_val, 16)
+                return AddressSet(ids={addr_int})
+            return AddressSet.top()  # 기타 → symbolic TOP
 
         else:
             # 그 외( bytesNN, string, etc. ) => 필요 시 구현
@@ -836,14 +850,23 @@ class Evaluation :
                 )
         # 비교 연산자 처리
         elif operator in ['==', '!=', '<', '>', '<=', '>=']:
+            # ★ AddressSet 비교
+            if isinstance(leftInterval, AddressSet) and isinstance(rightInterval, AddressSet):
+                if operator == '==':
+                    result = leftInterval.equals(rightInterval)
+                elif operator == '!=':
+                    result = leftInterval.not_equals(rightInterval)
+                else:
+                    # <, >, <=, >= 는 address에 대해 정의되지 않음
+                    result = BoolInterval.top()
             # 두 피연산자가 모두 Interval 계열인지 검사
-            if not (isinstance(leftInterval, (IntegerInterval,
+            elif not (isinstance(leftInterval, (IntegerInterval,
                                               UnsignedIntegerInterval,
                                               BoolInterval))
                     and isinstance(rightInterval, (IntegerInterval,
                                                    UnsignedIntegerInterval,
                                                    BoolInterval))):
-                # Interval 아니면 “결과 불확정” 으로 취급
+                # Interval 아니면 "결과 불확정" 으로 취급
                 result = BoolInterval.top()  # [0,1]
             else:
                 result = Evaluation.compare_intervals(
@@ -862,7 +885,13 @@ class Evaluation :
     def evaluate_function_call_context(self, expr, variables, callerObject=None, callerContext=None):
         if expr.context == "IdentifierExpContext":
             function_name = expr.identifier
-        elif expr.function.context == "MemberAccessContext":  # dynamic array에 대한 push, pop
+        elif expr.function.context == "MemberAccessContext":  # dynamic array에 대한 push, pop or address.call
+            # Check if it's address.call/delegatecall/staticcall
+            member = getattr(expr.function, 'member', None)
+            if member in ['call', 'delegatecall', 'staticcall']:
+                # address.call{value: ...}("") returns (bool success, bytes memory data)
+                # Return Top for success (bool)
+                return BoolInterval.top()
             return self.evaluate_expression(expr.function, variables, None, "functionCallContext")
         elif expr.function.context == "IdentifierExpContext":
             function_name = expr.function.identifier
@@ -1135,8 +1164,9 @@ class Evaluation :
             span = r - l
             # ① 범위가 너무 넓거나(≳1024) + 동적 배열이 비어 있으면 ⇒ TOP
             if span > 1024 or (callerObject.typeInfo.isDynamicArray and len(callerObject.elements) == 0):
-                if array_base_is_address(callerObject):  # ← ② baseVal → callerObject 로 수정
-                    return UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
+                if array_base_is_address(callerObject):
+                    # ★ address 배열의 경우 AddressSet TOP 반환
+                    return AddressSet.top()
                 return f"symbolicIndexRange({callerObject.identifier}[{result}])"
 
             joined = None
@@ -1216,7 +1246,11 @@ class Evaluation :
         elif var_type == "bool":
             return BoolInterval(0, 0)  # bool의 기본값 false (0)
 
-        # 4. 기타 처리 (필요시 확장 가능)
+        # 4. address 타입 처리 - 기본값은 address(0)
+        elif var_type == "address":
+            return AddressSet(ids={0})  # address의 기본값 0 (singleton set)
+
+        # 5. 기타 처리 (필요시 확장 가능)
         else:
             raise ValueError(f"Unsupported type for default interval: {var_type}")
 
