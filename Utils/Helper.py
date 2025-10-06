@@ -203,6 +203,12 @@ class VariableEnv:
             if type(v1) is not type(v2):
                 return False
 
+            # ArrayVariable 특수 처리 - elements는 리스트
+            if isinstance(v1, ArrayVariable):
+                if not VariableEnv._compare_array_elements(v1.elements, v2.elements):
+                    return False
+                continue
+
             # leaf – 값 비교
             if hasattr(v1, "value"):
                 if hasattr(v1.value, "equals"):
@@ -211,11 +217,31 @@ class VariableEnv:
                 elif v1.value != v2.value:
                     return False
             else:
-                # 복합 타입 – 재귀
-                if not VariableEnv.variables_equal(
-                        getattr(v1, "members", getattr(v1, "mapping", getattr(v1, "elements", {}))),
-                        getattr(v2, "members", getattr(v2, "mapping", getattr(v2, "elements", {})))
-                ):
+                # 복합 타입 – 재귀 (StructVariable, MappingVariable 등)
+                attr1 = getattr(v1, "members", getattr(v1, "mapping", {}))
+                attr2 = getattr(v2, "members", getattr(v2, "mapping", {}))
+                if not VariableEnv.variables_equal(attr1, attr2):
+                    return False
+        return True
+
+    @staticmethod
+    def _compare_array_elements(els1: list, els2: list) -> bool:
+        """ArrayVariable의 elements 리스트 비교"""
+        if len(els1) != len(els2):
+            return False
+        for e1, e2 in zip(els1, els2):
+            if type(e1) is not type(e2):
+                return False
+            # 재귀적으로 ArrayVariable 처리
+            if isinstance(e1, ArrayVariable):
+                if not VariableEnv._compare_array_elements(e1.elements, e2.elements):
+                    return False
+            # 값 비교
+            elif hasattr(e1, "value"):
+                if hasattr(e1.value, "equals"):
+                    if not e1.value.equals(e2.value):
+                        return False
+                elif e1.value != e2.value:
                     return False
         return True
 
@@ -248,12 +274,22 @@ class VariableEnv:
         if isinstance(v1, (Variables, EnumVariable)) and \
            not isinstance(v1, (ArrayVariable, StructVariable, MappingVariable)):
             new = copy.copy(v1)
-            new.value = VariableEnv._merge_values(v1.value, v2.value, mode)
+            # ★ v1.value가 Variables인 경우 방어 처리 (잘못된 초기화 감지)
+            if isinstance(v1.value, Variables):
+                print(f"WARNING: {v1.identifier}.value is Variables object (should be Interval or primitive)")
+                new.value = v1.value  # 그대로 유지
+            else:
+                new.value = VariableEnv._merge_values(v1.value, v2.value, mode)
             return new
 
         # ④ Array
         if isinstance(v1, ArrayVariable):
             if len(v1.elements) != len(v2.elements):
+                print(f"DEBUG _merge_values: ArrayVariable length mismatch! {v1.identifier}: {len(v1.elements)} vs {len(v2.elements)}, mode={mode}")
+                import traceback
+                import sys
+                traceback.print_stack(limit=15, file=sys.stdout)
+                sys.stdout.flush()
                 return f"symbolic{mode.capitalize()}({v1.identifier},{v2.identifier})"
             new_arr = copy.copy(v1)
             new_arr.elements = [

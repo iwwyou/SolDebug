@@ -541,12 +541,9 @@ class DynamicCFGBuilder:
         G.add_edge(cond, body, condition=True)
         G.add_edge(cond, exit_, condition=False)
 
-        # body → incr? join?
-        if incr_node:
-            G.add_edge(body, incr_node)
-            G.add_edge(incr_node, join)
-        else:
-            G.add_edge(body, join)
+        # body → incr
+        G.add_edge(body, incr_node)
+        G.add_edge(incr_node, join)
 
         # exit_ → 함수 EXIT (있으면)
         if funcExit:
@@ -1179,24 +1176,25 @@ class DynamicCFGBuilder:
 
     def get_current_block(self, context: str = "statement") -> CFGNode:
         """
-        Return the *predecessor anchor* where a new statement-block will be inserted,
-        or the condition node for else/else-if contexts.
-        - NEVER mutates the CFG here (no new nodes, no edge rewiring, no fixpoint).
-        - Selection rules:
-            * succ := first node at (L+1), fallback to EXIT
-            * if succ is loop-exit: return loop-body(True branch of the loop head)
-            * if succ is join:
-                - prefer predecessor with `is_do_end`
-                - else prefer predecessor join
-                - else try guard cond at same line and pick its branch via meta
-                - else pick nearest predecessor
-            * else (basic / others):
-                - expect exactly one pred (skeleton already makes joins)
-                - if not, fallback to "nearest" pred – but DO NOT create any join here
+        Return the predecessor anchor where a new statement-block will be inserted,
+        or the condition node for special contexts (else/else-if/catch).
+
+        Algorithm:
+        - For regular statements: Look at L+1 node
+          * If L+1 is loop-exit or join: check L-1
+            - If L-1 is cond: return cond's TRUE branch
+            - Else: return L-1 node
+          * Else: return L+1's predecessor
+
+        - For special statements (else-if/else/catch): Look at L node
+          * Traverse CFG predecessors from L to find specific node:
+            - else-if/else: first cond node (type=if/else-if)
+            - catch: first cond node (type=try)
+
+        Note: Do-while is NOT handled by this implementation yet.
 
         Args:
-            context: Analysis context - "statement" (default), "else", or "else_if"
-                    When "else" or "else_if", returns the condition node instead of branch
+            context: "statement" (default), "else", "else_if", or "catch"
         """
         an = self.an
         fcfg = an.current_target_function_cfg
@@ -1209,147 +1207,135 @@ class DynamicCFGBuilder:
         if L is None:
             raise ValueError("Neither current_end_line nor current_start_line is set.")
 
-        # ---------- helpers ----------
+        # ---------- Helper functions ----------
         def _line_nodes(line: int) -> list[CFGNode]:
-            info = an.line_info.get(line, None)
+            """Get all CFG nodes at given line."""
             info = an.line_info.get(line, None)
             if not info:
                 return []
-            out = []
-            if isinstance(info.get("cfg_nodes"), list) and info["cfg_nodes"]:
-                out.extend([n for n in info["cfg_nodes"] if n in G.nodes])
-            return out
+            cfg_nodes = info.get("cfg_nodes", [])
+            if isinstance(cfg_nodes, list):
+                return [n for n in cfg_nodes if n in G.nodes]
+            return []
 
         def _line_first(line: int) -> CFGNode | None:
+            """Get first CFG node at given line."""
             ns = _line_nodes(line)
             return ns[0] if ns else None
-
-        def _line_last(line: int) -> CFGNode | None:
-            ns = _line_nodes(line)
-            return ns[-1] if ns else None
-
-        def _branch_block(cond: CFGNode, want_true: bool) -> CFGNode | None:
-            for s in G.successors(cond):
-                if G[cond][s].get("condition") is want_true:
-                    return s
-            return None
-
-        def _cond_of_join_by_graph(j: CFGNode) -> CFGNode | None:
-            # join <- branch <- cond
-            for b in G.predecessors(j):
-                for q in G.predecessors(b):
-                    if getattr(q, "condition_node", False):
-                        return q
-            return None
-
-        def _branch_flag_from_meta(line: int) -> bool | None:
-            info = an.line_info.get(line, None)
-            if not info:
-                return None
-            meta = info.get("block_end", None)
-            if not meta:
-                return None
-            br = meta.get("branch", None)
-            return br if isinstance(br, bool) else None
-
-        def _is_join(n: CFGNode) -> bool:
-            return getattr(n, "join_point_node", False)
 
         def _is_loop_exit(n: CFGNode) -> bool:
             return getattr(n, "loop_exit_node", False)
 
+        def _is_join(n: CFGNode) -> bool:
+            return getattr(n, "join_point_node", False)
+
         def _is_cond(n: CFGNode) -> bool:
             return getattr(n, "condition_node", False)
 
-        def _nearest(nodes: list[CFGNode], succ_line: int) -> CFGNode:
-            def key(n: CFGNode):
-                ln = getattr(n, "src_line", None)
-                return (0 if ln is not None else 1, abs((ln or 0) - succ_line))
+        def _get_cond_type(n: CFGNode) -> str | None:
+            """Get condition node type (if/else-if/try/etc)."""
+            return getattr(n, "condition_node_type", None) if _is_cond(n) else None
 
-            return sorted(nodes, key=key)[0]
+        def _get_true_branch(cond: CFGNode) -> CFGNode | None:
+            """Get TRUE branch of condition node."""
+            for s in G.successors(cond):
+                if G[cond][s].get("condition") is True:
+                    return s
+            return None
 
-        # ---------- 1) succ pick at L+1 ----------
-        succ_line = L + 1
-        succ = _line_first(succ_line)
-        if succ is None:
-            succ = fcfg.get_exit_node()
+        def _find_cond_in_nodes(nodes: list[CFGNode]) -> CFGNode | None:
+            """Find condition node in list (search from end)."""
+            for n in reversed(nodes):
+                if _is_cond(n):
+                    return n
+            return None
 
-        # ---------- 2) succ is loop-exit → return loop body(True) as anchor ----------
-        if _is_loop_exit(succ):
-            loop_cond = None
-            for p in G.predecessors(succ):
-                if _is_cond(p) and G[p][succ].get("condition") is False:
-                    loop_cond = p
-                    break
-            if loop_cond is not None:
-                body = _branch_block(loop_cond, True)
-                if body is not None:
-                    return body
-            preds = list(G.predecessors(succ))
-            return _nearest(preds, succ_line) if preds else fcfg.get_entry_node()
+        # ========== Special contexts (else-if/else/catch) ==========
+        if context in ["else_if", "else", "catch"]:
+            # Get L line nodes and traverse predecessors
+            L_nodes = _line_nodes(L)
+            if not L_nodes:
+                raise ValueError(f"No CFG nodes found at line {L} for context '{context}'")
 
-        # ---------- 3) succ is join ----------
-        if _is_join(succ):
-            preds = list(G.predecessors(succ))
+            # BFS through predecessors to find target node
+            from collections import deque
+            visited = set()
+            queue = deque(L_nodes)
 
-            # Special case: else/else-if needs the condition node
-            if context in ["else", "else_if"]:
-                # Find condition node by traversing back through graph
-                cond = _cond_of_join_by_graph(succ)
-                if cond is not None and getattr(cond, "condition_node_type", None) in ['if', 'else if']:
-                    return cond
-                # Fallback: check same line
-                guard = _line_last(succ_line)
-                if guard is not None and _is_cond(guard) and getattr(guard, "condition_node_type", None) in ['if', 'else if']:
-                    return guard
-                # No condition found
-                raise ValueError(f"No condition node found for {context} at line {an.current_start_line}")
+            while queue:
+                node = queue.popleft()
+                if node in visited:
+                    continue
+                visited.add(node)
 
-            # (A) do-while 마무리: do_end_* 를 최우선
-            do_end_preds = [p for p in preds if getattr(p, "is_do_end", False)]
-            if do_end_preds:
-                return _nearest(do_end_preds, succ_line)
+                # Check if this is the target node
+                if _is_cond(node):
+                    node_type = _get_cond_type(node)
 
-            # (B) pred-join 선호
-            join_preds = [p for p in preds if _is_join(p)]
-            if join_preds:
-                return _nearest(join_preds, succ_line)
+                    if context in ["else_if", "else"]:
+                        # Looking for if/else-if condition
+                        if node_type in ["if", "else if"]:
+                            return node
+                    elif context == "catch":
+                        # Looking for try condition
+                        if node_type == "try":
+                            return node
 
-            # (C) 같은 줄 guard cond → 메타로 분기 선택
-            guard = _line_last(succ_line)
-            cond = guard if (guard is not None and _is_cond(guard)) else _cond_of_join_by_graph(succ)
-            if cond is not None:
-                want_true = _branch_flag_from_meta(succ_line)
-                if want_true is None:
-                    want_true = True
-                b = _branch_block(cond, want_true)
-                if b is not None:
-                    return b
+                # Continue searching predecessors
+                for pred in G.predecessors(node):
+                    if pred not in visited:
+                        queue.append(pred)
 
-            # (D) 폴백: 가장 가까운 pred
-            return _nearest(preds, succ_line) if preds else fcfg.get_entry_node()
+            raise ValueError(f"No matching condition node found for context '{context}' at line {L}")
 
-        # ---------- 4) BASIC / 기타 (EXIT 포함) ----------
-        preds = list(G.predecessors(succ))
+        # ========== Regular statement context ==========
+        # Look at L+1 node
+        L_plus_1_node = _line_first(L + 1)
 
-        # Special case: else/else-if context에서 EXIT의 pred가 join이면 condition 찾기
-        if context in ["else", "else_if"] and preds:
-            # EXIT의 predecessor가 join일 수 있음
-            for pred in preds:
-                if _is_join(pred):
-                    cond = _cond_of_join_by_graph(pred)
-                    if cond is not None and getattr(cond, "condition_node_type", None) in ['if', 'else if']:
-                        return cond
+        if L_plus_1_node is None:
+            # L+1 is empty, use EXIT
+            L_plus_1_node = fcfg.get_exit_node()
 
-        # 기대상황: skeleton 덕에 항상 단일 pred
-        if len(preds) == 1:
-            return preds[0]
+        # Check if L+1 is loop-exit or join
+        if _is_loop_exit(L_plus_1_node) or _is_join(L_plus_1_node):
+            # Look at L-1 nodes
+            L_minus_1_nodes = _line_nodes(L - 1)
 
-        # 방어적 폴백 (이상 상황): 가장 가까운 pred
-        # (여기서 join 생성/그래프 수정은 절대 하지 않음)
-        if len(preds) > 1:
-            return _nearest(preds, succ_line)
-        return fcfg.get_entry_node()
+            if not L_minus_1_nodes:
+                # L-1 empty, return first predecessor of L+1
+                preds = list(G.predecessors(L_plus_1_node))
+                return preds[0] if preds else fcfg.get_entry_node()
+
+            # Check if any L-1 node is a condition
+            cond_node = _find_cond_in_nodes(L_minus_1_nodes)
+
+            if cond_node:
+                # L-1 is cond: return TRUE branch
+                true_branch = _get_true_branch(cond_node)
+                if true_branch:
+                    return true_branch
+                else:
+                    # Fallback: return cond itself (shouldn't happen)
+                    return cond_node
+            else:
+                # L-1 is not cond: return last L-1 node
+                return L_minus_1_nodes[-1]
+        else:
+            # L+1 is not loop-exit/join: return L+1's predecessor
+            preds = list(G.predecessors(L_plus_1_node))
+
+            if len(preds) == 1:
+                return preds[0]
+            elif len(preds) > 1:
+                # Multiple predecessors (shouldn't happen for regular statement)
+                # Return the one closest to current line
+                def distance(n: CFGNode):
+                    ln = getattr(n, "src_line", None)
+                    return abs((ln or 0) - L) if ln is not None else 999999
+                return min(preds, key=distance)
+            else:
+                # No predecessors, return ENTRY
+                return fcfg.get_entry_node()
 
 
     def find_loop_join(self, start: CFGNode, fcfg: FunctionCFG) -> CFGNode | None:

@@ -74,15 +74,52 @@ class Engine:
                         vobj.identifier = var_name
                         variables[var_name] = vobj
                     else:
-                        # 평가 결과가 예상과 다르면 기본 객체 생성
-                        vobj = Variables(identifier=var_name, scope="local")
-                        vobj.typeInfo = var_type
-                        vobj.value = vobj
+                        # 평가 결과가 예상과 다르면 타입에 맞는 객체 생성
+                        if var_type.typeCategory == "array":
+                            vobj = ArrayVariable(
+                                identifier=var_name,
+                                base_type=var_type.arrayBaseType,
+                                array_length=var_type.arrayLength,
+                                is_dynamic=var_type.isDynamicArray,
+                                scope="local"
+                            )
+                        elif var_type.typeCategory == "struct":
+                            vobj = StructVariable(
+                                identifier=var_name,
+                                struct_type=var_type.structTypeName,
+                                scope="local"
+                            )
+                        elif var_type.typeCategory == "mapping":
+                            vobj = MappingVariable(
+                                identifier=var_name,
+                                key_type=var_type.mappingKeyType,
+                                value_type=var_type.mappingValueType,
+                                scope="local"
+                            )
                         variables[var_name] = vobj
                 else:
-                    # 초기화식 없으면 기본 객체 생성
-                    vobj = Variables(identifier=var_name, scope="local")
-                    vobj.typeInfo = var_type
+                    # 초기화식 없으면 타입에 맞는 객체 생성
+                    if var_type.typeCategory == "array":
+                        vobj = ArrayVariable(
+                            identifier=var_name,
+                            base_type=var_type.arrayBaseType,
+                            array_length=var_type.arrayLength,
+                            is_dynamic=var_type.isDynamicArray,
+                            scope="local"
+                        )
+                    elif var_type.typeCategory == "struct":
+                        vobj = StructVariable(
+                            identifier=var_name,
+                            struct_type=var_type.structTypeName,
+                            scope="local"
+                        )
+                    elif var_type.typeCategory == "mapping":
+                        vobj = MappingVariable(
+                            identifier=var_name,
+                            key_type=var_type.mappingKeyType,
+                            value_type=var_type.mappingValueType,
+                            scope="local"
+                        )
                     variables[var_name] = vobj
             else:
                 # Elementary 타입 처리
@@ -106,7 +143,12 @@ class Engine:
         if init_expr is not None and var_type.typeCategory not in ("struct", "array", "mapping"):
             # ArrayVariable 등 특수 케이스가 아니면 값 평가
             if not isinstance(vobj, ArrayVariable):
-                vobj.value = self.eval.evaluate_expression(init_expr, variables, None, None)
+                eval_result = self.eval.evaluate_expression(init_expr, variables, None, None)
+                # ★ 평가 결과가 Variables 객체면 그 value를 추출
+                if isinstance(eval_result, Variables) and not isinstance(eval_result, (ArrayVariable, StructVariable, MappingVariable)):
+                    vobj.value = getattr(eval_result, 'value', eval_result)
+                else:
+                    vobj.value = eval_result
                 if self._record_enabled and not self._suppress_stmt_records:
                     self.rec.record_variable_declaration(
                         line_no=stmt.src_line,
@@ -509,6 +551,9 @@ class Engine:
             if preds:
                 joined = None
                 for p in preds:
+                    # ★ 이번 해석에서 이미 방문한 predecessor만 join (재해석 시 이전 값 무시)
+                    if p not in visited:
+                        continue
                     flow = _edge_env_from_pred(p, node)
                     if flow is None: continue
                     joined = (VariableEnv.copy_variables(flow) if joined is None

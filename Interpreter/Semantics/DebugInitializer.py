@@ -177,7 +177,8 @@ class DebugInitializer:
         # ======================================================================
         # 4) 상위 객체 없음 (top-level ident) - 일반 변수 찾기
         # ======================================================================
-        if caller_context in ("IndexAccessContext", "MemberAccessContext", "TestingIndexAccess"):
+        if caller_context in (
+                "IndexAccessContext", "MemberAccessContext", "TestingIndexAccess"):
             # base에 대한 접근
             if ident in variables:
                 return variables[ident]  # MappingVariable, ArrayVariable 등을 반환
@@ -373,6 +374,8 @@ class DebugInitializer:
             target_var.typeInfo.arrayLength = len(new_value)
             target_var.elements.clear()
 
+            print(f"DEBUG _patch_var: ArrayVariable {target_var.identifier}, initializing with {new_value}")
+
             for idx, val in enumerate(new_value):
                 # Variables 객체 생성
                 elem_id = f"{target_var.identifier}[{idx}]"
@@ -394,6 +397,7 @@ class DebugInitializer:
                     if base_type.elementaryTypeName.startswith('uint'):
                         bits = base_type.intTypeLength or 256
                         elem.value = UnsignedIntegerInterval(val, val, bits)
+                        print(f"DEBUG _patch_var: Created element [{idx}] with value UnsignedIntegerInterval({val}, {val})")
                     elif base_type.elementaryTypeName.startswith('int'):
                         bits = base_type.intTypeLength or 256
                         elem.value = IntegerInterval(val, val, bits)
@@ -403,6 +407,8 @@ class DebugInitializer:
                     elem.value = val
 
                 target_var.elements.append(elem)
+
+            print(f"DEBUG _patch_var: ArrayVariable {target_var.identifier} now has {len(target_var.elements)} elements")
             return
 
         if isinstance(target_var, VarClass):
