@@ -186,6 +186,71 @@ class Engine:
         return env_out
 
     # =================================================================
+    #  Loop Iteration Estimation (조건식 기반)
+    # =================================================================
+    def _estimate_loop_iterations(self, head: CFGNode, start_env: dict) -> int:
+        """
+        Loop 조건식을 평가해서 예상 반복 횟수 추정
+
+        Args:
+            head: Loop head node
+            start_env: Loop 진입 시점의 변수 환경
+
+        Returns:
+            추정 반복 횟수 (기본값: 2, 최대값: 20)
+        """
+        # Loop head가 condition node가 아니면 기본값
+        if not getattr(head, 'condition_node', False):
+            return 2
+
+        cond_expr = getattr(head, 'condition_expr', None)
+        if cond_expr is None:
+            return 2
+
+        # 조건식 평가: tokenIndex < tokenCount
+        try:
+            # Binary expression인지 확인
+            if not hasattr(cond_expr, 'operator') or cond_expr.operator not in ['<', '<=', '>', '>=', '!=']:
+                return 2
+
+            # 좌변/우변 평가
+            left_val = self.eval.evaluate_expression(cond_expr.left, start_env, None, None)
+            right_val = self.eval.evaluate_expression(cond_expr.right, start_env, None, None)
+
+            # Interval인지 확인
+            if not (VariableEnv.is_interval(left_val) and VariableEnv.is_interval(right_val)):
+                return 2
+
+            # 반복 횟수 계산
+            if cond_expr.operator in ['<', '<=']:
+                # left < right: right의 상한 - left의 하한
+                iterations = right_val.max_value - left_val.min_value
+                if cond_expr.operator == '<=':
+                    iterations += 1
+            elif cond_expr.operator in ['>', '>=']:
+                # left > right: left의 상한 - right의 하한
+                iterations = left_val.max_value - right_val.min_value
+                if cond_expr.operator == '>=':
+                    iterations += 1
+            elif cond_expr.operator == '!=':
+                # != 조건은 예측 어려움, 보수적으로 처리
+                return 10
+            else:
+                return 2
+
+            # 합리적인 범위로 제한: [2, 20]
+            if iterations <= 0:
+                return 2
+            elif iterations > 20:
+                return 20
+            else:
+                return int(iterations)
+
+        except Exception as e:
+            # 평가 실패 시 기본값
+            return 2
+
+    # =================================================================
     #  Fixpoint (루프 중 문장기록 억제)
     # =================================================================
     def fixpoint(self, head: CFGNode) -> CFGNode:
@@ -210,38 +275,48 @@ class Engine:
         in_vars: dict[CFGNode, dict[str, Variables] | None] = {n: None for n in loop_nodes}
         out_vars: dict[CFGNode, dict[str, Variables] | None] = {n: None for n in loop_nodes}
 
-        for n in loop_nodes:
-            if getattr(n, "fixpoint_evaluation_node", False):
-                in_vars[n] = VariableEnv.copy_variables(getattr(n, "variables", {}) or {})
+        # Join 노드의 in_vars는 None으로 시작 (worklist 알고리즘이 올바르게 전파하도록)
+        # for n in loop_nodes:
+        #     if getattr(n, "fixpoint_evaluation_node", False):
+        #         in_vars[n] = VariableEnv.copy_variables(getattr(n, "variables", {}) or {})
 
         start_env = None
         for p in G.predecessors(head):
-            start_env = VariableEnv.join_variables_simple(start_env, getattr(p, "variables", {}) or {})
+            p_vars = getattr(p, "variables", {}) or {}
+            start_env = VariableEnv.join_variables_simple(start_env, p_vars)
         in_vars[head] = start_env or {}
+
+        # Debug: check _tokens and tokenCount
+        if '_tokens' in in_vars[head]:
+            print(f"DEBUG fixpoint start: _tokens={in_vars[head]['_tokens']}")
+        if 'tokenCount' in in_vars[head]:
+            print(f"DEBUG fixpoint start: tokenCount={in_vars[head]['tokenCount'].value}")
 
         # ── 루프 내부 문장 기록 억제 on
         old_sup = self._suppress_stmt_records
         self._suppress_stmt_records = True
 
-        # widening
+        # Loop 반복 횟수 추정 (조건식 기반)
+        widening_threshold = (self._estimate_loop_iterations(head, in_vars[head]))+1
+        print(f"DEBUG fixpoint: widening_threshold={widening_threshold}")
+
+        # widening - join 노드들도 초기 WL에 추가
         W_MAX = 300
         WL = deque([head])
+        for n in loop_nodes:
+            if getattr(n, "fixpoint_evaluation_node", False) and n != head:
+                WL.append(n)
+        iteration = 0
         while WL and max(visit_cnt.values(), default=0) < W_MAX:
             node = WL.popleft()
             visit_cnt[node] += 1
+            iteration += 1
 
             out_old = out_vars[node]
             out_raw = self.transfer_function(node, in_vars[node])
 
-            if getattr(node, "fixpoint_evaluation_node", False):
-                prev_snapshot = getattr(node, "fixpoint_evaluation_node_vars", None)
-                changed_vs_prev = (prev_snapshot is not None and
-                                   not VariableEnv.variables_equal(prev_snapshot, out_raw))
-            else:
-                changed_vs_prev = False
-
             need_widen = (getattr(node, "fixpoint_evaluation_node", False) and
-                          (visit_cnt[node] >= 2 or changed_vs_prev))
+                          visit_cnt[node] > widening_threshold)
 
             out_joined = (
                 VariableEnv.join_variables_with_widening(out_old, out_raw)
@@ -252,7 +327,20 @@ class Engine:
             if getattr(node, "fixpoint_evaluation_node", False):
                 node.fixpoint_evaluation_node_vars = VariableEnv.copy_variables(out_joined)
 
-            if VariableEnv.variables_equal(out_old, out_joined):
+            # Debug: track join node visits and resultIndex changes
+            if getattr(node, "fixpoint_evaluation_node", False):
+                print(f"DEBUG widening iter={iteration}: JOIN node={node.name}, visit_cnt={visit_cnt[node]}, threshold={widening_threshold}, need_widen={need_widen}")
+
+            if 'resultIndex' in (out_joined or {}):
+                old_val = out_old.get('resultIndex').value if (out_old and 'resultIndex' in out_old) else 'None'
+                new_val = out_joined['resultIndex'].value
+                print(f"DEBUG widening iter={iteration}: node={node.name}, visit_cnt={visit_cnt[node]}, need_widen={need_widen}, resultIndex: {old_val} → {new_val}")
+
+            equal = VariableEnv.variables_equal(out_old, out_joined)
+            if 'resultIndex' in (out_joined or {}):
+                print(f"DEBUG widening iter={iteration}: node={node.name}, equal={equal}, WL will continue={not equal}")
+
+            if equal:
                 out_vars[node] = out_joined; continue
             out_vars[node] = out_joined
 
@@ -263,16 +351,21 @@ class Engine:
                 if flow is None:
                     continue
                 if getattr(succ, "fixpoint_evaluation_node", False):
-                    prev_s = getattr(succ, "fixpoint_evaluation_node_vars", None)
-                    changed_succ = (prev_s is not None and not VariableEnv.variables_equal(prev_s, flow))
-                    succ_widen = (visit_cnt[succ] >= 2 or changed_succ)
+                    succ_widen = (visit_cnt[succ] > widening_threshold)
                 else:
                     succ_widen = False
 
                 in_new = (VariableEnv.join_variables_with_widening(in_vars[succ], flow)
                           if succ_widen
                           else VariableEnv.join_variables_simple(in_vars[succ], flow))
-                if not VariableEnv.variables_equal(in_vars[succ], in_new):
+
+                changed_succ = not VariableEnv.variables_equal(in_vars[succ], in_new)
+                if getattr(succ, "fixpoint_evaluation_node", False):
+                    old_ri = in_vars[succ].get('resultIndex').value if in_vars[succ] and 'resultIndex' in in_vars[succ] else 'None'
+                    new_ri = in_new.get('resultIndex').value if in_new and 'resultIndex' in in_new else 'None'
+                    print(f"DEBUG propagate: {node.name} → {succ.name}, succ_widen={succ_widen}, changed={changed_succ}, resultIndex: {old_ri} → {new_ri}")
+
+                if changed_succ:
                     in_vars[succ] = VariableEnv.copy_variables(in_new)
                     WL.append(succ)
 
@@ -324,19 +417,32 @@ class Engine:
             exit_env = VariableEnv.join_variables_simple(exit_env, flow)
         exit_node.variables = VariableEnv.copy_variables(exit_env or {})
 
+        # Debug: show final values
+        if 'resultIndex' in exit_node.variables:
+            print(f"DEBUG fixpoint exit: resultIndex={exit_node.variables['resultIndex'].value}")
+
         # loopDelta: 헤더(조건) 라인에 기록
-        base_env = None
+        # head의 predecessor 중 fixpoint_evaluation_node(=join)를 찾아 baseline 가져오기
+        join_node = None
         for p in G.predecessors(head):
             if getattr(p, "fixpoint_evaluation_node", False):
-                base_env = getattr(p, "join_baseline_env", None)
+                join_node = p
                 break
-        changed = VariableEnv.diff_changed(base_env, exit_node.variables) if base_env else {}
-        if changed:
-            ln_head = getattr(head, "src_line", None)
-            if ln_head is not None:
-                # 중복 방지: 일단 지우고 기록
-                rec.clear_line(ln_head)
-                rec.add_env_record(ln_head, "loopDelta", changed)
+
+        if join_node is not None:
+            base_env = getattr(join_node, "join_baseline_env", None)
+            if base_env is not None:
+                changed_flat = VariableEnv.diff_changed(base_env, exit_node.variables)
+                if changed_flat:
+                    ln_head = getattr(head, "src_line", None)
+                    if ln_head is not None:
+                        # loopDelta 기록: diff_changed는 이미 직렬화된 딕셔너리를 반환하므로
+                        # _append_or_replace를 직접 호출
+                        rec._append_or_replace(
+                            ln_head,
+                            {"kind": "loopDelta", "vars": changed_flat},
+                            replace_rule=lambda old, new: old.get("kind") == new["kind"],
+                        )
 
         return exit_node
 
@@ -630,6 +736,28 @@ class Engine:
 
         while WL:
             n = WL.popleft(); in_queue.discard(n)
+
+            in_env = _compute_in(n)
+
+            # ── loop head는 fixpoint에서 loopDelta를 기록하므로 특별 처리
+            if _is_loop_head(n):
+                ln_head = getattr(n, "src_line", None)
+                if ln_head is not None: touched_lines.add(ln_head)
+
+                # ★ fixpoint 재실행 전에 join 노드의 스냅샷 초기화
+                # 디버그 주석 적용 후 조건이 바뀌었을 수 있으므로 clean slate에서 시작
+                for p in G.predecessors(n):
+                    if getattr(p, "fixpoint_evaluation_node", False):
+                        if hasattr(p, "fixpoint_evaluation_node_vars"):
+                            delattr(p, "fixpoint_evaluation_node_vars")
+
+                exit_node = self.fixpoint(n)
+                for s in G.successors(exit_node):
+                    if not _is_sink(s) and s not in in_queue:
+                        WL.append(s); in_queue.add(s)
+
+                continue
+
             # ── (A) 라인 초기화: 이 노드가 기록을 남길 수 있는 라인들을 선제적으로 clear
             #     - 조건 노드: 자신의 src_line (branchTrue/requireTrue 등)
             #     - 일반/베이식: 각 statement 의 src_line
@@ -642,21 +770,6 @@ class Engine:
                     ln_st = getattr(st, "src_line", None)
                     _clear_line_once(ln_st)
                     if ln_st is not None: touched_lines.add(ln_st)
-
-            in_env = _compute_in(n)
-
-            if _is_loop_head(n):
-                # ★ loopDelta 가 찍힐 cond 라인도 미리 clear (중복 방지)
-                ln_head = getattr(n, "src_line", None)
-                _clear_line_once(ln_head)
-                if ln_head is not None: touched_lines.add(ln_head)
-
-                exit_node = self.fixpoint(n)
-                for s in G.successors(exit_node):
-                    if not _is_sink(s) and s not in in_queue:
-                        WL.append(s); in_queue.add(s)
-
-                continue
 
             new_out = self.transfer_function(n, in_env)
             n.variables = VariableEnv.copy_variables(new_out)

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/isjeon/PycharmProjects/pythonProject/SolDebug/Interpreter/Semantics/**)",
+      "Bash(python:*)",
+      "Read(//c/Users/isjeon/PycharmProjects/pythonProject/SolDebug/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

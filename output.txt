@@ -1,119 +1,48 @@
-target code :  contract ATIDStaking {
+target code :  contract AvatarArtMarketplace {
 }
 --------------------------------------------------------
-target code :      struct LockedStake {
-}
---------------------------------------------------------
-target code :          bool active;        
---------------------------------------------------------
-target code :          uint ID;
---------------------------------------------------------
-target code :          uint prevID;  
---------------------------------------------------------
-target code :          uint nextID;        
---------------------------------------------------------
-target code :          uint amount;        
---------------------------------------------------------
-target code :          uint lockedUntil;        
---------------------------------------------------------
-target code :          uint stakeWeight;
+target code :      uint256[] internal _tokens;
 --------------------------------------------------------
 target code :  
 
 --------------------------------------------------------
-target code :      mapping(address => mapping(uint => LockedStake)) public lockedStakeMap;
+target code :      function _removeFromTokens(uint tokenId) internal view returns(uint256[] memory){
+}
 --------------------------------------------------------
-target code :      mapping(address => uint) public headLockedStakeIDMap;
+target code :          uint256 tokenCount = _tokens.length;
+[5-5]  analysis ¢¡
+  L  5 | varDeclaration | {'tokenCount': '[0,0]'}
 --------------------------------------------------------
-target code :      mapping(address => uint) public nextLockedStakeIDMap;
+target code :          uint256[] memory result = new uint256[](tokenCount-1);
 --------------------------------------------------------
-target code :      mapping(address => uint) public tailLockedStakeIDMap;
+target code :          uint256 resultIndex = 0;
+[7-7]  analysis ¢¡
+  L  7 | varDeclaration | {'resultIndex': '[0,0]'}
 --------------------------------------------------------
-target code :      mapping(address => uint) public weightedStakes;
+target code :          for(uint tokenIndex = 0; tokenIndex < tokenCount; tokenIndex++){
+}
 --------------------------------------------------------
-target code :      mapping(address => uint) public unweightedStakes;
+target code :              uint tokenItemId = _tokens[tokenIndex];
+[9-9]  analysis ¢¡
+  L  9 | varDeclaration | {'tokenItemId': '[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+--------------------------------------------------------
+target code :              if(tokenItemId != tokenId){
+}
+--------------------------------------------------------
+target code :                  result[resultIndex] = tokenItemId;
+--------------------------------------------------------
+target code :                  resultIndex++;
 --------------------------------------------------------
 target code :  
 
 --------------------------------------------------------
-target code :      uint public totalWeightedATIDStaked;
+target code :          return result;
+[16-16]  analysis ¢¡
+  L 16 |         return | {'result': 'None'}
 --------------------------------------------------------
-target code :  
-
---------------------------------------------------------
-target code :      function _insertLockedStake(address _stakerAddress, uint _ATIDamount, uint _stakeWeight, uint _lockedUntil) internal returns (uint newLockedStakeID) {
-}
---------------------------------------------------------
-target code :          if (nextLockedStakeIDMap[_stakerAddress] == 0) {
-}
-[ANTLR] 1:8 mismatched input 'if' expecting {<EOF>, 'pragma', 'import', 'abstract', 'contract', 'interface', 'library', 'error', 'using', 'struct', 'modifier', 'function', 'event', 'enum', 'mapping', 'address', 'address payable', 'bool', 'string', 'var', 'bytes', Int, Uint, Byte, Fixed, Ufixed, 'payable', 'type', 'global', 'from', 'to', 'override', 'constructor', 'fallback', 'receive', Identifier}
---------------------------------------------------------
-target code :              nextLockedStakeIDMap[_stakerAddress] = 1;
-[23-23]  analysis ¢¡
-  L 23 |     assignment | {'nextLockedStakeIDMap[_stakerAddress]': '[1,1]'}
---------------------------------------------------------
-target code :          uint nextLockedStateID = nextLockedStakeIDMap[_stakerAddress];
-[25-25]  analysis ¢¡
-  L 25 | varDeclaration | {'nextLockedStateID': '[1,1]'}
---------------------------------------------------------
-target code :          nextLockedStakeIDMap[_stakerAddress]++;
---------------------------------------------------------
-target code :  
-
---------------------------------------------------------
-Error: Unknown context type for line:         LockedStake memory newLockedStake = LockedStake({
-target code :          LockedStake memory newLockedStake = LockedStake({
-            active: true,
-
-            ID: nextLockedStateID,
-            prevID: tailLockedStakeIDMap[_stakerAddress],  
-            nextID: 0,  
-
-            amount: _ATIDamount,
-            lockedUntil: _lockedUntil,
-            stakeWeight: _stakeWeight
-        });
---------------------------------------------------------
-Error: Unknown context type for line:         LockedStake memory newLockedStake = LockedStake({
-Error: Unknown context type for line:         LockedStake memory newLockedStake = LockedStake({
-target code :          lockedStakeMap[_stakerAddress][newLockedStake.ID] = newLockedStake;
---------------------------------------------------------
-target code :  
-
---------------------------------------------------------
-target code :          if (headLockedStakeIDMap[_stakerAddress] == 0) {           
-}
-[ANTLR] 1:8 mismatched input 'if' expecting {<EOF>, 'pragma', 'import', 'abstract', 'contract', 'interface', 'library', 'error', 'using', 'struct', 'modifier', 'function', 'event', 'enum', 'mapping', 'address', 'address payable', 'bool', 'string', 'var', 'bytes', Int, Uint, Byte, Fixed, Ufixed, 'payable', 'type', 'global', 'from', 'to', 'override', 'constructor', 'fallback', 'receive', Identifier}
---------------------------------------------------------
-Error: Unknown context type for line:         LockedStake memory newLockedStake = LockedStake({
-Error: Unknown context type for line:         LockedStake memory newLockedStake = LockedStake({
-target code :              headLockedStakeIDMap[_stakerAddress] = newLockedStake.ID;
-[42-42]  analysis ¢¡
-  L 42 |     assignment | {'headLockedStakeIDMap[_stakerAddress]': '[1,1]'}
---------------------------------------------------------
-Error: Unknown context type for line:         LockedStake memory newLockedStake = LockedStake({
-Error: Unknown context type for line:         LockedStake memory newLockedStake = LockedStake({
-target code :  else {           
-}
-Traceback (most recent call last):
-  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\test.py", line 402, in <module>
-    simulate_inputs(test_inputs)
-  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\test.py", line 54, in simulate_inputs
-    EnhancedSolidityVisitor(contract_analyzer).visit(tree)
-  File "C:\Users\isjeon\AppData\Local\Programs\Python\Python310\lib\site-packages\antlr4\tree\Tree.py", line 34, in visit
-    return tree.accept(self)
-  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Parser\SolidityParser.py", line 5643, in accept
-    return visitor.visitInteractiveIfElseUnit(self)
-  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\EnhancedSolidityVisitor.py", line 575, in visitInteractiveIfElseUnit
-    return self.visitChildren(ctx)
-  File "C:\Users\isjeon\AppData\Local\Programs\Python\Python310\lib\site-packages\antlr4\tree\Tree.py", line 44, in visitChildren
-    childResult = c.accept(self)
-  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Parser\SolidityParser.py", line 10716, in accept
-    return visitor.visitInteractiveElseStatement(self)
-  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\EnhancedSolidityVisitor.py", line 1225, in visitInteractiveElseStatement
-    self.contract_analyzer.process_else_statement()
-  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 1269, in process_else_statement
-    self.refiner.update_variables_with_condition(
-  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\Refine.py", line 43, in update_variables_with_condition
-    op = condition_expr.operator
-AttributeError: 'NoneType' object has no attribute 'operator'
+target code :  // @Debugging BEGIN
+target code :  // @StateVar _tokens = array [1,2,3];
+target code :  // @LocalVar tokenId = [4,4];
+target code :  // @Debugging END
+DEBUG: batch_targets before flush: 0
+DEBUG: recorder ledger before flush: 5

@@ -185,6 +185,10 @@ class IntegerInterval(Interval):
         if self.is_bottom():
             return new_interval
 
+        # new_interval이 bottom이면 self 유지
+        if new_interval.is_bottom():
+            return self
+
         cur_min = self.min_value if self.min_value != NEG_INFINITY else new_interval.min_value
         cur_max = self.max_value if self.max_value != INFINITY else new_interval.max_value
         if cur_min is None or cur_max is None:
@@ -542,6 +546,10 @@ class UnsignedIntegerInterval(Interval):
         if self.is_bottom():
             return new_interval
 
+        # new_interval이 bottom이면 self 유지
+        if new_interval.is_bottom():
+            return self
+
         cur_min = self.min_value
         cur_max = self.max_value
         if cur_max == INFINITY:
@@ -764,6 +772,10 @@ class BoolInterval(Interval):
     def narrow(self, new_interval):
         if self.is_bottom():
             return new_interval
+
+        # new_interval이 bottom이면 self 유지
+        if new_interval.is_bottom():
+            return self
 
         cur_min = self.min_value
         cur_max = self.max_value

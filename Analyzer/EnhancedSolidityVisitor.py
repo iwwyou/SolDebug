@@ -1608,7 +1608,15 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         # 2. 인자 목록 처리
         arguments, named_arguments = self.process_arguments(ctx.callArgumentList())
 
-        # 3. Expression 객체 생성
+        # 3. new 표현식인 경우: new uint256[](size) 형태 처리
+        if function_expr and function_expr.context == "NewExpContext":
+            # new expression에 크기 인자가 전달된 경우
+            # arguments를 NewExpContext의 arguments에 병합
+            if arguments:
+                function_expr.arguments = arguments
+            return function_expr
+
+        # 4. Expression 객체 생성
         result_expr = Expression(
             function=function_expr,
             arguments=arguments,

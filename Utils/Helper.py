@@ -309,18 +309,25 @@ class VariableEnv:
 
         def _flat(env: dict[str, Variables]) -> dict[str, str]:
             out = {}
-            for v in env.values():
+            for k, v in env.items():
+                # 방어 코드: v가 Variables 객체가 아니면 건너뛰기
+                if not hasattr(v, 'identifier'):
+                    print(f"WARNING: env['{k}'] has type {type(v)} instead of Variables: {v}")
+                    continue
                 rm._flatten_var(v, v.identifier, out)
             return out
 
-        old_flat = _flat(old_env)
-        new_flat = _flat(new_env)
+        old_flat = _flat(old_env) if old_env else {}
+        new_flat = _flat(new_env) if new_env else {}
 
         changed = {}
         for path, new_val in new_flat.items():
-            if path not in old_flat:
+            old_val = old_flat.get(path)
+            if old_val is None:
+                # 이전에 없던 변수는 제외 (루프 내부 새 변수는 loopDelta에 포함 안 함)
                 continue
-            if rm._serialize_val(old_flat[path]) != rm._serialize_val(new_val):
+            # old_val과 new_val은 이미 _flatten_var에서 직렬화된 문자열이므로 직접 비교
+            if old_val != new_val:
                 changed[path] = new_val  # path 는 "a[3].x" 같은 키
         return changed
 

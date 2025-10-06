@@ -258,7 +258,7 @@ debugUnit
   ) * EOF;
 
 debugGlobalVar
-  : '//' '@GlobalVar' identifier ('.' identifier)? '=' globalValue
+  : '//' '@GlobalVar' identifier ('.' identifier)? '=' globalValue ';'
   ;
 
 globalValue
@@ -267,11 +267,11 @@ globalValue
   ;
 
 debugStateVar
-  : '//' '@StateVar' testingExpression '=' stateLocalValue
+  : '//' '@StateVar' testingExpression '=' stateLocalValue ';'
   ;
 
 debugLocalVar
-  : '//' '@LocalVar' testingExpression '=' stateLocalValue
+  : '//' '@LocalVar' testingExpression '=' stateLocalValue ';'
   ;
 
 testingExpression
@@ -299,7 +299,7 @@ inlineArrayAnnotation
   ;
 inlineElement
   : '-'? numberLiteral                         # InlineIntElement
-  | 'array' inlineArrayAnnotation              # NestedArrayElement
+  | inlineArrayAnnotation              # NestedArrayElement
   | 'arrayAddress' '[' numberLiteral (',' numberLiteral)* ']' # AddrArrayElement
   ;
 

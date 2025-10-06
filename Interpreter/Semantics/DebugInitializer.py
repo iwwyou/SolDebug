@@ -359,11 +359,53 @@ class DebugInitializer:
             if id(target_var) not in self.an.snapman.store:
                 self.an.snapman.register(target_var, self.an.ser)
 
-    def _patch_var_with_new_value_for_debug(self, target_var: Variables, new_value):
+    def _patch_var_with_new_value_for_debug(self, target_var, new_value):
         """
         디버깅용 변수 값 패치
         """
-        if isinstance(target_var, Variables):
+        from Domain.Variable import Variables as VarClass
+        from Domain.Interval import UnsignedIntegerInterval, IntegerInterval
+
+        # ArrayVariable 처리: value가 리스트이고 배열 요소 값들인 경우
+        if isinstance(target_var, ArrayVariable) and isinstance(new_value, list):
+            # 배열 요소 초기화
+            base_type = target_var.typeInfo.arrayBaseType
+            target_var.typeInfo.arrayLength = len(new_value)
+            target_var.elements.clear()
+
+            for idx, val in enumerate(new_value):
+                # Variables 객체 생성
+                elem_id = f"{target_var.identifier}[{idx}]"
+                elem = VarClass(identifier=elem_id, scope=target_var.scope)
+                elem.typeInfo = base_type
+
+                # 값 설정
+                if isinstance(val, list) and len(val) == 2:
+                    min_val, max_val = val
+                    if base_type.elementaryTypeName.startswith('uint'):
+                        bits = base_type.intTypeLength or 256
+                        elem.value = UnsignedIntegerInterval(min_val, max_val, bits)
+                    elif base_type.elementaryTypeName.startswith('int'):
+                        bits = base_type.intTypeLength or 256
+                        elem.value = IntegerInterval(min_val, max_val, bits)
+                    else:
+                        elem.value = val
+                elif isinstance(val, int):
+                    if base_type.elementaryTypeName.startswith('uint'):
+                        bits = base_type.intTypeLength or 256
+                        elem.value = UnsignedIntegerInterval(val, val, bits)
+                    elif base_type.elementaryTypeName.startswith('int'):
+                        bits = base_type.intTypeLength or 256
+                        elem.value = IntegerInterval(val, val, bits)
+                    else:
+                        elem.value = val
+                else:
+                    elem.value = val
+
+                target_var.elements.append(elem)
+            return
+
+        if isinstance(target_var, VarClass):
             # 리스트 형태 값 처리 [1000,1000] -> UnsignedIntegerInterval(1000, 1000)
             if isinstance(new_value, list) and len(new_value) == 2:
                 min_val, max_val = new_value

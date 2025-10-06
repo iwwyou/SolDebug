@@ -1,0 +1,188 @@
+target code :  contract AvatarArtMarketplace {
+}
+--------------------------------------------------------
+target code :      uint256[] internal _tokens;
+--------------------------------------------------------
+target code :  
+
+--------------------------------------------------------
+target code :      function _removeFromTokens(uint tokenId) internal view returns(uint256[] memory){
+}
+--------------------------------------------------------
+target code :          uint256 tokenCount = _tokens.length;
+[5-5]  analysis ¢¡
+  L  5 | varDeclaration | {'tokenCount': '[0,0]'}
+--------------------------------------------------------
+target code :          uint256[] memory result = new uint256[](tokenCount-1);
+--------------------------------------------------------
+target code :          uint256 resultIndex = 0;
+[7-7]  analysis ¢¡
+  L  7 | varDeclaration | {'resultIndex': '[0,0]'}
+--------------------------------------------------------
+target code :          for(uint tokenIndex = 0; tokenIndex < tokenCount; tokenIndex++){
+}
+--------------------------------------------------------
+target code :              uint tokenItemId = _tokens[tokenIndex];
+DEBUG fixpoint start: _tokens=<Domain.Variable.ArrayVariable object at 0x000001DF319E0280>
+DEBUG fixpoint start: tokenCount=UnsignedIntegerInterval([0, 0])
+DEBUG fixpoint: widening_threshold=3
+DEBUG widening iter=1: node=for_cond_8, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=1: node=for_cond_8, equal=False, WL will continue=True
+DEBUG widening iter=2: JOIN node=for_join_8, visit_cnt=1, threshold=3, need_widen=False
+DEBUG widening iter=3: node=for_body_8, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=3: node=for_body_8, equal=False, WL will continue=True
+DEBUG widening iter=4: node=VarDecl_9, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=4: node=VarDecl_9, equal=False, WL will continue=True
+DEBUG widening iter=5: node=for_incr_8, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=5: node=for_incr_8, equal=False, WL will continue=True
+DEBUG propagate: for_incr_8 ¡æ for_join_8, succ_widen=False, changed=True, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=6: JOIN node=for_join_8, visit_cnt=2, threshold=3, need_widen=False
+DEBUG widening iter=6: node=for_join_8, visit_cnt=2, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=6: node=for_join_8, equal=False, WL will continue=True
+DEBUG fixpoint exit: resultIndex=UnsignedIntegerInterval([0, 0])
+[9-9]  analysis ¢¡
+  L  9 | varDeclaration | {'tokenItemId': '[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+--------------------------------------------------------
+target code :              if(tokenItemId != tokenId){
+}
+DEBUG fixpoint start: _tokens=<Domain.Variable.ArrayVariable object at 0x000001DF31A4EC20>
+DEBUG fixpoint start: tokenCount=UnsignedIntegerInterval([0, 0])
+DEBUG fixpoint: widening_threshold=3
+DEBUG widening iter=1: node=for_cond_8, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=1: node=for_cond_8, equal=False, WL will continue=True
+DEBUG widening iter=2: JOIN node=for_join_8, visit_cnt=1, threshold=3, need_widen=False
+DEBUG widening iter=3: node=for_body_8, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=3: node=for_body_8, equal=False, WL will continue=True
+DEBUG widening iter=4: node=if_condition_10, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=4: node=if_condition_10, equal=False, WL will continue=True
+DEBUG widening iter=5: node=if_true_10, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=5: node=if_true_10, equal=False, WL will continue=True
+DEBUG widening iter=6: node=if_false_10, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=6: node=if_false_10, equal=False, WL will continue=True
+DEBUG widening iter=7: node=if_join_10, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=7: node=if_join_10, equal=False, WL will continue=True
+DEBUG widening iter=8: node=VarDecl_9, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=8: node=VarDecl_9, equal=False, WL will continue=True
+DEBUG widening iter=9: node=for_incr_8, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=9: node=for_incr_8, equal=False, WL will continue=True
+DEBUG propagate: for_incr_8 ¡æ for_join_8, succ_widen=False, changed=True, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=10: JOIN node=for_join_8, visit_cnt=2, threshold=3, need_widen=False
+DEBUG widening iter=10: node=for_join_8, visit_cnt=2, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=10: node=for_join_8, equal=False, WL will continue=True
+DEBUG fixpoint exit: resultIndex=UnsignedIntegerInterval([0, 0])
+--------------------------------------------------------
+target code :                  result[resultIndex] = tokenItemId;
+DEBUG fixpoint start: _tokens=<Domain.Variable.ArrayVariable object at 0x000001DF31A9E0E0>
+DEBUG fixpoint start: tokenCount=UnsignedIntegerInterval([0, 0])
+DEBUG fixpoint: widening_threshold=3
+DEBUG widening iter=1: node=for_cond_8, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=1: node=for_cond_8, equal=False, WL will continue=True
+DEBUG widening iter=2: JOIN node=for_join_8, visit_cnt=1, threshold=3, need_widen=False
+DEBUG widening iter=3: node=for_body_8, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=3: node=for_body_8, equal=False, WL will continue=True
+DEBUG widening iter=4: node=if_condition_10, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=4: node=if_condition_10, equal=False, WL will continue=True
+DEBUG widening iter=5: node=if_true_10, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=5: node=if_true_10, equal=False, WL will continue=True
+DEBUG widening iter=6: node=if_false_10, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=6: node=if_false_10, equal=False, WL will continue=True
+DEBUG widening iter=7: node=Assign_11, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=7: node=Assign_11, equal=False, WL will continue=True
+DEBUG widening iter=8: node=if_join_10, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=8: node=if_join_10, equal=False, WL will continue=True
+DEBUG widening iter=9: node=VarDecl_9, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=9: node=VarDecl_9, equal=False, WL will continue=True
+DEBUG widening iter=10: node=for_incr_8, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=10: node=for_incr_8, equal=False, WL will continue=True
+DEBUG propagate: for_incr_8 ¡æ for_join_8, succ_widen=False, changed=True, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=11: JOIN node=for_join_8, visit_cnt=2, threshold=3, need_widen=False
+DEBUG widening iter=11: node=for_join_8, visit_cnt=2, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 0])
+DEBUG widening iter=11: node=for_join_8, equal=False, WL will continue=True
+DEBUG fixpoint exit: resultIndex=UnsignedIntegerInterval([0, 0])
+--------------------------------------------------------
+target code :                  resultIndex++;
+DEBUG fixpoint start: _tokens=<Domain.Variable.ArrayVariable object at 0x000001DF31A150C0>
+DEBUG fixpoint start: tokenCount=UnsignedIntegerInterval([0, 0])
+DEBUG fixpoint: widening_threshold=3
+DEBUG widening iter=1: node=for_cond_8, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=1: node=for_cond_8, equal=False, WL will continue=True
+DEBUG widening iter=2: JOIN node=for_join_8, visit_cnt=1, threshold=3, need_widen=False
+DEBUG widening iter=3: node=for_body_8, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=3: node=for_body_8, equal=False, WL will continue=True
+DEBUG widening iter=4: node=if_condition_10, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=4: node=if_condition_10, equal=False, WL will continue=True
+DEBUG widening iter=5: node=if_true_10, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=5: node=if_true_10, equal=False, WL will continue=True
+DEBUG widening iter=6: node=if_false_10, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=6: node=if_false_10, equal=False, WL will continue=True
+DEBUG widening iter=7: node=Unary_12, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=7: node=Unary_12, equal=False, WL will continue=True
+DEBUG widening iter=8: node=if_join_10, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=8: node=if_join_10, equal=False, WL will continue=True
+DEBUG widening iter=9: node=Assign_11, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=9: node=Assign_11, equal=False, WL will continue=True
+DEBUG widening iter=10: node=VarDecl_9, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=10: node=VarDecl_9, equal=False, WL will continue=True
+DEBUG widening iter=11: node=for_incr_8, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=11: node=for_incr_8, equal=False, WL will continue=True
+DEBUG propagate: for_incr_8 ¡æ for_join_8, succ_widen=False, changed=True, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=12: JOIN node=for_join_8, visit_cnt=2, threshold=3, need_widen=False
+DEBUG widening iter=12: node=for_join_8, visit_cnt=2, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=12: node=for_join_8, equal=False, WL will continue=True
+DEBUG fixpoint exit: resultIndex=UnsignedIntegerInterval([0, 1])
+--------------------------------------------------------
+target code :  
+
+--------------------------------------------------------
+target code :          return result;
+[16-16]  analysis ¢¡
+  L 16 |         return | {'result': 'None'}
+--------------------------------------------------------
+target code :  // @Debugging BEGIN
+target code :  // @StateVar _tokens = array [1,2,3];
+target code :  // @LocalVar tokenId = [4,4];
+target code :  // @Debugging END
+DEBUG: batch_targets before flush: 0
+DEBUG: recorder ledger before flush: 5
+DEBUG fixpoint start: _tokens=symbolicJoin(_tokens,_tokens)
+DEBUG fixpoint start: tokenCount=UnsignedIntegerInterval([0, 3])
+DEBUG fixpoint: widening_threshold=4
+DEBUG widening iter=1: node=for_cond_8, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=1: node=for_cond_8, equal=False, WL will continue=True
+DEBUG widening iter=2: JOIN node=for_join_8, visit_cnt=1, threshold=4, need_widen=False
+DEBUG widening iter=3: node=for_body_8, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=3: node=for_body_8, equal=False, WL will continue=True
+DEBUG widening iter=4: node=if_condition_10, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=4: node=if_condition_10, equal=False, WL will continue=True
+DEBUG widening iter=5: node=if_true_10, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=5: node=if_true_10, equal=False, WL will continue=True
+DEBUG widening iter=6: node=if_false_10, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=6: node=if_false_10, equal=False, WL will continue=True
+DEBUG widening iter=7: node=Unary_12, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=7: node=Unary_12, equal=False, WL will continue=True
+DEBUG widening iter=8: node=if_join_10, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=8: node=if_join_10, equal=False, WL will continue=True
+DEBUG widening iter=9: node=Assign_11, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=9: node=Assign_11, equal=False, WL will continue=True
+DEBUG widening iter=10: node=VarDecl_9, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=10: node=VarDecl_9, equal=False, WL will continue=True
+DEBUG widening iter=11: node=for_incr_8, visit_cnt=1, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=11: node=for_incr_8, equal=False, WL will continue=True
+DEBUG propagate: for_incr_8 ¡æ for_join_8, succ_widen=False, changed=True, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=12: JOIN node=for_join_8, visit_cnt=2, threshold=4, need_widen=False
+DEBUG widening iter=12: node=for_join_8, visit_cnt=2, need_widen=False, resultIndex: None ¡æ UnsignedIntegerInterval([0, 1])
+DEBUG widening iter=12: node=for_join_8, equal=False, WL will continue=True
+DEBUG fixpoint exit: resultIndex=UnsignedIntegerInterval([0, 1])
+WARNING: env['_tokens'] has type <class 'str'> instead of Variables: symbolicNarrow(symbolicJoin(_tokens,_tokens),symbolicJoin(<Domain.Variable.ArrayVariable object at 0x000001DF31AD90C0>,symbolicJoin(_tokens,_tokens)))
+
+=======  ANALYSIS  =======
+   9 ¦¢ varDeclaration ¦¢ {'tokenCount': '[3,3]'}
+  11 ¦¢ varDeclaration ¦¢ {'resultIndex': '[0,0]'}
+  12 ¦¢ varDeclaration ¦¢ {'tokenIndex': '[0,0]'}
+  12 ¦¢ loopDelta      ¦¢ {'tokenCount': '[0,3]', 'resultIndex': '[0,1]'}
+  20 ¦¢ return         ¦¢ {'result': 'None'}
+==========================
+
+DEBUG: _last_func_lines after flush: (9, 20)
+DEBUG: recorder ledger after flush: 5
+Analyze time : 0.91547 sec

@@ -86,10 +86,24 @@ class Evaluation :
 
         # ── (A) 배열 ───────────────────────────────────────────────
         if sol_t.typeCategory == "array":
+            # 동적 배열 크기 평가: new uint256[](size) 형태
+            array_length = sol_t.arrayLength
+            if expr.arguments and len(expr.arguments) > 0:
+                # arguments[0]에 길이 표현식이 있으면 평가
+                length_result = self.evaluate_expression(expr.arguments[0], variables, callerObject, callerContext)
+                # 결과가 interval이면 상한값 사용
+                if hasattr(length_result, 'upper'):
+                    array_length = length_result.upper
+                elif isinstance(length_result, int):
+                    array_length = length_result
+                else:
+                    # 심볼릭이거나 다른 타입이면 None으로 (동적)
+                    array_length = None
+
             arr = ArrayVariable(
                 fresh_id,
                 base_type=sol_t.arrayBaseType,
-                array_length=sol_t.arrayLength,
+                array_length=array_length,
                 is_dynamic=sol_t.isDynamicArray,
                 scope="memory"
             )
@@ -263,9 +277,19 @@ class Evaluation :
                         raise IndexError(f"Negative index {idx} for array '{callerObject.identifier}'")
 
                     if idx >= len(callerObject.elements):
-                        # ❗ 요소가 아직 없음 → base-type 의 bottom 값만 돌려준다
+                        # ❗ 요소가 아직 없음 → base-type 의 TOP 값 (알 수 없는 값)
                         base_t = callerObject.typeInfo.arrayBaseType
-                        return VariableEnv.bottom_from_soltype(base_t)
+                        if base_t.elementaryTypeName.startswith("uint"):
+                            bits = base_t.intTypeLength or 256
+                            return UnsignedIntegerInterval.top(bits)
+                        elif base_t.elementaryTypeName.startswith("int"):
+                            bits = base_t.intTypeLength or 256
+                            return IntegerInterval.top(bits)
+                        elif base_t.elementaryTypeName == "bool":
+                            return BoolInterval.top()
+                        else:
+                            # 주소/bytes/string 등은 symbol
+                            return f"symbolic_{callerObject.identifier}[{idx}]"
                     return callerObject.elements[idx]
 
                 # ── (B) 불확정(bottom 또는 [l,r] 범위) ─────────────────
@@ -277,16 +301,16 @@ class Evaluation :
                         joined = val if joined is None else joined.join(val)
                     return joined
 
-                # 배열이 비어 있으면 base-type 에 맞는 ⊥ 반환
+                # 배열이 비어 있으면 base-type 에 맞는 TOP 반환 (알 수 없는 값)
                 base_t = callerObject.typeInfo.arrayBaseType
                 if base_t.elementaryTypeName.startswith("uint"):
                     bits = base_t.intTypeLength or 256
-                    return UnsignedIntegerInterval.bottom(bits)
+                    return UnsignedIntegerInterval.top(bits)
                 if base_t.elementaryTypeName.startswith("int"):
                     bits = base_t.intTypeLength or 256
-                    return IntegerInterval.bottom(bits)
+                    return IntegerInterval.top(bits)
                 if base_t.elementaryTypeName == "bool":
-                    return BoolInterval.bottom()
+                    return BoolInterval.top()
                 # 주소/bytes/string 등은 symbol 로
                 return f"symbolic_{callerObject.identifier}[<unk>]"
 
@@ -349,8 +373,14 @@ class Evaluation :
                     return mvar
                 else:
                     return mvar.value
-            else:
+            elif isinstance(callerObject, EnumVariable):
                 raise ValueError(f"This '{ident_str}' may not be included in enum def '{callerObject.enum_name}'")
+            else:
+                # ArrayVariable 등 다른 타입에서 identifier 사용 - 변수로 간주
+                if ident_str in variables:
+                    return variables[ident_str].value
+                else:
+                    raise ValueError(f"Identifier '{ident_str}' not found in variables")
 
         # callerObject가 없고 callerContext는 있는 경우
         if callerContext is not None:
@@ -468,8 +498,11 @@ class Evaluation :
         # ──────────────────────────────────────────────────────────────
         if isinstance(baseVal, ArrayVariable):
             if member == "length":
-                if baseVal.typeInfo.isDynamicArray and len(baseVal.elements) == 0:
-                    # 아직 push 된 적이 없는 완전 “빈” 동적 배열
+                # typeInfo.arrayLength 속성이 있으면 우선 사용 (디버깅 주석 등으로 설정된 경우)
+                if baseVal.typeInfo.arrayLength is not None:
+                    return UnsignedIntegerInterval(baseVal.typeInfo.arrayLength, baseVal.typeInfo.arrayLength, 256)
+                elif baseVal.typeInfo.isDynamicArray and len(baseVal.elements) == 0:
+                    # 아직 push 된 적이 없는 완전 "빈" 동적 배열
                     # ⇒ 0‥2²⁵⁶-1  (UInt256 TOP) 로 보수적으로 가정
                     return UnsignedIntegerInterval(0, 2 ** 256 - 1, 256)
                 else:
