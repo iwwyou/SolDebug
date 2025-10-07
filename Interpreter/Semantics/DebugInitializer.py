@@ -374,8 +374,6 @@ class DebugInitializer:
             target_var.typeInfo.arrayLength = len(new_value)
             target_var.elements.clear()
 
-            print(f"DEBUG _patch_var: ArrayVariable {target_var.identifier}, initializing with {new_value}")
-
             for idx, val in enumerate(new_value):
                 # Variables 객체 생성
                 elem_id = f"{target_var.identifier}[{idx}]"
