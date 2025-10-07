@@ -285,12 +285,12 @@ class VariableEnv:
         # ④ Array
         if isinstance(v1, ArrayVariable):
             if len(v1.elements) != len(v2.elements):
-                print(f"DEBUG _merge_values: ArrayVariable length mismatch! {v1.identifier}: {len(v1.elements)} vs {len(v2.elements)}, mode={mode}")
-                import traceback
-                import sys
-                traceback.print_stack(limit=15, file=sys.stdout)
-                sys.stdout.flush()
-                return f"symbolic{mode.capitalize()}({v1.identifier},{v2.identifier})"
+                # Array smashing: 길이가 다르면 더 긴 배열 반환 (over-approximation)
+                # 디버깅 주석 없을 때는 이렇게 처리, 있을 때는 정확한 분석 가능
+                longer = v1 if len(v1.elements) >= len(v2.elements) else v2
+                new_arr = copy.copy(longer)
+                new_arr.elements = longer.elements.copy()
+                return new_arr
             new_arr = copy.copy(v1)
             new_arr.elements = [
                 VariableEnv._merge_values(a, b, mode) for a, b in zip(v1.elements, v2.elements)

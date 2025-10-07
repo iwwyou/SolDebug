@@ -164,7 +164,7 @@ class Engine:
 
         should_record = self._record_enabled and not self._suppress_stmt_records
         line_num = getattr(stmt, 'src_line', None)
-        # print(f"DEBUG Assignment L{line_num}: record={should_record}")
+
 
         # stmt.src_line을 line_no로 전달
         self.up.update_left_var(lexp, r_val, op, variables, None, None, should_record, line_num)
@@ -173,7 +173,8 @@ class Engine:
     def _interpret_unary(self, stmt, variables):
         op = stmt.operator
         operand = stmt.operand
-        if op == '++':
+
+        if op == '++' or op == 'unary_suffix' or op == 'unary_prefix':
             self.up.update_left_var(operand, 1, '+=', variables, None, None, False)
             return variables
         if op == '--':
@@ -223,7 +224,7 @@ class Engine:
         env_out = VariableEnv.copy_variables(env_in)
         if getattr(node, "statements", None):
             for st in node.statements:
-                self.update_statement_with_variables(st, env_out)
+                env_out = self.update_statement_with_variables(st, env_out)
         node.variables = VariableEnv.copy_variables(env_out)
         return env_out
 
@@ -317,22 +318,28 @@ class Engine:
         in_vars: dict[CFGNode, dict[str, Variables] | None] = {n: None for n in loop_nodes}
         out_vars: dict[CFGNode, dict[str, Variables] | None] = {n: None for n in loop_nodes}
 
-        # Join 노드의 in_vars는 None으로 시작 (worklist 알고리즘이 올바르게 전파하도록)
-        # for n in loop_nodes:
-        #     if getattr(n, "fixpoint_evaluation_node", False):
-        #         in_vars[n] = VariableEnv.copy_variables(getattr(n, "variables", {}) or {})
+        # ★ fixpoint 시작 전에 join 노드의 cached fixpoint vars 초기화
+        for n in loop_nodes:
+            if getattr(n, "fixpoint_evaluation_node", False):
+                if hasattr(n, "fixpoint_evaluation_node_vars"):
+                    delattr(n, "fixpoint_evaluation_node_vars")
 
+        # ★ start_env 계산: join 노드의 경우 back edge를 제외하고 초기 진입 edge만 사용
         start_env = None
         for p in G.predecessors(head):
-            p_vars = getattr(p, "variables", {}) or {}
-            start_env = VariableEnv.join_variables_simple(start_env, p_vars)
+            # join 노드인 경우: 그 predecessor 중 loop 내부가 아닌 것만 사용
+            if getattr(p, "fixpoint_evaluation_node", False):
+                for pp in G.predecessors(p):
+                    # back edge (증감식)는 제외: loop_nodes에 속하는 predecessor는 skip
+                    if pp in loop_nodes:
+                        continue
+                    pp_vars = getattr(pp, "variables", {}) or {}
+                    start_env = VariableEnv.join_variables_simple(start_env, pp_vars)
+            else:
+                # 일반 predecessor
+                p_vars = getattr(p, "variables", {}) or {}
+                start_env = VariableEnv.join_variables_simple(start_env, p_vars)
         in_vars[head] = start_env or {}
-
-        # Debug: check _tokens and tokenCount
-        if '_tokens' in in_vars[head]:
-            print(f"DEBUG fixpoint start: _tokens={in_vars[head]['_tokens']}")
-        if 'tokenCount' in in_vars[head]:
-            print(f"DEBUG fixpoint start: tokenCount={in_vars[head]['tokenCount'].value}")
 
         # ── 루프 내부 문장 기록 억제 on
         old_sup = self._suppress_stmt_records
@@ -340,19 +347,27 @@ class Engine:
 
         # Loop 반복 횟수 추정 (조건식 기반)
         widening_threshold = (self._estimate_loop_iterations(head, in_vars[head]))+1
-        print(f"DEBUG fixpoint: widening_threshold={widening_threshold}")
 
-        # widening - join 노드들도 초기 WL에 추가
+        # ★ widening - 초기 WL은 head만 (join 노드는 predecessor가 준비되면 자동으로 추가됨)
         W_MAX = 300
         WL = deque([head])
-        for n in loop_nodes:
-            if getattr(n, "fixpoint_evaluation_node", False) and n != head:
-                WL.append(n)
         iteration = 0
         while WL and max(visit_cnt.values(), default=0) < W_MAX:
             node = WL.popleft()
             visit_cnt[node] += 1
             iteration += 1
+
+            # ★ in_vars[node]가 None인 경우 처리
+            if in_vars[node] is None:
+                # None이면 predecessor들의 out을 join해서 계산
+                in_new = None
+                for p in G.predecessors(node):
+                    if p in loop_nodes and out_vars[p] is not None:
+                        flow = _edge_flow_from_node_out(p, node, out_vars[p])
+                        if flow is not None:
+                            in_new = VariableEnv.join_variables_simple(in_new, flow)
+                if in_new is not None:
+                    in_vars[node] = in_new
 
             out_old = out_vars[node]
             out_raw = self.transfer_function(node, in_vars[node])
@@ -369,18 +384,7 @@ class Engine:
             if getattr(node, "fixpoint_evaluation_node", False):
                 node.fixpoint_evaluation_node_vars = VariableEnv.copy_variables(out_joined)
 
-            # Debug: track join node visits and resultIndex changes
-            if getattr(node, "fixpoint_evaluation_node", False):
-                print(f"DEBUG widening iter={iteration}: JOIN node={node.name}, visit_cnt={visit_cnt[node]}, threshold={widening_threshold}, need_widen={need_widen}")
-
-            if 'resultIndex' in (out_joined or {}):
-                old_val = out_old.get('resultIndex').value if (out_old and 'resultIndex' in out_old) else 'None'
-                new_val = out_joined['resultIndex'].value
-                print(f"DEBUG widening iter={iteration}: node={node.name}, visit_cnt={visit_cnt[node]}, need_widen={need_widen}, resultIndex: {old_val} → {new_val}")
-
             equal = VariableEnv.variables_equal(out_old, out_joined)
-            if 'resultIndex' in (out_joined or {}):
-                print(f"DEBUG widening iter={iteration}: node={node.name}, equal={equal}, WL will continue={not equal}")
 
             if equal:
                 out_vars[node] = out_joined; continue
@@ -402,10 +406,6 @@ class Engine:
                           else VariableEnv.join_variables_simple(in_vars[succ], flow))
 
                 changed_succ = not VariableEnv.variables_equal(in_vars[succ], in_new)
-                if getattr(succ, "fixpoint_evaluation_node", False):
-                    old_ri = in_vars[succ].get('resultIndex').value if in_vars[succ] and 'resultIndex' in in_vars[succ] else 'None'
-                    new_ri = in_new.get('resultIndex').value if in_new and 'resultIndex' in in_new else 'None'
-                    print(f"DEBUG propagate: {node.name} → {succ.name}, succ_widen={succ_widen}, changed={changed_succ}, resultIndex: {old_ri} → {new_ri}")
 
                 if changed_succ:
                     in_vars[succ] = VariableEnv.copy_variables(in_new)
@@ -459,10 +459,6 @@ class Engine:
             exit_env = VariableEnv.join_variables_simple(exit_env, flow)
         exit_node.variables = VariableEnv.copy_variables(exit_env or {})
 
-        # Debug: show final values
-        if 'resultIndex' in exit_node.variables:
-            print(f"DEBUG fixpoint exit: resultIndex={exit_node.variables['resultIndex'].value}")
-
         # loopDelta: 헤더(조건) 라인에 기록
         # head의 predecessor 중 fixpoint_evaluation_node(=join)를 찾아 baseline 가져오기
         join_node = None
@@ -502,8 +498,6 @@ class Engine:
         # 기록 초기화
         self._record_enabled = True
         an._seen_stmt_ids.clear()
-        # print(f"DEBUG Engine: Starting function interpretation for {fcfg.function_name}")
-        # print(f"DEBUG Engine: _record_enabled = {self._record_enabled}")
         for blk in fcfg.graph.nodes:
             for st in blk.statements:
                 ln = getattr(st, "src_line", None)
@@ -655,8 +649,6 @@ class Engine:
         self._sync_named_return_vars(fcfg)
 
         # 컨텍스트 복원
-        # print(f"DEBUG Engine: Finished function interpretation for {fcfg.function_name}")
-        # print(f"DEBUG Engine: Recorder ledger size after: {len(self.rec.ledger)}")
         an.current_target_function = _old_func
         an.current_target_function_cfg = _old_fcfg
 

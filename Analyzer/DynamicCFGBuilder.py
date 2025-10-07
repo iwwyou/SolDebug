@@ -1202,10 +1202,12 @@ class DynamicCFGBuilder:
             raise ValueError("Active FunctionCFG not found.")
 
         G = fcfg.graph
-        L = (an.current_end_line if getattr(an, "current_end_line", None) is not None
-             else an.current_start_line)
-        if L is None:
-            raise ValueError("Neither current_end_line nor current_start_line is set.")
+        # ★ L-1을 볼 때는 start_line 기준, L+1을 볼 때는 end_line 기준
+        L_start = an.current_start_line
+        L_end = (an.current_end_line if getattr(an, "current_end_line", None) is not None
+                 else an.current_start_line)
+        if L_start is None:
+            raise ValueError("current_start_line is not set.")
 
         # ---------- Helper functions ----------
         def _line_nodes(line: int) -> list[CFGNode]:
@@ -1253,9 +1255,9 @@ class DynamicCFGBuilder:
         # ========== Special contexts (else-if/else/catch) ==========
         if context in ["else_if", "else", "catch"]:
             # Get L line nodes and traverse predecessors
-            L_nodes = _line_nodes(L)
+            L_nodes = _line_nodes(L_start)
             if not L_nodes:
-                raise ValueError(f"No CFG nodes found at line {L} for context '{context}'")
+                raise ValueError(f"No CFG nodes found at line {L_start} for context '{context}'")
 
             # BFS through predecessors to find target node
             from collections import deque
@@ -1286,20 +1288,28 @@ class DynamicCFGBuilder:
                     if pred not in visited:
                         queue.append(pred)
 
-            raise ValueError(f"No matching condition node found for context '{context}' at line {L}")
+            raise ValueError(f"No matching condition node found for context '{context}' at line {L_start}")
 
         # ========== Regular statement context ==========
-        # Look at L+1 node
-        L_plus_1_node = _line_first(L + 1)
+        # Look at L+1 node (L_end + 1)
+        L_plus_1_node = _line_first(L_end + 1)
+
+        # ★ DEBUG: if 문장 처리 시 디버깅
+        print(f"DEBUG get_current_block: L_start={L_start}, L_end={L_end}, L+1_node={L_plus_1_node.name if L_plus_1_node else None}")
 
         if L_plus_1_node is None:
             # L+1 is empty, use EXIT
             L_plus_1_node = fcfg.get_exit_node()
 
         # Check if L+1 is loop-exit or join
+        is_exit = _is_loop_exit(L_plus_1_node)
+        is_join = _is_join(L_plus_1_node)
+        print(f"DEBUG get_current_block: L+1={L_plus_1_node.name}, is_exit={is_exit}, is_join={is_join}")
+
         if _is_loop_exit(L_plus_1_node) or _is_join(L_plus_1_node):
-            # Look at L-1 nodes
-            L_minus_1_nodes = _line_nodes(L - 1)
+            # Look at L-1 nodes (L_start - 1)
+            L_minus_1_nodes = _line_nodes(L_start - 1)
+            print(f"DEBUG get_current_block: L-1={L_start - 1}, nodes={[n.name for n in L_minus_1_nodes]}")
 
             if not L_minus_1_nodes:
                 # L-1 empty, return first predecessor of L+1
@@ -1319,20 +1329,27 @@ class DynamicCFGBuilder:
                     return cond_node
             else:
                 # L-1 is not cond: return last L-1 node
-                return L_minus_1_nodes[-1]
+                result = L_minus_1_nodes[-1]
+                print(f"DEBUG get_current_block: Returning L-1 node: {result.name}")
+                return result
         else:
             # L+1 is not loop-exit/join: return L+1's predecessor
             preds = list(G.predecessors(L_plus_1_node))
+            print(f"DEBUG get_current_block: L+1 predecessors={[p.name for p in preds]}")
 
             if len(preds) == 1:
-                return preds[0]
+                result = preds[0]
+                print(f"DEBUG get_current_block: Returning single predecessor: {result.name}")
+                return result
             elif len(preds) > 1:
                 # Multiple predecessors (shouldn't happen for regular statement)
                 # Return the one closest to current line
                 def distance(n: CFGNode):
                     ln = getattr(n, "src_line", None)
-                    return abs((ln or 0) - L) if ln is not None else 999999
-                return min(preds, key=distance)
+                    return abs((ln or 0) - L_start) if ln is not None else 999999
+                result = min(preds, key=distance)
+                print(f"DEBUG get_current_block: Returning closest predecessor: {result.name}")
+                return result
             else:
                 # No predecessors, return ENTRY
                 return fcfg.get_entry_node()

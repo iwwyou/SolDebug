@@ -399,7 +399,12 @@ class Evaluation :
 
         # callerContext, callerObject 둘다 없는 경우
         if ident_str in variables:  # variables에 있으면
-            return variables[ident_str].value  # 해당 value 리턴
+            var_obj = variables[ident_str]
+            # ArrayVariable, StructVariable, MappingVariable는 객체 자체를 반환
+            if isinstance(var_obj, (ArrayVariable, StructVariable, MappingVariable)):
+                return var_obj
+            # 기본 변수는 value 반환
+            return var_obj.value
         else:
             raise ValueError(f"This '{ident_str}' is may be elementary variable but may not be declared")
 

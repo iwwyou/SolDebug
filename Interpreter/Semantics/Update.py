@@ -35,7 +35,6 @@ class Update :
 
         if log:
             actual_line = line_no if line_no is not None else self.an.current_start_line
-            # print(f"DEBUG Update: update_left_var called with log=True for expr context: {expr.context}, line_no={actual_line}")
 
         # ── ① 글로벌이면 갱신 금지 ─────────────────────────
         if callerObject is None and callerContext is None and VariableEnv.is_global_expr(expr):
@@ -105,7 +104,6 @@ class Update :
 
             if log :
                 line_no = self.an.current_start_line
-                # print(f"DEBUG Update: Recording assignment, line_no={line_no}")
                 # 🔸 즉시 기록
                 self.an.recorder.record_assignment(
                     line_no=line_no,
@@ -158,18 +156,14 @@ class Update :
 
             # ---- 매핑(MappingVariable) ------------------------------
             if isinstance(caller_object, MappingVariable):
-                print(f"DEBUG Mapping: interval=[{l},{r}], mapping_keys={list(caller_object.mapping.keys())}")
                 # Top interval인 경우: symbolic key로 entry 반환
                 if l == 0 and r >= 2**255:  # Top interval
-                    print(f"DEBUG: Top interval detected, mapping size={len(caller_object.mapping)}")
                     # 단일 entry가 있으면 반환
                     if len(caller_object.mapping) == 1:
                         entry = list(caller_object.mapping.values())[0]
-                        print(f"DEBUG: Returning single entry: {type(entry).__name__}")
                         return entry
                     # 없으면 symbolic key로 생성
                     symbolic_key = f"symbolic_index_{id(expr)}"
-                    print(f"DEBUG: Creating symbolic entry with key={symbolic_key}")
                     if symbolic_key not in caller_object.mapping:
                         caller_object.mapping[symbolic_key] = caller_object.get_or_create(symbolic_key)
                     return caller_object.mapping[symbolic_key]
@@ -253,42 +247,30 @@ class Update :
             # ① base expression 이 IndexAccess 면 → index 식에서 키 추출
             key = None
             base_exp = expr.base  # levels[i]   에서   expr.base == IndexAccess
-            print(f"DEBUG: base_obj={base_obj.identifier}, base_exp.context={getattr(base_exp, 'context', 'NO_CONTEXT')}")
             if getattr(base_exp, "context", "") == "IndexAccessExpContext":
                 idx_exp = base_exp.index
-                print(f"DEBUG: idx_exp.context={getattr(idx_exp, 'context', 'NO_CONTEXT')}")
                 # 식별자 인덱스  (levels[i]  →  "i")
                 if getattr(idx_exp, "context", "") == "IdentifierExpContext":
                     key = idx_exp.identifier
-                    print(f"DEBUG: Identifier key={key}")
                 # 숫자 / 주소 literal 인덱스
                 elif getattr(idx_exp, "context", "") == "LiteralExpContext":
                     key = str(idx_exp.literal)
-                    print(f"DEBUG: Literal key={key}")
                 # MemberAccess 인덱스 (newLockedStake.prevID → evaluate해서 값 추출)
                 elif getattr(idx_exp, "context", "") == "MemberAccessContext":
-                    print(f"DEBUG: MemberAccess index: {idx_exp.base.identifier}.{idx_exp.member}")
                     eval_result = self.ev.evaluate_expression(idx_exp, variables, None, None)
-                    print(f"DEBUG: eval_result={eval_result}, type={type(eval_result)}")
                     if isinstance(eval_result, (IntegerInterval, UnsignedIntegerInterval)):
                         if eval_result.min_value == eval_result.max_value:
                             key = str(eval_result.min_value)
-                            print(f"DEBUG: Singleton interval key={key}")
                         else:
                             # Top interval: symbolic key 사용
                             key = f"{idx_exp.base.identifier}.{idx_exp.member}"
-                            print(f"DEBUG: Top interval, using symbolic key={key}")
                     # Fallback: identifier로 사용
                     if key is None:
                         key = f"{idx_exp.base.identifier}.{idx_exp.member}"
-                        print(f"DEBUG: Fallback key={key}")
 
             # ② ①에서 못 뽑았고, 매핑에 엔트리 하나뿐이면 그걸 그대로 사용
             if key is None and len(base_obj.mapping) == 1:
                 key, _ = next(iter(base_obj.mapping.items()))
-                print(f"DEBUG: Single entry key={key}")
-
-            print(f"DEBUG: Final key={key}, mapping keys={list(base_obj.mapping.keys())}")
 
             # ③ key를 여전히 못 찾았으면 에러
             if key is None:
@@ -297,10 +279,8 @@ class Update :
             # ── 엔트리 가져오거나 생성
             if key not in base_obj.mapping:
                 base_obj.mapping[key] = base_obj.get_or_create(key)
-                print(f"DEBUG: Created new entry for key={key}")
 
             nested = base_obj.mapping[key]
-            print(f"DEBUG: nested type={type(nested).__name__}, nested={nested}")
             base_obj = nested  # 이후 Struct 처리로 fall-through
 
         if isinstance(base_obj, ArrayVariable):
@@ -525,6 +505,11 @@ class Update :
         # ────────────────────────── 내부 헬퍼 ──────────────────────────
         def _apply_to_leaf(var_obj: Variables | EnumVariable, record_expr: Expression):
             """leaf 변수에 compound-assignment 적용 + Recorder 호출"""
+            # ★ var_obj가 이미 Interval인 경우 (배열 원소가 직접 Interval로 저장된 경우)
+            # 이는 join된 결과로, 직접 처리할 수 없으므로 skip
+            if VariableEnv.is_interval(var_obj):
+                return
+
             # (a) r_val → Interval 변환(필요 시)
             conv_val = r_val
             if not VariableEnv.is_interval(r_val) and isinstance(var_obj, Variables):
@@ -557,7 +542,6 @@ class Update :
             if log and operator is not None:
                 # top_expr을 사용하여 최상위 LHS expression 기록
                 actual_record_expr = top_expr if top_expr is not None else record_expr
-                # print(f"DEBUG Update: _apply_to_leaf calling record_assignment, line_no={actual_line_no}, expr={self.an.recorder._expr_to_str(actual_record_expr)}")
                 self.an.recorder.record_assignment(
                     line_no=actual_line_no,
                     expr=actual_record_expr,
@@ -574,18 +558,57 @@ class Update :
                 raise ValueError(f"Index identifier '{ident}' not found.")
 
             idx_iv = variables[ident].value  # Interval | ⊥
-            # 전체-쓰기(⊥ or 구간) → record는 Array 쪽에서 이미 수행
-            if VariableEnv.is_interval(idx_iv) and (idx_iv.is_bottom() or idx_iv.min_value != idx_iv.max_value):
-                return caller_object  # 계속 상위에서 처리
 
+            # ⊥이면 전체-쓰기 추상화
+            if VariableEnv.is_interval(idx_iv) and idx_iv.is_bottom():
+                return caller_object
+
+            # Interval 범위가 너무 크면 전체-쓰기 추상화 (widening된 경우)
+            MAX_CONCRETE_INDICES = 20
+            if VariableEnv.is_interval(idx_iv) and idx_iv.min_value != idx_iv.max_value:
+                range_size = idx_iv.max_value - idx_iv.min_value + 1
+                if range_size > MAX_CONCRETE_INDICES:
+                    return caller_object
+
+                # ★ 범위가 작으면 각 인덱스에 할당 (over-approximation)
+                for idx in range(idx_iv.min_value, idx_iv.max_value + 1):
+                    if idx < 0:
+                        continue  # 음수 인덱스는 skip
+
+                    # 배열 크기 확장 필요 시
+                    if idx >= len(caller_object.elements):
+                        if caller_object.typeInfo.isDynamicArray:
+                            # 동적 배열이 너무 크면 추상화
+                            if idx >= MAX_CONCRETE_INDICES:
+                                return caller_object
+                        else:
+                            decl_len = caller_object.typeInfo.arrayLength or 0
+                            if idx >= decl_len:
+                                continue  # out of range
+
+                        base_t = caller_object.typeInfo.arrayBaseType
+                        while len(caller_object.elements) <= idx:
+                            caller_object.elements.append(VariableEnv.bottom_from_soltype(base_t))
+
+                    elem = caller_object.elements[idx]
+                    if isinstance(elem, (StructVariable, ArrayVariable, MappingVariable)):
+                        # composite는 처리 불가, 추상화
+                        return caller_object
+
+                    # leaf 업데이트 (join)
+                    _apply_to_leaf(elem, expr)
+
+                return None
+
+            # Singleton interval: 정확한 인덱스 하나
             if not (VariableEnv.is_interval(idx_iv) and idx_iv.min_value == idx_iv.max_value):
-                raise ValueError(f"Array index '{ident}' must resolve to single constant.")
+                raise ValueError(f"Array index '{ident}' must resolve to interval.")
 
             idx = idx_iv.min_value
             if idx < 0:
                 raise IndexError(f"Negative index {idx} for array '{caller_object.identifier}'")
 
-            # 정적/동적 패딩 로직 (동일)
+            # 정적/동적 패딩 로직
             if idx >= len(caller_object.elements):
                 if caller_object.typeInfo.isDynamicArray:
                     return caller_object  # 전체-쓰기 추상화

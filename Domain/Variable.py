@@ -190,7 +190,8 @@ class ArrayVariable(Variables):
     # ────────────────────────── public API ──────────────────────────
     def initialize_elements(self, init_iv: Interval):
         """int / uint / bool 전용 (추상화 도메인 사용)"""
-        if self.typeInfo.isDynamicArray:
+        # 동적 배열이지만 arrayLength가 설정된 경우(new uint256[](size))는 초기화 필요
+        if self.typeInfo.isDynamicArray and self.typeInfo.arrayLength is None:
             return
         self._init_recursive(
             baseT=self.typeInfo.arrayBaseType,
@@ -202,7 +203,8 @@ class ArrayVariable(Variables):
 
     def initialize_not_abstracted_type(self):
         """address / bytes / string 등 — address 는 fresh interval, 나머진 심볼"""
-        if self.typeInfo.isDynamicArray:
+        # 동적 배열이지만 arrayLength가 설정된 경우(new address[](size))는 초기화 필요
+        if self.typeInfo.isDynamicArray and self.typeInfo.arrayLength is None:
             return
 
         def builder(eid, et):

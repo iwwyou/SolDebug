@@ -11,7 +11,10 @@ batch_mgr         = DebugBatchManager(contract_analyzer, snapman)
 def simulate_inputs(records):
     in_testcase = False
 
-    for rec in records:
+    print(f"DEBUG: Total records to process: {len(records)}")
+
+    for idx, rec in enumerate(records):
+        print(f"DEBUG: Processing record {idx}/{len(records)-1}")
         code, s, e, ev = rec["code"], rec["startLine"], rec["endLine"], rec["event"]
         contract_analyzer.update_code(s, e, code, ev)  # solidity 소스 갱신
         print("target code : ", code)
@@ -20,11 +23,13 @@ def simulate_inputs(records):
 
         # ① BEGIN / END ---------------------------------------------------
         if stripped.startswith("// @Debugging BEGIN"):
+            print(f"DEBUG: Found @Debugging BEGIN at line {s}")
             batch_mgr.reset()  # ★ 새 TC 시작
             in_testcase = True
             continue
 
         if stripped.startswith("// @Debugging END"):
+            print(f"DEBUG: Found @Debugging END at line {s}, batch_mgr._lines has {len(batch_mgr._lines)} items")
             print(f"DEBUG: batch_targets before flush: {len(contract_analyzer._batch_targets)}")
             print(f"DEBUG: recorder ledger before flush: {len(contract_analyzer.recorder.ledger)}")
             batch_mgr.flush()  # TC 완성 → 1 회 해석
@@ -35,7 +40,9 @@ def simulate_inputs(records):
 
         # ② 디버그 주석 (@StateVar, @GlobalVar …) --------------------------
         if stripped.startswith("// @"):
+            print(f"DEBUG: Found debug annotation at line {s}: {stripped[:50]}...")
             if ev == "add":
+                print(f"DEBUG: Adding to batch_mgr: {code[:50]}...")
                 batch_mgr.add_line(code, s, e)
             elif ev == "modify":
                 batch_mgr.modify_line(code, s, e)
@@ -44,7 +51,10 @@ def simulate_inputs(records):
 
             # BEGIN-END 밖이면 즉시 재-해석
             if not in_testcase:
+                print(f"DEBUG: Not in testcase, flushing immediately")
                 batch_mgr.flush()
+            else:
+                print(f"DEBUG: In testcase, deferring flush. batch_mgr._lines now has {len(batch_mgr._lines)} items")
             continue
 
         # ③ 일반 Solidity 코드 --------------------------------------------
@@ -96,7 +106,7 @@ test_inputs = [
     "event": "add"
   },
   {
-    "code": "        uint256[] memory result = new uint256[](tokenCount-1);",
+    "code": "        uint256[] memory result = new uint256[](tokenCount);",
     "startLine": 6,
     "endLine": 6,
     "event": "add"

@@ -23,26 +23,52 @@ target code :          for(uint tokenIndex = 0; tokenIndex < tokenCount; tokenIn
 }
 --------------------------------------------------------
 target code :              uint tokenItemId = _tokens[tokenIndex];
-[9-9]  analysis ¢¡
-  L  9 | varDeclaration | {'tokenItemId': '[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
---------------------------------------------------------
-target code :              if(tokenItemId != tokenId){
-}
---------------------------------------------------------
-target code :                  result[resultIndex] = tokenItemId;
---------------------------------------------------------
-target code :                  resultIndex++;
---------------------------------------------------------
-target code :  
-
---------------------------------------------------------
-target code :          return result;
-[16-16]  analysis ¢¡
-  L 16 |         return | {'result': 'None'}
---------------------------------------------------------
-target code :  // @Debugging BEGIN
-target code :  // @StateVar _tokens = array [1,2,3];
-target code :  // @LocalVar tokenId = [4,4];
-target code :  // @Debugging END
-DEBUG: batch_targets before flush: 0
-DEBUG: recorder ledger before flush: 5
+DEBUG fixpoint: widening_threshold=3
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\test.py", line 180, in <module>
+    simulate_inputs(test_inputs)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\test.py", line 54, in simulate_inputs
+    EnhancedSolidityVisitor(contract_analyzer).visit(tree)
+  File "C:\Users\isjeon\AppData\Local\Programs\Python\Python310\lib\site-packages\antlr4\tree\Tree.py", line 34, in visit
+    return tree.accept(self)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Parser\SolidityParser.py", line 5514, in accept
+    return visitor.visitInteractiveBlockUnit(self)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\EnhancedSolidityVisitor.py", line 567, in visitInteractiveBlockUnit
+    return self.visitChildren(ctx)
+  File "C:\Users\isjeon\AppData\Local\Programs\Python\Python310\lib\site-packages\antlr4\tree\Tree.py", line 44, in visitChildren
+    childResult = c.accept(self)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Parser\SolidityParser.py", line 7483, in accept
+    return visitor.visitInteractiveBlockItem(self)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\EnhancedSolidityVisitor.py", line 952, in visitInteractiveBlockItem
+    return self.visitChildren(ctx)
+  File "C:\Users\isjeon\AppData\Local\Programs\Python\Python310\lib\site-packages\antlr4\tree\Tree.py", line 44, in visitChildren
+    childResult = c.accept(self)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Parser\SolidityParser.py", line 10542, in accept
+    return visitor.visitInteractiveStatement(self)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\EnhancedSolidityVisitor.py", line 1178, in visitInteractiveStatement
+    return self.visitInteractiveSimpleStatement(ctx.interactiveSimpleStatement())
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\EnhancedSolidityVisitor.py", line 872, in visitInteractiveSimpleStatement
+    return self.visitChildren(ctx)
+  File "C:\Users\isjeon\AppData\Local\Programs\Python\Python310\lib\site-packages\antlr4\tree\Tree.py", line 44, in visitChildren
+    childResult = c.accept(self)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Parser\SolidityParser.py", line 6962, in accept
+    return visitor.visitInteractiveVariableDeclarationStatement(self)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\EnhancedSolidityVisitor.py", line 895, in visitInteractiveVariableDeclarationStatement
+    self.contract_analyzer.process_variable_declaration(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 949, in process_variable_declaration
+    self.engine.reinterpret_from(fcfg, stmt_blk)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Engine.py", line 815, in reinterpret_from
+    exit_node = self.fixpoint(n)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Engine.py", line 398, in fixpoint
+    flow = _edge_flow_from_node_out(node, succ, out_joined)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Engine.py", line 309, in _edge_flow_from_node_out
+    ref.update_variables_with_condition(base, cond_expr, want_true)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\Refine.py", line 56, in update_variables_with_condition
+    return self._update_comparison_condition(variables, condition_expr, is_true_branch)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\Refine.py", line 142, in _update_comparison_condition
+    left_val = self.ev.evaluate_expression(left_expr, variables, None, None)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\Evaluation.py", line 39, in evaluate_expression
+    return self.evaluate_identifier_context(expr, variables, callerObject, callerContext)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\Evaluation.py", line 404, in evaluate_identifier_context
+    raise ValueError(f"This '{ident_str}' is may be elementary variable but may not be declared")
+ValueError: This 'tokenIndex' is may be elementary variable but may not be declared
