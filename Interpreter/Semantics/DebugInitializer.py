@@ -420,18 +420,24 @@ class DebugInitializer:
                     if et.startswith('uint'):
                         from Domain.Interval import UnsignedIntegerInterval
                         target_var.value = UnsignedIntegerInterval(min_val, max_val, bits)
+                        print(f"DEBUG _patch_var: Variable {target_var.identifier} = [{min_val},{max_val}] (uint{bits})")
                     elif et.startswith('int'):
                         from Domain.Interval import IntegerInterval
                         target_var.value = IntegerInterval(min_val, max_val, bits)
+                        print(f"DEBUG _patch_var: Variable {target_var.identifier} = [{min_val},{max_val}] (int{bits})")
                     elif et == 'bool':
                         from Domain.Interval import BoolInterval
                         target_var.value = BoolInterval(min_val, max_val)
+                        print(f"DEBUG _patch_var: Variable {target_var.identifier} = [{min_val},{max_val}] (bool)")
                     else:
                         target_var.value = new_value
+                        print(f"DEBUG _patch_var: Variable {target_var.identifier} = {new_value} (other)")
                 else:
                     target_var.value = new_value
+                    print(f"DEBUG _patch_var: Variable {target_var.identifier} = {new_value} (no typeInfo)")
             else:
                 target_var.value = new_value
+                print(f"DEBUG _patch_var: Variable {target_var.identifier} = {new_value} (non-list)")
 
     def _bind_if_address_for_debug(self, target_var: Variables):
         """

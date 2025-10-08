@@ -19,6 +19,7 @@ class Engine:
         # ── 기록 제어 플래그(기존 Runtime 것이 여기로 이동) ───────────────
         self._record_enabled: bool = True
         self._suppress_stmt_records: bool = False  # 고정점 중 문장 기록 억제
+        self._in_widening_mode: bool = False  # widening 중에는 side-effect 억제
 
     # ── lazy properties (그대로 유지) ──────────────────────────────────
     @property
@@ -143,12 +144,25 @@ class Engine:
         if init_expr is not None and var_type.typeCategory not in ("struct", "array", "mapping"):
             # ArrayVariable 등 특수 케이스가 아니면 값 평가
             if not isinstance(vobj, ArrayVariable):
+                # ★ 변수 선언 디버깅
+                if var_name in ["currentLength", "additionalCount"]:
+                    print(f"[DEBUG] Evaluating {var_name}:")
+                    if 'index' in variables:
+                        print(f"  index.value = {variables['index'].value}")
+                    if 'currentLength' in variables:
+                        print(f"  currentLength.value = {variables['currentLength'].value}")
+
                 eval_result = self.eval.evaluate_expression(init_expr, variables, None, None)
                 # ★ 평가 결과가 Variables 객체면 그 value를 추출
                 if isinstance(eval_result, Variables) and not isinstance(eval_result, (ArrayVariable, StructVariable, MappingVariable)):
                     vobj.value = getattr(eval_result, 'value', eval_result)
                 else:
                     vobj.value = eval_result
+
+                if var_name in ["currentLength", "additionalCount"]:
+                    print(f"  eval_result = {eval_result}")
+                    print(f"  vobj.value = {vobj.value}")
+
                 if self._record_enabled and not self._suppress_stmt_records:
                     self.rec.record_variable_declaration(
                         line_no=stmt.src_line,
@@ -352,17 +366,11 @@ class Engine:
         W_MAX = 300
         WL = deque([head])
         iteration = 0
-        print(f"[Engine.fixpoint] Starting widening phase, loop_nodes count: {len(loop_nodes)}")
         while WL and max(visit_cnt.values(), default=0) < W_MAX:
             node = WL.popleft()
             visit_cnt[node] += 1
             iteration += 1
 
-            # ★ 디버그 출력: 매 10번째 iteration마다
-            if iteration % 10 == 0:
-                node_name = getattr(node, 'name', 'unknown')
-                node_line = getattr(node, 'src_line', '?')
-                print(f"[Engine.fixpoint] iter={iteration}, processing node={node_name}(L{node_line}), WL size={len(WL)}, max_visit={max(visit_cnt.values(), default=0)}, visit_cnt[node]={visit_cnt[node]}")
 
             # ★ in_vars[node]가 None인 경우 처리
             if in_vars[node] is None:
@@ -377,10 +385,20 @@ class Engine:
                     in_vars[node] = in_new
 
             out_old = out_vars[node]
-            out_raw = self.transfer_function(node, in_vars[node])
 
+            # ★ widening 필요 여부를 미리 계산하고 플래그 설정
             need_widen = (getattr(node, "fixpoint_evaluation_node", False) and
                           visit_cnt[node] > widening_threshold)
+
+            # ★ widening 모드 설정 (후속 노드들도 widening threshold 넘으면 추상화)
+            old_widening = self._in_widening_mode
+            if visit_cnt[node] > widening_threshold:
+                self._in_widening_mode = True
+
+            out_raw = self.transfer_function(node, in_vars[node])
+
+            # ★ widening 모드 복원
+            self._in_widening_mode = old_widening
 
             out_joined = (
                 VariableEnv.join_variables_with_widening(out_old, out_raw)
@@ -392,6 +410,7 @@ class Engine:
                 node.fixpoint_evaluation_node_vars = VariableEnv.copy_variables(out_joined)
 
             equal = VariableEnv.variables_equal(out_old, out_joined)
+
 
             if equal:
                 out_vars[node] = out_joined; continue
@@ -417,16 +436,9 @@ class Engine:
                 if changed_succ:
                     in_vars[succ] = VariableEnv.copy_variables(in_new)
                     WL.append(succ)
-                    if iteration % 10 == 0:
-                        succ_name = getattr(succ, 'name', 'unknown')
-                        succ_line = getattr(succ, 'src_line', '?')
-                        print(f"  -> Added succ={succ_name}(L{succ_line}) to WL (changed)")
-
-        print(f"[Engine.fixpoint] Widening phase done. Total iterations: {iteration}")
 
         # narrowing
         WL = deque(loop_nodes); N_MAX = 30
-        print(f"[Engine.fixpoint] Starting narrowing phase")
         while WL and N_MAX:
             N_MAX -= 1
             node = WL.popleft()
@@ -513,6 +525,8 @@ class Engine:
         self._record_enabled = True
         an._seen_stmt_ids.clear()
         for blk in fcfg.graph.nodes:
+            # ★ 노드의 variables 초기화 (이전 실행의 값 제거)
+            blk.variables = {}
             for st in blk.statements:
                 ln = getattr(st, "src_line", None)
                 if ln is not None and ln in an.analysis_per_line:
@@ -520,7 +534,29 @@ class Engine:
 
         entry = fcfg.get_entry_node()
         (start_block,) = fcfg.graph.successors(entry)
-        start_block.variables = VariableEnv.copy_variables(fcfg.related_variables)
+
+        # ★ 디버깅: related_variables 확인
+        if fcfg.function_name == "_addActionBuilderAt":
+            print(f"[DEBUG] Before copy_variables:")
+            for k in ['index']:
+                if k in fcfg.related_variables:
+                    v = fcfg.related_variables[k]
+                    print(f"  related_variables[{k}].value = {repr(v.value)[:80]}")
+
+        try:
+            start_block.variables = VariableEnv.copy_variables(fcfg.related_variables)
+        except Exception as e:
+            print(f"[ERROR] copy_variables failed: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+        if fcfg.function_name == "_addActionBuilderAt":
+            print(f"[DEBUG] After copy_variables:")
+            for k in ['index']:
+                if k in start_block.variables:
+                    v = start_block.variables[k]
+                    print(f"  start_block.variables[{k}].value = {repr(v.value)[:80]}")
 
         if caller_env is not None:
             for k, v in caller_env.items():

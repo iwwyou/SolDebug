@@ -503,8 +503,11 @@ class Evaluation :
         # ──────────────────────────────────────────────────────────────
         if isinstance(baseVal, ArrayVariable):
             if member == "length":
+                # ★ widening으로 TOP으로 표시된 경우 (-1)
+                if baseVal.typeInfo.arrayLength == -1:
+                    return UnsignedIntegerInterval(0, 2 ** 256 - 1, 256)
                 # typeInfo.arrayLength 속성이 있으면 우선 사용 (디버깅 주석 등으로 설정된 경우)
-                if baseVal.typeInfo.arrayLength is not None:
+                elif baseVal.typeInfo.arrayLength is not None:
                     return UnsignedIntegerInterval(baseVal.typeInfo.arrayLength, baseVal.typeInfo.arrayLength, 256)
                 elif baseVal.typeInfo.isDynamicArray and len(baseVal.elements) == 0:
                     # 아직 push 된 적이 없는 완전 "빈" 동적 배열
@@ -521,15 +524,27 @@ class Evaluation :
                 elemType = baseVal.typeInfo.arrayBaseType
 
                 if expr.member == "push":
-                    if not expr.arguments:  # push()  – 값 없이
-                        elem = baseVal._create_new_array_element(len(baseVal.elements))
-                        baseVal.elements.append(elem)
-                    else:  # push(v)
-                        val = self.evaluate_expression(expr.arguments[0], variables)
-                        elem = baseVal._create_new_array_element(len(baseVal.elements))
-                        elem.value = val
-                        baseVal.elements.append(elem)
-                    return None  # Solidity push 는 값 반환 X
+                    # ★ widening 모드에서는 실제 push를 수행하지 않고 length를 TOP으로 추상화
+                    engine = getattr(self.an, 'engine', None)
+                    in_widening = engine and getattr(engine, '_in_widening_mode', False)
+
+                    if in_widening:
+                        # widening 중: 배열 길이를 TOP으로 추상화
+                        # arrayLength를 특수값(-1)으로 설정하여 TOP임을 표시
+                        # (elements는 유지하되, length 평가 시 TOP 반환하도록)
+                        baseVal.typeInfo.arrayLength = -1  # -1 = TOP을 의미하는 특수값
+                        return None
+                    else:
+                        # 정상 실행 또는 widening 전: 실제로 push 수행
+                        if not expr.arguments:  # push()  – 값 없이
+                            elem = baseVal._create_new_array_element(len(baseVal.elements))
+                            baseVal.elements.append(elem)
+                        else:  # push(v)
+                            val = self.evaluate_expression(expr.arguments[0], variables)
+                            elem = baseVal._create_new_array_element(len(baseVal.elements))
+                            elem.value = val
+                            baseVal.elements.append(elem)
+                        return None  # Solidity push 는 값 반환 X
 
                     # pop()
                 if expr.member == "pop":

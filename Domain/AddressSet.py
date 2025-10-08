@@ -44,6 +44,15 @@ class AddressSet:
             return self
         return AddressSet(self.ids & other.ids)
 
+    def narrow(self, other: "AddressSet") -> "AddressSet":
+        """Narrowing operator - refine the approximation"""
+        # Narrowing: TOP인 경우 other로 구체화, 아니면 교집합
+        if self.is_top:
+            return other
+        if other.is_top:
+            return self
+        return AddressSet(self.ids & other.ids)
+
     def equals(self, other: "AddressSet") -> BoolInterval:
         """Abstract equality: self == other"""
         if self.is_top or other.is_top:

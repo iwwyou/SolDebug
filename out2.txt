@@ -40,6 +40,12 @@ target code :              uint256 additionalCount = index - currentLength + 1;
 DEBUG get_current_block: L_start=8, L_end=8, L+1_node=if_join_7
 DEBUG get_current_block: L+1=if_join_7, is_exit=False, is_join=True
 DEBUG get_current_block: L-1=7, nodes=['if_condition_7']
+[DEBUG] Evaluating additionalCount:
+  variables keys: ['actionBuilder', 'index', 'actionBuilders', 'block.basefee', 'block.blobbasefee', 'block.chainid', 'block.coinbase', 'block.difficulty', 'block.gaslimit', 'block.number', 'block.prevrandao', 'block.timestamp', 'msg.sender', 'msg.value', 'tx.gasprice', 'tx.origin', 'currentLength', 'additionalCount']
+  index.value = UnsignedIntegerInterval(BOTTOM)
+  currentLength.value = UnsignedIntegerInterval([0, 0])
+  eval_result = UnsignedIntegerInterval(BOTTOM)
+  vobj.value = UnsignedIntegerInterval(BOTTOM)
 [8-8]  analysis ⇒
   L  8 | varDeclaration | {'additionalCount': '[None,None]'}
 --------------------------------------------------------
@@ -84,14 +90,17 @@ DEBUG: batch_targets before flush: 0
 DEBUG: recorder ledger before flush: 4
 DEBUG _patch_var: ArrayVariable actionBuilders now has 3 elements
 DEBUG _patch_var: Variable index = UnsignedIntegerInterval([3, 3]) (non-list)
-
-=======  ANALYSIS  =======
-   9 │ varDeclaration │ {'currentLength': '[3,3]'}
-  12 │ varDeclaration │ {'additionalCount': '[None,None]'}
-  13 │ varDeclaration │ {'i': '[0,0]'}
-  13 │ loopDelta      │ {'currentLength': '[None,None]', 'i': '[None,None]'}
-==========================
-
-DEBUG: _last_func_lines after flush: (9, 17)
-DEBUG: recorder ledger after flush: 4
-Analyze time : 1.44721 sec
+[DEBUG] Before copy_variables:
+  related_variables[index].value = UnsignedIntegerInterval([3, 3])
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\test.py", line 172, in <module>
+    simulate_inputs(test_inputs)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\test.py", line 35, in simulate_inputs
+    batch_mgr.flush()  # TC 완성 → 1 회 해석
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\DebugUnitAnalyzer.py", line 43, in flush
+    self.analyzer.flush_reinterpret_target()
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2026, in flush_reinterpret_target
+    self.engine.interpret_function_cfg(fcfg, None)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Engine.py", line 543, in interpret_function_cfg
+    print(f"  related_variables[{k}].value = {v.value}")
+UnicodeEncodeError: 'cp949' codec can't encode character '\u22a4' in position 54: illegal multibyte sequence

@@ -212,6 +212,8 @@ class VariableEnv:
             # leaf – 값 비교
             if hasattr(v1, "value"):
                 if hasattr(v1.value, "equals"):
+                    if type(v1.value) != type(v2.value):
+                        return False
                     if not v1.value.equals(v2.value):
                         return False
                 elif v1.value != v2.value:
@@ -239,6 +241,8 @@ class VariableEnv:
             # 값 비교
             elif hasattr(e1, "value"):
                 if hasattr(e1.value, "equals"):
+                    if type(e1.value) != type(e2.value):
+                        return False
                     if not e1.value.equals(e2.value):
                         return False
                 elif e1.value != e2.value:
