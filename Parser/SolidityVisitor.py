@@ -354,28 +354,13 @@ class SolidityVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by SolidityParser#StateLocalInlineValue.
-    def visitStateLocalInlineValue(self, ctx:SolidityParser.StateLocalInlineValueContext):
+    # Visit a parse tree produced by SolidityParser#StateLocalArrayValue.
+    def visitStateLocalArrayValue(self, ctx:SolidityParser.StateLocalArrayValueContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by SolidityParser#inlineArrayAnnotation.
-    def visitInlineArrayAnnotation(self, ctx:SolidityParser.InlineArrayAnnotationContext):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by SolidityParser#InlineIntElement.
-    def visitInlineIntElement(self, ctx:SolidityParser.InlineIntElementContext):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by SolidityParser#NestedArrayElement.
-    def visitNestedArrayElement(self, ctx:SolidityParser.NestedArrayElementContext):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by SolidityParser#AddrArrayElement.
-    def visitAddrArrayElement(self, ctx:SolidityParser.AddrArrayElementContext):
+    # Visit a parse tree produced by SolidityParser#StateLocalArrayAddressValue.
+    def visitStateLocalArrayAddressValue(self, ctx:SolidityParser.StateLocalArrayAddressValueContext):
         return self.visitChildren(ctx)
 
 

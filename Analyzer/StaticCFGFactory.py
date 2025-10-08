@@ -8,7 +8,7 @@ if TYPE_CHECKING:                                         # 타입 검사 전용
 from Utils.CFG import ContractCFG, FunctionCFG
 from Domain.Interval import UnsignedIntegerInterval, IntegerInterval, BoolInterval
 from Domain.Variable import GlobalVariable, Variables, ArrayVariable, StructVariable, EnumVariable
-from Domain.Address import AddressSymbolicManager
+from Domain.AddressSet import AddressSet
 from Domain.Type import SolType
 
 class StaticCFGFactory:
@@ -25,10 +25,9 @@ class StaticCFGFactory:
             """[val,val] 256-bit uint Interval"""
             return UnsignedIntegerInterval(val, val, 256)
 
-        def _addr_fixed(nid: int) -> UnsignedIntegerInterval:
-            """symbolicAddress nid → Interval [nid,nid] (일관성 위해 매니저에 등록)"""
-            an.sm.register_fixed_id(nid)
-            return an.sm.get_interval(nid)
+        def _addr_fixed(nid: int) -> AddressSet:
+            """symbolicAddress nid → AddressSet({nid})"""
+            return an.addr_mgr.make_symbolic_address(nid)
 
         def _sol_elem(name: str, bits: int | None = None) -> SolType:
             T = SolType()
@@ -132,8 +131,8 @@ class StaticCFGFactory:
                 if et.startswith(("int", "uint", "bool")):
                     var_obj.value = an.evaluator.calculate_default_interval(et)
                 elif et == "address":
-                    # 파라미터 address → 전체 범위
-                    var_obj.value = UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
+                    # 파라미터 address → TOP AddressSet
+                    var_obj.value = AddressSet.top()
                 else:  # bytes / string 등
                     var_obj.value = f"symbol_{var_name}"
 
@@ -310,7 +309,7 @@ class StaticCFGFactory:
             elif et == "bool":
                 v.value = BoolInterval.top()
             elif et == "address":
-                v.value = AddressSymbolicManager.top_interval()
+                v.value = AddressSet.top()
             else:  # bytes / string …
                 v.value = f"symbol_{ident}"
 

@@ -76,13 +76,13 @@ def simulate_inputs(records):
 
 test_inputs = [
   {
-    "code": "contract AvatarArtMarketplace {\n}",
+    "code": "contract Balancer {\n}",
     "startLine": 1,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "    uint256[] internal _tokens;",
+    "code": "    address[] public actionBuilders;",
     "startLine": 2,
     "endLine": 2,
     "event": "add"
@@ -94,69 +94,51 @@ test_inputs = [
     "event": "add"
   },
   {
-    "code": "    function _removeFromTokens(uint tokenId) internal view returns(uint256[] memory){\n}",
+    "code": "    function _addActionBuilderAt(address actionBuilder, uint256 index) internal {\n}",
     "startLine": 4,
     "endLine": 5,
     "event": "add"
   },
   {
-    "code": "        uint256 tokenCount = _tokens.length;",
+    "code": "        uint256 currentLength = actionBuilders.length;",
     "startLine": 5,
     "endLine": 5,
     "event": "add"
   },
   {
-    "code": "        uint256[] memory result = new uint256[](tokenCount);",
+    "code": "\n",
     "startLine": 6,
     "endLine": 6,
     "event": "add"
   },
   {
-    "code": "        uint256 resultIndex = 0;",
+    "code": "        if (currentLength == 0 || currentLength - 1 < index) {\n}",
     "startLine": 7,
-    "endLine": 7,
+    "endLine": 8,
     "event": "add"
   },
   {
-    "code": "        for(uint tokenIndex = 0; tokenIndex < tokenCount; tokenIndex++){\n}",
+    "code": "            uint256 additionalCount = index - currentLength + 1;",
     "startLine": 8,
-    "endLine": 9,
+    "endLine": 8,
     "event": "add"
   },
   {
-    "code": "            uint tokenItemId = _tokens[tokenIndex];",
+    "code": "            for (uint8 i = 0; i < additionalCount; i++) {\n}",
     "startLine": 9,
-    "endLine": 9,
+    "endLine": 10,
     "event": "add"
   },
   {
-    "code": "            if(tokenItemId != tokenId){\n}",
+    "code": "                actionBuilders.push();                ",
     "startLine": 10,
-    "endLine": 11,
+    "endLine": 10,
     "event": "add"
   },
   {
-    "code": "                result[resultIndex] = tokenItemId;",
-    "startLine": 11,
-    "endLine": 11,
-    "event": "add"
-  },
-  {
-    "code": "                resultIndex++;",
-    "startLine": 12,
-    "endLine": 12,
-    "event": "add"
-  },
-  {
-    "code": "\n",
-    "startLine": 15,
-    "endLine": 15,
-    "event": "add"
-  },
-  {
-    "code": "        return result;",
-    "startLine": 16,
-    "endLine": 16,
+    "code": "        actionBuilders[index] = actionBuilder;       ",
+    "startLine": 13,
+    "endLine": 13,
     "event": "add"
   },
   {
@@ -166,13 +148,13 @@ test_inputs = [
     "event": "add"
   },
   {
-    "code": "// @StateVar _tokens = array [1,2,3];",
+    "code": "// @StateVar actionBuilders = arrayAddress[1,2,3];",
     "startLine": 6,
     "endLine": 6,
     "event": "add"
   },
   {
-    "code": "// @LocalVar tokenId = [4,4];",
+    "code": "// @LocalVar index = [3,3];",
     "startLine": 7,
     "endLine": 7,
     "event": "add"

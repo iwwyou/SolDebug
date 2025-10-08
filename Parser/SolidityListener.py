@@ -629,48 +629,21 @@ class SolidityListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by SolidityParser#StateLocalInlineValue.
-    def enterStateLocalInlineValue(self, ctx:SolidityParser.StateLocalInlineValueContext):
+    # Enter a parse tree produced by SolidityParser#StateLocalArrayValue.
+    def enterStateLocalArrayValue(self, ctx:SolidityParser.StateLocalArrayValueContext):
         pass
 
-    # Exit a parse tree produced by SolidityParser#StateLocalInlineValue.
-    def exitStateLocalInlineValue(self, ctx:SolidityParser.StateLocalInlineValueContext):
-        pass
-
-
-    # Enter a parse tree produced by SolidityParser#inlineArrayAnnotation.
-    def enterInlineArrayAnnotation(self, ctx:SolidityParser.InlineArrayAnnotationContext):
-        pass
-
-    # Exit a parse tree produced by SolidityParser#inlineArrayAnnotation.
-    def exitInlineArrayAnnotation(self, ctx:SolidityParser.InlineArrayAnnotationContext):
+    # Exit a parse tree produced by SolidityParser#StateLocalArrayValue.
+    def exitStateLocalArrayValue(self, ctx:SolidityParser.StateLocalArrayValueContext):
         pass
 
 
-    # Enter a parse tree produced by SolidityParser#InlineIntElement.
-    def enterInlineIntElement(self, ctx:SolidityParser.InlineIntElementContext):
+    # Enter a parse tree produced by SolidityParser#StateLocalArrayAddressValue.
+    def enterStateLocalArrayAddressValue(self, ctx:SolidityParser.StateLocalArrayAddressValueContext):
         pass
 
-    # Exit a parse tree produced by SolidityParser#InlineIntElement.
-    def exitInlineIntElement(self, ctx:SolidityParser.InlineIntElementContext):
-        pass
-
-
-    # Enter a parse tree produced by SolidityParser#NestedArrayElement.
-    def enterNestedArrayElement(self, ctx:SolidityParser.NestedArrayElementContext):
-        pass
-
-    # Exit a parse tree produced by SolidityParser#NestedArrayElement.
-    def exitNestedArrayElement(self, ctx:SolidityParser.NestedArrayElementContext):
-        pass
-
-
-    # Enter a parse tree produced by SolidityParser#AddrArrayElement.
-    def enterAddrArrayElement(self, ctx:SolidityParser.AddrArrayElementContext):
-        pass
-
-    # Exit a parse tree produced by SolidityParser#AddrArrayElement.
-    def exitAddrArrayElement(self, ctx:SolidityParser.AddrArrayElementContext):
+    # Exit a parse tree produced by SolidityParser#StateLocalArrayAddressValue.
+    def exitStateLocalArrayAddressValue(self, ctx:SolidityParser.StateLocalArrayAddressValueContext):
         pass
 
 

@@ -30,7 +30,7 @@
     "event": "add"
   },
   {
-    "code": "        uint256[] memory result = new uint256[](tokenCount-1);",
+    "code": "        uint256[] memory result = new uint256[](tokenCount);",
     "startLine": 6,
     "endLine": 6,
     "event": "add"
@@ -90,13 +90,13 @@
     "event": "add"
   },
   {
-    "code": "// @StateVar _tokens = [1,1];",
+    "code": "// @StateVar _tokens = array [1,2,3];",
     "startLine": 6,
     "endLine": 6,
     "event": "add"
   },
   {
-    "code": "// @LocalVar tokenId = [1,1];",
+    "code": "// @LocalVar tokenId = [4,4];",
     "startLine": 7,
     "endLine": 7,
     "event": "add"

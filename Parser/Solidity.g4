@@ -284,23 +284,14 @@ subAccess
   ;
 
 stateLocalValue
-  : '[' '-'? numberLiteral ',' '-'? numberLiteral ']' #StateLocalIntValue
-  | 'symbolicAddress' numberLiteral # StateLocalAddressValue
-  | 'symbolicBytes'  hexStringLiteral # StateLocalByteValue
-  | 'symbolicString' hexStringLiteral # StateLocalStringValue
-  | ('true' | 'false' | 'any') # StateLocalBoolValue
-  | identifier ('.' identifier)? #StateLocalEnumValue
-  | inlineArrayAnnotation # StateLocalInlineValue
-  ;
-
-inlineArrayAnnotation
-  : 'array'
-    '[' ( inlineElement (',' inlineElement)* )? ']'
-  ;
-inlineElement
-  : '-'? numberLiteral                         # InlineIntElement
-  | inlineArrayAnnotation              # NestedArrayElement
-  | 'arrayAddress' '[' numberLiteral (',' numberLiteral)* ']' # AddrArrayElement
+  : '[' '-'? numberLiteral ',' '-'? numberLiteral ']'        # StateLocalIntValue
+  | 'symbolicAddress' numberLiteral                          # StateLocalAddressValue
+  | 'symbolicBytes' hexStringLiteral                         # StateLocalByteValue
+  | 'symbolicString' hexStringLiteral                        # StateLocalStringValue
+  | ('true' | 'false' | 'any')                               # StateLocalBoolValue
+  | identifier ('.' identifier)?                             # StateLocalEnumValue
+  | 'array' '[' ( '-'? numberLiteral (',' '-'? numberLiteral)* )? ']'           # StateLocalArrayValue
+  | 'arrayAddress' '[' ( numberLiteral (',' numberLiteral)* )? ']'              # StateLocalArrayAddressValue
   ;
 
 interactiveSimpleStatement

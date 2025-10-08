@@ -7,7 +7,7 @@ from solcx import (
     get_installed_solc_versions
 )
 from solcx.exceptions import SolcError
-from Domain.Address import *
+from Domain.AddressSet import address_manager, AddressSet
 from Domain.Interval import IntegerInterval, UnsignedIntegerInterval, BoolInterval
 from Utils.Helper import *
 from Utils.Snapshot import *
@@ -25,7 +25,7 @@ import re
 class ContractAnalyzer:
 
     def __init__(self):
-        self.sm = AddressSymbolicManager()
+        self.addr_mgr = address_manager  # 싱글톤 AddressManager
         self.snapman = SnapshotManager()
         self._batch_targets: set[FunctionCFG] = set()  # 🔹추가
 
@@ -603,8 +603,8 @@ class ContractAnalyzer:
                 if et.startswith(("int", "uint", "bool")):
                     variable_obj.value = self.evaluator.calculate_default_interval(et)
                 elif et == "address":
-                    # 초기화식이 없으면 전체 주소 공간으로 보수적으로 설정
-                    variable_obj.value = UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
+                    # 초기화식이 없으면 TOP AddressSet
+                    variable_obj.value = AddressSet.top()
 
                 # (string / bytes 등 - 추상화 안 할 타입은 심볼릭 문자열 그대로)
                 else:
@@ -884,7 +884,7 @@ class ContractAnalyzer:
                 elif et == "bool":
                     v.value = BoolInterval.top()
                 elif et == "address":
-                    v.value = AddressSymbolicManager.top_interval()
+                    v.value = AddressSet.top()
                 else:  # bytes/string
                     v.value = f"symbol_{var_name}"
 
@@ -1097,7 +1097,7 @@ class ContractAnalyzer:
                 elif et == "bool":
                     obj.value = BoolInterval(0, 0)
                 elif et == "address":
-                    obj.value = UnsignedIntegerInterval(0, 0, 160)
+                    obj.value = AddressSet(ids={0})  # address(0) singleton
                 else:
                     obj.value = f"symbolic_zero_{obj.identifier}"
 

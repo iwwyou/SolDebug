@@ -72,7 +72,7 @@
     "event": "add"
   },
   {
-    "code": "// @StateVar actionBuilders = [1,1];",
+    "code": "// @StateVar actionBuilders = arrayAddress [1,2,3];",
     "startLine": 6,
     "endLine": 6,
     "event": "add"

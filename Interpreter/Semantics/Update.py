@@ -6,9 +6,8 @@ if TYPE_CHECKING:                                         # 타입 검사 전용
      from Analyzer.ContractAnalyzer import ContractAnalyzer
 
 from Domain.Interval import *
-from Domain.AddressSet import AddressSet
+from Domain.AddressSet import AddressSet, address_manager
 from Domain.Variable import Variables, ArrayVariable, MappingVariable, StructVariable, EnumVariable
-from Domain.Address import AddressSymbolicManager
 from Domain.IR import Expression
 from Utils.Helper import VariableEnv
 
@@ -1011,11 +1010,7 @@ class Update :
         if getattr(var_obj.typeInfo, "elementaryTypeName", None) == "address":
             # ★ AddressSet 기반 바인딩
             if isinstance(var_obj.value, AddressSet):
-                if var_obj.value.is_singleton():
-                    nid = var_obj.value.get_singleton_id()
-                    # 필요시 AddressSymbolicManager에 등록
-                    # self.an.sm.register_fixed_id(nid)
-                    # self.an.sm.bind_var(var_obj.identifier, nid)
+                address_manager.bind_var(var_obj.identifier, var_obj.value)
 
     # -------------- public API ---------------------------------------------
     def apply_debug_directive(

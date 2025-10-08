@@ -1,5 +1,6 @@
 from Domain.Interval import *
 from Domain.Type import SolType
+from Domain.AddressSet import AddressSet
 import copy
 
 class Variables:
@@ -84,7 +85,7 @@ class ArrayVariable(Variables):
         # ─ address ──────────────────────────────────
         if (isinstance(bt, SolType) and bt.elementaryTypeName == "address") \
                 or bt == "address":
-            return UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
+            return AddressSet.top()
 
         # ─ bool ─────────────────────────────────────
         if (isinstance(bt, SolType) and bt.elementaryTypeName == "bool") \
@@ -144,7 +145,7 @@ class ArrayVariable(Variables):
         if isinstance(btype, SolType) and btype.typeCategory == "elementary":
             # 주소형
             if btype.elementaryTypeName == "address":
-                val = UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
+                val = AddressSet.top()
                 return Variables(eid, val, scope=self.scope, typeInfo=btype)
             # uint / int / bool → ⊤ interval
             if btype.elementaryTypeName.startswith("uint"):
@@ -210,7 +211,7 @@ class ArrayVariable(Variables):
         def builder(eid, et):
             # address
             if (isinstance(et, SolType) and et.elementaryTypeName == "address") or et == "address":
-                top = UnsignedIntegerInterval(0, 2 ** 160 - 1, 160)
+                top = AddressSet.top()
                 return Variables(eid, top, scope=self.scope, typeInfo=et)
             # 그 외 string/bytes … → 심볼
             return Variables(eid, f"symbol_{eid}", scope=self.scope, typeInfo=et)
@@ -355,7 +356,7 @@ class MappingVariable(Variables):
         elif et == "bool":
             v.value = BoolInterval.top()
         elif et == "address":
-            v.value = UnsignedIntegerInterval(0, 2**160 - 1, 160)   # TOP 주소
+            v.value = AddressSet.top()   # TOP 주소
         else:                               # string / bytes 등
             v.value = f"symbol_{sub_id}"
         return v
@@ -500,7 +501,7 @@ class StructVariable(Variables):
             elif et == "bool":
                 v.value = BoolInterval.top()
             elif et == "address":
-                v.value = UnsignedIntegerInterval(0, 2**160 - 1, 160)
+                v.value = AddressSet.top()
             else:
                 # string / bytes / 기타
                 v.value = f"symbol_{var_id}"

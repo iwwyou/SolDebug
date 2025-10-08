@@ -264,10 +264,11 @@ class Refine:
         return A, B
 
     def _coerce_literal_to_interval(self, lit, default_bits=256):
-        def _hex_addr_to_interval(hex_txt: str) -> UnsignedIntegerInterval:
-            """‘0x…’ 문자열을 160-bit UnsignedInterval 로 변환"""
+        def _hex_addr_to_addressset(hex_txt: str):
+            """'0x…' 문자열을 AddressSet({val}) 로 변환"""
+            from Domain.AddressSet import AddressSet
             val = int(hex_txt, 16)
-            return UnsignedIntegerInterval(val, val, 160)
+            return AddressSet(ids={val})
 
         def _is_address_literal(txt: str) -> bool:
             return txt.lower().startswith("0x") and all(c in "0123456789abcdef" for c in txt[2:])
@@ -278,7 +279,7 @@ class Refine:
                 else UnsignedIntegerInterval(v, v, default_bits)
         if isinstance(lit, str):
             if _is_address_literal(lit):
-                return _hex_addr_to_interval(lit)  # ◀︎ NEW
+                return _hex_addr_to_addressset(lit)  # ◀︎ AddressSet
             try:
                 v = int(lit, 0)
                 return IntegerInterval(v, v, default_bits) if v < 0 \

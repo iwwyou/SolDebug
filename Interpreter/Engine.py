@@ -352,10 +352,17 @@ class Engine:
         W_MAX = 300
         WL = deque([head])
         iteration = 0
+        print(f"[Engine.fixpoint] Starting widening phase, loop_nodes count: {len(loop_nodes)}")
         while WL and max(visit_cnt.values(), default=0) < W_MAX:
             node = WL.popleft()
             visit_cnt[node] += 1
             iteration += 1
+
+            # ★ 디버그 출력: 매 10번째 iteration마다
+            if iteration % 10 == 0:
+                node_name = getattr(node, 'name', 'unknown')
+                node_line = getattr(node, 'src_line', '?')
+                print(f"[Engine.fixpoint] iter={iteration}, processing node={node_name}(L{node_line}), WL size={len(WL)}, max_visit={max(visit_cnt.values(), default=0)}, visit_cnt[node]={visit_cnt[node]}")
 
             # ★ in_vars[node]가 None인 경우 처리
             if in_vars[node] is None:
@@ -410,9 +417,16 @@ class Engine:
                 if changed_succ:
                     in_vars[succ] = VariableEnv.copy_variables(in_new)
                     WL.append(succ)
+                    if iteration % 10 == 0:
+                        succ_name = getattr(succ, 'name', 'unknown')
+                        succ_line = getattr(succ, 'src_line', '?')
+                        print(f"  -> Added succ={succ_name}(L{succ_line}) to WL (changed)")
+
+        print(f"[Engine.fixpoint] Widening phase done. Total iterations: {iteration}")
 
         # narrowing
         WL = deque(loop_nodes); N_MAX = 30
+        print(f"[Engine.fixpoint] Starting narrowing phase")
         while WL and N_MAX:
             N_MAX -= 1
             node = WL.popleft()
