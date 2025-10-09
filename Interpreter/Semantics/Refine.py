@@ -86,39 +86,69 @@ class Refine:
             is_true_branch: bool) -> None:
 
         op = cond_expr.operator  # '&&', '||', '!'
-        # ───────── NOT ─────────
         if op == '!':
             # !X : true-branch → X=false, false-branch → X=true
             return self._update_single_condition(
                 variables,
-                cond_expr.expression,  # operand
+                cond_expr.expression,
                 not is_true_branch)
 
-        # AND / OR 는 좌·우 피연산자 필요
         condA = cond_expr.left
         condB = cond_expr.right
 
+        # 먼저 현재 env에서 A, B를 불리언으로 평가(정제 전에 힌트 확보)
+        A_b = self._as_bool_interval(condA, variables)
+        B_b = self._as_bool_interval(condB, variables)
+
         # ───────── AND ─────────
         if op == '&&':
-            if is_true_branch:  # 둘 다 참이어야 함
+            if is_true_branch:
+                # A && B 가 참 → 둘 다 참이어야 함 (교집합)
                 self.update_variables_with_condition(variables, condA, True)
                 self.update_variables_with_condition(variables, condB, True)
-            else:  # A==false  또는  B==false
-                # 두 피연산자 모두 “0 가능”하도록 meet
-                self.update_variables_with_condition(variables, condA, False)
-                self.update_variables_with_condition(variables, condB, False)
-            return
+                return
+            else:
+                # ¬(A && B) ≡ (¬A) ∨ (¬B)
+                # 단락 최적화: 한쪽이 확실히 false면 그쪽만 적용
+                if self._is_false(A_b):
+                    self.update_variables_with_condition(variables, condA, False)
+                    return
+                if self._is_false(B_b):
+                    self.update_variables_with_condition(variables, condB, False)
+                    return
+                # 둘 다 불명 → 분기 2개를 만들어 정제 후 join
+                env1 = self._clone_env(variables)
+                self.update_variables_with_condition(env1, condA, False)
+                env2 = self._clone_env(variables)
+                self.update_variables_with_condition(env2, condB, False)
+                merged = self._join_two_envs(env1, env2)
+                self._apply_env_inplace(variables, merged)
+                return
 
         # ───────── OR ─────────
         if op == '||':
-            if is_true_branch:  # A==true  또는  B==true
-                # 둘 다 “1 가능”으로 넓힘 (정보 손실 최소화)
-                self.update_variables_with_condition(variables, condA, True)
-                self.update_variables_with_condition(variables, condB, True)
-            else:  # 둘 다 false
+            if is_true_branch:
+                # A || B 가 참
+                # 단락 최적화: 한쪽이 확실히 true면 그쪽만 적용
+                if self._is_true(A_b):
+                    self.update_variables_with_condition(variables, condA, True)
+                    return
+                if self._is_true(B_b):
+                    self.update_variables_with_condition(variables, condB, True)
+                    return
+                # 둘 다 불명 → 분기 2개를 만들어 정제 후 join
+                env1 = self._clone_env(variables)
+                self.update_variables_with_condition(env1, condA, True)
+                env2 = self._clone_env(variables)
+                self.update_variables_with_condition(env2, condB, True)
+                merged = self._join_two_envs(env1, env2)
+                self._apply_env_inplace(variables, merged)
+                return
+            else:
+                # ¬(A || B) ≡ ¬A ∧ ¬B → 둘 다 false로 정제
                 self.update_variables_with_condition(variables, condA, False)
                 self.update_variables_with_condition(variables, condB, False)
-            return
+                return
 
         raise ValueError(f"Unexpected logical operator '{op}'")
 
@@ -131,7 +161,49 @@ class Refine:
         def _maybe_update(expr, variables, new_iv):
             if self._is_read_only_expr(expr, variables):
                 return  # read-only → 변수 상태 수정 X
-            self.up.update_left_var(expr, new_iv, '=', variables, None, None, False)
+
+            # ★ Update.py의 전략 적용: 매핑/배열 접근에서 심볼릭 인덱스 처리
+            # IndexAccessContext일 때 인덱스가 interval인지 확인
+            if getattr(expr, "context", "") == "IndexAccessExpContext":
+                idx_expr = expr.index
+                if getattr(idx_expr, "context", "") == "IdentifierExpContext":
+                    idx_name = idx_expr.identifier
+                    if idx_name in variables:
+                        idx_val = variables[idx_name].value
+                        # interval이 Top이거나 범위가 너무 크면 업데이트 skip
+                        if VariableEnv.is_interval(idx_val):
+                            # Top interval 체크 (0부터 최댓값까지)
+                            if idx_val.min_value == 0 and idx_val.max_value >= 2**255:
+                                return  # Top interval은 업데이트 불가
+                            # 범위가 너무 큰 경우도 skip
+                            MAX_REFINE_RANGE = 20
+                            if idx_val.max_value - idx_val.min_value + 1 > MAX_REFINE_RANGE:
+                                return
+
+            # MemberAccessContext에서 base가 IndexAccess이고 심볼릭 인덱스인 경우
+            if getattr(expr, "context", "") == "MemberAccessContext":
+                base_expr = expr.base
+                if getattr(base_expr, "context", "") == "IndexAccessExpContext":
+                    idx_expr = base_expr.index
+                    if getattr(idx_expr, "context", "") == "IdentifierExpContext":
+                        idx_name = idx_expr.identifier
+                        if idx_name in variables:
+                            idx_val = variables[idx_name].value
+                            if VariableEnv.is_interval(idx_val):
+                                # Top interval이거나 범위가 큰 경우 업데이트 skip
+                                if idx_val.min_value == 0 and idx_val.max_value >= 2**255:
+                                    return
+                                MAX_REFINE_RANGE = 20
+                                if idx_val.max_value - idx_val.min_value + 1 > MAX_REFINE_RANGE:
+                                    return
+
+            try:
+                self.up.update_left_var(expr, new_iv, '=', variables, None, None, False)
+            except ValueError as e:
+                # 매핑 키를 resolve할 수 없는 경우 등은 조용히 무시
+                if "Cannot resolve mapping key" in str(e):
+                    return
+                raise
 
         # ───── 준비 ─────────────────────────────────────────────
         op = cond_expr.operator
@@ -448,3 +520,44 @@ class Refine:
             '>=': '<'
         }
         return neg_map.get(op, op)
+
+    def _clone_env(self, env: dict[str, Variables]) -> dict[str, Variables]:
+        return VariableEnv.copy_variables(env)
+
+    def _join_two_envs(self, e1: dict[str, Variables], e2: dict[str, Variables]) -> dict[str, Variables]:
+        out = self._clone_env(e1)
+        for k, v2 in e2.items():
+            if k in out:
+                # Variables.value 에 lattice join 필요
+                # None 값 체크 추가
+                if out[k].value is None or v2.value is None:
+                    # 한쪽이 None이면 다른 쪽 값 사용, 둘 다 None이면 None 유지
+                    if out[k].value is None and v2.value is not None:
+                        out[k].value = v2.value
+                    # out[k].value가 None이 아니고 v2.value가 None이면 현재 값 유지
+                else:
+                    out[k].value = out[k].value.join(v2.value)
+            else:
+                out[k] = VariableEnv.copy_single_variable(v2)
+        return out
+
+    def _apply_env_inplace(self, dst: dict[str, Variables], src: dict[str, Variables]) -> None:
+        # dst를 src로 대체(메타데이터를 유지하려면 필요시 필드 단위 복사)
+        # 여기서는 value만 바꾸는 것으로 충분할 때가 많지만, 안전하게 통째로 교체
+        dst.clear()
+        for k, v in src.items():
+            dst[k] = VariableEnv.copy_single_variable(v)
+
+    def _as_bool_interval(self, expr: Expression, variables: dict[str, Variables]) -> BoolInterval | None:
+        val = self.ev.evaluate_expression(expr, variables, None, None)
+        if isinstance(val, BoolInterval):
+            return val
+        if VariableEnv.is_interval(val):
+            return VariableEnv.convert_int_to_bool_interval(val)
+        return None  # bool로 해석 불가
+
+    def _is_true(self, bi: BoolInterval | None) -> bool:
+        return isinstance(bi, BoolInterval) and bi.min_value == bi.max_value == 1
+
+    def _is_false(self, bi: BoolInterval | None) -> bool:
+        return isinstance(bi, BoolInterval) and bi.min_value == bi.max_value == 0

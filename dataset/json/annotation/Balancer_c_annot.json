@@ -72,21 +72,27 @@
     "event": "add"
   },
   {
-    "code": "// @StateVar actionBuilders = arrayAddress [1,2,3];",
+    "code": "// @StateVar actionBuilders = arrayAddress[1,2,3];",
     "startLine": 6,
     "endLine": 6,
     "event": "add"
   },
   {
-    "code": "// @LocalVar index = [1,1];",
+    "code": "// @LocalVar actionBuilder = symbolicAddress 4;",
     "startLine": 7,
     "endLine": 7,
     "event": "add"
   },
   {
-    "code": "// @Debugging END",
+    "code": "// @LocalVar index = [3,3];",
     "startLine": 8,
     "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 9,
+    "endLine": 9,
     "event": "add"
   }
 ]

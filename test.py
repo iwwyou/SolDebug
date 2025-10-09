@@ -76,93 +76,165 @@ def simulate_inputs(records):
 
 test_inputs = [
   {
-    "code": "contract Balancer {\n}",
+    "code": "contract AOC_BEP {\n}",
     "startLine": 1,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "    address[] public actionBuilders;",
+    "code": "    struct UserInfo {\n}",
     "startLine": 2,
-    "endLine": 2,
+    "endLine": 3,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "        uint256 balance;",
     "startLine": 3,
     "endLine": 3,
     "event": "add"
   },
   {
-    "code": "    function _addActionBuilderAt(address actionBuilder, uint256 index) internal {\n}",
+    "code": "        uint256 level;",
     "startLine": 4,
-    "endLine": 5,
+    "endLine": 4,
     "event": "add"
   },
   {
-    "code": "        uint256 currentLength = actionBuilders.length;",
+    "code": "        uint256 year;",
     "startLine": 5,
     "endLine": 5,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "        uint256 month;",
     "startLine": 6,
     "endLine": 6,
     "event": "add"
   },
   {
-    "code": "        if (currentLength == 0 || currentLength - 1 < index) {\n}",
-    "startLine": 7,
-    "endLine": 8,
-    "event": "add"
-  },
-  {
-    "code": "            uint256 additionalCount = index - currentLength + 1;",
+    "code": "\n",
     "startLine": 8,
     "endLine": 8,
     "event": "add"
   },
   {
-    "code": "            for (uint8 i = 0; i < additionalCount; i++) {\n}",
+    "code": "    struct Level {\n}",
     "startLine": 9,
     "endLine": 10,
     "event": "add"
   },
   {
-    "code": "                actionBuilders.push();                ",
+    "code": "        uint256 start;",
     "startLine": 10,
     "endLine": 10,
     "event": "add"
   },
   {
-    "code": "        actionBuilders[index] = actionBuilder;       ",
-    "startLine": 13,
-    "endLine": 13,
+    "code": "        uint256 end;",
+    "startLine": 11,
+    "endLine": 11,
     "event": "add"
   },
   {
-    "code": "// @Debugging BEGIN",
-    "startLine": 5,
-    "endLine": 5,
+    "code": "        uint256 percentage;",
+    "startLine": 12,
+    "endLine": 12,
     "event": "add"
   },
   {
-    "code": "// @StateVar actionBuilders = arrayAddress[1,2,3];",
-    "startLine": 6,
-    "endLine": 6,
+    "code": "\n",
+    "startLine": 14,
+    "endLine": 14,
     "event": "add"
   },
   {
-    "code": "// @LocalVar index = [3,3];",
-    "startLine": 7,
-    "endLine": 7,
+    "code": "    mapping(address => UserInfo) public userInfo;",
+    "startLine": 15,
+    "endLine": 15,
     "event": "add"
   },
   {
-    "code": "// @Debugging END",
-    "startLine": 8,
-    "endLine": 8,
+    "code": "    mapping(uint256 => Level) public levels;",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  },
+  {
+    "code": "    mapping(address => uint256) private _balances;",
+    "startLine": 17,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 18,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "    function updateUserInfo(address account, uint256 year, uint256 month) internal {\n}",
+    "startLine": 19,
+    "endLine": 20,
+    "event": "add"
+  },
+  {
+    "code": "        userInfo[account].balance = _balances[account];",
+    "startLine": 20,
+    "endLine": 20,
+    "event": "add"
+  },
+  {
+    "code": "        userInfo[account].year = year;",
+    "startLine": 21,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "        userInfo[account].month = month;",
+    "startLine": 22,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "        for(uint256 i = 1; i <= 4; i++) {\n}",
+    "startLine": 23,
+    "endLine": 24,
+    "event": "add"
+  },
+  {
+    "code": "            if(i == 4) {\n}",
+    "startLine": 24,
+    "endLine": 25,
+    "event": "add"
+  },
+  {
+    "code": "                userInfo[account].level = i;",
+    "startLine": 25,
+    "endLine": 25,
+    "event": "add"
+  },
+  {
+    "code": "                break;",
+    "startLine": 26,
+    "endLine": 26,
+    "event": "add"
+  },
+  {
+    "code": "            if(block.timestamp >= levels[i].start && block.timestamp <= levels[i].end) {\n}",
+    "startLine": 28,
+    "endLine": 29,
+    "event": "add"
+  },
+  {
+    "code": "                userInfo[account].level = i;",
+    "startLine": 29,
+    "endLine": 29,
+    "event": "add"
+  },
+  {
+    "code": "                break;",
+    "startLine": 30,
+    "endLine": 30,
     "event": "add"
   }
 ]

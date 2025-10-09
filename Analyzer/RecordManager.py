@@ -11,6 +11,7 @@ from Domain.Variable import (
     MappingVariable,
     EnumVariable,
 )
+from Domain.AddressSet import AddressSet
 
 from Utils.CFG import FunctionCFG
 
@@ -259,6 +260,15 @@ class RecordManager:
     # -------------------------------------- value serialisation  ---------
 
     def _serialize_val(self, v: Any) -> str:
+        # AddressSet  ----------------------------------------------------
+        if isinstance(v, AddressSet):
+            if v.is_top:
+                return "address(⊤)"
+            if not v.ids:
+                return "address(⊥)"
+            # 구체적인 ID들을 정렬해서 표시
+            return f"address({{{', '.join(map(str, sorted(v.ids)))}}})"
+
         # Interval / BoolInterval  ---------------------------------------
         if hasattr(v, "min_value"):
             return f"[{v.min_value},{v.max_value}]"

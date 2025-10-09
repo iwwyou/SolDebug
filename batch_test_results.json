@@ -1,16 +1,16 @@
 {
   "summary": {
     "total_files": 30,
-    "successful": 9,
-    "errors": 21,
-    "total_time": 3.149306535720825,
-    "avg_time": 0.10497688452402751
+    "successful": 12,
+    "errors": 18,
+    "total_time": 6.964280366897583,
+    "avg_time": 0.2321426788965861
   },
   "results": [
     {
       "filename": "AloeBlend_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 0.13438081741333008,
+      "execution_time": 0.12214279174804688,
       "error_message": "",
       "num_records": 23,
       "analysis_count": 7,
@@ -112,7 +112,7 @@
     {
       "filename": "Amoss_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 0.1600193977355957,
+      "execution_time": 0.13544178009033203,
       "error_message": "",
       "num_records": 22,
       "analysis_count": 3,
@@ -161,7 +161,7 @@
     {
       "filename": "AOC_BEP_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 0.974109411239624,
+      "execution_time": 1.9488556385040283,
       "error_message": "",
       "num_records": 27,
       "analysis_count": 5,
@@ -236,7 +236,7 @@
     {
       "filename": "ATIDStaking_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 0.4681246280670166,
+      "execution_time": 0.44277143478393555,
       "error_message": "",
       "num_records": 56,
       "analysis_count": 11,
@@ -388,26 +388,106 @@
     },
     {
       "filename": "AvatarArtMarketPlace_c_annot.json",
-      "status": "ERROR",
-      "execution_time": 0.027080059051513672,
-      "error_message": "ValueError: There is no function name in function call context",
+      "status": "SUCCESS",
+      "execution_time": 1.1914517879486084,
+      "error_message": "",
       "num_records": 18,
-      "analysis_count": 0,
-      "analysis_result": null
+      "analysis_count": 4,
+      "analysis_result": [
+        {
+          "line_range": "5-5",
+          "analysis": {
+            "5": [
+              {
+                "kind": "varDeclaration",
+                "vars": {
+                  "tokenCount": "[0,0]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "7-7",
+          "analysis": {
+            "7": [
+              {
+                "kind": "varDeclaration",
+                "vars": {
+                  "resultIndex": "[0,0]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "9-9",
+          "analysis": {
+            "9": [
+              {
+                "kind": "varDeclaration",
+                "vars": {
+                  "tokenItemId": "[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "16-16",
+          "analysis": {
+            "16": [
+              {
+                "kind": "return",
+                "vars": {
+                  "result": "array(len=3)"
+                }
+              }
+            ]
+          }
+        }
+      ]
     },
     {
       "filename": "Balancer_c_annot.json",
-      "status": "ERROR",
-      "execution_time": 0.04380369186401367,
-      "error_message": "ValueError: This 'additionalCount' is may be elementary variable but may not be declared",
-      "num_records": 15,
-      "analysis_count": 0,
-      "analysis_result": null
+      "status": "SUCCESS",
+      "execution_time": 1.4426558017730713,
+      "error_message": "",
+      "num_records": 16,
+      "analysis_count": 2,
+      "analysis_result": [
+        {
+          "line_range": "5-5",
+          "analysis": {
+            "5": [
+              {
+                "kind": "varDeclaration",
+                "vars": {
+                  "currentLength": "[0,0]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "8-8",
+          "analysis": {
+            "8": [
+              {
+                "kind": "varDeclaration",
+                "vars": {
+                  "additionalCount": "[1,115792089237316195423570985008687907853269984665640564039457584007913129639935]"
+                }
+              }
+            ]
+          }
+        }
+      ]
     },
     {
       "filename": "BitBookStake_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 0.024180173873901367,
+      "execution_time": 0.02915167808532715,
       "error_message": "",
       "num_records": 11,
       "analysis_count": 1,
@@ -430,7 +510,7 @@
     {
       "filename": "CitrusToken_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 0.0640559196472168,
+      "execution_time": 0.055538177490234375,
       "error_message": "",
       "num_records": 17,
       "analysis_count": 4,
@@ -492,8 +572,8 @@
     {
       "filename": "Claim_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.03981614112854004,
-      "error_message": "ValueError: else-if: outer join not found via line-scan/graph",
+      "execution_time": 0.027631282806396484,
+      "error_message": "ValueError: No CFG nodes found at line 12 for context 'else_if'",
       "num_records": 20,
       "analysis_count": 0,
       "analysis_result": null
@@ -501,7 +581,7 @@
     {
       "filename": "CoreVoting_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.006018161773681641,
+      "execution_time": 0.005645036697387695,
       "error_message": "ValueError: Function context not found for simple statement at line 10",
       "num_records": 15,
       "analysis_count": 0,
@@ -510,7 +590,7 @@
     {
       "filename": "Core_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.007503032684326172,
+      "execution_time": 0.005007505416870117,
       "error_message": "ValueError: This 'governorMap' is may be elementary variable but may not be declared",
       "num_records": 26,
       "analysis_count": 0,
@@ -519,7 +599,7 @@
     {
       "filename": "Dai_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 0.2512667179107666,
+      "execution_time": 0.2032008171081543,
       "error_message": "",
       "num_records": 27,
       "analysis_count": 1,
@@ -542,7 +622,7 @@
     {
       "filename": "DapiServer_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.11560368537902832,
+      "execution_time": 0.09781074523925781,
       "error_message": "ValueError: LHS cannot be resolved to a local variable even with debug mode.",
       "num_records": 15,
       "analysis_count": 0,
@@ -550,17 +630,131 @@
     },
     {
       "filename": "DeltaNeutralPancakeWorker02_c_annot.json",
-      "status": "ERROR",
-      "execution_time": 0.05231809616088867,
-      "error_message": "ValueError: There is no function name in function call context",
+      "status": "SUCCESS",
+      "execution_time": 0.23104572296142578,
+      "error_message": "",
       "num_records": 23,
-      "analysis_count": 0,
-      "analysis_result": null
+      "analysis_count": 9,
+      "analysis_result": [
+        {
+          "line_range": "9-9",
+          "analysis": {
+            "9": [
+              {
+                "kind": "return",
+                "vars": {
+                  "reinvestPath": "array(len=0)"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "13-13",
+          "analysis": {
+            "13": [
+              {
+                "kind": "assignment",
+                "vars": {}
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "14-14",
+          "analysis": {
+            "14": [
+              {
+                "kind": "assignment",
+                "vars": {
+                  "0": "[0,0]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "15-15",
+          "analysis": {
+            "15": [
+              {
+                "kind": "assignment",
+                "vars": {
+                  "1": "[1,1]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "17-17",
+          "analysis": {
+            "17": [
+              {
+                "kind": "assignment",
+                "vars": {}
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "18-18",
+          "analysis": {
+            "18": [
+              {
+                "kind": "assignment",
+                "vars": {
+                  "0": "[0,0]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "19-19",
+          "analysis": {
+            "19": [
+              {
+                "kind": "assignment",
+                "vars": {
+                  "1": "[1,1]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "20-20",
+          "analysis": {
+            "20": [
+              {
+                "kind": "assignment",
+                "vars": {
+                  "2": "[2,2]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "22-22",
+          "analysis": {
+            "22": [
+              {
+                "kind": "return",
+                "vars": {
+                  "path": "array(len=3)"
+                }
+              }
+            ]
+          }
+        }
+      ]
     },
     {
       "filename": "Dripper_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.0046041011810302734,
+      "execution_time": 0.005007266998291016,
       "error_message": "ValueError: Function context not found for simple statement at line 12",
       "num_records": 15,
       "analysis_count": 0,
@@ -568,17 +762,109 @@
     },
     {
       "filename": "Edentoken_c_annot.json",
-      "status": "ERROR",
-      "execution_time": 0.10798406600952148,
-      "error_message": "ValueError: This 'newAllowance' is may be elementary variable but may not be declared",
+      "status": "SUCCESS",
+      "execution_time": 0.2082657814025879,
+      "error_message": "",
       "num_records": 26,
-      "analysis_count": 0,
-      "analysis_result": null
+      "analysis_count": 7,
+      "analysis_result": [
+        {
+          "line_range": "9-9",
+          "analysis": {
+            "9": [
+              {
+                "kind": "assignment",
+                "vars": {
+                  "balanceOf[from]": "[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "10-10",
+          "analysis": {
+            "10": [
+              {
+                "kind": "assignment",
+                "vars": {
+                  "balanceOf[to]": "[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "14-14",
+          "analysis": {
+            "14": [
+              {
+                "kind": "varDeclaration",
+                "vars": {
+                  "spender": "address({101})"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "15-15",
+          "analysis": {
+            "15": [
+              {
+                "kind": "varDeclaration",
+                "vars": {
+                  "spenderAllowance": "[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "18-18",
+          "analysis": {
+            "18": [
+              {
+                "kind": "varDeclaration",
+                "vars": {
+                  "newAllowance": "[None,None]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "19-19",
+          "analysis": {
+            "19": [
+              {
+                "kind": "assignment",
+                "vars": {
+                  "allowance[src][spender]": "[None,None]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "23-23",
+          "analysis": {
+            "23": [
+              {
+                "kind": "return",
+                "vars": {
+                  "true": "[1,1]"
+                }
+              }
+            ]
+          }
+        }
+      ]
     },
     {
       "filename": "GovStakingStorage_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.008534908294677734,
+      "execution_time": 0.009821176528930664,
       "error_message": "ValueError: This 'allowed' is may be elementary variable but may not be declared",
       "num_records": 38,
       "analysis_count": 0,
@@ -587,7 +873,7 @@
     {
       "filename": "GreenHouse_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.005514860153198242,
+      "execution_time": 0.0052759647369384766,
       "error_message": "ValueError: Contract context not found for line 8",
       "num_records": 17,
       "analysis_count": 0,
@@ -596,7 +882,7 @@
     {
       "filename": "LockupContract_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 0.10943102836608887,
+      "execution_time": 0.13125944137573242,
       "error_message": "",
       "num_records": 26,
       "analysis_count": 7,
@@ -697,8 +983,8 @@
     {
       "filename": "Lock_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.15170574188232422,
-      "error_message": "ValueError: This '_nUnlock' is may be elementary variable but may not be declared",
+      "execution_time": 0.24356412887573242,
+      "error_message": "ValueError: [DebugGlobalVar] invalid global 'block.timsetamp'",
       "num_records": 33,
       "analysis_count": 0,
       "analysis_result": null
@@ -706,7 +992,7 @@
     {
       "filename": "Meter_flat_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.016031742095947266,
+      "execution_time": 0.014290571212768555,
       "error_message": "KeyError: '_beforeTokenTransfer'",
       "num_records": 18,
       "analysis_count": 0,
@@ -715,7 +1001,7 @@
     {
       "filename": "MockChainlinkOracle_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.007581472396850586,
+      "execution_time": 0.005016803741455078,
       "error_message": "ValueError: Contract context not found for line 16",
       "num_records": 28,
       "analysis_count": 0,
@@ -724,7 +1010,7 @@
     {
       "filename": "OptimisticRewards_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.010092973709106445,
+      "execution_time": 0.010116338729858398,
       "error_message": "ValueError: Contract context not found for line 9",
       "num_records": 17,
       "analysis_count": 0,
@@ -733,7 +1019,7 @@
     {
       "filename": "PercentageFeeModel_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.00614619255065918,
+      "execution_time": 0.005242824554443359,
       "error_message": "ValueError: Contract context not found for line 12",
       "num_records": 31,
       "analysis_count": 0,
@@ -741,70 +1027,17 @@
     },
     {
       "filename": "PoolKeeper_c_annot.json",
-      "status": "SUCCESS",
-      "execution_time": 0.07178473472595215,
-      "error_message": "",
+      "status": "ERROR",
+      "execution_time": 0.041174888610839844,
+      "error_message": "ValueError: No CFG nodes found at line 15 for context 'else'",
       "num_records": 20,
-      "analysis_count": 4,
-      "analysis_result": [
-        {
-          "line_range": "8-8",
-          "analysis": {
-            "8": [
-              {
-                "kind": "varDeclaration",
-                "vars": {
-                  "elapsedBlocksNumerator": "[0,0]"
-                }
-              }
-            ]
-          }
-        },
-        {
-          "line_range": "10-10",
-          "analysis": {
-            "10": [
-              {
-                "kind": "varDeclaration",
-                "vars": {
-                  "keeperTip": "[5,5]"
-                }
-              }
-            ]
-          }
-        },
-        {
-          "line_range": "13-13",
-          "analysis": {
-            "13": [
-              {
-                "kind": "return",
-                "vars": {
-                  "MAX_TIP": "[100,100]"
-                }
-              }
-            ]
-          }
-        },
-        {
-          "line_range": "16-16",
-          "analysis": {
-            "16": [
-              {
-                "kind": "return",
-                "vars": {
-                  "keeperTip": "[5,5]"
-                }
-              }
-            ]
-          }
-        }
-      ]
+      "analysis_count": 0,
+      "analysis_result": null
     },
     {
       "filename": "QANX_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.151261568069458,
+      "execution_time": 0.12841534614562988,
       "error_message": "ValueError: This '_balances' is may be elementary variable but may not be declared",
       "num_records": 43,
       "analysis_count": 0,
@@ -813,7 +1046,7 @@
     {
       "filename": "ThorusBond_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.022616147994995117,
+      "execution_time": 0.018391132354736328,
       "error_message": "ValueError: Contract context not found for line 14",
       "num_records": 19,
       "analysis_count": 0,
@@ -822,7 +1055,7 @@
     {
       "filename": "ThorusLottery_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.006525754928588867,
+      "execution_time": 0.0062062740325927734,
       "error_message": "AttributeError: 'NoneType' object has no attribute 'startswith'",
       "num_records": 20,
       "analysis_count": 0,
@@ -831,7 +1064,7 @@
     {
       "filename": "TimeLockPool_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.05439877510070801,
+      "execution_time": 0.043987274169921875,
       "error_message": "AttributeError: 'NoneType' object has no attribute 'startswith'",
       "num_records": 14,
       "analysis_count": 0,
@@ -840,8 +1073,8 @@
     {
       "filename": "WASTR_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.04681253433227539,
-      "error_message": "ValueError: This 'allowed' is may be elementary variable but may not be declared",
+      "execution_time": 0.14989495277404785,
+      "error_message": "AttributeError: 'NoneType' object has no attribute 'typeName'",
       "num_records": 23,
       "analysis_count": 0,
       "analysis_result": null
@@ -849,31 +1082,28 @@
   ],
   "error_categories": {
     "ValueError": [
-      "AvatarArtMarketPlace_c_annot.json",
-      "Balancer_c_annot.json",
       "Claim_c_annot.json",
       "CoreVoting_c_annot.json",
       "Core_c_annot.json",
       "DapiServer_c_annot.json",
-      "DeltaNeutralPancakeWorker02_c_annot.json",
       "Dripper_c_annot.json",
-      "Edentoken_c_annot.json",
       "GovStakingStorage_c_annot.json",
       "GreenHouse_c_annot.json",
       "Lock_c_annot.json",
       "MockChainlinkOracle_c_annot.json",
       "OptimisticRewards_c_annot.json",
       "PercentageFeeModel_c_annot.json",
+      "PoolKeeper_c_annot.json",
       "QANX_c_annot.json",
-      "ThorusBond_c_annot.json",
-      "WASTR_c_annot.json"
+      "ThorusBond_c_annot.json"
     ],
     "KeyError": [
       "Meter_flat_c_annot.json"
     ],
     "AttributeError": [
       "ThorusLottery_c_annot.json",
-      "TimeLockPool_c_annot.json"
+      "TimeLockPool_c_annot.json",
+      "WASTR_c_annot.json"
     ]
   }
 }

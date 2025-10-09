@@ -179,6 +179,14 @@ class Engine:
         should_record = self._record_enabled and not self._suppress_stmt_records
         line_num = getattr(stmt, 'src_line', None)
 
+        # ★ 디버깅: array assignment 추적
+        if hasattr(lexp, 'base') and hasattr(lexp.base, 'identifier'):
+            if lexp.base.identifier == 'actionBuilders':
+                print(f"[DEBUG assignment] Line {line_num}: actionBuilders[...] = ...")
+                print(f"  _record_enabled = {self._record_enabled}")
+                print(f"  _suppress_stmt_records = {self._suppress_stmt_records}")
+                print(f"  should_record = {should_record}")
+                print(f"  r_val type = {type(r_val)}")
 
         # stmt.src_line을 line_no로 전달
         self.up.update_left_var(lexp, r_val, op, variables, None, None, should_record, line_num)
@@ -340,9 +348,11 @@ class Engine:
 
         # ★ start_env 계산: join 노드의 경우 back edge를 제외하고 초기 진입 edge만 사용
         start_env = None
+        join_node_ref = None
         for p in G.predecessors(head):
             # join 노드인 경우: 그 predecessor 중 loop 내부가 아닌 것만 사용
             if getattr(p, "fixpoint_evaluation_node", False):
+                join_node_ref = p
                 for pp in G.predecessors(p):
                     # back edge (증감식)는 제외: loop_nodes에 속하는 predecessor는 skip
                     if pp in loop_nodes:
@@ -355,6 +365,14 @@ class Engine:
                 start_env = VariableEnv.join_variables_simple(start_env, p_vars)
         in_vars[head] = start_env or {}
 
+        # ★ join 노드를 loop_nodes에 추가하고 초기값 설정
+        # 이렇게 하면 첫 iteration에서 i=1부터 시작됨
+        if join_node_ref is not None:
+            loop_nodes.add(join_node_ref)
+            in_vars[join_node_ref] = VariableEnv.copy_variables(start_env or {})
+            out_vars[join_node_ref] = None
+            join_node_ref.join_baseline_env = VariableEnv.copy_variables(start_env or {})
+
         # ── 루프 내부 문장 기록 억제 on
         old_sup = self._suppress_stmt_records
         self._suppress_stmt_records = True
@@ -366,11 +384,15 @@ class Engine:
         W_MAX = 300
         WL = deque([head])
         iteration = 0
+
+        # ★ 디버그: loop head의 src_line 확인
+        loop_line = getattr(head, "src_line", None)
+        debug_loop = (loop_line == 23)  # for문이 23번 라인
+
         while WL and max(visit_cnt.values(), default=0) < W_MAX:
             node = WL.popleft()
             visit_cnt[node] += 1
             iteration += 1
-
 
             # ★ in_vars[node]가 None인 경우 처리
             if in_vars[node] is None:
@@ -385,6 +407,12 @@ class Engine:
                     in_vars[node] = in_new
 
             out_old = out_vars[node]
+
+            # ★ 디버그 출력
+            if debug_loop and getattr(node, "fixpoint_evaluation_node", False):
+                i_val = in_vars[node].get('i')
+                if i_val:
+                    print(f"[DEBUG fixpoint] join node visit #{visit_cnt[node]}, i={i_val.value}")
 
             # ★ widening 필요 여부를 미리 계산하고 플래그 설정
             need_widen = (getattr(node, "fixpoint_evaluation_node", False) and
@@ -408,6 +436,10 @@ class Engine:
 
             if getattr(node, "fixpoint_evaluation_node", False):
                 node.fixpoint_evaluation_node_vars = VariableEnv.copy_variables(out_joined)
+                if debug_loop:
+                    i_val_out = out_joined.get('i')
+                    if i_val_out:
+                        print(f"[DEBUG fixpoint] join node after transfer, i={i_val_out.value}")
 
             equal = VariableEnv.variables_equal(out_old, out_joined)
 
@@ -486,7 +518,7 @@ class Engine:
         exit_node.variables = VariableEnv.copy_variables(exit_env or {})
 
         # loopDelta: 헤더(조건) 라인에 기록
-        # head의 predecessor 중 fixpoint_evaluation_node(=join)를 찾아 baseline 가져오기
+        # ★ fixpoint evaluation node(join)의 고정점 상태를 사용 (false edge 정제 전)
         join_node = None
         for p in G.predecessors(head):
             if getattr(p, "fixpoint_evaluation_node", False):
@@ -495,8 +527,12 @@ class Engine:
 
         if join_node is not None:
             base_env = getattr(join_node, "join_baseline_env", None)
-            if base_env is not None:
-                changed_flat = VariableEnv.diff_changed(base_env, exit_node.variables)
+            # ★ fixpoint_evaluation_node_vars: 고정점 도달 후 join 노드의 최종 상태
+            fixpoint_env = getattr(join_node, "fixpoint_evaluation_node_vars", None)
+
+            if base_env is not None and fixpoint_env is not None:
+                changed_flat = VariableEnv.diff_changed(base_env, fixpoint_env)
+
                 if changed_flat:
                     ln_head = getattr(head, "src_line", None)
                     if ln_head is not None:
