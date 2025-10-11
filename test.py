@@ -77,147 +77,87 @@ def simulate_inputs(records):
 
 test_inputs = [
   {
-    "code": "contract ThorusLottery {\n}",
+    "code": "contract TimeLocPool {\n}",
     "startLine": 1,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "    uint256 public firstWinningNumber;",
+    "code": "\n",
     "startLine": 2,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "    uint256 public lastWinningNumber;",
+    "code": "    struct Deposit {\n}",
     "startLine": 3,
-    "endLine": 3,
+    "endLine": 4,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "        uint256 amount;",
     "startLine": 4,
     "endLine": 4,
     "event": "add"
   },
   {
-    "code": "    struct Ticket {\n}",
+    "code": "        uint64 start;",
     "startLine": 5,
-    "endLine": 6,
+    "endLine": 5,
     "event": "add"
   },
   {
-    "code": "        address owner;",
+    "code": "        uint64 end;",
     "startLine": 6,
     "endLine": 6,
     "event": "add"
   },
   {
-    "code": "        bool isClaimed;",
-    "startLine": 7,
-    "endLine": 7,
+    "code": "\n",
+    "startLine": 8,
+    "endLine": 8,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "    mapping(address => Deposit[]) public depositsOf;",
     "startLine": 9,
     "endLine": 9,
     "event": "add"
   },
   {
-    "code": "    Ticket[] public tickets;",
+    "code": "\n",
     "startLine": 10,
     "endLine": 10,
     "event": "add"
   },
   {
-    "code": "    uint256[] public ticketNumbers;",
+    "code": "    function getTotalDeposit(address _account) public view returns(uint256) {\n}",
     "startLine": 11,
-    "endLine": 11,
+    "endLine": 12,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "        uint256 total;",
     "startLine": 12,
     "endLine": 12,
     "event": "add"
   },
   {
-    "code": "    function isWinning(uint256 ticketIndex) public view returns (bool) {\n}",
+    "code": "        for(uint256 i = 0; i < depositsOf[_account].length; i++) {\n}",
     "startLine": 13,
     "endLine": 14,
     "event": "add"
   },
   {
-    "code": "        if(firstWinningNumber <= ticketNumbers[ticketIndex] && ticketNumbers[ticketIndex] < lastWinningNumber) {\n}",
-    "startLine": 14,
-    "endLine": 15,
-    "event": "add"
-  },
-  {
-    "code": "            return true;",
-    "startLine": 15,
-    "endLine": 15,
-    "event": "add"
-  },
-  {
-    "code": "        if(lastWinningNumber > tickets.length && ticketNumbers[ticketIndex] < (lastWinningNumber % tickets.length)) {\n}",
-    "startLine": 17,
-    "endLine": 18,
-    "event": "add"
-  },
-  {
-    "code": "            return true;",
-    "startLine": 18,
-    "endLine": 18,
-    "event": "add"
-  },
-  {
-    "code": "        return false;",
-    "startLine": 20,
-    "endLine": 20,
-    "event": "add"
-  },
-  {
-    "code": "// @Debugging BEGIN",
+    "code": "            total += depositsOf[_account][i].amount;",
     "startLine": 14,
     "endLine": 14,
     "event": "add"
   },
   {
-    "code": "// @StateVar firstWinningNumber = [100,100]",
-    "startLine": 15,
-    "endLine": 15,
-    "event": "add"
-  },
-  {
-    "code": "// @StateVar lastWinningNumber = [100,100]",
+    "code": "        return total;",
     "startLine": 16,
     "endLine": 16,
-    "event": "add"
-  },
-  {
-    "code": "// @StateVar tickets.length = [5,5];",
-    "startLine": 17,
-    "endLine": 17,
-    "event": "add"
-  },
-  {
-    "code": "// @StateVar ticketNumbers = array[0,1,2,3,4];",
-    "startLine": 18,
-    "endLine": 18,
-    "event": "add"
-  },
-  {
-    "code": "// @LocalVar  ticketIndex = [4,4];",
-    "startLine": 19,
-    "endLine": 19,
-    "event": "add"
-  },
-  {
-    "code": "// @Debugging END",
-    "startLine": 20,
-    "endLine": 20,
     "event": "add"
   }
 ]

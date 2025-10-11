@@ -443,7 +443,7 @@ class DebugInitializer:
         """
 
         # ★ 특별 케이스: 동적 배열의 .length 설정
-        if (lhs_expr.context == "MemberAccessContext" and
+        if (lhs_expr.context in ("MemberAccessContext", "TestingMemberAccess") and
             lhs_expr.member == "length"):
 
             # base 객체 찾기
@@ -603,11 +603,18 @@ class DebugInitializer:
         value에서 배열 길이를 추출
         - [N, N] → N
         - N (int) → N
+        - UnsignedIntegerInterval([N, N]) → N (min == max일 때)
         """
-        if isinstance(value, list) and len(value) == 2:
+        # Interval 객체인 경우
+        if hasattr(value, 'min_value') and hasattr(value, 'max_value'):
+            if value.min_value == value.max_value and isinstance(value.min_value, int):
+                return value.min_value
+        # 리스트 형태
+        elif isinstance(value, list) and len(value) == 2:
             # [N, N] 형태
             if value[0] == value[1] and isinstance(value[0], int):
                 return value[0]
+        # 정수 형태
         elif isinstance(value, int):
             return value
         return None

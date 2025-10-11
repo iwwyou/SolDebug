@@ -688,14 +688,17 @@ class ContractAnalyzer:
         # 우변 표현식을 저장하기 위해 init_expr를 확인
         if init_expr is None: # 초기화가 없으면
             if isinstance(variable_obj, ArrayVariable) :
-                if variable_obj.typeInfo.arrayBaseType.elementaryTypeName.startswith("int") :
-                    variable_obj.initialize_elements(IntegerInterval(0, 0, 256))
-                elif variable_obj.typeInfo.arrayBaseType.elementaryTypeName.startswith("uint") :
-                    variable_obj.initialize_elements(UnsignedIntegerInterval(0, 0, 256))
-                elif variable_obj.typeInfo.arrayBaseType.elementaryTypeName.startswith("bool") :
-                    variable_obj.initialize_elements(BoolInterval(0, 0))
-                elif variable_obj.typeInfo.arrayBaseType.elementaryTypeName in ["address", "address payable", "string", "bytes", "Byte", "Fixed", "Ufixed"] :
-                    variable_obj.initialize_not_abstracted_type()
+                # arrayBaseType이 elementary type인 경우에만 elementaryTypeName 체크
+                if variable_obj.typeInfo.arrayBaseType.typeCategory == "elementary":
+                    if variable_obj.typeInfo.arrayBaseType.elementaryTypeName.startswith("int") :
+                        variable_obj.initialize_elements(IntegerInterval(0, 0, 256))
+                    elif variable_obj.typeInfo.arrayBaseType.elementaryTypeName.startswith("uint") :
+                        variable_obj.initialize_elements(UnsignedIntegerInterval(0, 0, 256))
+                    elif variable_obj.typeInfo.arrayBaseType.elementaryTypeName.startswith("bool") :
+                        variable_obj.initialize_elements(BoolInterval(0, 0))
+                    elif variable_obj.typeInfo.arrayBaseType.elementaryTypeName in ["address", "address payable", "string", "bytes", "Byte", "Fixed", "Ufixed"] :
+                        variable_obj.initialize_not_abstracted_type()
+                # struct, enum 등 다른 타입의 배열은 동적으로 초기화됨 (필요 시)
             elif isinstance(variable_obj, StructVariable) :
                 if variable_obj.typeInfo.structTypeName in contract_cfg.structDefs.keys():
                     struct_def = contract_cfg.structDefs[variable_obj.typeInfo.structTypeName]

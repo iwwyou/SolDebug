@@ -279,13 +279,13 @@ class Evaluation :
                     if idx >= len(callerObject.elements):
                         # ❗ 요소가 아직 없음 → base-type 의 TOP 값 (알 수 없는 값)
                         base_t = callerObject.typeInfo.arrayBaseType
-                        if base_t.elementaryTypeName.startswith("uint"):
+                        if base_t.elementaryTypeName and base_t.elementaryTypeName.startswith("uint"):
                             bits = base_t.intTypeLength or 256
                             return UnsignedIntegerInterval.top(bits)
-                        elif base_t.elementaryTypeName.startswith("int"):
+                        elif base_t.elementaryTypeName and base_t.elementaryTypeName.startswith("int"):
                             bits = base_t.intTypeLength or 256
                             return IntegerInterval.top(bits)
-                        elif base_t.elementaryTypeName == "bool":
+                        elif base_t.elementaryTypeName and base_t.elementaryTypeName == "bool":
                             return BoolInterval.top()
                         else:
                             # 주소/bytes/string 등은 symbol
@@ -303,13 +303,13 @@ class Evaluation :
 
                 # 배열이 비어 있으면 base-type 에 맞는 TOP 반환 (알 수 없는 값)
                 base_t = callerObject.typeInfo.arrayBaseType
-                if base_t.elementaryTypeName.startswith("uint"):
+                if base_t.elementaryTypeName and base_t.elementaryTypeName.startswith("uint"):
                     bits = base_t.intTypeLength or 256
                     return UnsignedIntegerInterval.top(bits)
-                if base_t.elementaryTypeName.startswith("int"):
+                if base_t.elementaryTypeName and base_t.elementaryTypeName.startswith("int"):
                     bits = base_t.intTypeLength or 256
                     return IntegerInterval.top(bits)
-                if base_t.elementaryTypeName == "bool":
+                if base_t.elementaryTypeName and base_t.elementaryTypeName == "bool":
                     return BoolInterval.top()
                 # 주소/bytes/string 등은 symbol 로
                 return f"symbolic_{callerObject.identifier}[<unk>]"
