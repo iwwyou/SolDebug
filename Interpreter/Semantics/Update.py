@@ -504,14 +504,6 @@ class Update :
         # ────────────────────────── 내부 헬퍼 ──────────────────────────
         def _apply_to_leaf(var_obj: Variables | EnumVariable, record_expr: Expression):
             """leaf 변수에 compound-assignment 적용 + Recorder 호출"""
-            # ★ 디버깅: actionBuilders 배열 원소 업데이트 추적
-            if hasattr(caller_object, 'identifier') and caller_object.identifier == 'actionBuilders':
-                print(f"[DEBUG _apply_to_leaf] Called for actionBuilders element")
-                print(f"  var_obj = {var_obj}")
-                print(f"  r_val type = {type(r_val)}")
-                print(f"  log = {log}")
-                print(f"  operator = {operator}")
-
             # ★ var_obj가 이미 Interval인 경우 (배열 원소가 직접 Interval로 저장된 경우)
             # 이는 join된 결과로, 직접 처리할 수 없으므로 skip
             if VariableEnv.is_interval(var_obj):

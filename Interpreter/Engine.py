@@ -144,24 +144,12 @@ class Engine:
         if init_expr is not None and var_type.typeCategory not in ("struct", "array", "mapping"):
             # ArrayVariable 등 특수 케이스가 아니면 값 평가
             if not isinstance(vobj, ArrayVariable):
-                # ★ 변수 선언 디버깅
-                if var_name in ["currentLength", "additionalCount"]:
-                    print(f"[DEBUG] Evaluating {var_name}:")
-                    if 'index' in variables:
-                        print(f"  index.value = {variables['index'].value}")
-                    if 'currentLength' in variables:
-                        print(f"  currentLength.value = {variables['currentLength'].value}")
-
                 eval_result = self.eval.evaluate_expression(init_expr, variables, None, None)
                 # ★ 평가 결과가 Variables 객체면 그 value를 추출
                 if isinstance(eval_result, Variables) and not isinstance(eval_result, (ArrayVariable, StructVariable, MappingVariable)):
                     vobj.value = getattr(eval_result, 'value', eval_result)
                 else:
                     vobj.value = eval_result
-
-                if var_name in ["currentLength", "additionalCount"]:
-                    print(f"  eval_result = {eval_result}")
-                    print(f"  vobj.value = {vobj.value}")
 
                 if self._record_enabled and not self._suppress_stmt_records:
                     self.rec.record_variable_declaration(
@@ -178,15 +166,6 @@ class Engine:
 
         should_record = self._record_enabled and not self._suppress_stmt_records
         line_num = getattr(stmt, 'src_line', None)
-
-        # ★ 디버깅: array assignment 추적
-        if hasattr(lexp, 'base') and hasattr(lexp.base, 'identifier'):
-            if lexp.base.identifier == 'actionBuilders':
-                print(f"[DEBUG assignment] Line {line_num}: actionBuilders[...] = ...")
-                print(f"  _record_enabled = {self._record_enabled}")
-                print(f"  _suppress_stmt_records = {self._suppress_stmt_records}")
-                print(f"  should_record = {should_record}")
-                print(f"  r_val type = {type(r_val)}")
 
         # stmt.src_line을 line_no로 전달
         self.up.update_left_var(lexp, r_val, op, variables, None, None, should_record, line_num)
@@ -385,10 +364,6 @@ class Engine:
         WL = deque([head])
         iteration = 0
 
-        # ★ 디버그: loop head의 src_line 확인
-        loop_line = getattr(head, "src_line", None)
-        debug_loop = (loop_line == 23)  # for문이 23번 라인
-
         while WL and max(visit_cnt.values(), default=0) < W_MAX:
             node = WL.popleft()
             visit_cnt[node] += 1
@@ -407,12 +382,6 @@ class Engine:
                     in_vars[node] = in_new
 
             out_old = out_vars[node]
-
-            # ★ 디버그 출력
-            if debug_loop and getattr(node, "fixpoint_evaluation_node", False):
-                i_val = in_vars[node].get('i')
-                if i_val:
-                    print(f"[DEBUG fixpoint] join node visit #{visit_cnt[node]}, i={i_val.value}")
 
             # ★ widening 필요 여부를 미리 계산하고 플래그 설정
             need_widen = (getattr(node, "fixpoint_evaluation_node", False) and
@@ -436,10 +405,6 @@ class Engine:
 
             if getattr(node, "fixpoint_evaluation_node", False):
                 node.fixpoint_evaluation_node_vars = VariableEnv.copy_variables(out_joined)
-                if debug_loop:
-                    i_val_out = out_joined.get('i')
-                    if i_val_out:
-                        print(f"[DEBUG fixpoint] join node after transfer, i={i_val_out.value}")
 
             equal = VariableEnv.variables_equal(out_old, out_joined)
 
@@ -571,28 +536,12 @@ class Engine:
         entry = fcfg.get_entry_node()
         (start_block,) = fcfg.graph.successors(entry)
 
-        # ★ 디버깅: related_variables 확인
-        if fcfg.function_name == "_addActionBuilderAt":
-            print(f"[DEBUG] Before copy_variables:")
-            for k in ['index']:
-                if k in fcfg.related_variables:
-                    v = fcfg.related_variables[k]
-                    print(f"  related_variables[{k}].value = {repr(v.value)[:80]}")
-
         try:
             start_block.variables = VariableEnv.copy_variables(fcfg.related_variables)
         except Exception as e:
-            print(f"[ERROR] copy_variables failed: {e}")
             import traceback
             traceback.print_exc()
             raise
-
-        if fcfg.function_name == "_addActionBuilderAt":
-            print(f"[DEBUG] After copy_variables:")
-            for k in ['index']:
-                if k in start_block.variables:
-                    v = start_block.variables[k]
-                    print(f"  start_block.variables[{k}].value = {repr(v.value)[:80]}")
 
         if caller_env is not None:
             for k, v in caller_env.items():

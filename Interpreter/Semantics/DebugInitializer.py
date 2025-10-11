@@ -54,6 +54,9 @@ class DebugInitializer:
         elif expr.context == "TestingIndexAccess":
             return self._update_left_var_of_testing_index_access_context_for_debug(
                 expr, rVal, operator, variables, callerObject, callerContext)
+        elif expr.context == "TestingMemberAccess":
+            return self._update_left_var_of_testing_member_access_context_for_debug(
+                expr, rVal, operator, variables, callerObject, callerContext)
 
         return None
 
@@ -61,6 +64,7 @@ class DebugInitializer:
             self, expr: Expression, rVal, operator, variables, callerObject=None, callerContext=None):
         """
         TestingIndexAccess 컨텍스트 처리 (디버깅 전용)
+        allowed[_from][msg.sender] 같은 중첩 매핑 접근 처리
         """
         # base 객체 찾기
         base_obj = self._update_left_var_for_debug(
@@ -69,9 +73,10 @@ class DebugInitializer:
         if base_obj is None:
             return None
 
-        # index 처리
-        return self._update_left_var_for_debug(
+        # index 처리 - callerObject를 base_obj로, callerContext를 TestingIndexAccess로 전달
+        result = self._update_left_var_for_debug(
             expr.index, rVal, operator, variables, base_obj, "TestingIndexAccess")
+        return result
 
     def _update_left_var_of_identifier_context_for_debug(
             self, expr: Expression, rVal, operator, variables, caller_object=None, caller_context=None):
@@ -79,6 +84,14 @@ class DebugInitializer:
         Identifier 컨텍스트 처리 (디버깅 전용)
         """
         ident = expr.identifier
+
+        # ======================================================================
+        # 0) caller_context가 TestingIndexAccess이고 ident가 글로벌 변수인 경우
+        #    (예: block, tx, msg)
+        # ======================================================================
+        if caller_context == "TestingIndexAccess" and ident in ("block", "tx", "msg"):
+            # 글로벌 객체는 그대로 반환 (다음 MemberAccess에서 처리)
+            return ident
 
         # ======================================================================
         # 1) caller_object가 ArrayVariable인 경우 - arr[variable_index]
@@ -182,6 +195,9 @@ class DebugInitializer:
             # base에 대한 접근
             if ident in variables:
                 return variables[ident]  # MappingVariable, ArrayVariable 등을 반환
+            elif ident in ("block", "tx", "msg"):
+                # 글로벌 객체는 문자열로 반환 (MemberAccess에서 처리)
+                return ident
             else:
                 # 디버깅에서는 없어도 일단 None 반환 (에러 발생시키지 않음)
                 return None
@@ -205,14 +221,17 @@ class DebugInitializer:
             return None
 
         # index 처리
-        return self._update_left_var_for_debug(
+        result = self._update_left_var_for_debug(
             expr.index, rVal, operator, variables, base_obj, "IndexAccessContext")
+        return result
 
     def _update_left_var_of_member_access_context_for_debug(
             self, expr: Expression, rVal, operator, variables, callerObject=None, callerContext=None):
         """
-        MemberAccess 컨텍스트 처리 (디버깅 전용) - struct.field 등
+        MemberAccess 컨텍스트 처리 (디버깅 전용) - struct.field, msg.sender 등
         """
+        from Utils.Helper import VariableEnv
+
         # base 객체 찾기
         base_obj = self._update_left_var_for_debug(
             expr.base, rVal, operator, variables, None, "MemberAccessContext")
@@ -222,7 +241,59 @@ class DebugInitializer:
 
         member_name = expr.member
 
-        # StructVariable인 경우
+        # ======================================================================
+        # 1) 글로벌 멤버 (msg.sender, tx.origin 등)가 매핑 키로 사용되는 경우
+        #    예: allowed[_from][msg.sender], balances[msg.sender]
+        # ======================================================================
+        if VariableEnv.is_global_expr(expr) and isinstance(callerObject, MappingVariable):
+            key = f"{expr.base.identifier}.{member_name}"  # "msg.sender"
+
+            if not callerObject.struct_defs or not callerObject.enum_defs:
+                ccf = self.an.contract_cfgs[self.an.current_target_contract]
+                callerObject.struct_defs = ccf.structDefs
+                callerObject.enum_defs = ccf.enumDefs
+
+            # 엔트리 없으면 생성
+            if key not in callerObject.mapping:
+                callerObject.mapping[key] = callerObject.get_or_create(key)
+
+            entry = callerObject.mapping[key]
+
+            # TestingIndexAccess나 IndexAccessContext에서 호출된 경우
+            # 더 깊은 접근이 이어질 수 있으므로 객체 반환
+            if callerContext in ("TestingIndexAccess", "IndexAccessContext"):
+                return entry
+
+            # leaf 변수에 값 대입하는 경우
+            if rVal is not None and hasattr(entry, "value"):
+                entry.value = rVal
+
+            return entry
+
+        # ======================================================================
+        # 2) base가 글로벌 문자열인 경우 (ident 단계에서 "msg" 반환된 경우)
+        # ======================================================================
+        if isinstance(base_obj, str) and base_obj in ("block", "tx", "msg"):
+            # 글로벌 멤버 접근 - callerObject가 MappingVariable이면 키로 사용
+            if isinstance(callerObject, MappingVariable):
+                key = f"{base_obj}.{member_name}"
+
+                if not callerObject.struct_defs or not callerObject.enum_defs:
+                    ccf = self.an.contract_cfgs[self.an.current_target_contract]
+                    callerObject.struct_defs = ccf.structDefs
+                    callerObject.enum_defs = ccf.enumDefs
+
+                if key not in callerObject.mapping:
+                    callerObject.mapping[key] = callerObject.get_or_create(key)
+
+                return callerObject.mapping[key]
+
+            # 그 외에는 None 반환 (글로벌 값 자체는 변수가 아님)
+            return None
+
+        # ======================================================================
+        # 3) StructVariable인 경우
+        # ======================================================================
         if isinstance(base_obj, StructVariable):
             if member_name not in base_obj.members:
                 # 디버깅에서는 멤버가 없어도 생성 시도 (실제로는 struct 정의에 따라)
@@ -230,8 +301,10 @@ class DebugInitializer:
                 return None
             return base_obj.members[member_name]
 
-        # ArrayVariable의 length 접근 등
-        elif isinstance(base_obj, ArrayVariable):
+        # ======================================================================
+        # 4) ArrayVariable의 length 접근 등
+        # ======================================================================
+        if isinstance(base_obj, ArrayVariable):
             if member_name == "length":
                 # length는 변수가 아니므로 None 반환 (값만 필요한 경우)
                 return None
@@ -283,6 +356,67 @@ class DebugInitializer:
         # caller_context가 있는 경우 (base/index 해석용)
         if callerContext in ("IndexAccessContext", "MemberAccessContext"):
             return lit  # 리터럴 값 그대로 반환
+
+        return None
+
+    def _update_left_var_of_testing_member_access_context_for_debug(
+            self, expr: Expression, rVal, operator, variables, callerObject=None, callerContext=None):
+        """
+        TestingMemberAccess 컨텍스트 처리 (디버깅 전용)
+        디버그 주석에서 사용되는 멤버 접근: allowed[_from].member 형태
+        """
+        # ① 먼저 base 부분을 재귀-업데이트
+        base_obj = self._update_left_var_for_debug(
+            expr.base, rVal, operator, variables, None, "TestingMemberAccess")
+
+        if base_obj is None:
+            return None
+
+        member = expr.member
+
+        if member is not None:
+            # ======================================================================
+            # 1) 글로벌 멤버가 매핑 키로 사용되는 경우: allowed[msg.sender] 등
+            # ======================================================================
+            if VariableEnv.is_global_expr(expr) and isinstance(callerObject, MappingVariable):
+                key = f"{expr.base.identifier}.{member}"  # "msg.sender"
+
+                if not callerObject.struct_defs or not callerObject.enum_defs:
+                    ccf = self.an.contract_cfgs[self.an.current_target_contract]
+                    callerObject.struct_defs = ccf.structDefs
+                    callerObject.enum_defs = ccf.enumDefs
+
+                # 엔트리가 없으면 새로 만든다
+                if key not in callerObject.mapping:
+                    callerObject.mapping[key] = callerObject.get_or_create(key)
+
+                entry = callerObject.mapping[key]
+
+                # ① 더 깊은 IndexAccess 가 이어질 때는 객체 그대로 반환
+                if callerContext == "TestingIndexAccess":
+                    return entry  # allowed[msg.sender] 의 결과
+
+                # ② leaf 읽기(Testing이므로 값 패치는 하지 않음)
+                return entry  # Variables / EnumVariable / Array…
+
+            # ======================================================================
+            # 2) StructVariable인 경우
+            # ======================================================================
+            if isinstance(base_obj, StructVariable):
+                m = base_obj.members.get(member)
+                if m is None:
+                    # 디버깅에서는 멤버가 없어도 시도 (실제로는 정의에 따라)
+                    return None
+
+                nested = base_obj.members[member]
+
+                if isinstance(nested, (StructVariable, ArrayVariable, MappingVariable)):
+                    # 더 깊은 member access가 이어질 수 있으므로 그대로 반환
+                    return nested
+                elif isinstance(nested, (Variables, EnumVariable)):
+                    if rVal is not None:
+                        nested.value = rVal
+                    return nested
 
         return None
 
@@ -395,7 +529,6 @@ class DebugInitializer:
                     if base_type.elementaryTypeName.startswith('uint'):
                         bits = base_type.intTypeLength or 256
                         elem.value = UnsignedIntegerInterval(val, val, bits)
-                        print(f"DEBUG _patch_var: Created element [{idx}] with value UnsignedIntegerInterval({val}, {val})")
                     elif base_type.elementaryTypeName.startswith('int'):
                         bits = base_type.intTypeLength or 256
                         elem.value = IntegerInterval(val, val, bits)
@@ -405,8 +538,6 @@ class DebugInitializer:
                     elem.value = val
 
                 target_var.elements.append(elem)
-
-            print(f"DEBUG _patch_var: ArrayVariable {target_var.identifier} now has {len(target_var.elements)} elements")
             return
 
         if isinstance(target_var, VarClass):
@@ -420,24 +551,18 @@ class DebugInitializer:
                     if et.startswith('uint'):
                         from Domain.Interval import UnsignedIntegerInterval
                         target_var.value = UnsignedIntegerInterval(min_val, max_val, bits)
-                        print(f"DEBUG _patch_var: Variable {target_var.identifier} = [{min_val},{max_val}] (uint{bits})")
                     elif et.startswith('int'):
                         from Domain.Interval import IntegerInterval
                         target_var.value = IntegerInterval(min_val, max_val, bits)
-                        print(f"DEBUG _patch_var: Variable {target_var.identifier} = [{min_val},{max_val}] (int{bits})")
                     elif et == 'bool':
                         from Domain.Interval import BoolInterval
                         target_var.value = BoolInterval(min_val, max_val)
-                        print(f"DEBUG _patch_var: Variable {target_var.identifier} = [{min_val},{max_val}] (bool)")
                     else:
                         target_var.value = new_value
-                        print(f"DEBUG _patch_var: Variable {target_var.identifier} = {new_value} (other)")
                 else:
                     target_var.value = new_value
-                    print(f"DEBUG _patch_var: Variable {target_var.identifier} = {new_value} (no typeInfo)")
             else:
                 target_var.value = new_value
-                print(f"DEBUG _patch_var: Variable {target_var.identifier} = {new_value} (non-list)")
 
     def _bind_if_address_for_debug(self, target_var: Variables):
         """

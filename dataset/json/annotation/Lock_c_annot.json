@@ -138,19 +138,13 @@
     "event": "add"
   },
   {
-    "code": "\n",
-    "startLine": 31,
-    "endLine": 31,
-    "event": "add"
-  },
-  {
     "code": "// @Debugging BEGIN",
     "startLine": 15,
     "endLine": 15,
     "event": "add"
   },
   {
-    "code": "// @GlobalVar block.timsetamp = [1000,1500];",
+    "code": "// @GlobalVar block.timestamp = [1000,1500];",
     "startLine": 16,
     "endLine": 16,
     "event": "add"

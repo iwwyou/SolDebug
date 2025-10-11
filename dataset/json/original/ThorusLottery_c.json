@@ -72,9 +72,33 @@
     "event": "add"
   },
   {
-    "code": "        if(firstWinningNumber <= ticketNumbers[ticketIndex] && ticketNumbers[ticketIndex] < lastWinningNumber)\n            return true;\n        if(lastWinningNumber > tickets.length && ticketNumbers[ticketIndex] < (lastWinningNumber % tickets.length))\n            return true;\n        return false;\n    }\n}\n}",
+    "code": "        if(firstWinningNumber <= ticketNumbers[ticketIndex] && ticketNumbers[ticketIndex] < lastWinningNumber) {\n}",
     "startLine": 14,
-    "endLine": 21,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "            return true;",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "        if(lastWinningNumber > tickets.length && ticketNumbers[ticketIndex] < (lastWinningNumber % tickets.length)) {\n}",
+    "startLine": 17,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "            return true;",
+    "startLine": 18,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "        return false;",
+    "startLine": 20,
+    "endLine": 20,
     "event": "add"
   }
 ]

@@ -280,7 +280,6 @@ class VariableEnv:
             new = copy.copy(v1)
             # ★ v1.value가 Variables인 경우 방어 처리 (잘못된 초기화 감지)
             if isinstance(v1.value, Variables):
-                print(f"WARNING: {v1.identifier}.value is Variables object (should be Interval or primitive)")
                 new.value = v1.value  # 그대로 유지
             else:
                 new.value = VariableEnv._merge_values(v1.value, v2.value, mode)
@@ -352,7 +351,6 @@ class VariableEnv:
             for k, v in env.items():
                 # 방어 코드: v가 Variables 객체가 아니면 건너뛰기
                 if not hasattr(v, 'identifier'):
-                    print(f"WARNING: env['{k}'] has type {type(v)} instead of Variables: {v}")
                     continue
                 rm._flatten_var(v, v.identifier, out)
             return out

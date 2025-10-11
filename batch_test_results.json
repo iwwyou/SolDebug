@@ -1,16 +1,16 @@
 {
   "summary": {
     "total_files": 30,
-    "successful": 12,
-    "errors": 18,
-    "total_time": 6.964280366897583,
-    "avg_time": 0.2321426788965861
+    "successful": 14,
+    "errors": 16,
+    "total_time": 5.707585096359253,
+    "avg_time": 0.19025283654530842
   },
   "results": [
     {
       "filename": "AloeBlend_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 0.12214279174804688,
+      "execution_time": 0.1422252655029297,
       "error_message": "",
       "num_records": 23,
       "analysis_count": 7,
@@ -112,7 +112,7 @@
     {
       "filename": "Amoss_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 0.13544178009033203,
+      "execution_time": 0.18956398963928223,
       "error_message": "",
       "num_records": 22,
       "analysis_count": 3,
@@ -161,7 +161,7 @@
     {
       "filename": "AOC_BEP_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 1.9488556385040283,
+      "execution_time": 1.5606915950775146,
       "error_message": "",
       "num_records": 27,
       "analysis_count": 5,
@@ -236,7 +236,7 @@
     {
       "filename": "ATIDStaking_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 0.44277143478393555,
+      "execution_time": 0.3760061264038086,
       "error_message": "",
       "num_records": 56,
       "analysis_count": 11,
@@ -389,7 +389,7 @@
     {
       "filename": "AvatarArtMarketPlace_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 1.1914517879486084,
+      "execution_time": 0.905064582824707,
       "error_message": "",
       "num_records": 18,
       "analysis_count": 4,
@@ -451,7 +451,7 @@
     {
       "filename": "Balancer_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 1.4426558017730713,
+      "execution_time": 1.201505184173584,
       "error_message": "",
       "num_records": 16,
       "analysis_count": 2,
@@ -487,7 +487,7 @@
     {
       "filename": "BitBookStake_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 0.02915167808532715,
+      "execution_time": 0.02201533317565918,
       "error_message": "",
       "num_records": 11,
       "analysis_count": 1,
@@ -510,7 +510,7 @@
     {
       "filename": "CitrusToken_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 0.055538177490234375,
+      "execution_time": 0.044510602951049805,
       "error_message": "",
       "num_records": 17,
       "analysis_count": 4,
@@ -571,17 +571,57 @@
     },
     {
       "filename": "Claim_c_annot.json",
-      "status": "ERROR",
-      "execution_time": 0.027631282806396484,
-      "error_message": "ValueError: No CFG nodes found at line 12 for context 'else_if'",
+      "status": "SUCCESS",
+      "execution_time": 0.07348275184631348,
+      "error_message": "",
       "num_records": 20,
-      "analysis_count": 0,
-      "analysis_result": null
+      "analysis_count": 3,
+      "analysis_result": [
+        {
+          "line_range": "10-10",
+          "analysis": {
+            "10": [
+              {
+                "kind": "return",
+                "vars": {
+                  "None": "[0,1157920892373161954235709850086879078532699846656405640394575840079131296399]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "12-12",
+          "analysis": {
+            "12": [
+              {
+                "kind": "return",
+                "vars": {
+                  "claimable[user]": "[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "15-15",
+          "analysis": {
+            "15": [
+              {
+                "kind": "return",
+                "vars": {
+                  "0": "[0,0]"
+                }
+              }
+            ]
+          }
+        }
+      ]
     },
     {
       "filename": "CoreVoting_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.005645036697387695,
+      "execution_time": 0.004998683929443359,
       "error_message": "ValueError: Function context not found for simple statement at line 10",
       "num_records": 15,
       "analysis_count": 0,
@@ -590,7 +630,7 @@
     {
       "filename": "Core_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.005007505416870117,
+      "execution_time": 0.004998922348022461,
       "error_message": "ValueError: This 'governorMap' is may be elementary variable but may not be declared",
       "num_records": 26,
       "analysis_count": 0,
@@ -599,7 +639,7 @@
     {
       "filename": "Dai_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 0.2032008171081543,
+      "execution_time": 0.1714341640472412,
       "error_message": "",
       "num_records": 27,
       "analysis_count": 1,
@@ -622,7 +662,7 @@
     {
       "filename": "DapiServer_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.09781074523925781,
+      "execution_time": 0.07872557640075684,
       "error_message": "ValueError: LHS cannot be resolved to a local variable even with debug mode.",
       "num_records": 15,
       "analysis_count": 0,
@@ -631,7 +671,7 @@
     {
       "filename": "DeltaNeutralPancakeWorker02_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 0.23104572296142578,
+      "execution_time": 0.14592194557189941,
       "error_message": "",
       "num_records": 23,
       "analysis_count": 9,
@@ -754,7 +794,7 @@
     {
       "filename": "Dripper_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.005007266998291016,
+      "execution_time": 0.003992557525634766,
       "error_message": "ValueError: Function context not found for simple statement at line 12",
       "num_records": 15,
       "analysis_count": 0,
@@ -763,7 +803,7 @@
     {
       "filename": "Edentoken_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 0.2082657814025879,
+      "execution_time": 0.14143943786621094,
       "error_message": "",
       "num_records": 26,
       "analysis_count": 7,
@@ -864,7 +904,7 @@
     {
       "filename": "GovStakingStorage_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.009821176528930664,
+      "execution_time": 0.008000612258911133,
       "error_message": "ValueError: This 'allowed' is may be elementary variable but may not be declared",
       "num_records": 38,
       "analysis_count": 0,
@@ -873,7 +913,7 @@
     {
       "filename": "GreenHouse_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.0052759647369384766,
+      "execution_time": 0.004003047943115234,
       "error_message": "ValueError: Contract context not found for line 8",
       "num_records": 17,
       "analysis_count": 0,
@@ -882,7 +922,7 @@
     {
       "filename": "LockupContract_c_annot.json",
       "status": "SUCCESS",
-      "execution_time": 0.13125944137573242,
+      "execution_time": 0.07222390174865723,
       "error_message": "",
       "num_records": 26,
       "analysis_count": 7,
@@ -982,17 +1022,83 @@
     },
     {
       "filename": "Lock_c_annot.json",
-      "status": "ERROR",
-      "execution_time": 0.24356412887573242,
-      "error_message": "ValueError: [DebugGlobalVar] invalid global 'block.timsetamp'",
-      "num_records": 33,
-      "analysis_count": 0,
-      "analysis_result": null
+      "status": "SUCCESS",
+      "execution_time": 0.23087024688720703,
+      "error_message": "",
+      "num_records": 32,
+      "analysis_count": 5,
+      "analysis_result": [
+        {
+          "line_range": "16-16",
+          "analysis": {
+            "16": [
+              {
+                "kind": "varDeclaration",
+                "vars": {
+                  "_totalLockRemain": "[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "19-19",
+          "analysis": {
+            "19": [
+              {
+                "kind": "assignment",
+                "vars": {
+                  "_pending": "[1,115792089237316195423570985008687907853269984665640564039457584007913129639935]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "22-22",
+          "analysis": {
+            "22": [
+              {
+                "kind": "varDeclaration",
+                "vars": {
+                  "_nUnlock": "[6,6]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "23-23",
+          "analysis": {
+            "23": [
+              {
+                "kind": "assignment",
+                "vars": {
+                  "_pending": "[0,0]"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "line_range": "27-27",
+          "analysis": {
+            "27": [
+              {
+                "kind": "assignment",
+                "vars": {
+                  "_pending": "[2,115792089237316195423570985008687907853269984665640564039457584007913129639935]"
+                }
+              }
+            ]
+          }
+        }
+      ]
     },
     {
       "filename": "Meter_flat_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.014290571212768555,
+      "execution_time": 0.010943412780761719,
       "error_message": "KeyError: '_beforeTokenTransfer'",
       "num_records": 18,
       "analysis_count": 0,
@@ -1001,7 +1107,7 @@
     {
       "filename": "MockChainlinkOracle_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.005016803741455078,
+      "execution_time": 0.003006458282470703,
       "error_message": "ValueError: Contract context not found for line 16",
       "num_records": 28,
       "analysis_count": 0,
@@ -1010,7 +1116,7 @@
     {
       "filename": "OptimisticRewards_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.010116338729858398,
+      "execution_time": 0.007002353668212891,
       "error_message": "ValueError: Contract context not found for line 9",
       "num_records": 17,
       "analysis_count": 0,
@@ -1019,7 +1125,7 @@
     {
       "filename": "PercentageFeeModel_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.005242824554443359,
+      "execution_time": 0.0040018558502197266,
       "error_message": "ValueError: Contract context not found for line 12",
       "num_records": 31,
       "analysis_count": 0,
@@ -1028,7 +1134,7 @@
     {
       "filename": "PoolKeeper_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.041174888610839844,
+      "execution_time": 0.03200387954711914,
       "error_message": "ValueError: No CFG nodes found at line 15 for context 'else'",
       "num_records": 20,
       "analysis_count": 0,
@@ -1037,7 +1143,7 @@
     {
       "filename": "QANX_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.12841534614562988,
+      "execution_time": 0.10062241554260254,
       "error_message": "ValueError: This '_balances' is may be elementary variable but may not be declared",
       "num_records": 43,
       "analysis_count": 0,
@@ -1046,7 +1152,7 @@
     {
       "filename": "ThorusBond_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.018391132354736328,
+      "execution_time": 0.015084028244018555,
       "error_message": "ValueError: Contract context not found for line 14",
       "num_records": 19,
       "analysis_count": 0,
@@ -1055,16 +1161,16 @@
     {
       "filename": "ThorusLottery_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.0062062740325927734,
+      "execution_time": 0.0035886764526367188,
       "error_message": "AttributeError: 'NoneType' object has no attribute 'startswith'",
-      "num_records": 20,
+      "num_records": 24,
       "analysis_count": 0,
       "analysis_result": null
     },
     {
       "filename": "TimeLockPool_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.043987274169921875,
+      "execution_time": 0.034207820892333984,
       "error_message": "AttributeError: 'NoneType' object has no attribute 'startswith'",
       "num_records": 14,
       "analysis_count": 0,
@@ -1073,7 +1179,7 @@
     {
       "filename": "WASTR_c_annot.json",
       "status": "ERROR",
-      "execution_time": 0.14989495277404785,
+      "execution_time": 0.11544966697692871,
       "error_message": "AttributeError: 'NoneType' object has no attribute 'typeName'",
       "num_records": 23,
       "analysis_count": 0,
@@ -1082,14 +1188,12 @@
   ],
   "error_categories": {
     "ValueError": [
-      "Claim_c_annot.json",
       "CoreVoting_c_annot.json",
       "Core_c_annot.json",
       "DapiServer_c_annot.json",
       "Dripper_c_annot.json",
       "GovStakingStorage_c_annot.json",
       "GreenHouse_c_annot.json",
-      "Lock_c_annot.json",
       "MockChainlinkOracle_c_annot.json",
       "OptimisticRewards_c_annot.json",
       "PercentageFeeModel_c_annot.json",

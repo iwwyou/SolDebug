@@ -61,14 +61,14 @@
   },
   {
     "code": "else if (block.timestamp >= (startTime + locktime)) {\n}",
-    "startLine": 12,
-    "endLine": 13,
+    "startLine": 11,
+    "endLine": 12,
     "event": "add"
   },
   {
     "code": "            return claimable[user];",
-    "startLine": 13,
-    "endLine": 13,
+    "startLine": 12,
+    "endLine": 12,
     "event": "add"
   },
   {

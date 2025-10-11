@@ -240,6 +240,7 @@ class DynamicCFGBuilder:
             self,
             *,
             prev_cond: CFGNode,
+            outer_join: CFGNode | None,  # ★ 추가: get_current_block에서 전달받음
             condition_expr: Expression,
             false_base_env: dict[str, Variables],  # prev False 분기 기본 env
             true_env: dict[str, Variables],
@@ -290,12 +291,9 @@ class DynamicCFGBuilder:
         G.add_edge(t_blk, local_join)
         G.add_edge(f_blk, local_join)
 
-        # ③ outer-join: 헤딩 라인에서 '위로' 첫 join을 찾되, 현재 라인은 건너뜀
-        outer_join = self.find_outer_join_near(anchor_line=line_no, fcfg=fcfg,
-                                               direction="backward", include_anchor=False) \
-                     or self._outer_join_from_graph(prev_cond, fcfg)
+        # ③ outer-join: 이미 get_current_block에서 찾아서 전달받음
         if outer_join is None:
-            raise ValueError("else-if: outer join not found via line-scan/graph")
+            raise ValueError("else-if: outer join not found (passed from get_current_block)")
 
         G.add_edge(local_join, outer_join)
 
@@ -319,6 +317,7 @@ class DynamicCFGBuilder:
             self,
             *,
             cond_node: CFGNode,
+            outer_join: CFGNode | None,  # ★ 추가: get_current_block에서 전달받음
             else_env: dict[str, Variables],
             line_no: int,
             fcfg: FunctionCFG,
@@ -339,13 +338,13 @@ class DynamicCFGBuilder:
                 G.remove_edge(old_false, nxt)
             G.remove_node(old_false)
 
-        # ② target-join: 그래프 기반 검색을 우선, 실패 시 라인 스캔
-        # shift로 인해 join이 앞/뒤로 이동했을 수 있으므로 both 방향 검색
-        target_join = self._outer_join_from_graph(cond_node, fcfg) \
-                      or self.find_outer_join_near(anchor_line=line_no, fcfg=fcfg,
-                                                   direction="both", include_anchor=True)
+        # ② target-join: get_current_block에서 전달받은 것을 우선 사용
+        target_join = outer_join
         if target_join is None:
-            raise ValueError("else: target join not found via line-scan/graph")
+            # fallback: 그래프 기반 검색
+            target_join = self._outer_join_from_graph(cond_node, fcfg)
+        if target_join is None:
+            raise ValueError("else: target join not found (passed from get_current_block)")
 
         # ③ else 블록 생성 및 연결
         else_blk = CFGNode(f"else_block_{line_no}", branch_node=True, is_true_branch=False, src_line=line_no
@@ -1174,7 +1173,7 @@ class DynamicCFGBuilder:
         
         return new_block
 
-    def get_current_block(self, context: str = "statement") -> CFGNode:
+    def get_current_block(self, context: str = "statement") :
         """
         Return the predecessor anchor where a new statement-block will be inserted,
         or the condition node for special contexts (else/else-if/catch).
@@ -1259,10 +1258,19 @@ class DynamicCFGBuilder:
             if not L_nodes:
                 raise ValueError(f"No CFG nodes found at line {L_start} for context '{context}'")
 
+            # ★ L_nodes에서 outer join 찾기 (else_if/else의 경우)
+            found_outer_join = None
+            if context in ["else_if", "else"]:
+                for n in L_nodes:
+                    if _is_join(n):
+                        found_outer_join = n
+                        break
+
             # BFS through predecessors to find target node
             from collections import deque
             visited = set()
             queue = deque(L_nodes)
+            found_cond = None
 
             while queue:
                 node = queue.popleft()
@@ -1277,25 +1285,37 @@ class DynamicCFGBuilder:
                     if context in ["else_if", "else"]:
                         # Looking for if/else-if condition
                         if node_type in ["if", "else if"]:
-                            return node
+                            found_cond = node
+                            # ★ outer join과 함께 반환
+                            if found_outer_join is None:
+                                # fallback: 그래프에서 찾기
+                                found_outer_join = self._outer_join_from_graph(found_cond, fcfg)
+                            return (found_cond, found_outer_join)
                     elif context == "catch":
                         # Looking for try condition
                         if node_type == "try":
-                            return node
+                            # catch는 outer join 필요시 여기서도 찾아서 반환
+                            catch_outer_join = None
+                            for n in L_nodes:
+                                if _is_join(n):
+                                    catch_outer_join = n
+                                    break
+                            if catch_outer_join is not None:
+                                return (node, catch_outer_join)
+                            else:
+                                return node
 
                 # Continue searching predecessors
                 for pred in G.predecessors(node):
                     if pred not in visited:
                         queue.append(pred)
 
-            raise ValueError(f"No matching condition node found for context '{context}' at line {L_start}")
+            if found_cond is None:
+                raise ValueError(f"No matching condition node found for context '{context}' at line {L_start}")
 
         # ========== Regular statement context ==========
         # Look at L+1 node (L_end + 1)
         L_plus_1_node = _line_first(L_end + 1)
-
-        # ★ DEBUG: if 문장 처리 시 디버깅
-        print(f"DEBUG get_current_block: L_start={L_start}, L_end={L_end}, L+1_node={L_plus_1_node.name if L_plus_1_node else None}")
 
         if L_plus_1_node is None:
             # L+1 is empty, use EXIT
@@ -1304,12 +1324,10 @@ class DynamicCFGBuilder:
         # Check if L+1 is loop-exit or join
         is_exit = _is_loop_exit(L_plus_1_node)
         is_join = _is_join(L_plus_1_node)
-        print(f"DEBUG get_current_block: L+1={L_plus_1_node.name}, is_exit={is_exit}, is_join={is_join}")
 
         if _is_loop_exit(L_plus_1_node) or _is_join(L_plus_1_node):
             # Look at L-1 nodes (L_start - 1)
             L_minus_1_nodes = _line_nodes(L_start - 1)
-            print(f"DEBUG get_current_block: L-1={L_start - 1}, nodes={[n.name for n in L_minus_1_nodes]}")
 
             if not L_minus_1_nodes:
                 # L-1 empty, return first predecessor of L+1
@@ -1329,27 +1347,20 @@ class DynamicCFGBuilder:
                     return cond_node
             else:
                 # L-1 is not cond: return last L-1 node
-                result = L_minus_1_nodes[-1]
-                print(f"DEBUG get_current_block: Returning L-1 node: {result.name}")
-                return result
+                return L_minus_1_nodes[-1]
         else:
             # L+1 is not loop-exit/join: return L+1's predecessor
             preds = list(G.predecessors(L_plus_1_node))
-            print(f"DEBUG get_current_block: L+1 predecessors={[p.name for p in preds]}")
 
             if len(preds) == 1:
-                result = preds[0]
-                print(f"DEBUG get_current_block: Returning single predecessor: {result.name}")
-                return result
+                return preds[0]
             elif len(preds) > 1:
                 # Multiple predecessors (shouldn't happen for regular statement)
                 # Return the one closest to current line
                 def distance(n: CFGNode):
                     ln = getattr(n, "src_line", None)
                     return abs((ln or 0) - L_start) if ln is not None else 999999
-                result = min(preds, key=distance)
-                print(f"DEBUG get_current_block: Returning closest predecessor: {result.name}")
-                return result
+                return min(preds, key=distance)
             else:
                 # No predecessors, return ENTRY
                 return fcfg.get_entry_node()

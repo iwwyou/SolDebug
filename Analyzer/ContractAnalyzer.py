@@ -1246,7 +1246,8 @@ class ContractAnalyzer:
             raise ValueError("No active function CFG.")
         self.current_target_function_cfg = fcfg
 
-        prev_cond = self.builder.get_current_block(context="else_if")
+        # ★ get_current_block이 (prev_cond, outer_join) 튜플을 리턴
+        prev_cond, outer_join = self.builder.get_current_block(context="else_if")
         if prev_cond is None:
             raise ValueError("else-if used without a preceding if/else-if.")
 
@@ -1268,6 +1269,7 @@ class ContractAnalyzer:
 
         local_join = self.builder.build_else_if_statement(
             prev_cond=prev_cond,
+            outer_join=outer_join,  # ★ 전달
             condition_expr=condition_expr,
             false_base_env=false_base_env,  # ← 변경된 시그니처
             true_env=true_env,
@@ -1297,7 +1299,8 @@ class ContractAnalyzer:
         fcfg = self.current_target_function_cfg
 
         # ── 2. 직전 if / else-if 노드 찾기 -----------------------------------
-        cond_node = self.builder.get_current_block(context="else")
+        # ★ get_current_block이 (cond_node, outer_join) 튜플을 리턴
+        cond_node, outer_join = self.builder.get_current_block(context="else")
         if cond_node is None:
             raise ValueError("No preceding if/else-if for this 'else'.")
 
@@ -1320,6 +1323,7 @@ class ContractAnalyzer:
         # 🔁 join 재사용, else를 join에 연결하고 join 반환
         join = self.builder.build_else_statement(
             cond_node=cond_node,
+            outer_join=outer_join,  # ★ 전달
             else_env=else_env,
             line_no=self.current_start_line,
             fcfg=fcfg,
@@ -1848,11 +1852,32 @@ class ContractAnalyzer:
         if not fcfg:
             raise ValueError("No current target function for catch.")
 
-        found = self.builder.find_open_try_for_catch(line_no=self.current_start_line, fcfg=fcfg)
-        if found is None:
+        # ★ get_current_block을 사용해서 try condition과 join 찾기
+        result = self.builder.get_current_block(context="catch")
+        if result is None:
             raise ValueError("`catch` without preceding `try`.")
 
-        cond, false_stub, join = found
+        # catch는 튜플 또는 단일 노드를 반환할 수 있음
+        if isinstance(result, tuple):
+            cond, join = result
+        else:
+            cond = result
+            # join을 find_open_try_for_catch로 찾기
+            found = self.builder.find_open_try_for_catch(line_no=self.current_start_line, fcfg=fcfg)
+            if found is None:
+                raise ValueError("`catch`: try found but join not found.")
+            _, false_stub, join = found
+
+        # false_stub 찾기 (attach_catch_clause에서 필요)
+        false_stub = None
+        for s in fcfg.graph.successors(cond):
+            if fcfg.graph[cond][s].get("condition") is False:
+                false_stub = s
+                break
+
+        if false_stub is None:
+            raise ValueError("`catch`: false stub not found for try condition.")
+
         c_entry, c_end = self.builder.attach_catch_clause(
             cond=cond, false_stub=false_stub, join=join,
             line_no=self.current_start_line, fcfg=fcfg, line_info=self.line_info
