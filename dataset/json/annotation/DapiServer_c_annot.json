@@ -72,7 +72,7 @@
     "event": "add"
   },
   {
-    "code": "// @LocalVar initalValue = [300,350];",
+    "code": "// @LocalVar initialValue = [300,350];",
     "startLine": 6,
     "endLine": 6,
     "event": "add"

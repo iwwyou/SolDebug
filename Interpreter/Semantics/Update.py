@@ -102,10 +102,11 @@ class Update :
             self._patch_var_with_new_value(target, new_val)
 
             if log :
-                line_no = self.an.current_start_line
+                # Note: line_no는 함수 파라미터가 아니라 로컬 변수로 사용
+                actual_line = self.an.current_start_line
                 # 🔸 즉시 기록
                 self.an.recorder.record_assignment(
-                    line_no=line_no,
+                    line_no=actual_line,
                     expr=expr,
                     var_obj=target,
                     base_obj=caller_object,
@@ -342,9 +343,10 @@ class Update :
             nested.value = self.compound_assignment(nested.value, rVal, operator)
 
             if log :
+                actual_line = line_no if line_no is not None else self.an.current_start_line
                 self.an.recorder.record_assignment(
-                    line_no=self.an.current_start_line,
-                    expr=expr,
+                    line_no=actual_line,
+                    expr=top_expr if top_expr else expr,
                     var_obj=nested,
                     base_obj=base_obj,
                 )

@@ -76,13 +76,13 @@ def simulate_inputs(records):
 
 test_inputs = [
   {
-    "code": "contract DapiServer {\n}",
+    "code": "contract GovStakingStorage {    \n}",
     "startLine": 1,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "    uint256 public constant override HUNDRED_PERCENT = 1e8;",
+    "code": "    uint256 totalRewardMultiplier;",
     "startLine": 2,
     "endLine": 2,
     "event": "add"
@@ -94,75 +94,213 @@ test_inputs = [
     "event": "add"
   },
   {
-    "code": "    function calculateUpdateInPercentage(int224 initialValue, int224 updatedValue) private pure returns (uint256 updateInPercentage) {\n}",
+    "code": "    struct UserInfo {\n}",
     "startLine": 4,
     "endLine": 5,
     "event": "add"
   },
   {
-    "code": "        int256 delta = int256(updatedValue) - int256(initialValue);",
+    "code": "        uint256 amount; ",
     "startLine": 5,
     "endLine": 5,
     "event": "add"
   },
   {
-    "code": "        uint256 absoluteDelta = delta > 0 ? uint256(delta) : uint256(-delta);",
+    "code": "        uint256 lockStart; ",
     "startLine": 6,
     "endLine": 6,
     "event": "add"
   },
   {
-    "code": "        uint256 absoluteInitialValue = initialValue > 0 ? uint256(int256(initialValue)) : uint256(-int256(initialValue));",
+    "code": "        uint256 lockPeriod; ",
     "startLine": 7,
     "endLine": 7,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "        uint256 lastClaimed; ",
     "startLine": 8,
     "endLine": 8,
     "event": "add"
   },
   {
-    "code": "        if (absoluteInitialValue == 0) {\n}",
+    "code": "        uint256 unclaimedAmount; ",
     "startLine": 9,
-    "endLine": 10,
+    "endLine": 9,
     "event": "add"
   },
   {
-    "code": "            absoluteInitialValue = 1;",
+    "code": "        uint256 rewardRate; ",
     "startLine": 10,
     "endLine": 10,
     "event": "add"
   },
   {
-    "code": "        updateInPercentage = (absoluteDelta * HUNDRED_PERCENT) / absoluteInitialValue;",
+    "code": "        uint256 rewardMultiplier; ",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 userRewardPerTokenPaid; ",
     "startLine": 12,
     "endLine": 12,
     "event": "add"
   },
   {
+    "code": "        uint256 index;",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "    mapping(address => UserInfo) public userInfo;    ",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  },
+  {
+    "code": "    mapping(address => bool) public allowed;",
+    "startLine": 17,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 18,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "    modifier isAllowed() {\n}",
+    "startLine": 19,
+    "endLine": 20,
+    "event": "add"
+  },
+  {
+    "code": "        require(allowed[msg.sender], \"sender is not allowed to write\");",
+    "startLine": 20,
+    "endLine": 20,
+    "event": "add"
+  },
+  {
+    "code": "        _;",
+    "startLine": 21,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 23,
+    "endLine": 23,
+    "event": "add"
+  },
+  {
+    "code": "    function updateRewardMultiplier(\n        address user,\n        uint256 oldRate,\n        uint256 newRate,\n        uint256 passedTime,\n        uint256 oldLockPeriod,\n        uint256 newLockPeriod,\n        uint256 oldAmount,\n        uint256 newAmount\n    ) external isAllowed {\n}",
+    "startLine": 24,
+    "endLine": 34,
+    "event": "add"
+  },
+  {
+    "code": "        UserInfo storage info = userInfo[user];",
+    "startLine": 34,
+    "endLine": 34,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 toRemove = ((((oldLockPeriod - passedTime) / 1 weeks) *\n            oldRate) * oldAmount) / 100000;",
+    "startLine": 35,
+    "endLine": 36,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 toAdd = (((newLockPeriod / 1 weeks) * newRate) * newAmount) /\n            100000;",
+    "startLine": 37,
+    "endLine": 38,
+    "event": "add"
+  },
+  {
+    "code": "        info.rewardMultiplier = info.rewardMultiplier + toAdd - toRemove;",
+    "startLine": 39,
+    "endLine": 39,
+    "event": "add"
+  },
+  {
+    "code": "        totalRewardMultiplier = totalRewardMultiplier + toAdd - toRemove;",
+    "startLine": 40,
+    "endLine": 40,
+    "event": "add"
+  },
+  {
     "code": "// @Debugging BEGIN",
-    "startLine": 5,
-    "endLine": 5,
+    "startLine": 34,
+    "endLine": 34,
     "event": "add"
   },
   {
-    "code": "// @LocalVar initalValue = [300,350];",
-    "startLine": 6,
-    "endLine": 6,
+    "code": "// @StateVar info.rewardMultiplier = [100,200];",
+    "startLine": 35,
+    "endLine": 35,
     "event": "add"
   },
   {
-    "code": "// @LocalVar updatedValue = [500,550];",
-    "startLine": 7,
-    "endLine": 7,
+    "code": "// @StateVar totalRewardMultiplier = [50,70];",
+    "startLine": 36,
+    "endLine": 36,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar oldRate = [2,3];",
+    "startLine": 37,
+    "endLine": 37,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar newRate = [4,5];",
+    "startLine": 38,
+    "endLine": 38,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar passedTime = [10,15];",
+    "startLine": 39,
+    "endLine": 39,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar oldLockPeriod = [10,15];",
+    "startLine": 40,
+    "endLine": 40,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar newLockPeriod = [40,50];",
+    "startLine": 41,
+    "endLine": 41,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar oldAmount = [6,7];",
+    "startLine": 42,
+    "endLine": 42,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar newAmount = [8,10];",
+    "startLine": 43,
+    "endLine": 43,
     "event": "add"
   },
   {
     "code": "// @Debugging END",
-    "startLine": 8,
-    "endLine": 8,
+    "startLine": 44,
+    "endLine": 44,
     "event": "add"
   }
 ]

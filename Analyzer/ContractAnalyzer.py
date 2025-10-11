@@ -160,6 +160,10 @@ class ContractAnalyzer:
             return s.startswith("// @")  # 디버그 주석만 분석
         if s.endswith(";"):
             return True  # 일반 문장
+        # 여러 줄짜리 함수/modifier/constructor 정의의 끝 부분
+        # 예: "    ) external isAllowed {"
+        if ')' in s and '{' in s and not s.startswith(('if', 'for', 'while', 'else')):
+            return True
         # 블록 헤더 키워드
         return bool(re.match(
             r"^(abstract\s+contract|contract|library|interface|function|constructor|modifier|"
@@ -329,6 +333,32 @@ class ContractAnalyzer:
                     self.current_target_contract = self.find_contract_context(start_line)
 
         elif '{' in stripped_code: # definition 및 block 관련
+            # 여러 줄짜리 함수/modifier/constructor 정의의 마지막 줄일 수 있음
+            # 예: "    ) external isAllowed {"
+            # 이 경우 위로 올라가서 function/modifier/constructor를 찾아야 함
+            if ')' in stripped_code and not stripped_code.startswith(('function', 'constructor', 'modifier', 'contract', 'struct', 'enum')):
+                # 위로 올라가서 function/modifier/constructor 키워드 찾기
+                for check_line in range(start_line - 1, 0, -1):
+                    check_code = self.full_code_lines.get(check_line, '').strip()
+                    if check_code.startswith('function'):
+                        self.current_context_type = 'function'
+                        self.current_target_contract = self.find_contract_context(start_line)
+                        self.current_target_function = None  # 아직 함수가 생성되지 않음
+                        return
+                    elif check_code.startswith('modifier'):
+                        self.current_context_type = 'modifier'
+                        self.current_target_contract = self.find_contract_context(start_line)
+                        return
+                    elif check_code.startswith('constructor'):
+                        self.current_context_type = 'constructor'
+                        self.current_target_contract = self.find_contract_context(start_line)
+                        return
+                    # 빈 줄이나 파라미터 줄은 계속 위로
+                    if not check_code or check_code.startswith(('address', 'uint', 'int', 'bool', 'string', 'bytes')):
+                        continue
+                    else:
+                        break  # 다른 코드를 만나면 중단
+
             # Determine context type first
             ctx = self.determine_top_level_context(new_code)
 
@@ -352,8 +382,10 @@ class ContractAnalyzer:
             self.current_target_function = self.find_function_context(start_line)
 
 
-        # 최종적으로 context가 제대로 파악되지 않은 경우 기본값 처리
-        if not self.current_target_contract:
+        # 최종적으로 context가 제대로 파악되지 않은 경우
+        # 여러 줄짜리 정의문의 중간 줄이거나, 컨텍스트 분석이 불필요한 줄은 조용히 넘어감
+        if not self.current_target_contract and self.current_context_type:
+            # context_type은 설정되었는데 contract를 찾지 못한 경우에만 오류
             raise ValueError(f"Contract context not found for line {start_line}")
         if self.current_context_type == "simpleStatement" and not self.current_target_function:
             raise ValueError(f"Function context not found for simple statement at line {start_line}")

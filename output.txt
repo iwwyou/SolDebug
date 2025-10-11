@@ -1,112 +1,315 @@
-DEBUG: Total records to process: 17
-DEBUG: Processing record 0/16
-target code :  contract BEP20 {
+DEBUG: Total records to process: 38
+DEBUG: Processing record 0/37
+DEBUG find_contract_context: Searching from line 1
+  Line 1: open=1, close=0, cfg_nodes=0, code=contract GovStakingStorage {    
+DEBUG find_contract_context: No contract found!
+target code :  contract GovStakingStorage {    
 }
 --------------------------------------------------------
-DEBUG: Processing record 1/16
-target code :      mapping (address=>uint256) balances;    
+DEBUG: Processing record 1/37
+DEBUG find_contract_context: Searching from line 2
+  Line 2: open=0, close=0, cfg_nodes=0, code=    uint256 totalRewardMultiplier;
+  Line 1: open=1, close=0, cfg_nodes=1, code=contract GovStakingStorage {    
+  -> Found context_type=contract
+target code :      uint256 totalRewardMultiplier;
 --------------------------------------------------------
-DEBUG: Processing record 2/16
+DEBUG: Processing record 2/37
 target code :  
 
 --------------------------------------------------------
-DEBUG: Processing record 3/16
-target code :      mapping (address=>mapping (address=>uint256)) allowed;
+DEBUG: Processing record 3/37
+DEBUG find_contract_context: Searching from line 4
+  Line 4: open=1, close=0, cfg_nodes=0, code=    struct UserInfo {
+  Line 3: open=0, close=0, cfg_nodes=0, code=
+  Line 2: open=0, close=0, cfg_nodes=1, code=    uint256 totalRewardMultiplier;
+  Line 1: open=1, close=0, cfg_nodes=1, code=contract GovStakingStorage {    
+  -> Found context_type=contract
+target code :      struct UserInfo {
+}
 --------------------------------------------------------
-DEBUG: Processing record 4/16
+DEBUG: Processing record 4/37
+DEBUG find_contract_context: Searching from line 5
+  Line 5: open=0, close=0, cfg_nodes=0, code=        uint256 amount; 
+  Line 4: open=1, close=0, cfg_nodes=1, code=    struct UserInfo {
+  -> Found context_type=struct
+  Line 3: open=0, close=0, cfg_nodes=0, code=
+  Line 2: open=0, close=0, cfg_nodes=1, code=    uint256 totalRewardMultiplier;
+  Line 1: open=1, close=0, cfg_nodes=1, code=contract GovStakingStorage {    
+  -> Found context_type=contract
+target code :          uint256 amount; 
+--------------------------------------------------------
+DEBUG: Processing record 5/37
+DEBUG find_contract_context: Searching from line 6
+  Line 6: open=0, close=0, cfg_nodes=0, code=        uint256 lockStart; 
+  Line 5: open=0, close=0, cfg_nodes=0, code=        uint256 amount; 
+  Line 4: open=1, close=0, cfg_nodes=1, code=    struct UserInfo {
+  -> Found context_type=struct
+  Line 3: open=0, close=0, cfg_nodes=0, code=
+  Line 2: open=0, close=0, cfg_nodes=1, code=    uint256 totalRewardMultiplier;
+  Line 1: open=1, close=0, cfg_nodes=1, code=contract GovStakingStorage {    
+  -> Found context_type=contract
+target code :          uint256 lockStart; 
+--------------------------------------------------------
+DEBUG: Processing record 6/37
+DEBUG find_contract_context: Searching from line 7
+  Line 7: open=0, close=0, cfg_nodes=0, code=        uint256 lockPeriod; 
+  Line 6: open=0, close=0, cfg_nodes=0, code=        uint256 lockStart; 
+  Line 5: open=0, close=0, cfg_nodes=0, code=        uint256 amount; 
+  Line 4: open=1, close=0, cfg_nodes=1, code=    struct UserInfo {
+  -> Found context_type=struct
+  Line 3: open=0, close=0, cfg_nodes=0, code=
+  Line 2: open=0, close=0, cfg_nodes=1, code=    uint256 totalRewardMultiplier;
+  Line 1: open=1, close=0, cfg_nodes=1, code=contract GovStakingStorage {    
+  -> Found context_type=contract
+target code :          uint256 lockPeriod; 
+--------------------------------------------------------
+DEBUG: Processing record 7/37
+DEBUG find_contract_context: Searching from line 8
+  Line 8: open=0, close=0, cfg_nodes=0, code=        uint256 lastClaimed; 
+  Line 7: open=0, close=0, cfg_nodes=0, code=        uint256 lockPeriod; 
+  Line 6: open=0, close=0, cfg_nodes=0, code=        uint256 lockStart; 
+  Line 5: open=0, close=0, cfg_nodes=0, code=        uint256 amount; 
+  Line 4: open=1, close=0, cfg_nodes=1, code=    struct UserInfo {
+  -> Found context_type=struct
+  Line 3: open=0, close=0, cfg_nodes=0, code=
+  Line 2: open=0, close=0, cfg_nodes=1, code=    uint256 totalRewardMultiplier;
+  Line 1: open=1, close=0, cfg_nodes=1, code=contract GovStakingStorage {    
+  -> Found context_type=contract
+target code :          uint256 lastClaimed; 
+--------------------------------------------------------
+DEBUG: Processing record 8/37
+DEBUG find_contract_context: Searching from line 9
+  Line 9: open=0, close=0, cfg_nodes=0, code=        uint256 unclaimedAmount; 
+  Line 8: open=0, close=0, cfg_nodes=0, code=        uint256 lastClaimed; 
+  Line 7: open=0, close=0, cfg_nodes=0, code=        uint256 lockPeriod; 
+  Line 6: open=0, close=0, cfg_nodes=0, code=        uint256 lockStart; 
+  Line 5: open=0, close=0, cfg_nodes=0, code=        uint256 amount; 
+  Line 4: open=1, close=0, cfg_nodes=1, code=    struct UserInfo {
+  -> Found context_type=struct
+  Line 3: open=0, close=0, cfg_nodes=0, code=
+  Line 2: open=0, close=0, cfg_nodes=1, code=    uint256 totalRewardMultiplier;
+  Line 1: open=1, close=0, cfg_nodes=1, code=contract GovStakingStorage {    
+  -> Found context_type=contract
+target code :          uint256 unclaimedAmount; 
+--------------------------------------------------------
+DEBUG: Processing record 9/37
+DEBUG find_contract_context: Searching from line 10
+  Line 10: open=0, close=0, cfg_nodes=0, code=        uint256 rewardRate; 
+  Line 9: open=0, close=0, cfg_nodes=0, code=        uint256 unclaimedAmount; 
+  Line 8: open=0, close=0, cfg_nodes=0, code=        uint256 lastClaimed; 
+  Line 7: open=0, close=0, cfg_nodes=0, code=        uint256 lockPeriod; 
+  Line 6: open=0, close=0, cfg_nodes=0, code=        uint256 lockStart; 
+  Line 5: open=0, close=0, cfg_nodes=0, code=        uint256 amount; 
+  Line 4: open=1, close=0, cfg_nodes=1, code=    struct UserInfo {
+  -> Found context_type=struct
+  Line 3: open=0, close=0, cfg_nodes=0, code=
+  Line 2: open=0, close=0, cfg_nodes=1, code=    uint256 totalRewardMultiplier;
+  Line 1: open=1, close=0, cfg_nodes=1, code=contract GovStakingStorage {    
+  -> Found context_type=contract
+target code :          uint256 rewardRate; 
+--------------------------------------------------------
+DEBUG: Processing record 10/37
+DEBUG find_contract_context: Searching from line 11
+  Line 11: open=0, close=0, cfg_nodes=0, code=        uint256 rewardMultiplier; 
+  Line 10: open=0, close=0, cfg_nodes=0, code=        uint256 rewardRate; 
+  Line 9: open=0, close=0, cfg_nodes=0, code=        uint256 unclaimedAmount; 
+  Line 8: open=0, close=0, cfg_nodes=0, code=        uint256 lastClaimed; 
+  Line 7: open=0, close=0, cfg_nodes=0, code=        uint256 lockPeriod; 
+  Line 6: open=0, close=0, cfg_nodes=0, code=        uint256 lockStart; 
+  Line 5: open=0, close=0, cfg_nodes=0, code=        uint256 amount; 
+  Line 4: open=1, close=0, cfg_nodes=1, code=    struct UserInfo {
+  -> Found context_type=struct
+  Line 3: open=0, close=0, cfg_nodes=0, code=
+  Line 2: open=0, close=0, cfg_nodes=1, code=    uint256 totalRewardMultiplier;
+  Line 1: open=1, close=0, cfg_nodes=1, code=contract GovStakingStorage {    
+  -> Found context_type=contract
+target code :          uint256 rewardMultiplier; 
+--------------------------------------------------------
+DEBUG: Processing record 11/37
+DEBUG find_contract_context: Searching from line 12
+  Line 12: open=0, close=0, cfg_nodes=0, code=        uint256 userRewardPerTokenPaid; 
+  Line 11: open=0, close=0, cfg_nodes=0, code=        uint256 rewardMultiplier; 
+  Line 10: open=0, close=0, cfg_nodes=0, code=        uint256 rewardRate; 
+  Line 9: open=0, close=0, cfg_nodes=0, code=        uint256 unclaimedAmount; 
+  Line 8: open=0, close=0, cfg_nodes=0, code=        uint256 lastClaimed; 
+  Line 7: open=0, close=0, cfg_nodes=0, code=        uint256 lockPeriod; 
+  Line 6: open=0, close=0, cfg_nodes=0, code=        uint256 lockStart; 
+  Line 5: open=0, close=0, cfg_nodes=0, code=        uint256 amount; 
+  Line 4: open=1, close=0, cfg_nodes=1, code=    struct UserInfo {
+  -> Found context_type=struct
+  Line 3: open=0, close=0, cfg_nodes=0, code=
+  Line 2: open=0, close=0, cfg_nodes=1, code=    uint256 totalRewardMultiplier;
+  Line 1: open=1, close=0, cfg_nodes=1, code=contract GovStakingStorage {    
+  -> Found context_type=contract
+target code :          uint256 userRewardPerTokenPaid; 
+--------------------------------------------------------
+DEBUG: Processing record 12/37
+DEBUG find_contract_context: Searching from line 13
+  Line 13: open=0, close=0, cfg_nodes=0, code=        uint256 index;
+  Line 12: open=0, close=0, cfg_nodes=0, code=        uint256 userRewardPerTokenPaid; 
+  Line 11: open=0, close=0, cfg_nodes=0, code=        uint256 rewardMultiplier; 
+  Line 10: open=0, close=0, cfg_nodes=0, code=        uint256 rewardRate; 
+  Line 9: open=0, close=0, cfg_nodes=0, code=        uint256 unclaimedAmount; 
+  Line 8: open=0, close=0, cfg_nodes=0, code=        uint256 lastClaimed; 
+  Line 7: open=0, close=0, cfg_nodes=0, code=        uint256 lockPeriod; 
+  Line 6: open=0, close=0, cfg_nodes=0, code=        uint256 lockStart; 
+  Line 5: open=0, close=0, cfg_nodes=0, code=        uint256 amount; 
+  Line 4: open=1, close=0, cfg_nodes=1, code=    struct UserInfo {
+  -> Found context_type=struct
+  Line 3: open=0, close=0, cfg_nodes=0, code=
+  Line 2: open=0, close=0, cfg_nodes=1, code=    uint256 totalRewardMultiplier;
+  Line 1: open=1, close=0, cfg_nodes=1, code=contract GovStakingStorage {    
+  -> Found context_type=contract
+target code :          uint256 index;
+--------------------------------------------------------
+DEBUG: Processing record 13/37
 target code :  
 
 --------------------------------------------------------
-DEBUG: Processing record 5/16
-target code :      function transferFrom(address _from,address _to,uint256 _amount) public returns (bool success) {
+DEBUG: Processing record 14/37
+DEBUG find_contract_context: Searching from line 16
+  Line 16: open=0, close=0, cfg_nodes=0, code=    mapping(address => UserInfo) public userInfo; 
+  Line 15: open=0, close=0, cfg_nodes=0, code=
+  Line 14: open=0, close=1, cfg_nodes=0, code=}
+  Line 13: open=0, close=0, cfg_nodes=0, code=        uint256 index;
+  Line 12: open=0, close=0, cfg_nodes=0, code=        uint256 userRewardPerTokenPaid; 
+  Line 11: open=0, close=0, cfg_nodes=0, code=        uint256 rewardMultiplier; 
+  Line 10: open=0, close=0, cfg_nodes=0, code=        uint256 rewardRate; 
+  Line 9: open=0, close=0, cfg_nodes=0, code=        uint256 unclaimedAmount; 
+  Line 8: open=0, close=0, cfg_nodes=0, code=        uint256 lastClaimed; 
+  Line 7: open=0, close=0, cfg_nodes=0, code=        uint256 lockPeriod; 
+  Line 6: open=0, close=0, cfg_nodes=0, code=        uint256 lockStart; 
+  Line 5: open=0, close=0, cfg_nodes=0, code=        uint256 amount; 
+  Line 4: open=1, close=0, cfg_nodes=1, code=    struct UserInfo {
+  -> Found context_type=struct
+  Line 3: open=0, close=0, cfg_nodes=0, code=
+  Line 2: open=0, close=0, cfg_nodes=1, code=    uint256 totalRewardMultiplier;
+  Line 1: open=1, close=0, cfg_nodes=1, code=contract GovStakingStorage {    
+  -> Found context_type=contract
+target code :      mapping(address => UserInfo) public userInfo;    
+--------------------------------------------------------
+DEBUG: Processing record 15/37
+DEBUG find_contract_context: Searching from line 17
+  Line 17: open=0, close=0, cfg_nodes=0, code=    mapping(address => bool) public allowed;
+  Line 16: open=0, close=0, cfg_nodes=1, code=    mapping(address => UserInfo) public userInfo; 
+  Line 15: open=0, close=0, cfg_nodes=0, code=
+  Line 14: open=0, close=1, cfg_nodes=0, code=}
+  Line 13: open=0, close=0, cfg_nodes=0, code=        uint256 index;
+  Line 12: open=0, close=0, cfg_nodes=0, code=        uint256 userRewardPerTokenPaid; 
+  Line 11: open=0, close=0, cfg_nodes=0, code=        uint256 rewardMultiplier; 
+  Line 10: open=0, close=0, cfg_nodes=0, code=        uint256 rewardRate; 
+  Line 9: open=0, close=0, cfg_nodes=0, code=        uint256 unclaimedAmount; 
+  Line 8: open=0, close=0, cfg_nodes=0, code=        uint256 lastClaimed; 
+  Line 7: open=0, close=0, cfg_nodes=0, code=        uint256 lockPeriod; 
+  Line 6: open=0, close=0, cfg_nodes=0, code=        uint256 lockStart; 
+  Line 5: open=0, close=0, cfg_nodes=0, code=        uint256 amount; 
+  Line 4: open=1, close=0, cfg_nodes=1, code=    struct UserInfo {
+  -> Found context_type=struct
+  Line 3: open=0, close=0, cfg_nodes=0, code=
+  Line 2: open=0, close=0, cfg_nodes=1, code=    uint256 totalRewardMultiplier;
+  Line 1: open=1, close=0, cfg_nodes=1, code=contract GovStakingStorage {    
+  -> Found context_type=contract
+target code :      mapping(address => bool) public allowed;
+--------------------------------------------------------
+DEBUG: Processing record 16/37
+target code :  
+
+--------------------------------------------------------
+DEBUG: Processing record 17/37
+DEBUG find_contract_context: Searching from line 19
+  Line 19: open=1, close=0, cfg_nodes=0, code=    modifier isAllowed() {
+  Line 18: open=0, close=0, cfg_nodes=0, code=
+  Line 17: open=0, close=0, cfg_nodes=1, code=    mapping(address => bool) public allowed;
+  Line 16: open=0, close=0, cfg_nodes=1, code=    mapping(address => UserInfo) public userInfo; 
+  Line 15: open=0, close=0, cfg_nodes=0, code=
+  Line 14: open=0, close=1, cfg_nodes=0, code=}
+  Line 13: open=0, close=0, cfg_nodes=0, code=        uint256 index;
+  Line 12: open=0, close=0, cfg_nodes=0, code=        uint256 userRewardPerTokenPaid; 
+  Line 11: open=0, close=0, cfg_nodes=0, code=        uint256 rewardMultiplier; 
+  Line 10: open=0, close=0, cfg_nodes=0, code=        uint256 rewardRate; 
+  Line 9: open=0, close=0, cfg_nodes=0, code=        uint256 unclaimedAmount; 
+  Line 8: open=0, close=0, cfg_nodes=0, code=        uint256 lastClaimed; 
+  Line 7: open=0, close=0, cfg_nodes=0, code=        uint256 lockPeriod; 
+  Line 6: open=0, close=0, cfg_nodes=0, code=        uint256 lockStart; 
+  Line 5: open=0, close=0, cfg_nodes=0, code=        uint256 amount; 
+  Line 4: open=1, close=0, cfg_nodes=1, code=    struct UserInfo {
+  -> Found context_type=struct
+  Line 3: open=0, close=0, cfg_nodes=0, code=
+  Line 2: open=0, close=0, cfg_nodes=1, code=    uint256 totalRewardMultiplier;
+  Line 1: open=1, close=0, cfg_nodes=1, code=contract GovStakingStorage {    
+  -> Found context_type=contract
+target code :      modifier isAllowed() {
 }
 --------------------------------------------------------
-DEBUG: Processing record 6/16
-target code :          require (balances[_from]>=_amount&&allowed[_from][msg.sender]>=_amount&&_amount>0&&balances[_to]+_amount>balances[_to]);
-DEBUG Update(MemberAccess-Global): NOT recording (log=False) line=7, key=msg.sender
+DEBUG: Processing record 18/37
+DEBUG find_contract_context: Searching from line 20
+  Line 20: open=0, close=0, cfg_nodes=0, code=        require(allowed[msg.sender], "sender is no
+  Line 19: open=1, close=0, cfg_nodes=1, code=    modifier isAllowed() {
+  -> Found context_type=modifier
+  Line 18: open=0, close=0, cfg_nodes=0, code=
+  Line 17: open=0, close=0, cfg_nodes=1, code=    mapping(address => bool) public allowed;
+  Line 16: open=0, close=0, cfg_nodes=1, code=    mapping(address => UserInfo) public userInfo; 
+  Line 15: open=0, close=0, cfg_nodes=0, code=
+  Line 14: open=0, close=1, cfg_nodes=0, code=}
+  Line 13: open=0, close=0, cfg_nodes=0, code=        uint256 index;
+  Line 12: open=0, close=0, cfg_nodes=0, code=        uint256 userRewardPerTokenPaid; 
+  Line 11: open=0, close=0, cfg_nodes=0, code=        uint256 rewardMultiplier; 
+  Line 10: open=0, close=0, cfg_nodes=0, code=        uint256 rewardRate; 
+  Line 9: open=0, close=0, cfg_nodes=0, code=        uint256 unclaimedAmount; 
+  Line 8: open=0, close=0, cfg_nodes=0, code=        uint256 lastClaimed; 
+  Line 7: open=0, close=0, cfg_nodes=0, code=        uint256 lockPeriod; 
+  Line 6: open=0, close=0, cfg_nodes=0, code=        uint256 lockStart; 
+  Line 5: open=0, close=0, cfg_nodes=0, code=        uint256 amount; 
+  Line 4: open=1, close=0, cfg_nodes=1, code=    struct UserInfo {
+  -> Found context_type=struct
+  Line 3: open=0, close=0, cfg_nodes=0, code=
+  Line 2: open=0, close=0, cfg_nodes=1, code=    uint256 totalRewardMultiplier;
+  Line 1: open=1, close=0, cfg_nodes=1, code=contract GovStakingStorage {    
+  -> Found context_type=contract
+target code :          require(allowed[msg.sender], "sender is not allowed to write");
 --------------------------------------------------------
-DEBUG: Processing record 7/16
-target code :          balances[_from]-=_amount;
-[8-8]  analysis ⇒
-  L  8 |     assignment | {'balances[_from]': '[0,115792089237316195423570985008687907853269984665640564039457584007913129639933]'}
+DEBUG: Processing record 19/37
+DEBUG find_contract_context: Searching from line 21
+  Line 21: open=0, close=0, cfg_nodes=0, code=        _;
+  Line 20: open=0, close=0, cfg_nodes=1, code=        require(allowed[msg.sender], "sender is no
+  Line 19: open=1, close=0, cfg_nodes=1, code=    modifier isAllowed() {
+  -> Found context_type=modifier
+  Line 18: open=0, close=0, cfg_nodes=0, code=
+  Line 17: open=0, close=0, cfg_nodes=1, code=    mapping(address => bool) public allowed;
+  Line 16: open=0, close=0, cfg_nodes=1, code=    mapping(address => UserInfo) public userInfo; 
+  Line 15: open=0, close=0, cfg_nodes=0, code=
+  Line 14: open=0, close=1, cfg_nodes=0, code=}
+  Line 13: open=0, close=0, cfg_nodes=0, code=        uint256 index;
+  Line 12: open=0, close=0, cfg_nodes=0, code=        uint256 userRewardPerTokenPaid; 
+  Line 11: open=0, close=0, cfg_nodes=0, code=        uint256 rewardMultiplier; 
+  Line 10: open=0, close=0, cfg_nodes=0, code=        uint256 rewardRate; 
+  Line 9: open=0, close=0, cfg_nodes=0, code=        uint256 unclaimedAmount; 
+  Line 8: open=0, close=0, cfg_nodes=0, code=        uint256 lastClaimed; 
+  Line 7: open=0, close=0, cfg_nodes=0, code=        uint256 lockPeriod; 
+  Line 6: open=0, close=0, cfg_nodes=0, code=        uint256 lockStart; 
+  Line 5: open=0, close=0, cfg_nodes=0, code=        uint256 amount; 
+  Line 4: open=1, close=0, cfg_nodes=1, code=    struct UserInfo {
+  -> Found context_type=struct
+  Line 3: open=0, close=0, cfg_nodes=0, code=
+  Line 2: open=0, close=0, cfg_nodes=1, code=    uint256 totalRewardMultiplier;
+  Line 1: open=1, close=0, cfg_nodes=1, code=contract GovStakingStorage {    
+  -> Found context_type=contract
+target code :          _;
 --------------------------------------------------------
-DEBUG: Processing record 8/16
-target code :          allowed[_from][msg.sender]-=_amount;
-DEBUG Update(MemberAccess-Global): Recording line=9, key=msg.sender, operator=-=, value=UnsignedIntegerInterval([0, 115792089237316195423570985008687907853269984665640564039457584007913129639934])
-DEBUG Update(MemberAccess-Global): Recording line=9, key=msg.sender, operator=-=, value=UnsignedIntegerInterval([0, 115792089237316195423570985008687907853269984665640564039457584007913129639933])
-[9-9]  analysis ⇒
-  L  9 |     assignment | {'allowed[_from][msg.sender]': '[0,115792089237316195423570985008687907853269984665640564039457584007913129639933]'}
---------------------------------------------------------
-DEBUG: Processing record 9/16
-target code :          balances[_to]+=_amount;        
-[10-10]  analysis ⇒
-  L 10 |     assignment | {'balances[_to]': '[2,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
---------------------------------------------------------
-DEBUG: Processing record 10/16
-target code :          return true;
-[11-11]  analysis ⇒
-  L 11 |         return | {'true': '[1,1]'}
---------------------------------------------------------
-DEBUG: Processing record 11/16
-target code :  // @Debugging BEGIN
-DEBUG: Found @Debugging BEGIN at line 7
-DEBUG: Processing record 12/16
-target code :  // @StateVar allowed[_from][msg.sender] = [1,1];
-DEBUG: Found debug annotation at line 8: // @StateVar allowed[_from][msg.sender] = [1,1];...
-DEBUG: Adding to batch_mgr: // @StateVar allowed[_from][msg.sender] = [1,1];...
-DEBUG: In testcase, deferring flush. batch_mgr._lines now has 1 items
-DEBUG: Processing record 13/16
-target code :  // @StateVar balances[_from] = [1000,1000];
-DEBUG: Found debug annotation at line 9: // @StateVar balances[_from] = [1000,1000];...
-DEBUG: Adding to batch_mgr: // @StateVar balances[_from] = [1000,1000];...
-DEBUG: In testcase, deferring flush. batch_mgr._lines now has 2 items
-DEBUG: Processing record 14/16
-target code :  // @StateVar balances[_to] = [1000,1000];
-DEBUG: Found debug annotation at line 10: // @StateVar balances[_to] = [1000,1000];...
-DEBUG: Adding to batch_mgr: // @StateVar balances[_to] = [1000,1000];...
-DEBUG: In testcase, deferring flush. batch_mgr._lines now has 3 items
-DEBUG: Processing record 15/16
-target code :  // @LocalVar _amount = [1,1];
-DEBUG: Found debug annotation at line 11: // @LocalVar _amount = [1,1];...
-DEBUG: Adding to batch_mgr: // @LocalVar _amount = [1,1];...
-DEBUG: In testcase, deferring flush. batch_mgr._lines now has 4 items
-DEBUG: Processing record 16/16
-target code :  // @Debugging END
-DEBUG: Found @Debugging END at line 12, batch_mgr._lines has 4 items
-DEBUG: batch_targets before flush: 0
-DEBUG: recorder ledger before flush: 4
-DEBUG DebugInit: Resolved target type=Variables, id=allowed[_from][msg.sender], value=UnsignedIntegerInterval([0, 115792089237316195423570985008687907853269984665640564039457584007913129639935]), new_value=UnsignedIntegerInterval([1, 1])
-DEBUG _patch: Direct assignment to UnsignedIntegerInterval([1, 1])
-DEBUG DebugInit: After patch, value=UnsignedIntegerInterval([1, 1])
-DEBUG DebugInit: Resolved target type=Variables, id=balances[_from], value=UnsignedIntegerInterval([0, 115792089237316195423570985008687907853269984665640564039457584007913129639935]), new_value=UnsignedIntegerInterval([1000, 1000])
-DEBUG _patch: Direct assignment to UnsignedIntegerInterval([1000, 1000])
-DEBUG DebugInit: After patch, value=UnsignedIntegerInterval([1000, 1000])
-DEBUG DebugInit: Resolved target type=Variables, id=balances[_to], value=UnsignedIntegerInterval([0, 115792089237316195423570985008687907853269984665640564039457584007913129639935]), new_value=UnsignedIntegerInterval([1000, 1000])
-DEBUG _patch: Direct assignment to UnsignedIntegerInterval([1000, 1000])
-DEBUG DebugInit: After patch, value=UnsignedIntegerInterval([1000, 1000])
-DEBUG DebugInit: Resolved target type=Variables, id=_amount, value=UnsignedIntegerInterval([0, 115792089237316195423570985008687907853269984665640564039457584007913129639935]), new_value=UnsignedIntegerInterval([1, 1])
-DEBUG _patch: Direct assignment to UnsignedIntegerInterval([1, 1])
-DEBUG DebugInit: After patch, value=UnsignedIntegerInterval([1, 1])
-DEBUG Engine: Before copy, fcfg.related_variables has 19 vars
-DEBUG Engine: allowed mapping has 1 entries:
-  _from: MappingVariable = None
-    nested mapping has 1 entries:
-      msg.sender: Variables = UnsignedIntegerInterval([1, 1])
-DEBUG Engine: After copy, start_block.variables has 19 vars
-DEBUG Engine: COPIED allowed mapping has 1 entries:
-  _from: MappingVariable = None
-    nested mapping has 1 entries:
-      msg.sender: Variables = UnsignedIntegerInterval([1, 1])
-DEBUG Update(MemberAccess-Global): NOT recording (log=False) line=12, key=msg.sender
-DEBUG Update(MemberAccess-Global): NOT recording (log=False) line=12, key=msg.sender
-DEBUG Update(MemberAccess-Global): Recording line=12, key=msg.sender, operator=-=, value=UnsignedIntegerInterval([0, 0])
+DEBUG: Processing record 20/37
+target code :  
 
-=======  ANALYSIS  =======
-  14 │ assignment     │ {'balances[_from]': '[999,999]'}
-  16 │ assignment     │ {'balances[_to]': '[1001,1001]'}
-  17 │ return         │ {'true': '[1,1]'}
-==========================
-
-DEBUG: _last_func_lines after flush: (14, 17)
-DEBUG: recorder ledger after flush: 5
-Analyze time : 0.08548 sec
+--------------------------------------------------------
+DEBUG: Processing record 21/37
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\test.py", line 310, in <module>
+    simulate_inputs(test_inputs)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\test.py", line 19, in simulate_inputs
+    contract_analyzer.update_code(s, e, code, ev)  # solidity 소스 갱신
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 178, in update_code
+    self._insert_lines(start_line, lines)  # _insert_lines 내부에서 정규화
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 150, in _insert_lines
+    self.analyze_context(ln, line)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 357, in analyze_context
+    raise ValueError(f"Contract context not found for line {start_line}")
+ValueError: Contract context not found for line 24
