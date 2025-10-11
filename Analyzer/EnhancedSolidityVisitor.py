@@ -767,7 +767,6 @@ class EnhancedSolidityVisitor(SolidityVisitor):
                     root = Expression(
                         base=root,
                         member=member,
-                        operator='.',
                         context="TestingMemberAccess"
                     )
                 elif sub.getChild(0).getText() == '[':
@@ -1489,7 +1488,6 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         result_expr = Expression(
             base=base_expr,
             member=member_name,
-            operator='.',
             context='MemberAccessContext'
         )
 

@@ -60,6 +60,7 @@ def simulate_inputs(records):
         # ③ 일반 Solidity 코드 --------------------------------------------
         if code.strip():
             ctx = contract_analyzer.get_current_context_type()
+            print(f"[test.py] Line {s}-{e}: ctx={ctx}, current_target_contract={contract_analyzer.current_target_contract}")
             tree = ParserHelpers.generate_parse_tree(code, ctx, True)
             EnhancedSolidityVisitor(contract_analyzer).visit(tree)
 
@@ -76,231 +77,147 @@ def simulate_inputs(records):
 
 test_inputs = [
   {
-    "code": "contract GovStakingStorage {    \n}",
+    "code": "contract ThorusLottery {\n}",
     "startLine": 1,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "    uint256 totalRewardMultiplier;",
+    "code": "    uint256 public firstWinningNumber;",
     "startLine": 2,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "    uint256 public lastWinningNumber;",
     "startLine": 3,
     "endLine": 3,
     "event": "add"
   },
   {
-    "code": "    struct UserInfo {\n}",
+    "code": "\n",
     "startLine": 4,
-    "endLine": 5,
+    "endLine": 4,
     "event": "add"
   },
   {
-    "code": "        uint256 amount; ",
+    "code": "    struct Ticket {\n}",
     "startLine": 5,
-    "endLine": 5,
+    "endLine": 6,
     "event": "add"
   },
   {
-    "code": "        uint256 lockStart; ",
+    "code": "        address owner;",
     "startLine": 6,
     "endLine": 6,
     "event": "add"
   },
   {
-    "code": "        uint256 lockPeriod; ",
+    "code": "        bool isClaimed;",
     "startLine": 7,
     "endLine": 7,
     "event": "add"
   },
   {
-    "code": "        uint256 lastClaimed; ",
-    "startLine": 8,
-    "endLine": 8,
-    "event": "add"
-  },
-  {
-    "code": "        uint256 unclaimedAmount; ",
+    "code": "\n",
     "startLine": 9,
     "endLine": 9,
     "event": "add"
   },
   {
-    "code": "        uint256 rewardRate; ",
+    "code": "    Ticket[] public tickets;",
     "startLine": 10,
     "endLine": 10,
     "event": "add"
   },
   {
-    "code": "        uint256 rewardMultiplier; ",
+    "code": "    uint256[] public ticketNumbers;",
     "startLine": 11,
     "endLine": 11,
     "event": "add"
   },
   {
-    "code": "        uint256 userRewardPerTokenPaid; ",
+    "code": "\n",
     "startLine": 12,
     "endLine": 12,
     "event": "add"
   },
   {
-    "code": "        uint256 index;",
+    "code": "    function isWinning(uint256 ticketIndex) public view returns (bool) {\n}",
     "startLine": 13,
-    "endLine": 13,
+    "endLine": 14,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "        if(firstWinningNumber <= ticketNumbers[ticketIndex] && ticketNumbers[ticketIndex] < lastWinningNumber) {\n}",
+    "startLine": 14,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "            return true;",
     "startLine": 15,
     "endLine": 15,
     "event": "add"
   },
   {
-    "code": "    mapping(address => UserInfo) public userInfo;    ",
-    "startLine": 16,
-    "endLine": 16,
-    "event": "add"
-  },
-  {
-    "code": "    mapping(address => bool) public allowed;",
+    "code": "        if(lastWinningNumber > tickets.length && ticketNumbers[ticketIndex] < (lastWinningNumber % tickets.length)) {\n}",
     "startLine": 17,
-    "endLine": 17,
+    "endLine": 18,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "            return true;",
     "startLine": 18,
     "endLine": 18,
     "event": "add"
   },
   {
-    "code": "    modifier isAllowed() {\n}",
-    "startLine": 19,
-    "endLine": 20,
-    "event": "add"
-  },
-  {
-    "code": "        require(allowed[msg.sender], \"sender is not allowed to write\");",
+    "code": "        return false;",
     "startLine": 20,
     "endLine": 20,
     "event": "add"
   },
   {
-    "code": "        _;",
-    "startLine": 21,
-    "endLine": 21,
-    "event": "add"
-  },
-  {
-    "code": "\n",
-    "startLine": 23,
-    "endLine": 23,
-    "event": "add"
-  },
-  {
-    "code": "    function updateRewardMultiplier(\n        address user,\n        uint256 oldRate,\n        uint256 newRate,\n        uint256 passedTime,\n        uint256 oldLockPeriod,\n        uint256 newLockPeriod,\n        uint256 oldAmount,\n        uint256 newAmount\n    ) external isAllowed {\n}",
-    "startLine": 24,
-    "endLine": 34,
-    "event": "add"
-  },
-  {
-    "code": "        UserInfo storage info = userInfo[user];",
-    "startLine": 34,
-    "endLine": 34,
-    "event": "add"
-  },
-  {
-    "code": "        uint256 toRemove = ((((oldLockPeriod - passedTime) / 1 weeks) *\n            oldRate) * oldAmount) / 100000;",
-    "startLine": 35,
-    "endLine": 36,
-    "event": "add"
-  },
-  {
-    "code": "        uint256 toAdd = (((newLockPeriod / 1 weeks) * newRate) * newAmount) /\n            100000;",
-    "startLine": 37,
-    "endLine": 38,
-    "event": "add"
-  },
-  {
-    "code": "        info.rewardMultiplier = info.rewardMultiplier + toAdd - toRemove;",
-    "startLine": 39,
-    "endLine": 39,
-    "event": "add"
-  },
-  {
-    "code": "        totalRewardMultiplier = totalRewardMultiplier + toAdd - toRemove;",
-    "startLine": 40,
-    "endLine": 40,
-    "event": "add"
-  },
-  {
     "code": "// @Debugging BEGIN",
-    "startLine": 34,
-    "endLine": 34,
+    "startLine": 14,
+    "endLine": 14,
     "event": "add"
   },
   {
-    "code": "// @StateVar info.rewardMultiplier = [100,200];",
-    "startLine": 35,
-    "endLine": 35,
+    "code": "// @StateVar firstWinningNumber = [100,100]",
+    "startLine": 15,
+    "endLine": 15,
     "event": "add"
   },
   {
-    "code": "// @StateVar totalRewardMultiplier = [50,70];",
-    "startLine": 36,
-    "endLine": 36,
+    "code": "// @StateVar lastWinningNumber = [100,100]",
+    "startLine": 16,
+    "endLine": 16,
     "event": "add"
   },
   {
-    "code": "// @LocalVar oldRate = [2,3];",
-    "startLine": 37,
-    "endLine": 37,
+    "code": "// @StateVar tickets.length = [5,5];",
+    "startLine": 17,
+    "endLine": 17,
     "event": "add"
   },
   {
-    "code": "// @LocalVar newRate = [4,5];",
-    "startLine": 38,
-    "endLine": 38,
+    "code": "// @StateVar ticketNumbers = array[0,1,2,3,4];",
+    "startLine": 18,
+    "endLine": 18,
     "event": "add"
   },
   {
-    "code": "// @LocalVar passedTime = [10,15];",
-    "startLine": 39,
-    "endLine": 39,
-    "event": "add"
-  },
-  {
-    "code": "// @LocalVar oldLockPeriod = [10,15];",
-    "startLine": 40,
-    "endLine": 40,
-    "event": "add"
-  },
-  {
-    "code": "// @LocalVar newLockPeriod = [40,50];",
-    "startLine": 41,
-    "endLine": 41,
-    "event": "add"
-  },
-  {
-    "code": "// @LocalVar oldAmount = [6,7];",
-    "startLine": 42,
-    "endLine": 42,
-    "event": "add"
-  },
-  {
-    "code": "// @LocalVar newAmount = [8,10];",
-    "startLine": 43,
-    "endLine": 43,
+    "code": "// @LocalVar  ticketIndex = [4,4];",
+    "startLine": 19,
+    "endLine": 19,
     "event": "add"
   },
   {
     "code": "// @Debugging END",
-    "startLine": 44,
-    "endLine": 44,
+    "startLine": 20,
+    "endLine": 20,
     "event": "add"
   }
 ]

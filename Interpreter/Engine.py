@@ -536,34 +536,7 @@ class Engine:
         entry = fcfg.get_entry_node()
         (start_block,) = fcfg.graph.successors(entry)
 
-        try:
-            print(f"DEBUG Engine: Before copy, fcfg.related_variables has {len(fcfg.related_variables)} vars")
-            for vname, vobj in fcfg.related_variables.items():
-                if isinstance(vobj, MappingVariable) and vname == "allowed":
-                    print(f"DEBUG Engine: allowed mapping has {len(vobj.mapping)} entries:")
-                    for k, v in vobj.mapping.items():
-                        print(f"  {k}: {type(v).__name__} = {getattr(v, 'value', 'N/A') if hasattr(v, 'value') else v}")
-                        if isinstance(v, MappingVariable):
-                            print(f"    nested mapping has {len(v.mapping)} entries:")
-                            for k2, v2 in v.mapping.items():
-                                print(f"      {k2}: {type(v2).__name__} = {getattr(v2, 'value', 'N/A')}")
-
-            start_block.variables = VariableEnv.copy_variables(fcfg.related_variables)
-
-            print(f"DEBUG Engine: After copy, start_block.variables has {len(start_block.variables)} vars")
-            for vname, vobj in start_block.variables.items():
-                if isinstance(vobj, MappingVariable) and vname == "allowed":
-                    print(f"DEBUG Engine: COPIED allowed mapping has {len(vobj.mapping)} entries:")
-                    for k, v in vobj.mapping.items():
-                        print(f"  {k}: {type(v).__name__} = {getattr(v, 'value', 'N/A') if hasattr(v, 'value') else v}")
-                        if isinstance(v, MappingVariable):
-                            print(f"    nested mapping has {len(v.mapping)} entries:")
-                            for k2, v2 in v.mapping.items():
-                                print(f"      {k2}: {type(v2).__name__} = {getattr(v2, 'value', 'N/A')}")
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            raise
+        start_block.variables = VariableEnv.copy_variables(fcfg.related_variables)
 
         if caller_env is not None:
             for k, v in caller_env.items():
@@ -730,8 +703,10 @@ class Engine:
             if len(var_objs) == 1:
                 rec.record_return(line_no=ln, return_expr=None, return_val=var_objs[0].value, fn_cfg=fcfg)
             else:
-                flat = {v.identifier: self.rec._serialize_val(v.value) for v in var_objs}
-                self.rec.add_env_record(ln, "implicitReturn", flat)
+                # ★ add_env_record는 Variables 객체의 딕셔너리를 기대함
+                # 직렬화된 딕셔너리가 아닌 Variables 객체 딕셔너리를 전달
+                env_dict = {v.identifier: v for v in var_objs}
+                self.rec.add_env_record(ln, "implicitReturn", env_dict)
 
         if len(return_values) == 0:
             if fcfg.return_vars:

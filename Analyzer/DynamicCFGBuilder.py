@@ -1326,11 +1326,21 @@ class DynamicCFGBuilder:
         is_join = _is_join(L_plus_1_node)
 
         if _is_loop_exit(L_plus_1_node) or _is_join(L_plus_1_node):
-            # Look at L-1 nodes (L_start - 1)
-            L_minus_1_nodes = _line_nodes(L_start - 1)
+            # Look at L-1 nodes (L_start - 1) and search upward if empty
+            search_line = L_start - 1
+            L_minus_1_nodes = []
+
+            # Search upward until we find a line with CFG nodes (max 10 lines)
+            for _ in range(10):
+                if search_line < 1:
+                    break
+                L_minus_1_nodes = _line_nodes(search_line)
+                if L_minus_1_nodes:
+                    break
+                search_line -= 1
 
             if not L_minus_1_nodes:
-                # L-1 empty, return first predecessor of L+1
+                # Still empty after searching, return first predecessor of L+1
                 preds = list(G.predecessors(L_plus_1_node))
                 return preds[0] if preds else fcfg.get_entry_node()
 

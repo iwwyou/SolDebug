@@ -91,44 +91,44 @@
   },
   {
     "code": "else {\n}",
+    "startLine": 22,
+    "endLine": 23,
+    "event": "add"
+  },
+  {
+    "code": "            FeeOverride memory feeOverrideForPool =\n                earlyWithdrawFeeOverrideForPool[pool];",
     "startLine": 23,
     "endLine": 24,
     "event": "add"
   },
   {
-    "code": "            FeeOverride memory feeOverrideForPool =\n                earlyWithdrawFeeOverrideForPool[pool];",
-    "startLine": 24,
-    "endLine": 25,
-    "event": "add"
-  },
-  {
     "code": "            if (feeOverrideForPool.isOverridden) {            \n}",
-    "startLine": 26,
-    "endLine": 27,
+    "startLine": 25,
+    "endLine": 26,
     "event": "add"
   },
   {
     "code": "                feeRate = feeOverrideForPool.fee;",
-    "startLine": 27,
-    "endLine": 27,
+    "startLine": 26,
+    "endLine": 26,
     "event": "add"
   },
   {
     "code": "else {              \n}",
-    "startLine": 29,
-    "endLine": 30,
+    "startLine": 27,
+    "endLine": 28,
     "event": "add"
   },
   {
     "code": "                feeRate = earlyWithdrawFee;",
-    "startLine": 30,
-    "endLine": 30,
+    "startLine": 28,
+    "endLine": 28,
     "event": "add"
   },
   {
     "code": "        return (withdrawnDepositAmount * feeRate) / PRECISION;",
-    "startLine": 33,
-    "endLine": 33,
+    "startLine": 31,
+    "endLine": 31,
     "event": "add"
   },
   {
@@ -138,25 +138,25 @@
     "event": "add"
   },
   {
-    "code": "// @StateVar earlyWithdrawFeeOverrideForDeposit.isOverriden = any;",
+    "code": "// @StateVar earlyWithdrawFeeOverrideForDeposit[pool][depositID].isOverridden = any;",
     "startLine": 18,
     "endLine": 18,
     "event": "add"
   },
   {
-    "code": "// @StateVar earlyWithdrawFeeOverrideForDeposit.fee = [30,40];",
+    "code": "// @StateVar earlyWithdrawFeeOverrideForDeposit[pool][depositID].fee = [30,40];",
     "startLine": 19,
     "endLine": 19,
     "event": "add"
   },
   {
-    "code": "// @StateVar earlyWithdrawFeeOverrideForPool.isOverriden = any;",
+    "code": "// @StateVar earlyWithdrawFeeOverrideForPool[pool].isOverridden = any;",
     "startLine": 20,
     "endLine": 20,
     "event": "add"
   },
   {
-    "code": "// @StateVar earlyWithdrawFeeOverrideForPool.fee = [20,30];",
+    "code": "// @StateVar earlyWithdrawFeeOverrideForPool[pool].fee = [20,30];",
     "startLine": 21,
     "endLine": 21,
     "event": "add"

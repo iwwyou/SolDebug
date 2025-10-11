@@ -218,9 +218,12 @@ class ContractAnalyzer:
         # full-code 재조합
         self.full_code = "\n".join(self.full_code_lines[ln] for ln in sorted(self.full_code_lines))
 
-        # add/modify 는 새 코드 전체 재분석(이미 라인별 analyze_context 호출했으므로 아래는 선택)
-        # if event in {"add", "modify"} and new_code.strip():
-        #     self.analyze_context(start_line, new_code)
+        # add/modify 후 전체 블록의 컨텍스트 설정
+        # 여러 줄짜리 정의(함수/constructor/modifier 등)의 경우,
+        # 마지막 라인('}')이 분석을 스킵하므로 컨텍스트가 설정되지 않음
+        # 따라서 전체 코드 블록을 대상으로 한 번 더 analyze_context 호출
+        if event in {"add", "modify"} and new_code.strip():
+            self.analyze_context(start_line, new_code)
 
     def normalize_compound_control_lines(self, lines: list[str]) -> list[str]:
         """
@@ -336,13 +339,14 @@ class ContractAnalyzer:
             # 여러 줄짜리 함수/modifier/constructor 정의의 마지막 줄일 수 있음
             # 예: "    ) external isAllowed {"
             # 이 경우 위로 올라가서 function/modifier/constructor를 찾아야 함
-            if ')' in stripped_code and not stripped_code.startswith(('function', 'constructor', 'modifier', 'contract', 'struct', 'enum')):
+            if ')' in stripped_code and not stripped_code.startswith(('function', 'constructor', 'modifier', 'contract', 'struct', 'enum', 'if', 'for', 'while', 'else')):
                 # 위로 올라가서 function/modifier/constructor 키워드 찾기
                 for check_line in range(start_line - 1, 0, -1):
                     check_code = self.full_code_lines.get(check_line, '').strip()
                     if check_code.startswith('function'):
                         self.current_context_type = 'function'
                         self.current_target_contract = self.find_contract_context(start_line)
+                        print(f"[analyze_context] Line {start_line}: Found function, contract={self.current_target_contract}")
                         self.current_target_function = None  # 아직 함수가 생성되지 않음
                         return
                     elif check_code.startswith('modifier'):
@@ -412,13 +416,45 @@ class ContractAnalyzer:
 
     def find_contract_context(self, line_number):
         # 위로 거슬러 올라가면서 해당 라인이 속한 컨트랙트를 찾습니다.
+        close_brace_count = 0
+
         for line in range(line_number, 0, -1):
             brace_info = self.line_info.get(line, {'open': 0, 'close': 0, 'cfg_nodes': []})
-            cfg_nodes = brace_info.get('cfg_nodes', [])
-            if brace_info['open'] > 0 and cfg_nodes:
-                context_type = self.determine_top_level_context(self.full_code_lines[line])
-                if context_type == "contract":
-                    return self.full_code_lines[line].split()[1]  # contract 이름 반환
+            open_braces = brace_info['open']
+            close_braces = brace_info['close']
+
+            # '}' 카운팅: 닫힌 괄호를 먼저 센다
+            if close_brace_count > 0:
+                close_brace_count -= open_braces
+                if close_brace_count <= 0:
+                    close_brace_count = 0
+            else:
+                # '{' 발견: 이 라인이 컨트랙트 선언인지 확인
+                if open_braces > 0:
+                    code_line = self.full_code_lines.get(line, '').strip()
+                    context_type = self.determine_top_level_context(code_line)
+                    if context_type in ["contract", "library", "interface", "abstract contract"]:
+                        # contract 이름 추출
+                        parts = code_line.split()
+                        # "abstract contract Name" or "contract Name" 형식
+                        if "contract" in parts:
+                            idx = parts.index("contract")
+                            if idx + 1 < len(parts):
+                                result = parts[idx + 1].split('{')[0].strip()
+                                return result
+                        elif "library" in parts:
+                            idx = parts.index("library")
+                            if idx + 1 < len(parts):
+                                result = parts[idx + 1].split('{')[0].strip()
+                                return result
+                        elif "interface" in parts:
+                            idx = parts.index("interface")
+                            if idx + 1 < len(parts):
+                                result = parts[idx + 1].split('{')[0].strip()
+                                return result
+                # 닫힌 괄호 누적
+                close_brace_count += close_braces
+
         return None
 
     def find_function_context(self, line_number):

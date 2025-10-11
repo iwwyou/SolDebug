@@ -79,14 +79,14 @@
   },
   {
     "code": "else {\n}",
-    "startLine": 15,
-    "endLine": 16,
+    "startLine": 14,
+    "endLine": 15,
     "event": "add"
   },
   {
     "code": "            return keeperTip;",
-    "startLine": 16,
-    "endLine": 16,
+    "startLine": 15,
+    "endLine": 15,
     "event": "add"
   },
   {
