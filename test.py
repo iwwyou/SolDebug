@@ -76,13 +76,13 @@ def simulate_inputs(records):
 
 test_inputs = [
   {
-    "code": "contract BEP20 {\n}",
+    "code": "contract DapiServer {\n}",
     "startLine": 1,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "    mapping (address=>uint256) balances;    ",
+    "code": "    uint256 public constant override HUNDRED_PERCENT = 1e8;",
     "startLine": 2,
     "endLine": 2,
     "event": "add"
@@ -94,87 +94,75 @@ test_inputs = [
     "event": "add"
   },
   {
-    "code": "    mapping (address=>mapping (address=>uint256)) allowed;",
+    "code": "    function calculateUpdateInPercentage(int224 initialValue, int224 updatedValue) private pure returns (uint256 updateInPercentage) {\n}",
     "startLine": 4,
-    "endLine": 4,
+    "endLine": 5,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "        int256 delta = int256(updatedValue) - int256(initialValue);",
     "startLine": 5,
     "endLine": 5,
     "event": "add"
   },
   {
-    "code": "    function transferFrom(address _from,address _to,uint256 _amount) public returns (bool success) {\n}",
+    "code": "        uint256 absoluteDelta = delta > 0 ? uint256(delta) : uint256(-delta);",
     "startLine": 6,
-    "endLine": 7,
+    "endLine": 6,
     "event": "add"
   },
   {
-    "code": "        require (balances[_from]>=_amount&&allowed[_from][msg.sender]>=_amount&&_amount>0&&balances[_to]+_amount>balances[_to]);",
+    "code": "        uint256 absoluteInitialValue = initialValue > 0 ? uint256(int256(initialValue)) : uint256(-int256(initialValue));",
     "startLine": 7,
     "endLine": 7,
     "event": "add"
   },
   {
-    "code": "        balances[_from]-=_amount;",
+    "code": "\n",
     "startLine": 8,
     "endLine": 8,
     "event": "add"
   },
   {
-    "code": "        allowed[_from][msg.sender]-=_amount;",
+    "code": "        if (absoluteInitialValue == 0) {\n}",
     "startLine": 9,
-    "endLine": 9,
+    "endLine": 10,
     "event": "add"
   },
   {
-    "code": "        balances[_to]+=_amount;        ",
+    "code": "            absoluteInitialValue = 1;",
     "startLine": 10,
     "endLine": 10,
     "event": "add"
   },
   {
-    "code": "        return true;",
-    "startLine": 11,
-    "endLine": 11,
+    "code": "        updateInPercentage = (absoluteDelta * HUNDRED_PERCENT) / absoluteInitialValue;",
+    "startLine": 12,
+    "endLine": 12,
     "event": "add"
   },
   {
     "code": "// @Debugging BEGIN",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar initalValue = [300,350];",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar updatedValue = [500,550];",
     "startLine": 7,
     "endLine": 7,
     "event": "add"
   },
   {
-    "code": "// @StateVar allowed[_from][msg.sender] = [1,1];",
+    "code": "// @Debugging END",
     "startLine": 8,
     "endLine": 8,
-    "event": "add"
-  },
-  {
-    "code": "// @StateVar balances[_from] = [1000,1000];",
-    "startLine": 9,
-    "endLine": 9,
-    "event": "add"
-  },
-  {
-    "code": "// @StateVar balances[_to] = [1000,1000];",
-    "startLine": 10,
-    "endLine": 10,
-    "event": "add"
-  },
-  {
-    "code": "// @LocalVar _amount = [10,10];",
-    "startLine": 11,
-    "endLine": 11,
-    "event": "add"
-  },
-  {
-    "code": "// @Debugging END",
-    "startLine": 12,
-    "endLine": 12,
     "event": "add"
   }
 ]

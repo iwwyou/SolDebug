@@ -391,17 +391,58 @@ class ContractAnalyzer:
 
     def find_function_context(self, line_number):
         # 위로 거슬러 올라가면서 해당 라인이 속한 함수를 찾습니다.
+        # 방법 1: '{' 문자가 있는 라인을 찾고, 그 라인부터 위로 function 키워드를 찾는다
+
+        # 먼저 가장 가까운 '{' 문자가 있는 라인을 찾기
+        open_brace_line = None
+        close_brace_count = 0
+
         for line in range(line_number, 0, -1):
             brace_info = self.line_info.get(line, {'open': 0, 'close': 0, 'cfg_nodes': []})
-            cfg_nodes = brace_info.get('cfg_nodes', [])
-            if brace_info['open'] > 0 and cfg_nodes:
-                context_type = self.determine_top_level_context(self.full_code_lines[line])
-                if context_type in ["function", "modifier"] :
-                    # 함수 이름 뒤에 붙은 '('를 기준으로 함수 이름만 추출
-                    function_declaration = self.full_code_lines[line]
-                    function_name = function_declaration.split()[1]  # 첫 번째는 함수 선언, 두 번째는 함수 이름 포함
-                    function_name = function_name.split('(')[0]  # 함수 이름만 추출
+            open_braces = brace_info['open']
+            close_braces = brace_info['close']
+
+            if close_brace_count > 0:
+                close_brace_count -= open_braces
+                if close_brace_count <= 0:
+                    close_brace_count = 0
+            else:
+                if open_braces > 0:
+                    open_brace_line = line
+                    break
+                close_brace_count += close_braces
+
+        if open_brace_line is None:
+            return None
+
+        # '{' 문자가 있는 라인부터 위로 올라가면서 function/constructor/modifier 키워드를 찾기
+        for line in range(open_brace_line, 0, -1):
+            code_line = self.full_code_lines.get(line, "").strip()
+            if not code_line:
+                continue
+
+            # function, constructor, modifier 키워드를 찾으면 함수 이름 추출
+            if code_line.startswith("function "):
+                # 함수 이름 추출
+                parts = code_line.split()
+                if len(parts) >= 2:
+                    function_name = parts[1].split('(')[0]
                     return function_name
+            elif code_line.startswith("constructor"):
+                return "constructor"
+            elif code_line.startswith("modifier "):
+                parts = code_line.split()
+                if len(parts) >= 2:
+                    modifier_name = parts[1].split('(')[0]
+                    return modifier_name
+            elif code_line.startswith("fallback"):
+                return "fallback"
+            elif code_line.startswith("receive"):
+                return "receive"
+
+            # contract/struct/interface 등을 만나면 함수가 아니므로 중단
+            if any(code_line.startswith(kw) for kw in ["contract ", "library ", "interface ", "struct ", "enum "]):
+                break
 
         return None
 

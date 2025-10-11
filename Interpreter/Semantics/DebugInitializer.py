@@ -363,8 +363,40 @@ class DebugInitializer:
             self, expr: Expression, rVal, operator, variables, callerObject=None, callerContext=None):
         """
         TestingMemberAccess 컨텍스트 처리 (디버깅 전용)
-        디버그 주석에서 사용되는 멤버 접근: allowed[_from].member 형태
+        디버그 주석에서 사용되는 멤버 접근: allowed[_from][msg.sender] 형태
+
+        callerObject: 외부 매핑 객체 (예: allowed[_from])
+        callerContext: 호출 컨텍스트 (예: "TestingIndexAccess")
         """
+        member = expr.member
+
+        # ======================================================================
+        # 1) 글로벌 멤버가 매핑 키로 사용되는 경우: allowed[_from][msg.sender]
+        # ======================================================================
+        if VariableEnv.is_global_expr(expr) and isinstance(callerObject, MappingVariable):
+            key = f"{expr.base.identifier}.{member}"  # "msg.sender"
+
+            if not callerObject.struct_defs or not callerObject.enum_defs:
+                ccf = self.an.contract_cfgs[self.an.current_target_contract]
+                callerObject.struct_defs = ccf.structDefs
+                callerObject.enum_defs = ccf.enumDefs
+
+            # 엔트리가 없으면 새로 만든다
+            if key not in callerObject.mapping:
+                callerObject.mapping[key] = callerObject.get_or_create(key)
+
+            entry = callerObject.mapping[key]
+
+            # ① 더 깊은 IndexAccess 가 이어질 때는 객체 그대로 반환
+            if callerContext == "TestingIndexAccess":
+                return entry  # allowed[msg.sender] 의 결과
+
+            # ② leaf 읽기(Testing이므로 값 패치는 하지 않음)
+            return entry  # Variables / EnumVariable / Array…
+
+        # ======================================================================
+        # 2) 일반적인 경우: base 객체를 먼저 찾고 멤버 접근
+        # ======================================================================
         # ① 먼저 base 부분을 재귀-업데이트
         base_obj = self._update_left_var_for_debug(
             expr.base, rVal, operator, variables, None, "TestingMemberAccess")
@@ -372,35 +404,9 @@ class DebugInitializer:
         if base_obj is None:
             return None
 
-        member = expr.member
-
         if member is not None:
             # ======================================================================
-            # 1) 글로벌 멤버가 매핑 키로 사용되는 경우: allowed[msg.sender] 등
-            # ======================================================================
-            if VariableEnv.is_global_expr(expr) and isinstance(callerObject, MappingVariable):
-                key = f"{expr.base.identifier}.{member}"  # "msg.sender"
-
-                if not callerObject.struct_defs or not callerObject.enum_defs:
-                    ccf = self.an.contract_cfgs[self.an.current_target_contract]
-                    callerObject.struct_defs = ccf.structDefs
-                    callerObject.enum_defs = ccf.enumDefs
-
-                # 엔트리가 없으면 새로 만든다
-                if key not in callerObject.mapping:
-                    callerObject.mapping[key] = callerObject.get_or_create(key)
-
-                entry = callerObject.mapping[key]
-
-                # ① 더 깊은 IndexAccess 가 이어질 때는 객체 그대로 반환
-                if callerContext == "TestingIndexAccess":
-                    return entry  # allowed[msg.sender] 의 결과
-
-                # ② leaf 읽기(Testing이므로 값 패치는 하지 않음)
-                return entry  # Variables / EnumVariable / Array…
-
-            # ======================================================================
-            # 2) StructVariable인 경우
+            # 3) StructVariable인 경우
             # ======================================================================
             if isinstance(base_obj, StructVariable):
                 m = base_obj.members.get(member)

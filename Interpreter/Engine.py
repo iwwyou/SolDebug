@@ -537,7 +537,29 @@ class Engine:
         (start_block,) = fcfg.graph.successors(entry)
 
         try:
+            print(f"DEBUG Engine: Before copy, fcfg.related_variables has {len(fcfg.related_variables)} vars")
+            for vname, vobj in fcfg.related_variables.items():
+                if isinstance(vobj, MappingVariable) and vname == "allowed":
+                    print(f"DEBUG Engine: allowed mapping has {len(vobj.mapping)} entries:")
+                    for k, v in vobj.mapping.items():
+                        print(f"  {k}: {type(v).__name__} = {getattr(v, 'value', 'N/A') if hasattr(v, 'value') else v}")
+                        if isinstance(v, MappingVariable):
+                            print(f"    nested mapping has {len(v.mapping)} entries:")
+                            for k2, v2 in v.mapping.items():
+                                print(f"      {k2}: {type(v2).__name__} = {getattr(v2, 'value', 'N/A')}")
+
             start_block.variables = VariableEnv.copy_variables(fcfg.related_variables)
+
+            print(f"DEBUG Engine: After copy, start_block.variables has {len(start_block.variables)} vars")
+            for vname, vobj in start_block.variables.items():
+                if isinstance(vobj, MappingVariable) and vname == "allowed":
+                    print(f"DEBUG Engine: COPIED allowed mapping has {len(vobj.mapping)} entries:")
+                    for k, v in vobj.mapping.items():
+                        print(f"  {k}: {type(v).__name__} = {getattr(v, 'value', 'N/A') if hasattr(v, 'value') else v}")
+                        if isinstance(v, MappingVariable):
+                            print(f"    nested mapping has {len(v.mapping)} entries:")
+                            for k2, v2 in v.mapping.items():
+                                print(f"      {k2}: {type(v2).__name__} = {getattr(v2, 'value', 'N/A')}")
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -672,6 +694,7 @@ class Engine:
 
             else:
                 for stmt in node.statements:
+                    # ★ 디버그 로그 제거 (문제 파악 완료)
                     cur_vars = self.update_statement_with_variables(stmt, cur_vars, return_values)
                     if "__STOP__" in return_values:
                         break
@@ -755,6 +778,10 @@ class Engine:
         G = fcfg.graph; ref = self.ref
         rec = self.rec  # ★ Recorder
         # --- helpers 동일 (_is_loop_head / _false_succs / _is_sink / _edge_env_from_pred / _compute_in) ---
+
+        # ★ 재해석 시 기록 활성화
+        self._record_enabled = True
+        self._suppress_stmt_records = False
 
         seeds = list(seed_or_seeds) if isinstance(seed_or_seeds, (list, tuple, set)) else [seed_or_seeds]
         WL, in_queue = deque(), set()

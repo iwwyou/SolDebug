@@ -117,6 +117,9 @@ class StaticCFGFactory:
         mod_cfg = FunctionCFG(function_type="modifier",
                               function_name=modifier_name)
 
+        # Get ENTRY node to add variables
+        entry_node = mod_cfg.get_entry_node()
+
         # ────────── 1. 파라미터 변수 생성 ──────────
         # 2) 파라미터 처리 (없으면 {} 로 대체)
         parameters = parameters or {}
@@ -137,13 +140,19 @@ class StaticCFGFactory:
                     var_obj.value = f"symbol_{var_name}"
 
             mod_cfg.add_related_variable(var_obj)
+            # Add parameter to ENTRY block's variables so it can be propagated
+            entry_node.variables[var_name] = var_obj
 
         # ────────── 2. 상태‧글로벌 변수 얕은 참조 등록 ──────────
         if contract_cfg.state_variable_node:
             for var in contract_cfg.state_variable_node.variables.values():
                 mod_cfg.add_related_variable(var)
+                # Add state variables to ENTRY block's variables so they can be propagated
+                entry_node.variables[var.identifier] = var
         for gv in contract_cfg.globals.values():
             mod_cfg.add_related_variable(gv)
+            # Add global variables to ENTRY block's variables so they can be propagated
+            entry_node.variables[gv.identifier] = gv
 
         # ────────── 3. 저장 & snapshot 등록 ──────────
         contract_cfg.functions[modifier_name] = mod_cfg

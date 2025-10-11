@@ -1,0 +1,112 @@
+DEBUG: Total records to process: 17
+DEBUG: Processing record 0/16
+target code :  contract BEP20 {
+}
+--------------------------------------------------------
+DEBUG: Processing record 1/16
+target code :      mapping (address=>uint256) balances;    
+--------------------------------------------------------
+DEBUG: Processing record 2/16
+target code :  
+
+--------------------------------------------------------
+DEBUG: Processing record 3/16
+target code :      mapping (address=>mapping (address=>uint256)) allowed;
+--------------------------------------------------------
+DEBUG: Processing record 4/16
+target code :  
+
+--------------------------------------------------------
+DEBUG: Processing record 5/16
+target code :      function transferFrom(address _from,address _to,uint256 _amount) public returns (bool success) {
+}
+--------------------------------------------------------
+DEBUG: Processing record 6/16
+target code :          require (balances[_from]>=_amount&&allowed[_from][msg.sender]>=_amount&&_amount>0&&balances[_to]+_amount>balances[_to]);
+DEBUG Update(MemberAccess-Global): NOT recording (log=False) line=7, key=msg.sender
+--------------------------------------------------------
+DEBUG: Processing record 7/16
+target code :          balances[_from]-=_amount;
+[8-8]  analysis ¢¡
+  L  8 |     assignment | {'balances[_from]': '[0,115792089237316195423570985008687907853269984665640564039457584007913129639933]'}
+--------------------------------------------------------
+DEBUG: Processing record 8/16
+target code :          allowed[_from][msg.sender]-=_amount;
+DEBUG Update(MemberAccess-Global): Recording line=9, key=msg.sender, operator=-=, value=UnsignedIntegerInterval([0, 115792089237316195423570985008687907853269984665640564039457584007913129639934])
+DEBUG Update(MemberAccess-Global): Recording line=9, key=msg.sender, operator=-=, value=UnsignedIntegerInterval([0, 115792089237316195423570985008687907853269984665640564039457584007913129639933])
+[9-9]  analysis ¢¡
+  L  9 |     assignment | {'allowed[_from][msg.sender]': '[0,115792089237316195423570985008687907853269984665640564039457584007913129639933]'}
+--------------------------------------------------------
+DEBUG: Processing record 9/16
+target code :          balances[_to]+=_amount;        
+[10-10]  analysis ¢¡
+  L 10 |     assignment | {'balances[_to]': '[2,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+--------------------------------------------------------
+DEBUG: Processing record 10/16
+target code :          return true;
+[11-11]  analysis ¢¡
+  L 11 |         return | {'true': '[1,1]'}
+--------------------------------------------------------
+DEBUG: Processing record 11/16
+target code :  // @Debugging BEGIN
+DEBUG: Found @Debugging BEGIN at line 7
+DEBUG: Processing record 12/16
+target code :  // @StateVar allowed[_from][msg.sender] = [1,1];
+DEBUG: Found debug annotation at line 8: // @StateVar allowed[_from][msg.sender] = [1,1];...
+DEBUG: Adding to batch_mgr: // @StateVar allowed[_from][msg.sender] = [1,1];...
+DEBUG: In testcase, deferring flush. batch_mgr._lines now has 1 items
+DEBUG: Processing record 13/16
+target code :  // @StateVar balances[_from] = [1000,1000];
+DEBUG: Found debug annotation at line 9: // @StateVar balances[_from] = [1000,1000];...
+DEBUG: Adding to batch_mgr: // @StateVar balances[_from] = [1000,1000];...
+DEBUG: In testcase, deferring flush. batch_mgr._lines now has 2 items
+DEBUG: Processing record 14/16
+target code :  // @StateVar balances[_to] = [1000,1000];
+DEBUG: Found debug annotation at line 10: // @StateVar balances[_to] = [1000,1000];...
+DEBUG: Adding to batch_mgr: // @StateVar balances[_to] = [1000,1000];...
+DEBUG: In testcase, deferring flush. batch_mgr._lines now has 3 items
+DEBUG: Processing record 15/16
+target code :  // @LocalVar _amount = [1,1];
+DEBUG: Found debug annotation at line 11: // @LocalVar _amount = [1,1];...
+DEBUG: Adding to batch_mgr: // @LocalVar _amount = [1,1];...
+DEBUG: In testcase, deferring flush. batch_mgr._lines now has 4 items
+DEBUG: Processing record 16/16
+target code :  // @Debugging END
+DEBUG: Found @Debugging END at line 12, batch_mgr._lines has 4 items
+DEBUG: batch_targets before flush: 0
+DEBUG: recorder ledger before flush: 4
+DEBUG DebugInit: Resolved target type=Variables, id=allowed[_from][msg.sender], value=UnsignedIntegerInterval([0, 115792089237316195423570985008687907853269984665640564039457584007913129639935]), new_value=UnsignedIntegerInterval([1, 1])
+DEBUG _patch: Direct assignment to UnsignedIntegerInterval([1, 1])
+DEBUG DebugInit: After patch, value=UnsignedIntegerInterval([1, 1])
+DEBUG DebugInit: Resolved target type=Variables, id=balances[_from], value=UnsignedIntegerInterval([0, 115792089237316195423570985008687907853269984665640564039457584007913129639935]), new_value=UnsignedIntegerInterval([1000, 1000])
+DEBUG _patch: Direct assignment to UnsignedIntegerInterval([1000, 1000])
+DEBUG DebugInit: After patch, value=UnsignedIntegerInterval([1000, 1000])
+DEBUG DebugInit: Resolved target type=Variables, id=balances[_to], value=UnsignedIntegerInterval([0, 115792089237316195423570985008687907853269984665640564039457584007913129639935]), new_value=UnsignedIntegerInterval([1000, 1000])
+DEBUG _patch: Direct assignment to UnsignedIntegerInterval([1000, 1000])
+DEBUG DebugInit: After patch, value=UnsignedIntegerInterval([1000, 1000])
+DEBUG DebugInit: Resolved target type=Variables, id=_amount, value=UnsignedIntegerInterval([0, 115792089237316195423570985008687907853269984665640564039457584007913129639935]), new_value=UnsignedIntegerInterval([1, 1])
+DEBUG _patch: Direct assignment to UnsignedIntegerInterval([1, 1])
+DEBUG DebugInit: After patch, value=UnsignedIntegerInterval([1, 1])
+DEBUG Engine: Before copy, fcfg.related_variables has 19 vars
+DEBUG Engine: allowed mapping has 1 entries:
+  _from: MappingVariable = None
+    nested mapping has 1 entries:
+      msg.sender: Variables = UnsignedIntegerInterval([1, 1])
+DEBUG Engine: After copy, start_block.variables has 19 vars
+DEBUG Engine: COPIED allowed mapping has 1 entries:
+  _from: MappingVariable = None
+    nested mapping has 1 entries:
+      msg.sender: Variables = UnsignedIntegerInterval([1, 1])
+DEBUG Update(MemberAccess-Global): NOT recording (log=False) line=12, key=msg.sender
+DEBUG Update(MemberAccess-Global): NOT recording (log=False) line=12, key=msg.sender
+DEBUG Update(MemberAccess-Global): Recording line=12, key=msg.sender, operator=-=, value=UnsignedIntegerInterval([0, 0])
+
+=======  ANALYSIS  =======
+  14 ¦¢ assignment     ¦¢ {'balances[_from]': '[999,999]'}
+  16 ¦¢ assignment     ¦¢ {'balances[_to]': '[1001,1001]'}
+  17 ¦¢ return         ¦¢ {'true': '[1,1]'}
+==========================
+
+DEBUG: _last_func_lines after flush: (14, 17)
+DEBUG: recorder ledger after flush: 5
+Analyze time : 0.08548 sec
