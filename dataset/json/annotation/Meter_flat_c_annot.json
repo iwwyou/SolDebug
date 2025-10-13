@@ -18,93 +18,105 @@
     "event": "add"
   },
   {
-    "code": "    function _transfer(address sender, address recipient, uint256 amount) internal virtual {\n}",
+    "code": "    function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual {\n}",
     "startLine": 4,
     "endLine": 5,
     "event": "add"
   },
   {
-    "code": "        require(sender != address(0), \"ERC20: transfer from the zero address\");",
-    "startLine": 5,
-    "endLine": 5,
-    "event": "add"
-  },
-  {
-    "code": "        require(recipient != address(0), \"ERC20: transfer to the zero address\");",
+    "code": "\n",
     "startLine": 6,
     "endLine": 6,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "    function _transfer(address sender, address recipient, uint256 amount) internal virtual {\n}",
     "startLine": 7,
-    "endLine": 7,
+    "endLine": 8,
     "event": "add"
   },
   {
-    "code": "        _beforeTokenTransfer(sender, recipient, amount);",
+    "code": "        require(sender != address(0), \"ERC20: transfer from the zero address\");",
     "startLine": 8,
     "endLine": 8,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "        require(recipient != address(0), \"ERC20: transfer to the zero address\");",
     "startLine": 9,
     "endLine": 9,
     "event": "add"
   },
   {
-    "code": "        uint256 senderBalance = _balances[sender];",
+    "code": "\n",
     "startLine": 10,
     "endLine": 10,
     "event": "add"
   },
   {
-    "code": "        require(senderBalance >= amount, \"ERC20: transfer amount exceeds balance\");",
+    "code": "        _beforeTokenTransfer(sender, recipient, amount);",
     "startLine": 11,
     "endLine": 11,
     "event": "add"
   },
   {
-    "code": "        _balances[sender] = senderBalance - amount;",
+    "code": "\n",
     "startLine": 12,
     "endLine": 12,
     "event": "add"
   },
   {
-    "code": "        _balances[recipient] += amount;",
+    "code": "        uint256 senderBalance = _balances[sender];",
     "startLine": 13,
     "endLine": 13,
     "event": "add"
-  },   
+  },
+  {
+    "code": "        require(senderBalance >= amount, \"ERC20: transfer amount exceeds balance\");",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "        _balances[sender] = senderBalance - amount;",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "        _balances[recipient] += amount;        ",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  },
   {
     "code": "// @Debugging BEGIN",
-    "startLine": 5,
-    "endLine": 5,
-    "event": "add"
-  },
-  {
-    "code": "// @StateVar _balances[sender] = [1000,1000];",
-    "startLine": 6,
-    "endLine": 6,
-    "event": "add"
-  },
-  {
-    "code": "// @StateVar _balances[recipient] = [100,200];",
-    "startLine": 7,
-    "endLine": 7,
-    "event": "add"
-  },
-  {
-    "code": "// @LocalVar amount = [10,10];",
     "startLine": 8,
     "endLine": 8,
     "event": "add"
   },
   {
-    "code": "// @Debugging END",
+    "code": "// @StateVar _balances[sender] = [1000,1000];",
     "startLine": 9,
     "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar _balances[recipient] = [100,200];",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar amount = [10,10];",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 12,
+    "endLine": 12,
     "event": "add"
   }
 ]

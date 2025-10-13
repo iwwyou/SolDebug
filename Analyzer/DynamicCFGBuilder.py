@@ -91,7 +91,45 @@ class DynamicCFGBuilder:
 
         # 3) Add to function-scope variable table
         fcfg.add_related_variable(var_obj)
-        
+
+        return new_block
+
+    def build_variable_declaration_tuple(
+            self,
+            *,
+            cur_block: CFGNode,
+            var_objects: list,  # [(var_obj, type_obj), ...]
+            init_expr,
+            line_no: int,
+            fcfg: FunctionCFG,
+            line_info: dict
+    ) -> CFGNode:
+        """
+        Create a new statement block for tuple variable declaration.
+        Example: (bool success, bytes memory data) = addr.call(...)
+
+        This handles all variables in the tuple as a single statement.
+        """
+        # 1) Create new statement block
+        new_block = self.insert_new_statement_block(
+            pred_block=cur_block,
+            fcfg=fcfg,
+            line_no=line_no,
+            line_info=line_info,
+            tag="VarDeclTuple"
+        )
+
+        # 2) Add all variables to the new block
+        for var_obj, type_obj in var_objects:
+            new_block.variables[var_obj.identifier] = var_obj
+            # Add individual declaration statement for each variable
+            # For tuple, init_expr is None for each variable (the tuple expression is evaluated separately)
+            new_block.add_variable_declaration_statement(
+                type_obj, var_obj.identifier, None, line_no
+            )
+            # 3) Add to function-scope variable table
+            fcfg.add_related_variable(var_obj)
+
         return new_block
 
     def build_assignment_statement(
@@ -1314,26 +1352,32 @@ class DynamicCFGBuilder:
                 raise ValueError(f"No matching condition node found for context '{context}' at line {L_start}")
 
         # ========== Regular statement context ==========
-        # Look at L+1 node (L_end + 1)
-        L_plus_1_node = _line_first(L_end + 1)
+        # Look at L+1 node (L_end + 1) and search forward if empty
+        search_line = L_end + 1
+        L_plus_1_node = None
+
+        # Search forward until we find a line with CFG nodes or reach end
+        max_line = max(an.line_info.keys()) if an.line_info else L_end + 100
+        while search_line <= max_line:
+            L_plus_1_node = _line_first(search_line)
+            if L_plus_1_node is not None:
+                break
+            search_line += 1
 
         if L_plus_1_node is None:
-            # L+1 is empty, use EXIT
-            L_plus_1_node = fcfg.get_exit_node()
+            raise ValueError(f"No CFG node found after line {L_end} (searched up to line {max_line})")
 
         # Check if L+1 is loop-exit or join
-        is_exit = _is_loop_exit(L_plus_1_node)
-        is_join = _is_join(L_plus_1_node)
+        #is_exit = _is_loop_exit(L_plus_1_node)
+        #is_join = _is_join(L_plus_1_node)
 
         if _is_loop_exit(L_plus_1_node) or _is_join(L_plus_1_node):
             # Look at L-1 nodes (L_start - 1) and search upward if empty
             search_line = L_start - 1
             L_minus_1_nodes = []
 
-            # Search upward until we find a line with CFG nodes (max 10 lines)
-            for _ in range(10):
-                if search_line < 1:
-                    break
+            # Search upward until we find a line with CFG nodes
+            while search_line >= 1:
                 L_minus_1_nodes = _line_nodes(search_line)
                 if L_minus_1_nodes:
                     break

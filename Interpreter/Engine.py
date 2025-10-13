@@ -145,6 +145,7 @@ class Engine:
             # ArrayVariable 등 특수 케이스가 아니면 값 평가
             if not isinstance(vobj, ArrayVariable):
                 eval_result = self.eval.evaluate_expression(init_expr, variables, None, None)
+
                 # ★ 평가 결과가 Variables 객체면 그 value를 추출
                 if isinstance(eval_result, Variables) and not isinstance(eval_result, (ArrayVariable, StructVariable, MappingVariable)):
                     vobj.value = getattr(eval_result, 'value', eval_result)
@@ -230,8 +231,66 @@ class Engine:
         return env_out
 
     # =================================================================
-    #  Loop Iteration Estimation (조건식 기반)
+    #  Loop Condition Convergence Check & Iteration Estimation
     # =================================================================
+    def _check_loop_condition_converged(self, cond_expr: Expression,
+                                       prev_env: dict[str, Variables],
+                                       curr_env: dict[str, Variables]) -> bool:
+        """
+        루프 조건식을 평가하여 조건이 수렴했는지 체크
+
+        조건식의 좌변과 우변을 각각 평가하여 둘 다 singleton으로 수렴했는지 확인
+
+        Args:
+            cond_expr: 루프 조건식
+            prev_env: 이전 iteration의 변수 환경
+            curr_env: 현재 iteration의 변수 환경
+
+        Returns:
+            True if 조건식의 좌변/우변이 모두 singleton으로 수렴
+        """
+        if cond_expr is None or not prev_env or not curr_env:
+            return False
+
+        # Binary expression이 아니면 판단 불가
+        if not (hasattr(cond_expr, 'left') and hasattr(cond_expr, 'right')):
+            return False
+
+        try:
+            # 좌변 평가
+            prev_left = self.eval.evaluate_expression(cond_expr.left, prev_env, None, None)
+            curr_left = self.eval.evaluate_expression(cond_expr.left, curr_env, None, None)
+
+            # 우변 평가
+            prev_right = self.eval.evaluate_expression(cond_expr.right, prev_env, None, None)
+            curr_right = self.eval.evaluate_expression(cond_expr.right, curr_env, None, None)
+
+            # 좌변 수렴 체크
+            left_converged = False
+            if VariableEnv.is_interval(prev_left) and VariableEnv.is_interval(curr_left):
+                prev_left_singleton = (not prev_left.is_bottom() and
+                                      prev_left.min_value == prev_left.max_value)
+                curr_left_singleton = (not curr_left.is_bottom() and
+                                      curr_left.min_value == curr_left.max_value)
+                if prev_left_singleton and curr_left_singleton:
+                    left_converged = (prev_left.min_value == curr_left.min_value)
+
+            # 우변 수렴 체크
+            right_converged = False
+            if VariableEnv.is_interval(prev_right) and VariableEnv.is_interval(curr_right):
+                prev_right_singleton = (not prev_right.is_bottom() and
+                                       prev_right.min_value == prev_right.max_value)
+                curr_right_singleton = (not curr_right.is_bottom() and
+                                       curr_right.min_value == curr_right.max_value)
+                if prev_right_singleton and curr_right_singleton:
+                    right_converged = (prev_right.min_value == curr_right.min_value)
+
+            # 좌변과 우변이 모두 수렴하면 true
+            return left_converged and right_converged
+
+        except Exception:
+            return False
+
     def _estimate_loop_iterations(self, head: CFGNode, start_env: dict) -> int:
         """
         Loop 조건식을 평가해서 예상 반복 횟수 추정
@@ -251,18 +310,22 @@ class Engine:
         if cond_expr is None:
             return 2
 
-        # 조건식 평가: tokenIndex < tokenCount
+        # 조건식 평가
         try:
             # Binary expression인지 확인
             if not hasattr(cond_expr, 'operator') or cond_expr.operator not in ['<', '<=', '>', '>=', '!=']:
                 return 2
 
-            # 좌변/우변 평가
+            # 좌변/우변 평가 (Evaluation.py 활용)
             left_val = self.eval.evaluate_expression(cond_expr.left, start_env, None, None)
             right_val = self.eval.evaluate_expression(cond_expr.right, start_env, None, None)
 
             # Interval인지 확인
             if not (VariableEnv.is_interval(left_val) and VariableEnv.is_interval(right_val)):
+                return 2
+
+            # bottom 체크
+            if left_val.is_bottom() or right_val.is_bottom():
                 return 2
 
             # 반복 횟수 계산
@@ -357,12 +420,16 @@ class Engine:
         self._suppress_stmt_records = True
 
         # Loop 반복 횟수 추정 (조건식 기반)
-        widening_threshold = (self._estimate_loop_iterations(head, in_vars[head]))+1
+        widening_threshold = (self._estimate_loop_iterations(head, in_vars[head]))
 
         # ★ widening - 초기 WL은 head만 (join 노드는 predecessor가 준비되면 자동으로 추가됨)
         W_MAX = 300
         WL = deque([head])
         iteration = 0
+
+        # 조건식 수렴 체크를 위한 변수
+        cond_expr = getattr(head, 'condition_expr', None)
+        prev_join_env = None  # 이전 iteration의 join 노드 환경
 
         while WL and max(visit_cnt.values(), default=0) < W_MAX:
             node = WL.popleft()
@@ -408,6 +475,17 @@ class Engine:
 
             equal = VariableEnv.variables_equal(out_old, out_joined)
 
+            # ★ 조건식 수렴 체크: join 노드에서 조건이 수렴했는지 확인
+            if getattr(node, "fixpoint_evaluation_node", False) and cond_expr is not None:
+                if prev_join_env is not None:
+                    # 조건식이 수렴했는지 체크
+                    if self._check_loop_condition_converged(cond_expr, prev_join_env, out_joined):
+                        out_vars[node] = out_joined
+                        # WL을 비워서 루프 조기 종료
+                        WL.clear()
+                        break
+                # 다음 iteration을 위해 현재 환경 저장
+                prev_join_env = VariableEnv.copy_variables(out_joined)
 
             if equal:
                 out_vars[node] = out_joined; continue

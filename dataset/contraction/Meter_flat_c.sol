@@ -1,7 +1,8 @@
 contract ERC20 {
     mapping (address => uint256) private _balances;
 
-    
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual {
+    }
     
     function _transfer(address sender, address recipient, uint256 amount) internal virtual {
         require(sender != address(0), "ERC20: transfer from the zero address");

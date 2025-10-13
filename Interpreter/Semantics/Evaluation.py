@@ -9,6 +9,7 @@ from Domain.Variable import Variables, ArrayVariable, StructVariable, MappingVar
 from Domain.Type import SolType
 from Domain.Interval import Interval, IntegerInterval, BoolInterval, UnsignedIntegerInterval
 from Domain.AddressSet import AddressSet
+from Domain.BytesSet import BytesSet
 from Domain.IR import Expression
 
 from Utils.Helper import VariableEnv
@@ -119,6 +120,9 @@ class Evaluation :
             return self.evaluate_member_access_context(expr, variables, callerObject, callerContext)
         elif expr.context == "IndexAccessContext":
             return self.evaluate_index_access_context(expr, variables, callerObject, callerContext)
+        elif expr.context == "MetaTypeContext":
+            # type(uint256), type(address) 등
+            return {"isType": True, "typeName": expr.typeName}
         elif expr.context == "TypeConversion":
             return self.evaluate_type_conversion_context(expr, variables, callerObject, callerContext)
         elif expr.context == "ConditionalExpContext":
@@ -329,6 +333,23 @@ class Evaluation :
             val_int = int(lit, 16)
             # ★ Set domain 사용: 구체적 address ID로 singleton set 생성
             return AddressSet(ids={val_int})
+
+        # bytes32, bytes16 등 고정 크기 바이트 배열
+        if ety and ety.startswith("bytes") and len(ety) > 5:  # "bytes32", "bytes16" 등
+            byte_size = int(ety[5:])  # "bytes32" -> 32
+            maybe_int = _parse_maybe_int(lit)
+            if maybe_int is not None:
+                # 숫자로 파싱 가능하면 BytesSet으로 처리
+                return BytesSet(values={maybe_int}, byte_size=byte_size)
+            # 16진수 문자열 시도
+            if lit.startswith("0x"):
+                try:
+                    val_int = int(lit, 16)
+                    return BytesSet(values={val_int}, byte_size=byte_size)
+                except ValueError:
+                    pass
+            # 파싱 불가능하면 심볼릭 (TOP)
+            return BytesSet.top(byte_size)
 
         if ety in ("string", "bytes"):
             maybe_int = _parse_maybe_int(lit)
@@ -623,13 +644,23 @@ class Evaluation :
                 # ★ widening으로 TOP으로 표시된 경우 (-1)
                 if baseVal.typeInfo.arrayLength == -1:
                     return UnsignedIntegerInterval(0, 2 ** 256 - 1, 256)
-                # typeInfo.arrayLength 속성이 있으면 우선 사용 (디버깅 주석 등으로 설정된 경우)
+
+                # 동적 배열의 경우: 실제 elements 길이를 우선 사용
+                # (typeInfo.arrayLength는 초기 선언 시의 값이고, 실제 길이는 elements로 결정)
+                if baseVal.typeInfo.isDynamicArray:
+                    if len(baseVal.elements) > 0:
+                        # elements가 있으면 그 길이 반환
+                        ln = len(baseVal.elements)
+                        return UnsignedIntegerInterval(ln, ln, 256)
+                    else:
+                        # 빈 동적 배열: TOP 반환 (알 수 없는 길이)
+                        return UnsignedIntegerInterval(0, 2 ** 256 - 1, 256)
+
+                # 정적 배열의 경우: typeInfo.arrayLength 사용
                 elif baseVal.typeInfo.arrayLength is not None:
                     return UnsignedIntegerInterval(baseVal.typeInfo.arrayLength, baseVal.typeInfo.arrayLength, 256)
-                elif baseVal.typeInfo.isDynamicArray and len(baseVal.elements) == 0:
-                    # 아직 push 된 적이 없는 완전 "빈" 동적 배열
-                    # ⇒ 0‥2²⁵⁶-1  (UInt256 TOP) 로 보수적으로 가정
-                    return UnsignedIntegerInterval(0, 2 ** 256 - 1, 256)
+
+                # 기타: elements 길이 반환
                 else:
                     ln = len(baseVal.elements)
                     return UnsignedIntegerInterval(ln, ln, 256)
@@ -718,7 +749,9 @@ class Evaluation :
         # 5. Solidity type(uint).max / min  (baseVal == dict with "isType")
         # ──────────────────────────────────────────────────────────────
         if isinstance(baseVal, dict) and baseVal.get("isType"):
-            T = baseVal["typeName"]
+            T = baseVal.get("typeName")
+            if T is None:
+                raise ValueError(f"typeName is None in type() member access for '{member}'")
             if member not in {"max", "min"}:
                 raise ValueError(f"Unsupported type property '{member}' for {T}")
 
@@ -840,8 +873,30 @@ class Evaluation :
                 return AddressSet(ids={addr_int})
             return AddressSet.top()  # 기타 → symbolic TOP
 
+        # bytes32, bytes16 등 고정 크기 바이트 배열 타입 변환
+        elif type_name.startswith("bytes") and len(type_name) > 5:
+            byte_size = int(type_name[5:])  # "bytes32" -> 32
+            # 이미 BytesSet이면 그대로
+            if isinstance(sub_val, BytesSet):
+                return sub_val
+            # uint/int → bytes: singleton이면 구체적 값, 아니면 TOP
+            if isinstance(sub_val, (UnsignedIntegerInterval, IntegerInterval)):
+                if sub_val.is_bottom():
+                    return BytesSet.bot(byte_size)
+                if sub_val.min_value == sub_val.max_value:
+                    return BytesSet(values={sub_val.min_value}, byte_size=byte_size)
+                return BytesSet.top(byte_size)
+            # 16진수 문자열 → bytes
+            if isinstance(sub_val, str) and sub_val.startswith("0x"):
+                try:
+                    val_int = int(sub_val, 16)
+                    return BytesSet(values={val_int}, byte_size=byte_size)
+                except ValueError:
+                    pass
+            return BytesSet.top(byte_size)  # 기타 → symbolic TOP
+
         else:
-            # 그 외( bytesNN, string, etc. ) => 필요 시 구현
+            # 그 외( string, etc. ) => 필요 시 구현
             return f"symbolicTypeConversion({type_name}, {sub_val})"
 
     def evaluate_conditional_expression_context(self, expr, variables, callerObject=None, callerContext=None):
@@ -1029,6 +1084,15 @@ class Evaluation :
                 else:
                     # <, >, <=, >= 는 address에 대해 정의되지 않음
                     result = BoolInterval.top()
+            # ★ BytesSet 비교
+            elif isinstance(leftInterval, BytesSet) and isinstance(rightInterval, BytesSet):
+                if operator == '==':
+                    result = leftInterval.equals(rightInterval)
+                elif operator == '!=':
+                    result = leftInterval.not_equals(rightInterval)
+                else:
+                    # <, >, <=, >= 는 bytes에 대해 정의되지 않음 (Solidity에서)
+                    result = BoolInterval.top()
             # 두 피연산자가 모두 Interval 계열인지 검사
             elif not (isinstance(leftInterval, (IntegerInterval,
                                               UnsignedIntegerInterval,
@@ -1060,9 +1124,17 @@ class Evaluation :
             member = getattr(expr.function, 'member', None)
             if member in ['call', 'delegatecall', 'staticcall']:
                 # address.call{value: ...}("") returns (bool success, bytes memory data)
-                # Return Top for success (bool)
-                return BoolInterval.top()
+                # Return tuple: [BoolInterval.top(), symbolic_bytes]
+                return [BoolInterval.top(), "symbolic_bytes_data"]
             return self.evaluate_expression(expr.function, variables, None, "functionCallContext")
+        elif expr.function.context == "FunctionCallOptionContext":
+            # This handles: to.call{value: value}(...)
+            # The outer call is FunctionCallContext, inner is FunctionCallOptionContext
+            inner_result = self.evaluate_function_call_option_context(expr.function, variables, callerObject, callerContext)
+            # If inner is call/delegatecall/staticcall, return tuple
+            if isinstance(inner_result, str) and any(call_type in inner_result for call_type in ['call', 'delegatecall', 'staticcall']):
+                return [BoolInterval.top(), "symbolic_bytes_data"]
+            return inner_result
         elif expr.function.context == "IdentifierExpContext":
             function_name = expr.function.identifier
         else:
@@ -1451,7 +1523,12 @@ class Evaluation :
         elif var_type == "address":
             return AddressSet(ids={0})  # address의 기본값 0 (singleton set)
 
-        # 5. 기타 처리 (필요시 확장 가능)
+        # 5. bytes32, bytes16 등 고정 크기 바이트 배열 - 기본값은 bytes32(0)
+        elif var_type.startswith("bytes") and len(var_type) > 5:
+            byte_size = int(var_type[5:])  # "bytes32" -> 32
+            return BytesSet(values={0}, byte_size=byte_size)  # bytes32의 기본값 0
+
+        # 6. 기타 처리 (필요시 확장 가능)
         else:
             raise ValueError(f"Unsupported type for default interval: {var_type}")
 
@@ -1463,15 +1540,25 @@ class Evaluation :
         1) 구조체 생성자: StructName({ field1: val1, field2: val2 })
         2) 함수 호출 옵션: contract.func{value: 1 ether, gas: 5000}(args)
         """
+        # Check if it's a MemberAccess with call/delegatecall/staticcall
+        if expr.function and hasattr(expr.function, 'context') and expr.function.context == "MemberAccessContext":
+            member = getattr(expr.function, 'member', None)
+            if member in ['call', 'delegatecall', 'staticcall']:
+                # This is the case: address.call{value: ...}
+                # Return marker that will be handled by outer FunctionCallContext
+                return f"symbolicFunctionCallOptions({member})"
+
         # expr.function이 구조체 타입 이름인지 확인
         if expr.function and expr.function.context == "IdentifierExpContext":
             struct_name = expr.function.identifier
 
+            # 현재 컨트랙트 CFG에서 구조체 정의 가져오기
+            ccf = self.an.contract_cfgs[self.an.current_target_contract]
+
             # 구조체인지 확인
-            if struct_name in self.an.structs:
+            if struct_name in ccf.structDefs:
                 # 구조체 생성자: 새 StructVariable 생성
-                struct_def = self.an.structs[struct_name]
-                ccf = self.an.contract_cfgs[self.an.current_target_contract]
+                struct_def = ccf.structDefs[struct_name]
 
                 new_struct = StructVariable(
                     identifier=f"temp_{struct_name}_{id(expr)}",

@@ -319,6 +319,10 @@ class StaticCFGFactory:
                 v.value = BoolInterval.top()
             elif et == "address":
                 v.value = AddressSet.top()
+            elif et.startswith("bytes") and len(et) > 5:  # bytes32, bytes16 등
+                from Domain.BytesSet import BytesSet
+                byte_size = int(et[5:])  # "bytes32" -> 32
+                v.value = BytesSet.top(byte_size)
             else:  # bytes / string …
                 v.value = f"symbol_{ident}"
 

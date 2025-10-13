@@ -1,6 +1,7 @@
 from Domain.Interval import *
 from Domain.Type import SolType
 from Domain.AddressSet import AddressSet
+from Domain.BytesSet import BytesSet
 import copy
 
 class Variables:
@@ -370,6 +371,9 @@ class MappingVariable(Variables):
             v.value = BoolInterval.top()
         elif et == "address":
             v.value = AddressSet.top()   # TOP 주소
+        elif et.startswith("bytes") and len(et) > 5:  # bytes32, bytes16 등
+            byte_size = int(et[5:])  # "bytes32" -> 32
+            v.value = BytesSet.top(byte_size)  # TOP bytes
         else:                               # string / bytes 등
             v.value = f"symbol_{sub_id}"
         return v
@@ -523,6 +527,9 @@ class StructVariable(Variables):
                 v.value = BoolInterval.top()
             elif et == "address":
                 v.value = AddressSet.top()
+            elif et.startswith("bytes") and len(et) > 5:  # bytes32, bytes16 등
+                byte_size = int(et[5:])  # "bytes32" -> 32
+                v.value = BytesSet.top(byte_size)  # TOP bytes
             else:
                 # string / bytes / 기타
                 v.value = f"symbol_{var_id}"

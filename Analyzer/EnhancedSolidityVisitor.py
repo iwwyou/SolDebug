@@ -838,30 +838,67 @@ class EnhancedSolidityVisitor(SolidityVisitor):
 
     # Visit a parse tree produced by SolidityParser#interactiveVariableDeclarationStatement.
     def visitInteractiveVariableDeclarationStatement(self, ctx:SolidityParser.InteractiveVariableDeclarationStatementContext):
-        # 1. 변수 선언 정보 가져오기
-        type_ctx = ctx.variableDeclaration().typeName()
-        var_name = ctx.variableDeclaration().identifier().getText()
+        # Check if this is a tuple declaration like (bool success, ) = ...
+        if ctx.variableDeclarationTuple():
+            tuple_ctx = ctx.variableDeclarationTuple()
+            init_expr = None
+            if ctx.expression():
+                init_expr = self.visitExpression(ctx.expression())
 
-        # dataLocation?  (memory / storage / calldata)
-        data_loc = None
-        #if ctx.dataLocation():
-        #    data_loc = ctx.dataLocation().getText()  # 'storage' 등
+            # Collect all variable declarations in the tuple
+            var_declarations = []
+            var_decls = tuple_ctx.variableDeclaration()
 
-        # 2. 초기화 값이 있는 경우 처리
-        init_expr = None
-        if ctx.expression():
-            init_expr = self.visitExpression(ctx.expression())
+            for var_decl in var_decls:
+                if var_decl is None:  # Handle empty slots like (bool success, )
+                    continue
 
-        # 3. 변수 타입 정보 분석 및 적절한 Variables 객체 생성
-        type_obj = SolType()
-        type_obj = self.visitTypeName(type_ctx, type_obj)  # 타입 정보 분석
+                type_ctx = var_decl.typeName()
+                var_name = var_decl.identifier().getText()
 
-        # 5. ContractAnalyzer로 Variables 객체 및 lineComment 전달
-        self.contract_analyzer.process_variable_declaration(
-            type_obj=type_obj,
-            var_name=var_name,
-            init_expr=init_expr
-        )
+                # Create type object
+                type_obj = SolType()
+                type_obj = self.visitTypeName(type_ctx, type_obj)
+
+                var_declarations.append((type_obj, var_name))
+
+            # Process tuple declaration
+            self.contract_analyzer.process_variable_declaration_tuple(
+                var_declarations=var_declarations,
+                init_expr=init_expr
+            )
+            return
+
+        # Handle single variable declaration like uint256 x = 5;
+        if ctx.variableDeclaration():
+            # 1. 변수 선언 정보 가져오기
+            type_ctx = ctx.variableDeclaration().typeName()
+            var_name = ctx.variableDeclaration().identifier().getText()
+
+            # dataLocation?  (memory / storage / calldata)
+            data_loc = None
+            #if ctx.dataLocation():
+            #    data_loc = ctx.dataLocation().getText()  # 'storage' 등
+
+            # 2. 초기화 값이 있는 경우 처리
+            init_expr = None
+            if ctx.expression():
+                init_expr = self.visitExpression(ctx.expression())
+
+            # 3. 변수 타입 정보 분석 및 적절한 Variables 객체 생성
+            type_obj = SolType()
+            type_obj = self.visitTypeName(type_ctx, type_obj)  # 타입 정보 분석
+
+            # 5. ContractAnalyzer로 Variables 객체 및 lineComment 전달
+            self.contract_analyzer.process_variable_declaration(
+                type_obj=type_obj,
+                var_name=var_name,
+                init_expr=init_expr
+            )
+            return
+
+        # If neither, just visit children
+        return self.visitChildren(ctx)
 
     # Visit a parse tree produced by SolidityParser#interactiveExpressionStatement.
     def visitInteractiveExpressionStatement(self, ctx:SolidityParser.InteractiveExpressionStatementContext):
@@ -1498,7 +1535,7 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         grammar:
             MetaType : 'type' '(' typeName ')'   (#에 해당)
         반환값은 이후의 MemberAccess(.max / .min 등)를 처리하기 위해
-        base-expression 역할만 하면 되므로 ‘identifier’ 하나만 넣어둔다.
+        base-expression 역할만 하면 되므로 'identifier' 하나만 넣어둔다.
         """
         # ① 안쪽 typeName 을 소스 그대로 추출
         type_name_txt = ctx.typeName().getText()  # 예: 'uint256'
@@ -1506,8 +1543,10 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         # ② Expression 생성
         #    identifier = 'type(uint256)'  로 두고
         #    context    = 'MetaTypeContext' 로 구분만 해둔다.
+        #    typeName   = type_name_txt 로 설정하여 evaluate_expression에서 사용
         return Expression(
             identifier=f"type({type_name_txt})",
+            typeName=type_name_txt,
             context="MetaTypeContext"
         )
 
@@ -1516,7 +1555,12 @@ class EnhancedSolidityVisitor(SolidityVisitor):
         # print(f"[DEBUG] visitFunctionCallOptions called: {ctx.getText()[:100]}")
 
         # 1. 베이스 표현식 방문
-        base_expr = self.visitExpression(ctx.expression())
+        # ctx.expression() can return a list or a single object
+        expr_result = ctx.expression()
+        if isinstance(expr_result, list):
+            base_expr = self.visitExpression(expr_result[0]) if expr_result else None
+        else:
+            base_expr = self.visitExpression(expr_result)
 
         # 2. 옵션 매개변수 처리
         options = {}

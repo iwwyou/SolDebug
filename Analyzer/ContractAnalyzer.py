@@ -717,7 +717,9 @@ class ContractAnalyzer:
                 elif et == "address":
                     # 초기화식이 없으면 TOP AddressSet
                     variable_obj.value = AddressSet.top()
-
+                elif et.startswith("bytes") and len(et) > 5:  # bytes32, bytes16 등
+                    # bytes32의 기본값은 bytes32(0)
+                    variable_obj.value = self.evaluator.calculate_default_interval(et)
                 # (string / bytes 등 - 추상화 안 할 타입은 심볼릭 문자열 그대로)
                 else:
                     variable_obj.value = f"symbol_{variable_obj.identifier}"
@@ -836,6 +838,7 @@ class ContractAnalyzer:
 
         # 3) CFG 저장
         self.line_info[self.current_start_line]['cfg_nodes'] = [mod_cfg.get_entry_node()]
+        self.line_info[self.current_end_line]['cfg_nodes'] = [mod_cfg.get_exit_node()]
 
     # ContractAnalyzer.py  ----------------------------------------------
 
@@ -898,24 +901,15 @@ class ContractAnalyzer:
         if exit_node not in self.line_info[self.current_end_line]["cfg_nodes"]:
             self.line_info[self.current_end_line]["cfg_nodes"].append(exit_node)
 
-    def process_variable_declaration(
+    def _create_variable_object(
             self,
             type_obj: SolType,
             var_name: str,
-            init_expr: Expression | None = None
-    ):
-
-        ccf = self.contract_cfgs[self.current_target_contract]
-        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
-        if self.current_target_function_cfg is None:
-            raise ValueError("variableDeclaration: active FunctionCFG not found")
-        fcfg = self.current_target_function_cfg
-
-        cur_blk = self.builder.get_current_block()
-
-        # ───────────────────────────────────────────────────────────────
-        # 2. 변수 객체 생성
-        # ----------------------------------------------------------------
+            ccf
+    ) -> Variables | ArrayVariable | StructVariable | MappingVariable | EnumVariable:
+        """
+        Helper function to create a variable object based on type information.
+        """
         v: Variables | ArrayVariable | StructVariable | MappingVariable | EnumVariable
 
         # 2-A  배열
@@ -953,6 +947,28 @@ class ContractAnalyzer:
         else:
             v = Variables(identifier=var_name, scope="local")
             v.typeInfo = type_obj
+
+        return v
+
+    def process_variable_declaration(
+            self,
+            type_obj: SolType,
+            var_name: str,
+            init_expr: Expression | None = None
+    ):
+
+        ccf = self.contract_cfgs[self.current_target_contract]
+        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+        if self.current_target_function_cfg is None:
+            raise ValueError("variableDeclaration: active FunctionCFG not found")
+        fcfg = self.current_target_function_cfg
+
+        cur_blk = self.builder.get_current_block()
+
+        # ───────────────────────────────────────────────────────────────
+        # 2. 변수 객체 생성 (헬퍼 함수 사용)
+        # ----------------------------------------------------------------
+        v = self._create_variable_object(type_obj, var_name, ccf)
 
         if init_expr is None:
             # ── 배열 기본
@@ -997,6 +1013,10 @@ class ContractAnalyzer:
                     v.value = BoolInterval.top()
                 elif et == "address":
                     v.value = AddressSet.top()
+                elif et.startswith("bytes") and len(et) > 5:  # bytes32, bytes16 등
+                    from Domain.BytesSet import BytesSet
+                    byte_size = int(et[5:])  # "bytes32" -> 32
+                    v.value = BytesSet.top(byte_size)
                 else:  # bytes/string
                     v.value = f"symbol_{var_name}"
 
@@ -1064,6 +1084,161 @@ class ContractAnalyzer:
         ccf.functions[self.current_target_function] = self.current_target_function_cfg
         self.contract_cfgs[self.current_target_contract] = ccf
         self.current_target_function_cfg = None
+
+    def process_variable_declaration_tuple(
+            self,
+            var_declarations: list[tuple[SolType, str]],  # [(type_obj, var_name), ...]
+            init_expr: Expression | None = None
+    ):
+        """
+        튜플 변수 선언 처리
+        예: (bool success, bytes memory data) = addr.call(...)
+
+        여러 변수를 한꺼번에 선언하므로, CFG 업데이트는 한 번만 수행
+        """
+        ccf = self.contract_cfgs[self.current_target_contract]
+        self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+        if self.current_target_function_cfg is None:
+            raise ValueError("variableDeclarationTuple: active FunctionCFG not found")
+        fcfg = self.current_target_function_cfg
+
+        cur_blk = self.builder.get_current_block()
+
+        # 각 변수 객체 생성 및 초기화
+        var_objects = []
+        for idx, (type_obj, var_name) in enumerate(var_declarations):
+            v = self._create_variable_object(type_obj, var_name, ccf)
+
+            # ───────────────────────────────────────────────────────────────
+            # init_expr가 있는 경우: 튜플 expression 결과에서 해당 인덱스 추출
+            # ───────────────────────────────────────────────────────────────
+            if init_expr is not None:
+                # init_expr를 evaluate하면 tuple 결과가 나올 수 있음
+                # 현재는 간단하게 평가하되, 튜플 결과는 리스트로 가정
+                resolved = self.evaluator.evaluate_expression(init_expr,
+                                                              cur_blk.variables, None, None)
+
+                # resolved가 튜플/리스트인 경우 idx번째 요소 사용
+                if isinstance(resolved, (list, tuple)) and idx < len(resolved):
+                    init_val = resolved[idx]
+
+                    # 구조체/배열/매핑
+                    if isinstance(init_val, (StructVariable, ArrayVariable, MappingVariable)):
+                        v = VariableEnv.deep_clone_variable(init_val, var_name)
+
+                    # enum 초기화
+                    elif isinstance(v, EnumVariable):
+                        enum_def = ccf.enumDefs.get(v.typeInfo.enumTypeName)
+                        if enum_def is None:
+                            raise ValueError(f"undefined enum {v.typeInfo.enumTypeName}")
+
+                        if isinstance(init_val, EnumVariable):
+                            v.valueIndex = init_val.valueIndex
+                            v.value = init_val.value
+                        elif isinstance(init_val, str) and not init_val.isdigit():
+                            member = init_val.split('.')[-1]
+                            v.valueIndex = enum_def.members.index(member)
+                            v.value = member
+                        else:  # 숫자
+                            idx_num = int(init_val, 0)
+                            v.valueIndex = idx_num
+                            v.value = enum_def.members[idx_num]
+
+                    # 나머지 (elementary)
+                    else:
+                        if isinstance(v, ArrayVariable):
+                            for e in init_val:
+                                v.elements.append(e)
+                        elif isinstance(v, Variables):
+                            v.value = init_val
+                        elif isinstance(v, StructVariable) and isinstance(init_val, StructVariable):
+                            v.copy_from(init_val)
+
+                else:
+                    # 튜플 결과가 아니거나 인덱스 범위 밖 → 기본 초기화
+                    self._initialize_variable_default(v, ccf, var_name)
+
+            # ───────────────────────────────────────────────────────────────
+            # init_expr가 없는 경우: 기본 초기화
+            # ───────────────────────────────────────────────────────────────
+            else:
+                self._initialize_variable_default(v, ccf, var_name)
+
+            var_objects.append((v, type_obj))
+
+        # CFG 빌더 / 레코더 위임 (튜플 전체를 한 statement로 처리)
+        stmt_blk = self.builder.build_variable_declaration_tuple(
+            cur_block=cur_blk,
+            var_objects=var_objects,
+            init_expr=init_expr,
+            line_no=self.current_start_line,
+            fcfg=fcfg,
+            line_info=self.line_info,
+        )
+
+        # 레코더 기록 (loop body인 경우)
+        if stmt_blk.is_loop_body:
+            for v, type_obj in var_objects:
+                self.recorder.record_variable_declaration(
+                    line_no=self.current_start_line,
+                    var_name=v.identifier,
+                    var_obj=v,
+                )
+
+        # reinterpret (한 번만)
+        self.engine.reinterpret_from(fcfg, stmt_blk)
+
+        # 저장 & 정리
+        ccf.functions[self.current_target_function] = fcfg
+        self.contract_cfgs[self.current_target_contract] = ccf
+        self.current_target_function_cfg = None
+
+    def _initialize_variable_default(self, v, ccf, var_name):
+        """Helper function to initialize variable with default values."""
+        # 배열 기본
+        if isinstance(v, ArrayVariable):
+            bt = v.typeInfo.arrayBaseType
+            if isinstance(bt, SolType):
+                et = bt.elementaryTypeName
+                if et and et.startswith("int"):
+                    bits = bt.intTypeLength or 256
+                    v.initialize_elements(IntegerInterval.top(bits))
+                elif et and et.startswith("uint"):
+                    bits = bt.intTypeLength or 256
+                    v.initialize_elements(UnsignedIntegerInterval.top(bits))
+                elif et == "bool":
+                    v.initialize_elements(BoolInterval.top())
+                else:
+                    v.initialize_not_abstracted_type()
+
+        # 구조체 기본
+        elif isinstance(v, StructVariable):
+            if v.typeInfo.structTypeName not in ccf.structDefs:
+                raise ValueError(f"Undefined struct {v.typeInfo.structTypeName}")
+            v.initialize_struct(ccf.structDefs[v.typeInfo.structTypeName])
+
+        # enum 기본 (첫 멤버)
+        elif isinstance(v, EnumVariable):
+            enum_def = ccf.enumDefs.get(v.typeInfo.enumTypeName)
+            if enum_def:
+                v.valueIndex = 0
+                v.value = enum_def.members[0]
+
+        # elementary 기본
+        elif isinstance(v, Variables):
+            et = v.typeInfo.elementaryTypeName
+            if et.startswith("int"):
+                type_len = v.typeInfo.intTypeLength or 256
+                v.value = IntegerInterval.top(type_len)
+            elif et.startswith("uint"):
+                type_len = v.typeInfo.intTypeLength or 256
+                v.value = UnsignedIntegerInterval.top(type_len)
+            elif et == "bool":
+                v.value = BoolInterval.top()
+            elif et == "address":
+                v.value = AddressSet.top()
+            else:  # bytes/string
+                v.value = f"symbol_{var_name}"
 
     # Analyzer/ContractAnalyzer.py
     def process_assignment_expression(self, expr: Expression) -> None:
@@ -2062,9 +2237,6 @@ class ContractAnalyzer:
             if self.current_target_function_cfg is None:
                 raise ValueError("@StateVar must be inside a function.")
 
-            # print(f"DEBUG: Processing @StateVar, current_target_function: {self.current_target_function}")
-            # print(f"DEBUG: lhs_expr: {lhs_expr}, value: {value}")
-
             self.debug_initializer.apply_debug_directive_enhanced(
                 scope="state",
                 lhs_expr=lhs_expr,
@@ -2075,7 +2247,6 @@ class ContractAnalyzer:
 
             # 함수 다시 해석하도록 배치
             self._batch_targets.add(self.current_target_function_cfg)
-            # print(f"DEBUG: Added to batch_targets, now has {len(self._batch_targets)} items")
         except Exception as e:
             print(f"ERROR in process_state_var_for_debug: {e}")
             import traceback
@@ -2124,14 +2295,11 @@ class ContractAnalyzer:
         if patched_lines:
             for _code, s, e in patched_lines:
                 touched.update(range(s, e + 1))
-            # print(f"DEBUG send_report: Using patched_lines, touched={touched}")
         elif getattr(self, "_last_func_lines", None):
             s, e = self._last_func_lines
             touched.update(range(s, e + 1))
-            # print(f"DEBUG send_report: Using _last_func_lines ({s}, {e}), touched={touched}")
         elif getattr(self, "_last_touched_lines", None):
             touched |= set(self._last_touched_lines)
-            # print(f"DEBUG send_report: Using _last_touched_lines, touched={touched}")
 
         if not touched:
             print("※ send_report_to_front : 보여줄 라인이 없습니다.")

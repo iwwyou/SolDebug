@@ -236,15 +236,12 @@ class Update :
 
             if log :
                 actual_line = line_no if line_no is not None else self.an.current_start_line
-                print(f"DEBUG Update(MemberAccess-Global): Recording line={actual_line}, key={key}, operator={operator}, value={getattr(entry, 'value', None)}")
                 self.an.recorder.record_assignment(
                     line_no=actual_line,
                     expr=top_expr if top_expr else expr,
                     var_obj=entry,
                     base_obj=callerObject,
                 )
-            else:
-                print(f"DEBUG Update(MemberAccess-Global): NOT recording (log={log}) line={line_no if line_no is not None else self.an.current_start_line}, key={key}")
             return None
 
         if isinstance(base_obj, MappingVariable):

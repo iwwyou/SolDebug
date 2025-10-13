@@ -132,6 +132,18 @@
     "event": "add"
   },
   {
+    "code": "// @LocalVar from = symbolicAddress 1;",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar to = symbolicAddress 2;",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
     "code": "// @Debugging END",
     "startLine": 10,
     "endLine": 10,
