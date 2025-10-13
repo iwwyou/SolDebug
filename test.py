@@ -77,7 +77,7 @@ def simulate_inputs(records):
 
 test_inputs = [
   {
-    "code": "contract TimeLocPool {\n}",
+    "code": "contract TimeLockPool {\n}",
     "startLine": 1,
     "endLine": 2,
     "event": "add"
@@ -156,6 +156,42 @@ test_inputs = [
   },
   {
     "code": "        return total;",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar depositsOf[_account][0].amount = [100,200];",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar depositsOf[_account][1].amount = [200,300];",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar depositsOf[_account][2].amount = [400,500];",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar _account = symbolicAddress 1;",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
     "startLine": 16,
     "endLine": 16,
     "event": "add"

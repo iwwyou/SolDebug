@@ -15,6 +15,7 @@ from Utils.Helper import VariableEnv
 
 from decimal import Decimal, InvalidOperation
 import re
+import copy
 
 class Evaluation :
 
@@ -31,6 +32,83 @@ class Evaluation :
     @property
     def engine(self):
         return self.an.engine          # Engine 싱글톤
+
+    # ──────────────────── Helper functions ───────────────────────────
+    def _join_struct_fields(self, struct_list):
+        """
+        구조체 리스트의 각 필드를 join하여 하나의 구조체 반환
+        """
+        if not struct_list:
+            return None
+
+        # 첫 구조체를 복사하여 결과 구조체 생성
+        result = copy.deepcopy(struct_list[0])
+
+        # 각 필드별로 모든 구조체의 값을 join
+        for field_name in result.members:
+            values = []
+            for s in struct_list:
+                if field_name in s.members:
+                    field_var = s.members[field_name]
+                    if isinstance(field_var, (StructVariable, ArrayVariable, MappingVariable)):
+                        # 복합 타입은 join 불가 - 첫 번째 것 사용
+                        values.append(field_var)
+                        break
+                    else:
+                        values.append(field_var.value)
+
+            # join 수행
+            if values:
+                joined_val = values[0]
+                for v in values[1:]:
+                    if hasattr(joined_val, 'join') and hasattr(v, 'join'):
+                        joined_val = joined_val.join(v)
+
+                # 결과 저장
+                if isinstance(result.members[field_name], Variables):
+                    result.members[field_name].value = joined_val
+
+        return result
+
+    def _join_array_elements_virtually(self, array, index_range):
+        """
+        배열을 수정하지 않고 가상으로 요소 생성하여 join
+        """
+        l, r = index_range
+        span = r - l
+
+        # 샘플링할 인덱스 결정 (최대 20개)
+        if span > 20:
+            sample_indices = [l + i * span // 20 for i in range(21)]
+        else:
+            sample_indices = list(range(l, r + 1))
+
+        joined = None
+        for idx in sample_indices:
+            # 기존 요소가 있으면 사용, 없으면 가상으로 생성
+            if idx < len(array.elements):
+                elem = array.elements[idx]
+            else:
+                elem = array._create_element_virtual(idx)
+
+            # join 로직
+            if isinstance(elem, StructVariable):
+                # 구조체는 각 필드별로 join
+                if joined is None:
+                    joined = copy.deepcopy(elem)
+                else:
+                    # 구조체의 각 필드 join
+                    for field in elem.members:
+                        if field in joined.members:
+                            elem_val = elem.members[field].value if hasattr(elem.members[field], 'value') else elem.members[field]
+                            joined_val = joined.members[field].value if hasattr(joined.members[field], 'value') else joined.members[field]
+                            if hasattr(elem_val, 'join') and hasattr(joined_val, 'join'):
+                                joined.members[field].value = joined_val.join(elem_val)
+            else:
+                val = elem.value if hasattr(elem, 'value') else elem
+                joined = val if joined is None else joined.join(val)
+
+        return joined
 
     def evaluate_expression(self, expr: Expression, variables, callerObject=None, callerContext=None):
         if expr.context == "LiteralExpContext":
@@ -199,7 +277,11 @@ class Evaluation :
                 idx = int(lit)
                 if idx < 0 or idx >= len(callerObject.elements):
                     raise IndexError(f"Index {idx} out of range for array '{callerObject.identifier}'")
-                return callerObject.elements[idx]  # element (Variables | …)
+                elem = callerObject.elements[idx]
+                # 구조체나 배열 등 복합 타입이면 객체 자체 반환, 기본 타입이면 .value 반환
+                if isinstance(elem, (StructVariable, ArrayVariable, MappingVariable)):
+                    return elem
+                return elem.value if hasattr(elem, "value") else elem
 
             # 1-B) 매핑 키 – 문자열·hex·decimal 모두 허용
             if isinstance(callerObject, MappingVariable):
@@ -290,19 +372,51 @@ class Evaluation :
                         else:
                             # 주소/bytes/string 등은 symbol
                             return f"symbolic_{callerObject.identifier}[{idx}]"
-                    return callerObject.elements[idx]
+
+                    elem = callerObject.elements[idx]
+                    # 구조체나 배열 등 복합 타입이면 객체 자체 반환, 기본 타입이면 .value 반환
+                    if isinstance(elem, (StructVariable, ArrayVariable, MappingVariable)):
+                        return elem
+                    return elem.value if hasattr(elem, "value") else elem
 
                 # ── (B) 불확정(bottom 또는 [l,r] 범위) ─────────────────
-                #      ⇒  배열 모든 요소의 join 을 반환
+                #      ⇒  배열 모든 요소의 join 을 반환 (구조체 포함)
                 if callerObject.elements:
-                    joined = None
-                    for elem in callerObject.elements:
-                        val = getattr(elem, "value", elem)  # 스칼라 / 복합 둘 다 지원
-                        joined = val if joined is None else joined.join(val)
-                    return joined
+                    first_elem = callerObject.elements[0]
 
-                # 배열이 비어 있으면 base-type 에 맞는 TOP 반환 (알 수 없는 값)
+                    # 구조체 배열: 각 필드를 join하여 필드마다 TOP으로 만든 구조체 반환
+                    if isinstance(first_elem, StructVariable):
+                        return self._join_struct_fields(callerObject.elements)
+
+                    # 기본 타입: 모든 값 join
+                    elif not isinstance(first_elem, (ArrayVariable, MappingVariable)):
+                        joined = None
+                        for elem in callerObject.elements:
+                            val = getattr(elem, "value", elem)
+                            joined = val if joined is None else joined.join(val)
+                        return joined
+
+                    # 배열/매핑 중첩: 첫 요소 그대로 반환 (복잡도 제한)
+                    else:
+                        return first_elem
+
+                # 배열이 비어 있으면 base-type 에 맞는 TOP 반환
                 base_t = callerObject.typeInfo.arrayBaseType
+
+                # 구조체: 빈 구조체 생성 후 초기화
+                if isinstance(base_t, SolType) and base_t.typeCategory == "struct":
+                    empty_struct = StructVariable(
+                        f"{callerObject.identifier}[virtual]",
+                        base_t.structTypeName,
+                        scope=callerObject.scope
+                    )
+                    # struct_defs가 필요하면 ContractAnalyzer에서 가져오기
+                    ccf = self.an.contract_cfgs[self.an.current_target_contract]
+                    if base_t.structTypeName in ccf.structDefs:
+                        empty_struct.initialize_struct(ccf.structDefs[base_t.structTypeName])
+                    return empty_struct
+
+                # 기본형: TOP interval
                 if base_t.elementaryTypeName and base_t.elementaryTypeName.startswith("uint"):
                     bits = base_t.intTypeLength or 256
                     return UnsignedIntegerInterval.top(bits)
@@ -311,7 +425,10 @@ class Evaluation :
                     return IntegerInterval.top(bits)
                 if base_t.elementaryTypeName and base_t.elementaryTypeName == "bool":
                     return BoolInterval.top()
-                # 주소/bytes/string 등은 symbol 로
+                if base_t.elementaryTypeName and base_t.elementaryTypeName == "address":
+                    return AddressSet.top()
+
+                # 기타
                 return f"symbolic_{callerObject.identifier}[<unk>]"
 
             elif isinstance(callerObject, StructVariable):
@@ -1195,13 +1312,28 @@ class Evaluation :
             return et == "address"
 
         if isinstance(callerObject, ArrayVariable):
-            # 숫자/인터벌이 아니면 그대로 symbolic
+            # 숫자/인터벌이 아니면 그대로 symbolic (fallback)
             if not hasattr(result, "min_value"):
-                return f"symbolicIndex({callerObject.identifier}[{result}])"
+                # 가상 생성 시도
+                return self._join_array_elements_virtually(callerObject, (0, 0))
 
-            # bottom → symbolic
+            # bottom → 빈 구조체 또는 TOP interval
             if result.is_bottom():
-                return f"symbolicIndex({callerObject.identifier}[BOTTOM])"
+                base_t = callerObject.typeInfo.arrayBaseType
+                if isinstance(base_t, SolType) and base_t.typeCategory == "struct":
+                    empty_struct = StructVariable(
+                        f"{callerObject.identifier}[bottom]",
+                        base_t.structTypeName,
+                        scope=callerObject.scope
+                    )
+                    ccf = self.an.contract_cfgs[self.an.current_target_contract]
+                    if base_t.structTypeName in ccf.structDefs:
+                        empty_struct.initialize_struct(ccf.structDefs[base_t.structTypeName])
+                    return empty_struct
+                elif array_base_is_address(callerObject):
+                    return AddressSet.top()
+                else:
+                    return f"symbolicIndex({callerObject.identifier}[BOTTOM])"
 
             l, r = result.min_value, result.max_value
 
@@ -1210,78 +1342,94 @@ class Evaluation :
                 try:
                     elem = callerObject.get_or_create_element(l)
                 except IndexError:
-                    return f"symbolicIndex({callerObject.identifier}[{l}])"
+                    # 범위 밖: 가상 생성
+                    elem = callerObject._create_element_virtual(l)
+                if isinstance(elem, (StructVariable, ArrayVariable, MappingVariable)):
+                    return elem
                 return elem.value if hasattr(elem, "value") else elem
 
-            # ─── (B) 범위 [l..r]  → join  ─────────────────────
-            span = r - l
-            # ① 범위가 너무 넓거나(≳1024) + 동적 배열이 비어 있으면 ⇒ TOP
-            if span > 1024 or (callerObject.typeInfo.isDynamicArray and len(callerObject.elements) == 0):
-                if array_base_is_address(callerObject):
-                    # ★ address 배열의 경우 AddressSet TOP 반환
-                    return AddressSet.top()
-                return f"symbolicIndexRange({callerObject.identifier}[{result}])"
+            # ─── (B) 범위 [l..r]  → 가상 생성 + join  ─────────────────────
+            return self._join_array_elements_virtually(callerObject, (l, r))
 
-            joined = None
-            for idx in range(l, r + 1):
-                try:
-                    elem = callerObject.get_or_create_element(idx)
-                except IndexError:
-                    return f"symbolicIndexRange({callerObject.identifier}[{result}])"
-
-                val = elem.value if hasattr(elem, "value") else elem
-                if hasattr(val, "join"):
-                    joined = val if joined is None else joined.join(val)
-                else:
-                    return f"symbolicMixedType({callerObject.identifier}[{result}])"
-
-            return joined
-
-        # 3) callerObject가 MappingVariable인 경우 (비슷한 로직 확장 가능)
+        # 3) callerObject가 MappingVariable인 경우
         if isinstance(callerObject, MappingVariable):
-            # result => 단일 키 or 범위 => map lookup
-            if not hasattr(result, 'min_value') or not hasattr(result, 'max_value'):
-                # symbolic
-                return f"symbolicMappingIndex({callerObject.identifier}[{result}])"
-
-            if result.is_bottom():
-                return f"symbolicMappingIndex({callerObject.identifier}[BOTTOM])"
-
             if not callerObject.struct_defs or not callerObject.enum_defs:
                 ccf = self.an.contract_cfgs[self.an.current_target_contract]
                 callerObject.struct_defs = ccf.structDefs
                 callerObject.enum_defs = ccf.enumDefs
 
+            # result => 단일 키 or 범위 => map lookup
+            if not hasattr(result, 'min_value') or not hasattr(result, 'max_value'):
+                # 가상 키로 value 생성
+                sample_keys = [0, 1, 2, 3, 4]
+                return self._join_mapping_values_virtually(callerObject, sample_keys)
+
+            if result.is_bottom():
+                # bottom: 빈 value 생성
+                return callerObject._create_value_virtual("bottom")
+
             min_idx = result.min_value
             max_idx = result.max_value
+
+            # 단일 키
             if min_idx == max_idx:
                 key_str = str(min_idx)
                 if key_str in callerObject.mapping:
-                    return callerObject.mapping[key_str].value
+                    val_obj = callerObject.mapping[key_str]
                 else:
-                    # 새로 추가 or symbolic
-                    new_var_obj = callerObject.get_or_create(key_str)
-                    self.update_mapping_in_cfg(callerObject.identifier, key_str, new_var_obj)
-                    return new_var_obj.value
+                    val_obj = callerObject.get_or_create(key_str)
+                    self.update_mapping_in_cfg(callerObject.identifier, key_str, val_obj)
+
+                # 복합 타입이면 객체 반환, 기본 타입이면 value 반환
+                if isinstance(val_obj, (StructVariable, ArrayVariable, MappingVariable)):
+                    return val_obj
+                return val_obj.value if hasattr(val_obj, "value") else val_obj
+
+            # 범위 키: 가상 생성 + join
             else:
-                # 범위 [min_idx .. max_idx]  ─ MappingVariable -----------------------------
-                joined = None
-                for k in range(min_idx, max_idx + 1):
-                    k_str = str(k)
-                    if k_str not in callerObject.mapping:
-                        new_obj = callerObject.get_or_create(k_str)
-                        self.update_mapping_in_cfg(callerObject.identifier, k_str, new_obj)
-                        val = new_obj.value
-                    else:
-                        val = callerObject.mapping[k_str].value
+                span = max_idx - min_idx
+                if span > 20:
+                    # 샘플링
+                    sample_keys = [min_idx + i * span // 20 for i in range(21)]
+                else:
+                    sample_keys = list(range(min_idx, max_idx + 1))
 
-                    if hasattr(val, "join"):
-                        joined = val if joined is None else joined.join(val)
-                    else:
-                        return f"symbolicMixedType({callerObject.identifier}[{result}])"
-
-                return joined
+                return self._join_mapping_values_virtually(callerObject, sample_keys)
         return
+
+    def _join_mapping_values_virtually(self, mapping, sample_keys):
+        """
+        매핑의 여러 키에 대해 가상으로 value 생성하여 join
+        """
+        joined = None
+        for k in sample_keys:
+            k_str = str(k)
+            if k_str in mapping.mapping:
+                val_obj = mapping.mapping[k_str]
+            else:
+                val_obj = mapping._create_value_virtual(k_str)
+
+            # 구조체: 필드별 join
+            if isinstance(val_obj, StructVariable):
+                if joined is None:
+                    joined = copy.deepcopy(val_obj)
+                else:
+                    for field in val_obj.members:
+                        if field in joined.members:
+                            val = val_obj.members[field].value if hasattr(val_obj.members[field], 'value') else val_obj.members[field]
+                            joined_val = joined.members[field].value if hasattr(joined.members[field], 'value') else joined.members[field]
+                            if hasattr(val, 'join') and hasattr(joined_val, 'join'):
+                                joined.members[field].value = joined_val.join(val)
+            # 기본 타입: value join
+            elif isinstance(val_obj, (ArrayVariable, MappingVariable)):
+                # 복합 타입은 첫 것만 사용
+                if joined is None:
+                    joined = val_obj
+            else:
+                val = val_obj.value if hasattr(val_obj, "value") else val_obj
+                joined = val if joined is None else joined.join(val)
+
+        return joined
 
     @staticmethod
     def calculate_default_interval(var_type):

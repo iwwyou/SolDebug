@@ -1,4 +1,4 @@
-contract TimeLocPool {
+contract TimeLockPool {
     
     struct Deposit {
         uint256 amount;

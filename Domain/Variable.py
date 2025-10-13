@@ -66,7 +66,8 @@ class ArrayVariable(Variables):
     def __init__(self, identifier=None, base_type=None,
                  array_length=None,
                  value=None, isConstant=False, scope=None,
-                 is_dynamic=False):
+                 is_dynamic=False,
+                 struct_defs=None, enum_defs=None):
         super().__init__(identifier, value, isConstant, scope)
 
         self.typeInfo = SolType()
@@ -75,6 +76,8 @@ class ArrayVariable(Variables):
         self.typeInfo.arrayLength = array_length  # None → 동적
         self.typeInfo.isDynamicArray = is_dynamic
         self.elements: list[Variables | "ArrayVariable"] = []
+        self.struct_defs = struct_defs or {}
+        self.enum_defs = enum_defs or {}
 
     # models.py ― ArrayVariable  내부
     def _create_default_value(self, eid: str):
@@ -93,10 +96,10 @@ class ArrayVariable(Variables):
             return BoolInterval(0, 1)  # TOP of bool
 
         # ─ int / uint ──────────────────────────────
-        if isinstance(bt, SolType) and bt.elementaryTypeName.startswith("int"):
+        if isinstance(bt, SolType) and bt.elementaryTypeName and bt.elementaryTypeName.startswith("int"):
             w = bt.intTypeLength or 256
             return IntegerInterval(-(2 ** (w - 1)), 2 ** (w - 1) - 1, w)
-        if isinstance(bt, SolType) and bt.elementaryTypeName.startswith("uint"):
+        if isinstance(bt, SolType) and bt.elementaryTypeName and bt.elementaryTypeName.startswith("uint"):
             w = bt.intTypeLength or 256
             return UnsignedIntegerInterval(0, 2 ** w - 1, w)
 
@@ -115,11 +118,8 @@ class ArrayVariable(Variables):
         # 동적 배열 → 필요하면 확장
         if self.typeInfo.isDynamicArray:
             while idx >= len(self.elements):  # auto-push
-                eid = f"{self.identifier}[{len(self.elements)}]"
-                new_elem = Variables(eid,
-                                     self._create_default_value(eid),
-                                     scope=self.scope,
-                                     typeInfo=self.typeInfo.arrayBaseType)
+                # ★ _create_new_array_element 사용 (struct, nested array 등을 올바르게 생성)
+                new_elem = self._create_new_array_element(len(self.elements))
                 self.elements.append(new_elem)
 
         # 정적 배열 → 범위 검사
@@ -163,7 +163,11 @@ class ArrayVariable(Variables):
 
         # ─ struct ───────────────────────────────────────────────────
         if isinstance(btype, SolType) and btype.typeCategory == "struct":
-            return StructVariable(eid, btype.structTypeName, scope=self.scope)
+            sv = StructVariable(eid, btype.structTypeName, scope=self.scope)
+            # ★ struct 정의가 있으면 초기화
+            if btype.structTypeName in self.struct_defs:
+                sv.initialize_struct(self.struct_defs[btype.structTypeName], struct_defs=self.struct_defs)
+            return sv
 
         # ─ enum ─────────────────────────────────────────────────────
         if isinstance(btype, SolType) and btype.typeCategory == "enum":
@@ -186,6 +190,13 @@ class ArrayVariable(Variables):
 
         # fallback
         raise ValueError(f"Unhandled array base-type for {eid!r}")
+
+    def _create_element_virtual(self, idx: int):
+        """
+        배열에 실제로 추가하지 않고 가상으로 요소를 생성한다.
+        범위 인덱스 join 시 사용.
+        """
+        return self._create_new_array_element(idx)
 
 
     # ────────────────────────── public API ──────────────────────────
@@ -302,6 +313,8 @@ class MappingVariable(Variables):
                 array_length = sol_t.arrayLength,
                 is_dynamic   = sol_t.isDynamicArray,
                 scope        = self.scope,
+                struct_defs  = self.struct_defs,  # ★ struct 정의 전달
+                enum_defs    = self.enum_defs,    # ★ enum 정의 전달
             )
             arr.initialize_not_abstracted_type()   # 내부까지 재귀 초기화
             return arr
@@ -374,6 +387,14 @@ class MappingVariable(Variables):
             new_var = self._make_value(sub_id, self.typeInfo.mappingValueType)
             self.mapping[key_val] = new_var
         return self.mapping[key_val]
+
+    def _create_value_virtual(self, key_val):
+        """
+        매핑에 실제로 추가하지 않고 가상으로 value를 생성한다.
+        범위 키 join 시 사용.
+        """
+        sub_id = f"{self.identifier}[{key_val}]"
+        return self._make_value(sub_id, self.typeInfo.mappingValueType)
 
     def get_default_interval_for_type(self, sol_type):
         # 예시 구현: elementary int/uint/bool만 처리
