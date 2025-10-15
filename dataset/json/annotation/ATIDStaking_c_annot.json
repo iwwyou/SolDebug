@@ -270,69 +270,75 @@
     "event": "add"
   },
   {
-    "code": "// @StateVar nextLockedStakeIDMap[_stakerAddress] = [1,1];",
+    "code": "// @LocalVar _stakerAddress = symbolicAddress 1;",
     "startLine": 24,
     "endLine": 24,
     "event": "add"
   },
   {
-    "code": "// @StateVar tailLockedStakeIDMap[_stakerAddress] = [1,1];",
+    "code": "// @StateVar nextLockedStakeIDMap[_stakerAddress] = [1,1];",
     "startLine": 25,
     "endLine": 25,
     "event": "add"
   },
   {
-    "code": "// @StateVar headLockedStakeIDMap[_stakerAddress] = [1,1];",
+    "code": "// @StateVar tailLockedStakeIDMap[_stakerAddress] = [1,1];",
     "startLine": 26,
     "endLine": 26,
     "event": "add"
   },
   {
-    "code": "// @StateVar weightedStakes[_stakerAddress] = [1,1];",
+    "code": "// @StateVar headLockedStakeIDMap[_stakerAddress] = [1,1];",
     "startLine": 27,
     "endLine": 27,
     "event": "add"
   },
   {
-    "code": "// @StateVar totalWeightedATIDStaked = [500,500];",
+    "code": "// @StateVar weightedStakes[_stakerAddress] = [1,1];",
     "startLine": 28,
     "endLine": 28,
     "event": "add"
   },
   {
-    "code": "// @StateVar unweightedStakes[_stakerAddress] = [1,1];",
+    "code": "// @StateVar totalWeightedATIDStaked = [500,500];",
     "startLine": 29,
     "endLine": 29,
     "event": "add"
   },
   {
-    "code": "// @StateVar totalUnweightedATIDStaked = [500,500];",
+    "code": "// @StateVar unweightedStakes[_stakerAddress] = [1,1];",
     "startLine": 30,
     "endLine": 30,
     "event": "add"
   },
   {
-    "code": "// @LocalVar _ATIDamount = [10,10];",
+    "code": "// @StateVar totalUnweightedATIDStaked = [500,500];",
     "startLine": 31,
     "endLine": 31,
     "event": "add"
   },
   {
-    "code": "// @LocalVar _stakeWeight = [1,1];",
+    "code": "// @LocalVar _ATIDamount = [10,10];",
     "startLine": 32,
     "endLine": 32,
     "event": "add"
   },
   {
-    "code": "// @LocalVar _lockedUntil = [1,1];",
+    "code": "// @LocalVar _stakeWeight = [1,1];",
     "startLine": 33,
     "endLine": 33,
     "event": "add"
   },
   {
-    "code": "// @Debugging END",
+    "code": "// @LocalVar _lockedUntil = [1,1];",
     "startLine": 34,
     "endLine": 34,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 35,
+    "endLine": 35,
     "event": "add"
   }
 ]

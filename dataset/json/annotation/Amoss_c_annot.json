@@ -114,6 +114,12 @@
     "event": "add"
   },
   {
+    "code": "// @LocalVar account = symbolicAddress 1;",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
     "code": "// @StateVar _balances[account] = [1000,1000];",
     "startLine": 14,
     "endLine": 14,

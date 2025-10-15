@@ -87,36 +87,42 @@
     "code": "// @GlobalVar block.timestamp = [300,400];",
     "startLine": 10,
     "endLine": 10,
-    "event": "add"  },
-  
+    "event": "add"  
+  },
   {
-    "code": "// @StateVar claimedOnce[user] = any;",
+    "code": "// @LocalVar user = symbolicAddress 1;",
     "startLine": 11,
     "endLine": 11,
     "event": "add"
-  },
+  },  
   {
-    "code": "// @StateVar startTime = [200,300];",
+    "code": "// @StateVar claimedOnce[user] = any;",
     "startLine": 12,
     "endLine": 12,
     "event": "add"
   },
   {
-    "code": "// @StateVar locktime = [50,150];",
+    "code": "// @StateVar startTime = [200,300];",
     "startLine": 13,
     "endLine": 13,
     "event": "add"
   },
   {
-    "code": "// @StateVar claimable[user] = [3,30];",
+    "code": "// @StateVar locktime = [50,150];",
     "startLine": 14,
     "endLine": 14,
     "event": "add"
   },
   {
-    "code": "// @Debugging END",
+    "code": "// @StateVar claimable[user] = [3,30];",
     "startLine": 15,
     "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 16,
+    "endLine": 16,
     "event": "add"
   }
 ]

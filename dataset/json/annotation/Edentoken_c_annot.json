@@ -132,27 +132,51 @@
     "event": "add"
   },
   {
-    "code": "// @StateVar allowance[src][spender] = [100,200];",
-    "startLine": 15,
-    "endLine": 15,
-    "event": "add"
-  },
-  {
-    "code": "// @StateVar balanceOf[from] = [300,400];",
+    "code": "// @LocalVar src = symbolicAddress 1;",
     "startLine": 16,
     "endLine": 16,
     "event": "add"
   },
   {
-    "code": "// @StateVar balanceOf[to] = [200,250];",
+    "code": "// @LocalVar dst = symbolicAddress 2;",
     "startLine": 17,
     "endLine": 17,
     "event": "add"
   },
   {
-    "code": "// @Debugging END",
+    "code": "// @StateVar allowance[src][spender] = [100,200];",
     "startLine": 18,
     "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar allowance[src][spender] = [100,200];",
+    "startLine": 19,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar balanceOf[from] = [300,400];",
+    "startLine": 20,
+    "endLine": 20,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar balanceOf[to] = [200,250];",
+    "startLine": 21,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar amount = [10,20];",
+    "startLine": 22,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 23,
+    "endLine": 23,
     "event": "add"
   }
 ]

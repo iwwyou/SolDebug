@@ -1247,12 +1247,27 @@ class DynamicCFGBuilder:
             raise ValueError("current_start_line is not set.")
 
         # ---------- Helper functions ----------
-        def _line_nodes(line: int) -> list[CFGNode]:
-            """Get all CFG nodes at given line."""
+        def _line_nodes(line: int, search_backward: bool = False) -> list[CFGNode]:
+            """Get all CFG nodes at given line.
+
+            Args:
+                line: Line number to search
+                search_backward: If True and line has no nodes, search backward to previous lines
+            """
             info = an.line_info.get(line, None)
-            if not info:
-                return []
-            cfg_nodes = info.get("cfg_nodes", [])
+            cfg_nodes = info.get("cfg_nodes", []) if info else []
+
+            # cfg_nodes가 비어있고 search_backward가 True이면 이전 라인 검색
+            if not cfg_nodes and search_backward:
+                search_line = line - 1
+                while search_line >= 1:
+                    info = an.line_info.get(search_line, None)
+                    if info:
+                        cfg_nodes = info.get("cfg_nodes", [])
+                        if cfg_nodes:
+                            break
+                    search_line -= 1
+
             if isinstance(cfg_nodes, list):
                 return [n for n in cfg_nodes if n in G.nodes]
             return []
@@ -1291,10 +1306,10 @@ class DynamicCFGBuilder:
 
         # ========== Special contexts (else-if/else/catch) ==========
         if context in ["else_if", "else", "catch"]:
-            # Get L line nodes and traverse predecessors
-            L_nodes = _line_nodes(L_start)
+            # Get L line nodes (else 자신의 라인부터 시작, 없으면 이전 라인 검색)
+            L_nodes = _line_nodes(L_start, search_backward=True)
             if not L_nodes:
-                raise ValueError(f"No CFG nodes found at line {L_start} for context '{context}'")
+                raise ValueError(f"No CFG nodes found at or before line {L_start} for context '{context}'")
 
             # ★ L_nodes에서 outer join 찾기 (else_if/else의 경우)
             found_outer_join = None

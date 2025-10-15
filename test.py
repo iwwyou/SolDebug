@@ -63,103 +63,151 @@ def simulate_inputs(records):
 
 test_inputs = [
   {
-    "code": "contract OptimisitcRewards {    \n}",
+    "code": "contract DeltaNeutralPancakeWorker02 {\n}",
     "startLine": 1,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "    bytes32 public pendingRoot;",
+    "code": "    address public wNative;",
     "startLine": 2,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "    bytes32 public rewardsRoot;",
+    "code": "    address public cake;",
     "startLine": 3,
     "endLine": 3,
     "event": "add"
   },
   {
-    "code": "    uint256 public proposalTime;",
+    "code": "    address public override baseToken;",
     "startLine": 4,
     "endLine": 4,
     "event": "add"
   },
   {
-    "code": "    address public proposer;",
+    "code": "    address[] public reinvestPath;",
     "startLine": 5,
     "endLine": 5,
     "event": "add"
   },
   {
-    "code": "    uint256 public challengePeriod = 60 * 60 * 24 * 7;",
+    "code": "\n",
     "startLine": 6,
     "endLine": 6,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "    function getReinvestPath() public view returns (address[] memory) {\n}",
     "startLine": 7,
-    "endLine": 7,
+    "endLine": 8,
     "event": "add"
   },
   {
-    "code": "    function proposeRewards(bytes32 newRoot) external {       \n}",
+    "code": "        if (reinvestPath.length != 0) {\n}",
     "startLine": 8,
     "endLine": 9,
     "event": "add"
   },
   {
-    "code": "        require(msg.sender == proposer, \"Not proposer\");     ",
+    "code": "        return reinvestPath;",
     "startLine": 9,
     "endLine": 9,
     "event": "add"
   },
   {
-    "code": "        if (           \n            pendingRoot != bytes32(0) &&\n            proposalTime != 0 &&        \n            block.timestamp > proposalTime + challengePeriod\n        ) {          \n}",
-    "startLine": 10,
-    "endLine": 15,
-    "event": "add"
-  },
-  {
-    "code": "            rewardsRoot = pendingRoot;",
-    "startLine": 15,
-    "endLine": 15,
-    "event": "add"
-  },
-  {
-    "code": "        pendingRoot = newRoot;",
-    "startLine": 17,
-    "endLine": 17,
-    "event": "add"
-  },
-  {
-    "code": "        proposalTime = block.timestamp;",
-    "startLine": 18,
-    "endLine": 18,
-    "event": "add"
-  },
-  {
-    "code": "// @Debugging BEGIN",
-    "startLine": 9,
-    "endLine": 9,
-    "event": "add"
-  },
-  {
-    "code": "// @GlobalVar block.timestamp = [100,200];",
-    "startLine": 10,
-    "endLine": 10,
-    "event": "add"
-  },
-  {
-    "code": "// @StateVar proposalTime = [0,10];",
+    "code": "           address[] memory path;",
     "startLine": 11,
     "endLine": 11,
     "event": "add"
   },
   {
-    "code": "// @StateVar challengePeriod = [80,95];",
+    "code": "           if (baseToken == wNative) {\n}",
+    "startLine": 12,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "           path = new address[](2);",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "            path[0] = address(cake);",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "            path[1] = address(wNative);",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "else {\n}",
+    "startLine": 16,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "            path = new address[](3);",
+    "startLine": 17,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "            path[0] = address(cake);",
+    "startLine": 18,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "            path[1] = address(wNative);",
+    "startLine": 19,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "            path[2] = address(baseToken);",
+    "startLine": 20,
+    "endLine": 20,
+    "event": "add"
+  },
+  {
+    "code": "        return path;",
+    "startLine": 22,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar reinvestPath.length = [0,0];",
+    "startLine": 9,
+    "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar wNative = symbolicAddress 1;",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar cake = symbolicAddress 2;",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar baseToken = symbolicAddress 1;",
     "startLine": 12,
     "endLine": 12,
     "event": "add"
