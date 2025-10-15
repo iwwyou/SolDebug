@@ -1,0 +1,9 @@
+{
+  "contract_name": "DapiServer_c",
+  "state_slots": {},
+  "state_arrays": {},
+  "inputs": [
+    300,
+    500
+  ]
+}

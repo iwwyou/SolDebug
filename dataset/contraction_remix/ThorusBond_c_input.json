@@ -1,0 +1,10 @@
+{
+  "contract_name": "ThorusBond_c",
+  "state_slots": {
+    "info.lastInteractionSecond": 50,
+    "info.remainingVestingSeconds": 40,
+    "info.remainingPayout": 10
+  },
+  "state_arrays": {},
+  "inputs": []
+}

@@ -1,0 +1,10 @@
+{
+  "contract_name": "MockChainlinkOracle_c",
+  "state_slots": {
+    "roundId": 0,
+    "latestRoundDataShouldRevert": true,
+    "entry.updatedAt": 0
+  },
+  "state_arrays": {},
+  "inputs": []
+}

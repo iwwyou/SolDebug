@@ -1,0 +1,13 @@
+{
+  "contract_name": "Lock_c",
+  "state_slots": {
+    "_data.total": 700,
+    "_data.UnlockedAmounts": 10,
+    "_data.pending": 30,
+    "startLock": 300,
+    "unlockDuration": 1,
+    "lockedTime": 600
+  },
+  "state_arrays": {},
+  "inputs": []
+}

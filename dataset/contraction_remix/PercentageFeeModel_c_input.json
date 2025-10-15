@@ -1,0 +1,15 @@
+{
+  "contract_name": "PercentageFeeModel_c",
+  "state_slots": {
+    "earlyWithdrawFeeOverrideForDeposit[pool][depositID].isOverridden": true,
+    "earlyWithdrawFeeOverrideForDeposit[pool][depositID].fee": 30,
+    "earlyWithdrawFeeOverrideForPool[pool].isOverridden": true,
+    "earlyWithdrawFeeOverrideForPool[pool].fee": 20,
+    "earlyWithdrawFee": 10
+  },
+  "state_arrays": {},
+  "inputs": [
+    1,
+    10
+  ]
+}

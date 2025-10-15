@@ -1,0 +1,14 @@
+{
+  "contract_name": "AvatarArtMarketPlace_c",
+  "state_slots": {},
+  "state_arrays": {
+    "_tokens": [
+      1,
+      2,
+      3
+    ]
+  },
+  "inputs": [
+    4
+  ]
+}

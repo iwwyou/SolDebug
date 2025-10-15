@@ -1,0 +1,12 @@
+{
+  "contract_name": "AloeBlend_c",
+  "state_slots": {
+    "maintenanceBudget0": 100,
+    "maintenanceBudget1": 100
+  },
+  "state_arrays": {},
+  "inputs": [
+    50,
+    50
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "contract_name": "GreenHouse_c",
+  "state_slots": {},
+  "state_arrays": {},
+  "inputs": [
+    10
+  ]
+}

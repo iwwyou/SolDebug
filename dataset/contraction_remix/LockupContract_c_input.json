@@ -1,0 +1,11 @@
+{
+  "contract_name": "LockupContract_c",
+  "state_slots": {
+    "initialAmount": 50,
+    "deploymentStartTime": 8,
+    "monthsToWaitBeforeUnlock": 5,
+    "releaseSchedule": 2
+  },
+  "state_arrays": {},
+  "inputs": []
+}

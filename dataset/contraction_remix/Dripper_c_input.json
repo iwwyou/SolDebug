@@ -1,0 +1,10 @@
+{
+  "contract_name": "Dripper_c",
+  "state_slots": {},
+  "state_arrays": {},
+  "inputs": [
+    100,
+    10,
+    5
+  ]
+}

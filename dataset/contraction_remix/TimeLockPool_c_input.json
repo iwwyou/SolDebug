@@ -1,0 +1,12 @@
+{
+  "contract_name": "TimeLockPool_c",
+  "state_slots": {
+    "depositsOf[_account][0].amount": 100,
+    "depositsOf[_account][1].amount": 200,
+    "depositsOf[_account][2].amount": 400
+  },
+  "state_arrays": {},
+  "inputs": [
+    "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2"
+  ]
+}

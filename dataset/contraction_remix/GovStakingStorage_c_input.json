@@ -1,0 +1,17 @@
+{
+  "contract_name": "GovStakingStorage_c",
+  "state_slots": {
+    "info.rewardMultiplier": 100,
+    "totalRewardMultiplier": 50
+  },
+  "state_arrays": {},
+  "inputs": [
+    2,
+    4,
+    10,
+    10,
+    40,
+    6,
+    8
+  ]
+}

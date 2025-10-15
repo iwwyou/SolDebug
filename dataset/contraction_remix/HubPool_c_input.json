@@ -1,0 +1,14 @@
+{
+  "contract_name": "HubPool_c",
+  "state_slots": {
+    "protocolFeeCapturePct": 10000,
+    "pooledTokens[l1Token].undistributedLpFees": 100,
+    "pooledTokens[l1Token].utilizedReserves": 100,
+    "unclaimedAccumulatedProtocolFees[l1Token]": 100
+  },
+  "state_arrays": {},
+  "inputs": [
+    "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2",
+    3000000
+  ]
+}

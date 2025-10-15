@@ -1,0 +1,34 @@
+[
+  {
+    "setup_time_ms":7189.3349001184,
+    "compile_time_ms":21371.1041002534,
+    "deploy_time_ms":21508.6489999667,
+    "state_slot_setup_time_ms":1953.9989000186,
+    "num_state_slots":2,
+    "num_state_arrays":0,
+    "execution_time_ms":963.0289999768,
+    "success":false,
+    "error":"No debug button found",
+    "contract_name":"AloeBlend",
+    "function_name":"_earmarkSomeForMaintenance",
+    "annotation_targets":4,
+    "expected_state_slots":2,
+    "run_number":1
+  },
+  {
+    "setup_time_ms":7219.1405999474,
+    "compile_time_ms":21310.1071002893,
+    "deploy_time_ms":21380.2801999263,
+    "state_slot_setup_time_ms":1011.8972999044,
+    "num_state_slots":2,
+    "num_state_arrays":0,
+    "execution_time_ms":1103.3323998563,
+    "success":false,
+    "error":"No debug button found",
+    "contract_name":"Amoss",
+    "function_name":"_burn",
+    "annotation_targets":4,
+    "expected_state_slots":2,
+    "run_number":1
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "contract_name": "Claim_c",
+  "state_slots": {
+    "claimedOnce[user]": true,
+    "startTime": 200,
+    "locktime": 50,
+    "claimable[user]": 3
+  },
+  "state_arrays": {},
+  "inputs": [
+    "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2"
+  ]
+}

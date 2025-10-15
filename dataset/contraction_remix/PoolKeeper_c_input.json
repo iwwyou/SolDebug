@@ -1,0 +1,9 @@
+{
+  "contract_name": "PoolKeeper_c",
+  "state_slots": {},
+  "state_arrays": {},
+  "inputs": [
+    10,
+    5
+  ]
+}
