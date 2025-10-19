@@ -2,7 +2,11 @@
   "contract_name": "CoreVoting_c",
   "state_slots": {
     "baseQuorum": 100,
-    "_quorums[target][functionSelector]": 0
+    "_quorums": {
+      "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2": {
+        "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2": 0
+      }
+    }
   },
   "state_arrays": {},
   "inputs": [

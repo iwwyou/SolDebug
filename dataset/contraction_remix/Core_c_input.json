@@ -1,7 +1,9 @@
 {
   "contract_name": "Core_c",
   "state_slots": {
-    "governorMap[msg.sender]": true
+    "governorMap": {
+      "0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB": true
+    }
   },
   "state_arrays": {
     "_stablecoinList": [

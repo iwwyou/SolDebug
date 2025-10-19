@@ -1,0 +1,10 @@
+{
+  "contract_name": "AOC_BEP_c",
+  "state_slots": {},
+  "state_arrays": {},
+  "inputs": [
+    "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2",
+    2024,
+    10
+  ]
+}

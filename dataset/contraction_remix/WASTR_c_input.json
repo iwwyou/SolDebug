@@ -1,8 +1,14 @@
 {
   "contract_name": "WASTR_c",
   "state_slots": {
-    "allowance[from][msg.sender]": 10,
-    "balanceOf[from]": 100
+    "allowance": {
+      "2": {
+        "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2": 10
+      }
+    },
+    "balanceOf": {
+      "2": 100
+    }
   },
   "state_arrays": {},
   "inputs": [

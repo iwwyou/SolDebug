@@ -55,7 +55,7 @@ contract ATIDStaking {
         totalWeightedATIDStaked += newWeightedStake;        
         
         unweightedStakes[_stakerAddress] += _ATIDamount;
-        totalUnweightedATIDStaked += _ATIDamount;
+        totalUnWeightedATIDStaked += _ATIDamount;
 
         return newLockedStake.ID;
     }

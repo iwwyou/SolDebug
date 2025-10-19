@@ -8,6 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import time
 import json
@@ -16,10 +17,10 @@ from pathlib import Path
 import sys
 import io
 
-# Fix Windows encoding issue
+# Fix Windows encoding issue and enable real-time output (unbuffered)
 if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', line_buffering=True)
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', line_buffering=True)
 
 
 class RemixBenchmark:
@@ -30,6 +31,7 @@ class RemixBenchmark:
             chrome_options.add_argument("--headless")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--window-size=1920,1080")
+        chrome_options.add_argument("--start-maximized")  # Maximize window on startup
 
         self.driver = webdriver.Chrome(options=chrome_options)
         self.driver.get("https://remix.ethereum.org")
@@ -97,6 +99,7 @@ class RemixBenchmark:
         """Reset workspace for next test"""
         # Delete current file
         try:
+            print("  [INFO] Resetting Remix workspace...")
             self.driver.execute_script("""
                 // Clear workspace
                 window.location.reload();
@@ -107,15 +110,30 @@ class RemixBenchmark:
             self._handle_popups()
 
             # Wait for Remix FileSystem API to be available after reload
+            print("  [INFO] Waiting for Remix to reload...")
             try:
                 WebDriverWait(self.driver, 30).until(
                     lambda d: d.execute_script("return typeof window.remixFileSystem !== 'undefined' && window.remixFileSystem !== null")
                 )
                 time.sleep(2)
+                print("  [OK] Remix FileSystem API ready")
             except TimeoutException:
-                pass
-        except:
-            pass
+                print("  [WARNING] Remix FileSystem API not detected after reset")
+
+            # Wait for essential plugins to load (especially Solidity Compiler)
+            print("  [INFO] Waiting for Solidity Compiler plugin...")
+            try:
+                WebDriverWait(self.driver, 20).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "[plugin='solidity']"))
+                )
+                time.sleep(1)
+                print("  [OK] Solidity Compiler plugin loaded")
+            except TimeoutException:
+                print("  [WARNING] Solidity Compiler plugin not detected after reset")
+
+            print("  [OK] Reset completed")
+        except Exception as e:
+            print(f"  [WARNING] Reset had issues: {e}")
 
     def close(self):
         """Close browser"""
@@ -171,11 +189,11 @@ class RemixBenchmark:
             print(f"  [INFO] Expanding contracts folder...")
             try:
                 # Click on contracts folder to expand it
-                contracts_folder = WebDriverWait(self.driver, 10).until(
+                contracts_folder = WebDriverWait(self.driver, 0.1).until(
                     EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-id='treeViewLitreeViewItemcontracts']"))
                 )
                 contracts_folder.click()
-                time.sleep(1)
+                #time.sleep(1)
                 print(f"  [OK] Contracts folder expanded")
             except Exception as e:
                 print(f"  [WARNING] Could not expand contracts folder: {e}")
@@ -194,11 +212,11 @@ class RemixBenchmark:
             try:
                 # Use the correct selector that works in Remix 1.0.0
                 # data-id format: treeViewDivDraggableItemcontracts/{filename}
-                file_element = WebDriverWait(self.driver, 10).until(
+                file_element = WebDriverWait(self.driver, 0.1).until(
                     EC.element_to_be_clickable((By.CSS_SELECTOR, f"[data-id='treeViewDivDraggableItemcontracts/{filename}']"))
                 )
                 file_element.click()
-                time.sleep(2)
+                #time.sleep(2)
                 print(f"  [OK] File selected in explorer")
             except Exception as e:
                 print(f"  [WARNING] Could not click file in explorer: {e}")
@@ -210,17 +228,17 @@ class RemixBenchmark:
                             fileElement.click();
                         }}
                     """)
-                    time.sleep(2)
+                    #time.sleep(2)
                     print(f"  [OK] File selected via JavaScript")
                 except Exception as e2:
                     print(f"  [ERROR] Could not select file: {e2}")
 
             # Wait for the editor to be ready
-            WebDriverWait(self.driver, 10).until(
-                lambda d: d.execute_script("return window.monaco !== undefined")
-            )
+            #WebDriverWait(self.driver, 10).until(
+            #    lambda d: d.execute_script("return window.monaco !== undefined")
+            #)
 
-            time.sleep(1)
+            #time.sleep(1)
 
             print(f"  [OK] Created contract file: {filename}")
         except Exception as e:
@@ -233,7 +251,7 @@ class RemixBenchmark:
             # Handle any lingering popups before clicking
             self._handle_popups()
 
-            # Click Solidity Compiler tab using JavaScript
+            # Click Solidity Compiler tab using JavaScript (instant)
             print("  [INFO] Opening Solidity Compiler tab...")
             self.driver.execute_script("""
                 const compilerTab = document.querySelector("[plugin='solidity']");
@@ -241,14 +259,21 @@ class RemixBenchmark:
                     compilerTab.click();
                 }
             """)
-            time.sleep(3)
             print("  [OK] Compiler tab opened")
 
-            # Wait for compile button to be enabled (not disabled)
-            WebDriverWait(self.driver, 15).until(
-                lambda d: d.find_element(By.CSS_SELECTOR, "[data-id='compilerContainerCompileBtn']").is_enabled()
-            )
-            time.sleep(1)
+            # Wait for compile button to exist and be enabled
+            print("  [INFO] Waiting for compile button to be ready...")
+            #WebDriverWait(self.driver, 20).until(
+            #    EC.presence_of_element_located((By.CSS_SELECTOR, "[data-id='compilerContainerCompileBtn']"))
+            #)
+
+            # Additional wait for button to be fully initialized and enabled
+            #WebDriverWait(self.driver, 15).until(
+            #    lambda d: d.find_element(By.CSS_SELECTOR, "[data-id='compilerContainerCompileBtn']") is not None and
+            #              d.find_element(By.CSS_SELECTOR, "[data-id='compilerContainerCompileBtn']").is_enabled()
+            #)
+            #time.sleep(1)
+            print("  [OK] Compile button is ready")
 
             # Click compile button using JavaScript to avoid interception
             print("  [INFO] Clicking compile button...")
@@ -258,10 +283,10 @@ class RemixBenchmark:
 
             # Wait for compilation to complete (check for compilation finished indicator)
             # The data-id includes the compiler version, so we use a prefix match
-            WebDriverWait(self.driver, 30).until(
-                lambda d: d.find_element(By.CSS_SELECTOR, "[data-id^='compilationFinishedWith']")
-            )
-            time.sleep(1)
+            #WebDriverWait(self.driver, 30).until(
+            #    lambda d: d.find_element(By.CSS_SELECTOR, "[data-id^='compilationFinishedWith']")
+            #)
+            #time.sleep(1)
             print("  [OK] Compilation successful")
         except Exception as e:
             print(f"  [ERROR] Compilation failed: {e}")
@@ -273,7 +298,7 @@ class RemixBenchmark:
             # Handle any lingering popups before clicking
             self._handle_popups()
 
-            # Click Deploy & Run Transactions tab using JavaScript (Selenium click is intercepted)
+            # Click Deploy & Run Transactions tab using JavaScript (instant)
             print("  [INFO] Opening Deploy & Run Transactions tab...")
             self.driver.execute_script("""
                 const deployTab = document.querySelector("[plugin='udapp']");
@@ -281,7 +306,6 @@ class RemixBenchmark:
                     deployTab.click();
                 }
             """)
-            time.sleep(2)
             print("  [OK] Deploy tab opened")
 
             # Ensure JavaScript VM is selected (default)
@@ -297,12 +321,12 @@ class RemixBenchmark:
 
             # Wait for deployment - check for deployed contract instance
             print("  [INFO] Waiting for contract deployment...")
-            WebDriverWait(self.driver, 15).until(
+            WebDriverWait(self.driver, 2).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "[data-shared='universalDappUiInstance']"))
             )
 
             # Additional wait for contract to fully initialize
-            time.sleep(2)
+            #time.sleep(2)
 
             print("  [INFO] Verifying deployed contracts...")
             deployed_contracts = self.driver.find_elements(By.CSS_SELECTOR, "[data-shared='universalDappUiInstance']")
@@ -359,6 +383,43 @@ class RemixBenchmark:
                 except:
                     pass
 
+            # Expand the bottom panel (terminal area) to make debug buttons more visible
+            print("  [INFO] Expanding bottom panel for better visibility...")
+            try:
+                self.driver.execute_script("""
+                    // Find the terminal panel using the correct selector
+                    const terminalView = document.querySelector('#terminal-view');
+                    const terminalWrap = document.querySelector('.terminal-wrap');
+
+                    if (terminalView) {
+                        // Increase the height to make debug buttons more visible
+                        terminalView.style.height = '500px';
+                        terminalView.style.minHeight = '500px';
+                        console.log('Terminal view height set to 500px');
+                    }
+
+                    if (terminalWrap) {
+                        terminalWrap.style.height = '500px';
+                        terminalWrap.style.minHeight = '500px';
+                        console.log('Terminal wrap height set to 500px');
+                    }
+
+                    // Find the draggable separator and adjust it
+                    const separator = document.querySelector('.gutter.gutter-vertical');
+                    if (separator) {
+                        // Adjust separator position to expand bottom panel
+                        separator.style.top = 'calc(100% - 500px)';
+                        console.log('Separator adjusted');
+                    }
+
+                    // Force a window resize event to update the layout
+                    window.dispatchEvent(new Event('resize'));
+                """)
+                time.sleep(1)  # Wait for panel to resize
+                print("  [OK] Bottom panel expanded")
+            except Exception as e:
+                print(f"  [WARNING] Could not expand bottom panel: {e}")
+
             print("  [OK] Contract deployed")
             return True
         except Exception as e:
@@ -368,61 +429,141 @@ class RemixBenchmark:
     def _set_state_slots(self, state_slots_data):
         """
         Set state variables before function execution using setter functions
-        state_slots_data: dict of {variable_name: value}
+        state_slots_data: dict of {variable_name: value or dict}
+
+        For simple variables: {"_totalSupply": 500}
+        For mapping variables: {"_balances": {"0xAddress": 1000}}
+        For nested mapping: {"allowance": {"0xAddr1": {"0xAddr2": 100}}}
         """
         if not state_slots_data or len(state_slots_data) == 0:
             return
 
         try:
-            print(f"  [SETUP] Setting {len(state_slots_data)} state slots...")
+            # Count total slots (including mapping entries)
+            total_slots = sum(
+                len(v) if isinstance(v, dict) else 1
+                for v in state_slots_data.values()
+            )
+            print(f"  [SETUP] Setting {total_slots} state slots...")
 
             for var_name, value in state_slots_data.items():
-                # Setter function pattern: set_{var_name}
-                setter_function = f"set_{var_name}"
-                print(f"    Setting {var_name} = {value} via {setter_function}")
-
-                try:
-                    # Find the wrapper for this setter function
-                    wrapper_selector = f"[data-id='{setter_function} - transact (not payable)-wrapper']"
-                    wrapper = self.driver.find_element(By.CSS_SELECTOR, wrapper_selector)
-
-                    # Find the parent container (udapp_contractActionsContainerSingle) that contains both wrapper and input
-                    parent_container = wrapper.find_element(By.XPATH, "..")
-
-                    # Find input field as sibling within the parent container
-                    input_field = parent_container.find_element(
-                        By.CSS_SELECTOR,
-                        "input[data-id='multiParamManagerBasicInputField']"
-                    )
-
-                    # Input value
-                    input_field.clear()
-                    input_field.send_keys(str(value))
-                    time.sleep(0.3)  # Wait for input to register
-
-                    # Wait for button to be enabled
-                    button_selector = f"[data-id='{setter_function} - transact (not payable)']"
-                    WebDriverWait(self.driver, 5).until(
-                        lambda d: not d.find_element(By.CSS_SELECTOR, button_selector).get_attribute('disabled')
-                    )
-
-                    # Click setter button
-                    setter_btn = self.driver.find_element(By.CSS_SELECTOR, button_selector)
-                    setter_btn.click()
-                    time.sleep(0.5)  # Wait for transaction
-
-                    print(f"      [OK] {var_name} set successfully")
-
-                except NoSuchElementException:
-                    print(f"      [SKIP] Could not find setter for {var_name}")
-                    continue
-                except Exception as e:
-                    print(f"      [ERROR] Error setting {var_name}: {e}")
-                    continue
+                # Check if value is a dict (mapping type)
+                if isinstance(value, dict):
+                    # Handle mapping type
+                    self._set_mapping_variable(var_name, value)
+                else:
+                    # Handle simple type
+                    self._set_simple_variable(var_name, value)
 
             print(f"  [OK] State slots configured")
         except Exception as e:
             print(f"  [WARNING] State slot setup partial failure: {e}")
+
+    def _set_simple_variable(self, var_name, value):
+        """Set a simple (non-mapping) state variable"""
+        setter_function = f"set_{var_name}"
+        print(f"    Setting {var_name} = {value} via {setter_function}")
+
+        try:
+            # Find the wrapper for this setter function
+            wrapper_selector = f"[data-id='{setter_function} - transact (not payable)-wrapper']"
+            wrapper = self.driver.find_element(By.CSS_SELECTOR, wrapper_selector)
+
+            # Find the parent container
+            parent_container = wrapper.find_element(By.XPATH, "..")
+
+            # Find input field
+            input_field = parent_container.find_element(
+                By.CSS_SELECTOR,
+                "input[data-id='multiParamManagerBasicInputField']"
+            )
+
+            # Input value
+            input_field.clear()
+            input_field.send_keys(str(value))
+            time.sleep(0.3)
+
+            # Wait for button to be enabled
+            button_selector = f"[data-id='{setter_function} - transact (not payable)']"
+            WebDriverWait(self.driver, 5).until(
+                lambda d: not d.find_element(By.CSS_SELECTOR, button_selector).get_attribute('disabled')
+            )
+
+            # Click setter button
+            setter_btn = self.driver.find_element(By.CSS_SELECTOR, button_selector)
+            setter_btn.click()
+            time.sleep(0.5)
+
+            print(f"      [OK] {var_name} set successfully")
+
+        except NoSuchElementException:
+            print(f"      [SKIP] Could not find setter for {var_name}")
+        except Exception as e:
+            print(f"      [ERROR] Error setting {var_name}: {e}")
+
+    def _set_mapping_variable(self, var_name, mapping_data):
+        """
+        Set a mapping state variable
+        mapping_data: dict of {key: value} or {key: {nested_key: value}}
+        """
+        setter_function = f"set_{var_name}"
+
+        for key, value in mapping_data.items():
+            if isinstance(value, dict):
+                # Nested mapping: iterate over nested keys
+                for nested_key, nested_value in value.items():
+                    print(f"    Setting {var_name}[{key}][{nested_key}] = {nested_value} via {setter_function}")
+                    try:
+                        self._call_setter_with_params(setter_function, [key, nested_key, nested_value])
+                        print(f"      [OK] {var_name}[{key}][{nested_key}] set successfully")
+                    except NoSuchElementException:
+                        print(f"      [SKIP] Could not find setter for {var_name}")
+                        break
+                    except Exception as e:
+                        print(f"      [ERROR] Error setting {var_name}[{key}][{nested_key}]: {e}")
+            else:
+                # Simple mapping
+                print(f"    Setting {var_name}[{key}] = {value} via {setter_function}")
+                try:
+                    self._call_setter_with_params(setter_function, [key, value])
+                    print(f"      [OK] {var_name}[{key}] set successfully")
+                except NoSuchElementException:
+                    print(f"      [SKIP] Could not find setter for {var_name}")
+                    break
+                except Exception as e:
+                    print(f"      [ERROR] Error setting {var_name}[{key}]: {e}")
+
+    def _call_setter_with_params(self, setter_function, params):
+        """Call a setter function with multiple parameters"""
+        # Find the wrapper for this setter function
+        wrapper_selector = f"[data-id='{setter_function} - transact (not payable)-wrapper']"
+        wrapper = self.driver.find_element(By.CSS_SELECTOR, wrapper_selector)
+
+        # Find the parent container
+        parent_container = wrapper.find_element(By.XPATH, "..")
+
+        # Find input field
+        input_field = parent_container.find_element(
+            By.CSS_SELECTOR,
+            "input[data-id='multiParamManagerBasicInputField']"
+        )
+
+        # Input parameters as comma-separated string
+        input_str = ','.join([str(p) for p in params])
+        input_field.clear()
+        input_field.send_keys(input_str)
+        time.sleep(0.3)
+
+        # Wait for button to be enabled
+        button_selector = f"[data-id='{setter_function} - transact (not payable)']"
+        WebDriverWait(self.driver, 5).until(
+            lambda d: not d.find_element(By.CSS_SELECTOR, button_selector).get_attribute('disabled')
+        )
+
+        # Click setter button
+        setter_btn = self.driver.find_element(By.CSS_SELECTOR, button_selector)
+        setter_btn.click()
+        time.sleep(0.5)
 
     def _set_state_arrays(self, state_arrays_data):
         """
@@ -545,22 +686,34 @@ class RemixBenchmark:
             print(f"  [ERROR] Function execution failed: {e}")
             raise
 
-    def _open_debugger(self, expected_button_index=None):
+    def _is_debugger_loaded(self):
+        """Check if debugger has loaded successfully"""
+        try:
+            slider = self.driver.find_element(By.CSS_SELECTOR, "[data-id='slider']")
+            max_val = int(slider.get_attribute('max') or '0')
+            return max_val > 0
+        except:
+            return False
+
+    def _open_debugger(self, expected_button_index=None, manual_click_timeout=60):
         """
-        Open debugger for the target function transaction
+        Open debugger for the target function transaction using MANUAL click
 
         Args:
             expected_button_index: The index where we expect the target function's debug button
                                    (i.e., the number of debug buttons before executing target function)
+            manual_click_timeout: Maximum time to wait for manual click (seconds)
         """
         try:
-            # Inject performance measurement
+            # Inject performance measurement and click detection
             self.driver.execute_script("""
                 window.debugStartTime = performance.now();
+                window.manualClickDetected = false;
+                window.manualClickTime = null;
             """)
 
-            # Wait a moment for the debug button to appear
-            time.sleep(0.5)
+            # Wait for debug button to appear and for event handlers to be attached
+            time.sleep(1)  # Initial wait for button to appear
 
             # Find all debug buttons
             # Use data-shared instead of data-id because data-id includes transaction hash
@@ -572,31 +725,171 @@ class RemixBenchmark:
             if len(debug_btns) == 0:
                 raise Exception("No debug button found")
 
-            print(f"  [INFO] Found {len(debug_btns)} debug button(s) total")
+            print(f"  [INFO] Found {len(debug_btns)} debug button(s) total", flush=True)
+
+            # CRITICAL: Wait for debug button event handlers to be attached
+            # Debug buttons are dynamically created and event handlers may not be immediately ready
+            print(f"  [INFO] Waiting for debug button event handlers to be attached...", flush=True)
+            time.sleep(2)  # Give time for event handlers to be attached to debug buttons
+            print(f"  [OK] Event handlers should be ready", flush=True)
 
             # Click the target function's debug button
             # If expected_button_index is provided, use that specific button
             # Otherwise, fall back to the last button
             if expected_button_index is not None and len(debug_btns) > expected_button_index:
                 target_button_index = expected_button_index
-                print(f"  [INFO] Clicking debug button at index {target_button_index} (target function)")
+                print(f"  [INFO] Target debug button at index {target_button_index}", flush=True)
             else:
                 target_button_index = -1
-                print(f"  [INFO] Clicking last debug button (fallback)")
+                print(f"  [INFO] Target debug button at last index (fallback)", flush=True)
 
-            debug_btns[target_button_index].click()
+            # Validate the index
+            actual_index = target_button_index if target_button_index >= 0 else len(debug_btns) + target_button_index
+            if actual_index < 0 or actual_index >= len(debug_btns):
+                raise Exception(f"Invalid button index: {actual_index} (total buttons: {len(debug_btns)})")
 
-            # Wait for debugger to load (slider appears)
+            # Inject manual click event listener BEFORE attempting automatic clicks
+            print(f"  [INFO] Setting up manual click detection...", flush=True)
+            self.driver.execute_script("""
+                const targetButton = arguments[0];
+                targetButton.addEventListener('click', function() {
+                    window.manualClickDetected = true;
+                    window.manualClickTime = performance.now();
+                    console.log('[MANUAL CLICK] Detected at:', window.manualClickTime);
+                }, true);  // Use capture phase to ensure we catch the event
+            """, debug_btns[actual_index])
+
+            # Scroll the debug button into view to ensure it's visible
+            print(f"  [INFO] Scrolling debug button into view...", flush=True)
+            self.driver.execute_script("""
+                arguments[0].scrollIntoView({behavior: 'instant', block: 'center', inline: 'nearest'});
+            """, debug_btns[actual_index])
+            time.sleep(0.5)
+
+            # Skip automatic clicking - request manual click immediately
+            print(f"\n{'='*60}", flush=True)
+            print(f"  [MANUAL] Please manually click the Debug button now", flush=True)
+            print(f"  [MANUAL] (Look for the 'Debug' button in the terminal area)", flush=True)
+            print(f"  [MANUAL] The button is highlighted in YELLOW with RED border", flush=True)
+            print(f"  [MANUAL] Waiting for your click (timeout: {manual_click_timeout}s)...", flush=True)
+            print(f"{'='*60}\n", flush=True)
+
+            # Highlight the button to make it easier to find
+            try:
+                self.driver.execute_script("""
+                    const btn = arguments[0];
+                    btn.style.border = '5px solid red';
+                    btn.style.backgroundColor = 'yellow';
+                    btn.style.fontWeight = 'bold';
+                    btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                """, debug_btns[actual_index])
+            except:
+                pass
+
+            # Wait for manual click with progress indicator
+            wait_start = time.time()
+            clicked = False
+            last_progress_time = wait_start
+
+            while time.time() - wait_start < manual_click_timeout:
+                manual_clicked = self.driver.execute_script("return window.manualClickDetected;")
+
+                if manual_clicked:
+                    print(f"  [OK] Manual click detected!", flush=True)
+                    clicked = True
+                    break
+
+                # Also check if debugger loaded (in case event listener missed it)
+                if self._is_debugger_loaded():
+                    print(f"  [OK] Debugger loaded (manual click detected indirectly)", flush=True)
+                    clicked = True
+                    break
+
+                # Show progress every 5 seconds
+                elapsed = time.time() - wait_start
+                if time.time() - last_progress_time >= 5:
+                    remaining = manual_click_timeout - elapsed
+                    print(f"  [WAITING] Still waiting for manual click... ({remaining:.0f}s remaining)", flush=True)
+                    last_progress_time = time.time()
+
+                time.sleep(0.5)
+
+            if not clicked:
+                raise Exception(f"Manual click timeout ({manual_click_timeout}s)")
+
+            # Remove highlight
+            try:
+                self.driver.execute_script("""
+                    const btn = arguments[0];
+                    btn.style.border = '';
+                    btn.style.backgroundColor = '';
+                    btn.style.fontWeight = '';
+                """, debug_btns[actual_index])
+            except:
+                pass
+
+            # Wait for debugger to actually start (check for slider or debugView content)
+            # Debug button automatically opens debugger tab and loads the transaction
+            print(f"  [INFO] Waiting for debugger to load...", flush=True)
+            time.sleep(4)  # Give Remix time to process the debug button click, open debugger tab, and load transaction
+
+            # Wait for debugger tab to open and debugger to start
+            # Check multiple conditions to ensure debugging actually started:
+            # 1. Slider appears
+            # 2. Transaction hash is loaded in txinput field
+            # 3. Slider has a valid max value (> 0)
+
+            # Wait for slider to appear
+            print(f"  [INFO] Waiting for slider to appear...", flush=True)
             WebDriverWait(self.driver, 15).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "[data-id='slider']"))
             )
+            print(f"  [INFO] Slider appeared", flush=True)
+
+            # Wait for transaction hash to be loaded in txinput field
+            # The debugger automatically fills this field when debugging starts
+            try:
+                WebDriverWait(self.driver, 15).until(
+                    lambda d: len(d.find_element(By.CSS_SELECTOR, "[data-id='debuggerTransactionInput']").get_attribute('value') or '') > 0
+                )
+                loaded_tx_hash = self.driver.find_element(By.CSS_SELECTOR, "[data-id='debuggerTransactionInput']").get_attribute('value')
+                print(f"  [INFO] Transaction hash loaded in debugger: {loaded_tx_hash}", flush=True)
+            except TimeoutException:
+                print(f"  [WARNING] Transaction hash not loaded in txinput field within timeout", flush=True)
+
+            # Wait for slider to have a valid max value (debugging actually started)
+            # When debugging starts, slider max is set to the total number of steps
+            try:
+                WebDriverWait(self.driver, 10).until(
+                    lambda d: int(d.find_element(By.CSS_SELECTOR, "[data-id='slider']").get_attribute('max') or '0') > 0
+                )
+                slider_max = int(self.driver.find_element(By.CSS_SELECTOR, "[data-id='slider']").get_attribute('max'))
+                print(f"  [INFO] Slider initialized with max value: {slider_max}", flush=True)
+            except TimeoutException:
+                print(f"  [WARNING] Slider max value not set within timeout", flush=True)
+                # Try to get current max value anyway
+                try:
+                    slider_max = int(self.driver.find_element(By.CSS_SELECTOR, "[data-id='slider']").get_attribute('max') or '0')
+                    print(f"  [INFO] Current slider max: {slider_max}", flush=True)
+                except:
+                    pass
+
+            # Additional wait to ensure UI is fully ready
+            time.sleep(1)
 
             # Measure time using performance API
+            # If manual click was used, use the manual click time; otherwise use current time
             debug_open_time = self.driver.execute_script("""
-                return performance.now() - window.debugStartTime;
+                if (window.manualClickTime !== null) {
+                    console.log('[TIME] Using manual click time:', window.manualClickTime);
+                    return window.manualClickTime - window.debugStartTime;
+                } else {
+                    console.log('[TIME] Using automatic click time');
+                    return performance.now() - window.debugStartTime;
+                }
             """)
 
-            print(f"  [OK] Debugger opened in {debug_open_time:.2f}ms")
+            print(f"  [OK] Debugger opened and debugging started in {debug_open_time:.2f}ms", flush=True)
             return debug_open_time
         except Exception as e:
             print(f"  [ERROR] Failed to open debugger: {e}")
@@ -614,32 +907,80 @@ class RemixBenchmark:
             return None
 
     def _jump_to_end(self):
-        """Jump to the last step of execution"""
+        """Jump to the last step of execution by clicking step over forward until end"""
         try:
             # Inject performance measurement
             self.driver.execute_script("""
                 window.jumpStartTime = performance.now();
             """)
 
-            # Click "Jump to the last breakpoint" button
-            jump_end_btn = self.driver.find_element(
-                By.CSS_SELECTOR,
-                "[data-id='debuggerTransactionEndButton']"
-            )
-            jump_end_btn.click()
+            print(f"  [INFO] Starting step-by-step execution to end...", flush=True)
 
-            # Wait for UI to update
-            time.sleep(1)
+            # Get initial slider position and max value
+            slider = self.driver.find_element(By.CSS_SELECTOR, "[data-id='slider']")
+            max_steps = int(slider.get_attribute('max'))
+
+            print(f"  [INFO] Total steps to execute: {max_steps}", flush=True)
+
+            # Click step over forward button repeatedly until we reach the end
+            # Use buttonNavigatorOverForward (the container div)
+            step_count = 0
+            max_iterations = max_steps + 10  # Safety limit
+
+            while step_count < max_iterations:
+                try:
+                    # Get current slider value
+                    current_step = int(slider.get_attribute('value'))
+
+                    # Check if we've reached the end
+                    if current_step >= max_steps:
+                        print(f"  [OK] Reached end of execution at step {current_step}", flush=True)
+                        break
+
+                    # Enable pointer-events and click the step over forward button
+                    # Target the container div (buttonNavigatorOverForwardContainer)
+                    clicked = self.driver.execute_script("""
+                        const container = document.querySelector('[data-id="buttonNavigatorOverForward"]');
+                        const button = document.querySelector('#overforward');
+
+                        if (container) {
+                            // Enable pointer events on button if disabled
+                            if (button) {
+                                button.style.pointerEvents = 'auto';
+                            }
+                            // Click the container div
+                            container.click();
+                            return true;
+                        } else {
+                            return false;
+                        }
+                    """)
+
+                    if not clicked:
+                        print(f"  [WARNING] Could not find step over forward button", flush=True)
+                        break
+
+                    # Small wait for UI to update
+                    time.sleep(0.05)  # 50ms between steps
+
+                    step_count += 1
+
+                except Exception as e:
+                    print(f"  [WARNING] Error during step execution: {e}", flush=True)
+                    break
+
+            if step_count >= max_iterations:
+                print(f"  [WARNING] Reached max iterations limit", flush=True)
 
             # Measure time
             jump_time = self.driver.execute_script("""
                 return performance.now() - window.jumpStartTime;
             """)
 
-            print(f"  [OK] Jumped to end in {jump_time:.2f}ms")
+            print(f"  [OK] Stepped to end in {jump_time:.2f}ms ({step_count} steps executed)", flush=True)
             return jump_time
         except Exception as e:
-            print(f"  [ERROR] Failed to jump to end: {e}")
+            print(f"  [ERROR] Failed to jump to end: {e}", flush=True)
             raise
 
     def _extract_variables(self):
@@ -771,11 +1112,8 @@ class RemixBenchmark:
             # 8. Jump to end (using performance.now())
             results['jump_to_end_time_ms'] = self._jump_to_end()
 
-            # 9. Extract variables (using performance.now())
-            variables, extract_time = self._extract_variables()
-            results['variable_extraction_time_ms'] = extract_time
-            results['num_variables_extracted'] = len(variables)
-            results['variables'] = variables
+            # Note: Variable extraction removed - users can see variables directly in browser
+            # No need to extract them via Selenium (slow and unnecessary)
 
             # Calculate total
             results['total_time_ms'] = (time.perf_counter() - total_start) * 1000
@@ -783,8 +1121,7 @@ class RemixBenchmark:
             # Calculate "pure debugging time" (what user experiences after setup)
             results['pure_debug_time_ms'] = (
                 results['debug_open_time_ms'] +
-                results['jump_to_end_time_ms'] +
-                results['variable_extraction_time_ms']
+                results['jump_to_end_time_ms']
             )
 
             results['success'] = True

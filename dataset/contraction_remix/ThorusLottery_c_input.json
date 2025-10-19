@@ -1,8 +1,6 @@
 {
   "contract_name": "ThorusLottery_c",
-  "state_slots": {
-    "tickets.length": 5
-  },
+  "state_slots": {},
   "state_arrays": {
     "ticketNumbers": [
       0,

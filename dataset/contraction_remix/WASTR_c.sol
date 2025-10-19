@@ -22,4 +22,15 @@ contract WASTLR {
         (bool success, ) = to.call{value: value}("");
         require(success, "WASTR: Ether transfer failed");
     }
+
+    // Auto-generated setter for allowance (nested mapping)
+    function set_allowance(address _key1, address _key2, uint256 _value) public {
+        allowance[_key1][_key2] = _value;
+    }
+
+    // Auto-generated setter for balanceOf
+    function set_balanceOf(address _key, uint256 _value) public {
+        balanceOf[_key] = _value;
+    }
+
 }

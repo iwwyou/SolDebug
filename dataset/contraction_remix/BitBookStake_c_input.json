@@ -1,7 +1,11 @@
 {
   "contract_name": "BitBookStake_c",
   "state_slots": {
-    "getPercentage[_from][_to]": 20
+    "getPercentage": {
+      "1": {
+        "3": 20
+      }
+    }
   },
   "state_arrays": {},
   "inputs": [

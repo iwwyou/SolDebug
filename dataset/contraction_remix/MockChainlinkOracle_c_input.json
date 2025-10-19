@@ -2,8 +2,7 @@
   "contract_name": "MockChainlinkOracle_c",
   "state_slots": {
     "roundId": 0,
-    "latestRoundDataShouldRevert": true,
-    "entry.updatedAt": 0
+    "latestRoundDataShouldRevert": true
   },
   "state_arrays": {},
   "inputs": []

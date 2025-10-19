@@ -1,7 +1,9 @@
 {
   "contract_name": "OptimisticGrants_c",
   "state_slots": {
-    "grants[_owner].amount": 100
+    "grants": {
+      "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2": 100
+    }
   },
   "state_arrays": {},
   "inputs": [
