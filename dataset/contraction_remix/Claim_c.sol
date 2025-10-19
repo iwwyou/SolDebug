@@ -16,4 +16,24 @@ contract Claim {
         }
         return 0;
     }
+
+    // Auto-generated setter for claimedOnce (mapping)
+    function set_claimedOnce(address _key, bool _value) public {
+        claimedOnce[_key] = _value;
+    }
+
+    // Auto-generated setter for startTime
+    function set_startTime(uint256 _value) public {
+        startTime = _value;
+    }
+
+    // Auto-generated setter for locktime
+    function set_locktime(uint256 _value) public {
+        locktime = _value;
+    }
+
+    // Auto-generated setter for claimable (mapping)
+    function set_claimable(address _key, uint256 _value) public {
+        claimable[_key] = _value;
+    }
 }

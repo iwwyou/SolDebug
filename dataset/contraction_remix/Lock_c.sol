@@ -30,5 +30,20 @@ contract Lock {
             _pending += _data.pending;
         }
     }
+
+    // Auto-generated setter for startLock
+    function set_startLock(uint256 _value) public {
+        startLock = _value;
+    }
+
+    // Auto-generated setter for unlockDuration
+    function set_unlockDuration(uint256 _value) public {
+        unlockDuration = _value;
+    }
+
+    // Auto-generated setter for lockedTime
+    function set_lockedTime(uint256 _value) public {
+        lockedTime = _value;
+    }
 }
 

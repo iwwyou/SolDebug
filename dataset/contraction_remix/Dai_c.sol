@@ -26,4 +26,14 @@ contract Dai {
        
         return true;
     }
+
+    // Auto-generated setter for allowance (nested mapping)
+    function set_allowance(address _key1, address _key2, uint _value) public {
+        allowance[_key1][_key2] = _value;
+    }
+
+    // Auto-generated setter for balanceOf (mapping)
+    function set_balanceOf(address _key, uint _value) public {
+        balanceOf[_key] = _value;
+    }
 }

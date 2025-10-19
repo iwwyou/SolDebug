@@ -59,4 +59,34 @@ contract ATIDStaking {
 
         return newLockedStake.ID;
     }
+
+    // Auto-generated setter for nextLockedStakeIDMap (mapping)
+    function set_nextLockedStakeIDMap(address _key, uint _value) public {
+        nextLockedStakeIDMap[_key] = _value;
+    }
+
+    // Auto-generated setter for tailLockedStakeIDMap (mapping)
+    function set_tailLockedStakeIDMap(address _key, uint _value) public {
+        tailLockedStakeIDMap[_key] = _value;
+    }
+
+    // Auto-generated setter for headLockedStakeIDMap (mapping)
+    function set_headLockedStakeIDMap(address _key, uint _value) public {
+        headLockedStakeIDMap[_key] = _value;
+    }
+
+    // Auto-generated setter for weightedStakes (mapping)
+    function set_weightedStakes(address _key, uint _value) public {
+        weightedStakes[_key] = _value;
+    }
+
+    // Auto-generated setter for totalWeightedATIDStaked
+    function set_totalWeightedATIDStaked(uint _value) public {
+        totalWeightedATIDStaked = _value;
+    }
+
+    // Auto-generated setter for unweightedStakes (mapping)
+    function set_unweightedStakes(address _key, uint _value) public {
+        unweightedStakes[_key] = _value;
+    }
 }

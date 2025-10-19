@@ -46,4 +46,14 @@ contract MockChainlinkOracle {
         }
         return getRoundData(uint80(roundId));
     }
+
+    // Auto-generated setter for roundId
+    function set_roundId(uint80 _value) public {
+        roundId = _value;
+    }
+
+    // Auto-generated setter for latestRoundDataShouldRevert
+    function set_latestRoundDataShouldRevert(bool _value) public {
+        latestRoundDataShouldRevert = _value;
+    }
 }

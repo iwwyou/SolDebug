@@ -40,4 +40,9 @@ contract Core {
         _stablecoinList[_index] = _value;
     }
 
+
+    // Auto-generated setter for governorMap (mapping)
+    function set_governorMap(address _key, bool _value) public {
+        governorMap[_key] = _value;
+    }
 }

@@ -1367,10 +1367,43 @@ def run_benchmark_suite(num_runs=3, sample_size=None, start_from=None):
     # Close browser
     benchmark.close()
 
-    # Save results
+    # Save results (merge with existing results if any)
     results_df = pd.DataFrame(all_results)
-    results_df.to_csv('remix_benchmark_results.csv', index=False)
-    results_df.to_json('remix_benchmark_results.json', orient='records', indent=2)
+
+    # Load existing results if CSV file exists
+    import os
+    csv_file = 'remix_benchmark_results.csv'
+    json_file = 'remix_benchmark_results.json'
+
+    if os.path.exists(csv_file):
+        print(f"\n[INFO] Found existing results file, merging with new results...")
+        existing_df = pd.read_csv(csv_file)
+
+        # Combine existing and new results
+        # Remove duplicates: keep new results if same contract+function+run exists
+        combined_df = pd.concat([existing_df, results_df], ignore_index=True)
+
+        # Remove duplicates based on contract_name, function_name, and run_number
+        # Keep the last occurrence (new results override old ones)
+        combined_df = combined_df.drop_duplicates(
+            subset=['contract_name', 'function_name', 'run_number'],
+            keep='last'
+        )
+
+        # Sort by contract_name and run_number for better readability
+        combined_df = combined_df.sort_values(
+            by=['contract_name', 'run_number']
+        ).reset_index(drop=True)
+
+        print(f"[INFO] Previous results: {len(existing_df)} rows")
+        print(f"[INFO] New results: {len(results_df)} rows")
+        print(f"[INFO] Combined results: {len(combined_df)} rows")
+
+        results_df = combined_df
+
+    # Save combined results
+    results_df.to_csv(csv_file, index=False)
+    results_df.to_json(json_file, orient='records', indent=2)
 
     print(f"\n{'='*60}")
     print(f"[OK] Benchmark suite completed")

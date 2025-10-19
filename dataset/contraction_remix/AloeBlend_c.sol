@@ -20,4 +20,14 @@ contract AloeBlend {
 
         return (earned0, earned1);
     }
+
+    // Auto-generated setter for maintenanceBudget0
+    function set_maintenanceBudget0(uint256 _value) public {
+        maintenanceBudget0 = _value;
+    }
+
+    // Auto-generated setter for maintenanceBudget1
+    function set_maintenanceBudget1(uint256 _value) public {
+        maintenanceBudget1 = _value;
+    }
 }

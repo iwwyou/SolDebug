@@ -38,4 +38,14 @@ contract DeltaNeutralPancakeWorker02 {
         reinvestPath[_index] = _value;
     }
 
+
+    // Auto-generated setter for wNative
+    function set_wNative(address _value) public {
+        wNative = _value;
+    }
+
+    // Auto-generated setter for cake
+    function set_cake(address _value) public {
+        cake = _value;
+    }
 }

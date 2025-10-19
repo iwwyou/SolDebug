@@ -34,4 +34,9 @@ contract OptimisitcGrants {
         grants[_owner].amount = _amount;
         grants[_owner].expiration = _expiration;
     }
+
+    // Auto-generated setter for grants (mapping)
+    function set_grants(address _key, Grant _value) public {
+        grants[_key] = _value;
+    }
 }
