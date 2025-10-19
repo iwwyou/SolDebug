@@ -13,15 +13,4 @@ contract BEP20 {
         balances[_to]+=_amount;        
         return true;
     }    
-
-
-    // Auto-generated setter for balances
-    function set_balances(address _key, uint256 _value) public {
-        balances[_key] = _value;
-    }
-
-    // Auto-generated setter for allowed (nested mapping)
-    function set_allowed(address _key1, address _key2, uint256 _value) public {
-        allowed[_key1][_key2] = _value;
-    }
 }

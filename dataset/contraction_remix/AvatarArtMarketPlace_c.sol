@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 contract AvatarArtMarketplace {
     uint256[] public _tokens;
     
-    function _removeFromTokens(uint tokenId) public view returns(uint256[] memory){
+    function _removeFromTokens(uint tokenId) public returns(uint256[] memory){
         uint256 tokenCount = _tokens.length;
         uint256[] memory result = new uint256[](tokenCount-1);
         uint256 resultIndex = 0;
@@ -15,7 +15,7 @@ contract AvatarArtMarketplace {
                 resultIndex++;
             }
         }
-        
+
         return result;
     }
 

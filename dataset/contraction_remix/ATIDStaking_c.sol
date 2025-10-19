@@ -59,45 +59,4 @@ contract ATIDStaking {
 
         return newLockedStake.ID;
     }
-
-
-    // Auto-generated setter for lockedStakeMap (nested mapping)
-    function set_lockedStakeMap(address _key1, uint _key2, LockedStake memory _value) public {
-        lockedStakeMap[_key1][_key2] = _value;
-    }
-
-    // Auto-generated setter for headLockedStakeIDMap
-    function set_headLockedStakeIDMap(address _key, uint _value) public {
-        headLockedStakeIDMap[_key] = _value;
-    }
-
-    // Auto-generated setter for nextLockedStakeIDMap
-    function set_nextLockedStakeIDMap(address _key, uint _value) public {
-        nextLockedStakeIDMap[_key] = _value;
-    }
-
-    // Auto-generated setter for tailLockedStakeIDMap
-    function set_tailLockedStakeIDMap(address _key, uint _value) public {
-        tailLockedStakeIDMap[_key] = _value;
-    }
-
-    // Auto-generated setter for weightedStakes
-    function set_weightedStakes(address _key, uint _value) public {
-        weightedStakes[_key] = _value;
-    }
-
-    // Auto-generated setter for unweightedStakes
-    function set_unweightedStakes(address _key, uint _value) public {
-        unweightedStakes[_key] = _value;
-    }
-
-    // Auto-generated setter for totalWeightedATIDStaked
-    function set_totalWeightedATIDStaked(uint _value) public {
-        totalWeightedATIDStaked = _value;
-    }
-
-    // Auto-generated setter for totalUnWeightedATIDStaked
-    function set_totalUnWeightedATIDStaked(uint _value) public {
-        totalUnWeightedATIDStaked = _value;
-    }
 }

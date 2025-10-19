@@ -34,20 +34,4 @@ contract OptimisitcGrants {
         grants[_owner].amount = _amount;
         grants[_owner].expiration = _expiration;
     }
-
-
-    // Auto-generated setter for _governance
-    function set__governance(address _value) public {
-        _governance = _value;
-    }
-
-    // Auto-generated setter for solvency
-    function set_solvency(uint256 _value) public {
-        solvency = _value;
-    }
-
-    // Auto-generated setter for grants
-    function set_grants(address _key, Grant memory _value) public {
-        grants[_key] = _value;
-    }
 }

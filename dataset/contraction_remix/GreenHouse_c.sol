@@ -9,8 +9,7 @@ contract GreenHouse {
     uint256 constant public FEE_PARTNER_WALLET_PERMILLE = 50;
     
     function _calculateFees(uint256 amount)
-    public pure
-    returns(
+    public returns(
         uint256 allUsers,
         uint256 bonusPool,
         uint256 partner,

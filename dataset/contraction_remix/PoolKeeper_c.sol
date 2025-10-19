@@ -7,15 +7,15 @@ contract PoolKeeper {
     uint256 public constant BLOCK_TIME = 13;  
     uint256 public constant MAX_TIP = 100; 
     
-    function keeperTip(uint256 _savedPreviousUpdatedTimestamp, uint256 _poolInterval) public view returns (uint256) {
+    function keeperTip(uint256 _savedPreviousUpdatedTimestamp, uint256 _poolInterval) public returns (uint256) {        
         uint256 elapsedBlocksNumerator = (block.timestamp - (_savedPreviousUpdatedTimestamp + _poolInterval));
 
-        uint256 calculatedTip = BASE_TIP + (TIP_DELTA_PER_BLOCK * elapsedBlocksNumerator) / BLOCK_TIME;
-
-        if (calculatedTip > MAX_TIP) {
+        uint256 keeperTip = BASE_TIP + (TIP_DELTA_PER_BLOCK * elapsedBlocksNumerator) / BLOCK_TIME;
+        
+        if (keeperTip > MAX_TIP) {
             return MAX_TIP;
         } else {
-            return calculatedTip;
+            return keeperTip;
         }
     }
 }

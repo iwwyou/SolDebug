@@ -13,7 +13,7 @@ contract ThorusLottery {
     Ticket[] public tickets;
     uint256[] public ticketNumbers;
 
-    function isWinning(uint256 ticketIndex) public view returns (bool) {
+    function isWinning(uint256 ticketIndex) public returns (bool) {
         if(firstWinningNumber <= ticketNumbers[ticketIndex] && ticketNumbers[ticketIndex] < lastWinningNumber) {
             return true;
         }
@@ -21,17 +21,6 @@ contract ThorusLottery {
             return true;
         }
         return false;
-    }
-
-
-    // Auto-generated setter for firstWinningNumber
-    function set_firstWinningNumber(uint256 _value) public {
-        firstWinningNumber = _value;
-    }
-
-    // Auto-generated setter for lastWinningNumber
-    function set_lastWinningNumber(uint256 _value) public {
-        lastWinningNumber = _value;
     }
 
     // Auto-generated setter for array tickets
@@ -59,6 +48,16 @@ contract ThorusLottery {
             }
         }
         ticketNumbers[_index] = _value;
+    }
+
+    // Setter for firstWinningNumber
+    function set_firstWinningNumber(uint256 _value) public {
+        firstWinningNumber = _value;
+    }
+
+    // Setter for lastWinningNumber
+    function set_lastWinningNumber(uint256 _value) public {
+        lastWinningNumber = _value;
     }
 
 }

@@ -16,7 +16,7 @@ contract PercentageFeeModel {
         address pool,
         uint64 depositID,
         uint256 withdrawnDepositAmount
-    ) external view returns (uint256 feeAmount) {
+    ) external returns (uint256 feeAmount) {
         uint256 feeRate;
         FeeOverride memory feeOverrideForDeposit =
             earlyWithdrawFeeOverrideForDeposit[pool][depositID];
@@ -32,21 +32,5 @@ contract PercentageFeeModel {
             }
         }
         return (withdrawnDepositAmount * feeRate) / PRECISION;
-    }
-
-
-    // Auto-generated setter for earlyWithdrawFeeOverrideForPool
-    function set_earlyWithdrawFeeOverrideForPool(address _key, FeeOverride memory _value) public {
-        earlyWithdrawFeeOverrideForPool[_key] = _value;
-    }
-
-    // Auto-generated setter for earlyWithdrawFeeOverrideForDeposit (nested mapping)
-    function set_earlyWithdrawFeeOverrideForDeposit(address _key1, uint64 _key2, FeeOverride _value) public {
-        earlyWithdrawFeeOverrideForDeposit[_key1][_key2] = _value;
-    }
-
-    // Auto-generated setter for earlyWithdrawFee
-    function set_earlyWithdrawFee(uint256 _value) public {
-        earlyWithdrawFee = _value;
     }
 }

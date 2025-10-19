@@ -18,7 +18,6 @@ contract MockChainlinkOracle {
 
     function getRoundData(uint80 _roundId)
         public
-        view
         returns (
             uint80,
             int256,
@@ -34,7 +33,6 @@ contract MockChainlinkOracle {
     
     function latestRoundData()
         external
-        view
         returns (
             uint80,
             int256,
@@ -47,21 +45,5 @@ contract MockChainlinkOracle {
             revert("latestRoundData reverted");
         }
         return getRoundData(uint80(roundId));
-    }
-
-
-    // Auto-generated setter for roundId
-    function set_roundId(uint80 _value) public {
-        roundId = _value;
-    }
-
-    // Auto-generated setter for entries
-    function set_entries(uint256 _key, Entry memory _value) public {
-        entries[_key] = _value;
-    }
-
-    // Auto-generated setter for latestRoundDataShouldRevert
-    function set_latestRoundDataShouldRevert(bool _value) public {
-        latestRoundDataShouldRevert = _value;
     }
 }

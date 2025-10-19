@@ -11,20 +11,11 @@ contract TimeLockPool {
 
     mapping(address => Deposit[]) public depositsOf;
     
-    function getTotalDeposit(address _account) public view returns(uint256) {
+    function getTotalDeposit(address _account) public returns(uint256) {
         uint256 total;
         for(uint256 i = 0; i < depositsOf[_account].length; i++) {
             total += depositsOf[_account][i].amount;
         }
         return total;
-    }
-
-
-    // Auto-generated setter for depositsOf
-    function set_depositsOf(address _key, Deposit[] memory _value) public {
-        delete depositsOf[_key];
-        for (uint256 i = 0; i < _value.length; i++) {
-            depositsOf[_key].push(_value[i]);
-        }
     }
 }

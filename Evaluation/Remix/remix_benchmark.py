@@ -104,7 +104,7 @@ class RemixBenchmark:
                 // Clear workspace
                 window.location.reload();
             """)
-            time.sleep(3)
+            #time.sleep(3)
 
             # Handle popups after reload
             self._handle_popups()
@@ -112,10 +112,10 @@ class RemixBenchmark:
             # Wait for Remix FileSystem API to be available after reload
             print("  [INFO] Waiting for Remix to reload...")
             try:
-                WebDriverWait(self.driver, 30).until(
+                WebDriverWait(self.driver, 10).until(
                     lambda d: d.execute_script("return typeof window.remixFileSystem !== 'undefined' && window.remixFileSystem !== null")
                 )
-                time.sleep(2)
+                #time.sleep(2)
                 print("  [OK] Remix FileSystem API ready")
             except TimeoutException:
                 print("  [WARNING] Remix FileSystem API not detected after reset")
@@ -123,10 +123,10 @@ class RemixBenchmark:
             # Wait for essential plugins to load (especially Solidity Compiler)
             print("  [INFO] Waiting for Solidity Compiler plugin...")
             try:
-                WebDriverWait(self.driver, 20).until(
+                WebDriverWait(self.driver, 10).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "[plugin='solidity']"))
                 )
-                time.sleep(1)
+                #time.sleep(1)
                 print("  [OK] Solidity Compiler plugin loaded")
             except TimeoutException:
                 print("  [WARNING] Solidity Compiler plugin not detected after reset")
@@ -183,7 +183,7 @@ class RemixBenchmark:
             if result and result.startswith('error'):
                 raise Exception(result)
 
-            time.sleep(2)
+            #time.sleep(2)
 
             # First, expand the contracts folder if it's collapsed
             print(f"  [INFO] Expanding contracts folder...")
@@ -246,47 +246,26 @@ class RemixBenchmark:
             raise
 
     def _compile_contract(self):
-        """Compile the contract"""
+        """Compile the contract using header Compile button (faster, no tab switching)"""
         try:
             # Handle any lingering popups before clicking
             self._handle_popups()
 
-            # Click Solidity Compiler tab using JavaScript (instant)
-            print("  [INFO] Opening Solidity Compiler tab...")
+            # Click the header Compile button directly (no need to switch to Solidity Compiler tab)
+            print("  [INFO] Clicking header Compile button...")
             self.driver.execute_script("""
-                const compilerTab = document.querySelector("[plugin='solidity']");
-                if (compilerTab) {
-                    compilerTab.click();
+                const compileBtn = document.querySelector("[data-id='compile-action']");
+                if (compileBtn) {
+                    compileBtn.click();
                 }
-            """)
-            print("  [OK] Compiler tab opened")
-
-            # Wait for compile button to exist and be enabled
-            print("  [INFO] Waiting for compile button to be ready...")
-            #WebDriverWait(self.driver, 20).until(
-            #    EC.presence_of_element_located((By.CSS_SELECTOR, "[data-id='compilerContainerCompileBtn']"))
-            #)
-
-            # Additional wait for button to be fully initialized and enabled
-            #WebDriverWait(self.driver, 15).until(
-            #    lambda d: d.find_element(By.CSS_SELECTOR, "[data-id='compilerContainerCompileBtn']") is not None and
-            #              d.find_element(By.CSS_SELECTOR, "[data-id='compilerContainerCompileBtn']").is_enabled()
-            #)
-            #time.sleep(1)
-            print("  [OK] Compile button is ready")
-
-            # Click compile button using JavaScript to avoid interception
-            print("  [INFO] Clicking compile button...")
-            self.driver.execute_script("""
-                document.querySelector("[data-id='compilerContainerCompileBtn']").click();
             """)
 
             # Wait for compilation to complete (check for compilation finished indicator)
             # The data-id includes the compiler version, so we use a prefix match
-            #WebDriverWait(self.driver, 30).until(
-            #    lambda d: d.find_element(By.CSS_SELECTOR, "[data-id^='compilationFinishedWith']")
-            #)
-            #time.sleep(1)
+            print("  [INFO] Waiting for compilation to complete...")
+            WebDriverWait(self.driver, 15).until(
+                lambda d: d.find_element(By.CSS_SELECTOR, "[data-id^='compilationFinishedWith']")
+            )
             print("  [OK] Compilation successful")
         except Exception as e:
             print(f"  [ERROR] Compilation failed: {e}")
@@ -848,14 +827,108 @@ class RemixBenchmark:
 
             # Wait for transaction hash to be loaded in txinput field
             # The debugger automatically fills this field when debugging starts
-            try:
-                WebDriverWait(self.driver, 15).until(
-                    lambda d: len(d.find_element(By.CSS_SELECTOR, "[data-id='debuggerTransactionInput']").get_attribute('value') or '') > 0
-                )
-                loaded_tx_hash = self.driver.find_element(By.CSS_SELECTOR, "[data-id='debuggerTransactionInput']").get_attribute('value')
-                print(f"  [INFO] Transaction hash loaded in debugger: {loaded_tx_hash}", flush=True)
-            except TimeoutException:
-                print(f"  [WARNING] Transaction hash not loaded in txinput field within timeout", flush=True)
+            max_auto_retries = 3
+            tx_hash_loaded = False
+
+            for retry in range(max_auto_retries):
+                try:
+                    WebDriverWait(self.driver, 15).until(
+                        lambda d: len(d.find_element(By.CSS_SELECTOR, "[data-id='debuggerTransactionInput']").get_attribute('value') or '') > 0
+                    )
+                    loaded_tx_hash = self.driver.find_element(By.CSS_SELECTOR, "[data-id='debuggerTransactionInput']").get_attribute('value')
+                    print(f"  [INFO] Transaction hash loaded in debugger: {loaded_tx_hash}", flush=True)
+                    tx_hash_loaded = True
+                    break
+                except TimeoutException:
+                    # Check if transaction hash is actually empty
+                    try:
+                        current_tx_hash = self.driver.find_element(By.CSS_SELECTOR, "[data-id='debuggerTransactionInput']").get_attribute('value') or ''
+                        if current_tx_hash:
+                            # Hash exists but timeout occurred, consider it loaded
+                            print(f"  [INFO] Transaction hash loaded (via retry check): {current_tx_hash}", flush=True)
+                            tx_hash_loaded = True
+                            break
+                    except:
+                        pass
+
+                    # If not the last retry, click debug button again automatically
+                    if retry < max_auto_retries - 1:
+                        print(f"  [RETRY] Transaction hash not loaded, clicking debug button automatically (retry {retry + 1}/{max_auto_retries - 1})...", flush=True)
+                        try:
+                            # Click debug button using JavaScript
+                            self.driver.execute_script("""
+                                arguments[0].click();
+                            """, debug_btns[actual_index])
+
+                            # Wait for debugger to process the click
+                            time.sleep(4)
+                            print(f"  [INFO] Auto-click completed, checking result...", flush=True)
+                        except Exception as e:
+                            print(f"  [ERROR] Auto-click failed: {e}", flush=True)
+                    else:
+                        print(f"  [WARNING] Transaction hash not loaded after {max_auto_retries} automatic attempts", flush=True)
+
+            # If auto-clicks failed, request manual click
+            if not tx_hash_loaded:
+                print(f"\n{'='*60}", flush=True)
+                print(f"  [MANUAL] Automatic clicks failed. Please manually click the Debug button", flush=True)
+                print(f"  [MANUAL] (Look for the 'Debug' button in the terminal area)", flush=True)
+                print(f"  [MANUAL] The button is highlighted in YELLOW with RED border", flush=True)
+                print(f"  [MANUAL] Waiting for your click (timeout: 60s)...", flush=True)
+                print(f"{'='*60}\n", flush=True)
+
+                # Highlight the button
+                try:
+                    self.driver.execute_script("""
+                        const btn = arguments[0];
+                        btn.style.border = '5px solid red';
+                        btn.style.backgroundColor = 'yellow';
+                        btn.style.fontWeight = 'bold';
+                        btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    """, debug_btns[actual_index])
+                except:
+                    pass
+
+                # Wait for manual click
+                manual_wait_start = time.time()
+                manual_timeout = 60
+                manual_clicked = False
+
+                while time.time() - manual_wait_start < manual_timeout:
+                    # Check if transaction hash loaded
+                    try:
+                        current_tx_hash = self.driver.find_element(By.CSS_SELECTOR, "[data-id='debuggerTransactionInput']").get_attribute('value') or ''
+                        if current_tx_hash:
+                            print(f"  [OK] Manual click successful - transaction hash loaded: {current_tx_hash}", flush=True)
+                            tx_hash_loaded = True
+                            manual_clicked = True
+                            break
+                    except:
+                        pass
+
+                    # Also check if debugger loaded
+                    if self._is_debugger_loaded():
+                        print(f"  [OK] Manual click successful - debugger loaded", flush=True)
+                        manual_clicked = True
+                        break
+
+                    time.sleep(0.5)
+
+                if not manual_clicked:
+                    print(f"  [ERROR] Manual click timeout", flush=True)
+                else:
+                    time.sleep(2)  # Wait for debugger to stabilize
+
+                # Remove highlight
+                try:
+                    self.driver.execute_script("""
+                        const btn = arguments[0];
+                        btn.style.border = '';
+                        btn.style.backgroundColor = '';
+                        btn.style.fontWeight = '';
+                    """, debug_btns[actual_index])
+                except:
+                    pass
 
             # Wait for slider to have a valid max value (debugging actually started)
             # When debugging starts, slider max is set to the total number of steps
@@ -1179,16 +1252,32 @@ def load_input_file(contract_filename):
     return state_slots, state_arrays, inputs
 
 
-def run_benchmark_suite(num_runs=3, sample_size=None):
+def run_benchmark_suite(num_runs=3, sample_size=None, start_from=None):
     """
     Run benchmark suite on dataset contracts
 
     Args:
         num_runs: Number of times to run each test (for averaging)
         sample_size: If specified, only test this many contracts (for quick testing)
+        start_from: If specified, start from this contract file name (e.g., "AvatarArtMarketPlace_c.sol")
     """
     # Load dataset
     df = load_dataset()
+
+    # If start_from is specified, skip contracts until we find the matching one
+    if start_from:
+        found_index = None
+        for idx, row in df.iterrows():
+            contract_filename = row['Sol_File_Name'].replace('.sol', '_c.sol')
+            if contract_filename == start_from:
+                found_index = idx
+                break
+
+        if found_index is not None:
+            df = df.iloc[found_index:].reset_index(drop=True)
+            print(f"\n[INFO] Starting from contract: {start_from} (skipped {found_index} contracts)")
+        else:
+            print(f"\n[WARNING] Contract {start_from} not found in dataset, starting from beginning")
 
     if sample_size:
         df = df.head(sample_size)
@@ -1197,6 +1286,8 @@ def run_benchmark_suite(num_runs=3, sample_size=None):
     print(f"Remix Benchmark Suite")
     print(f"Total contracts: {len(df)}")
     print(f"Runs per contract: {num_runs}")
+    if start_from:
+        print(f"Starting from: {start_from}")
     print(f"{'='*60}\n")
 
     # Initialize benchmark
@@ -1295,6 +1386,8 @@ if __name__ == "__main__":
     import sys
 
     # Check command line arguments
+    start_from_file = None
+
     if len(sys.argv) > 1:
         if sys.argv[1] == '--full':
             # Full benchmark: All 30 contracts, 1 run each
@@ -1307,16 +1400,29 @@ if __name__ == "__main__":
             # Quick test: 3 contracts, 1 run each
             print("\n>> Running QUICK test (3 contracts x 1 run)")
             results = run_benchmark_suite(num_runs=1, sample_size=3)
+        elif sys.argv[1] == '--start-from':
+            # Start from a specific contract file
+            if len(sys.argv) < 3:
+                print("ERROR: --start-from requires a filename argument")
+                print("Usage: python remix_benchmark.py --start-from AvatarArtMarketPlace_c.sol")
+                sys.exit(1)
+            start_from_file = sys.argv[2]
+            print(f"\n>> Running benchmark starting from: {start_from_file}")
+            print("Press Ctrl+C within 5 seconds to cancel...\n")
+            time.sleep(5)
+            results = run_benchmark_suite(num_runs=1, sample_size=None, start_from=start_from_file)
         else:
-            print("Usage: python remix_benchmark.py [--full|--quick]")
-            print("  --full:  Measure all 30 contracts (recommended for final results)")
-            print("  --quick: Test with 3 contracts only (for testing)")
+            print("Usage: python remix_benchmark.py [--full|--quick|--start-from FILENAME]")
+            print("  --full:       Measure all 30 contracts (recommended for final results)")
+            print("  --quick:      Test with 3 contracts only (for testing)")
+            print("  --start-from: Start from a specific contract file (e.g., AvatarArtMarketPlace_c.sol)")
             sys.exit(1)
     else:
         # Default: Full benchmark
         print("\n>> Running FULL benchmark (30 contracts x 1 run)")
         print("   Estimated time: ~30 minutes")
         print("   Tip: Use '--quick' for testing with 3 contracts only")
+        print("   Tip: Use '--start-from FILENAME' to resume from a specific contract")
         print("Press Ctrl+C within 5 seconds to cancel...\n")
         time.sleep(5)
         results = run_benchmark_suite(num_runs=1, sample_size=None)

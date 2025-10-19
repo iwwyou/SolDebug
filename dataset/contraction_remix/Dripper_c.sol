@@ -8,9 +8,7 @@ contract Dripper {
     }
     
     function _availableFunds(uint256 _balance, Drip memory _drip)
-        public
-        view
-        returns (uint256)
+        public returns (uint256)
     {
         uint256 elapsed = block.timestamp - _drip.lastCollect;
         uint256 allowed = (elapsed * _drip.perBlock);

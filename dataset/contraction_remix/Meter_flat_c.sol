@@ -18,10 +18,4 @@ contract ERC20 {
         _balances[sender] = senderBalance - amount;
         _balances[recipient] += amount;        
     }
-
-
-    // Auto-generated setter for _balances
-    function set__balances(address _key, uint256 _value) public {
-        _balances[_key] = _value;
-    }
 }

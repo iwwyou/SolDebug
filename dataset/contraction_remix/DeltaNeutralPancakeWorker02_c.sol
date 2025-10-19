@@ -7,7 +7,7 @@ contract DeltaNeutralPancakeWorker02 {
     address public baseToken;
     address[] public reinvestPath;
     
-    function getReinvestPath() public view returns (address[] memory) {
+    function getReinvestPath() public returns (address[] memory) {
         if (reinvestPath.length != 0) {
             return reinvestPath;
         }
@@ -23,17 +23,6 @@ contract DeltaNeutralPancakeWorker02 {
             path[2] = address(baseToken);
         }
         return path;
-    }
-
-
-    // Auto-generated setter for wNative
-    function set_wNative(address _value) public {
-        wNative = _value;
-    }
-
-    // Auto-generated setter for cake
-    function set_cake(address _value) public {
-        cake = _value;
     }
 
     // Auto-generated setter for array reinvestPath

@@ -27,12 +27,6 @@ contract Core {
         _stablecoinList.pop();        
     }
 
-
-    // Auto-generated setter for governorMap
-    function set_governorMap(address _key, bool _value) public {
-        governorMap[_key] = _value;
-    }
-
     // Auto-generated setter for array _stablecoinList
     function _addStablecoinListAt(address _value, uint256 _index) public {
         uint256 currentLength = _stablecoinList.length;

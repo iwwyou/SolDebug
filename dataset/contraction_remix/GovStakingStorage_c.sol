@@ -43,19 +43,13 @@ contract GovStakingStorage {
         totalRewardMultiplier = totalRewardMultiplier + toAdd - toRemove;
     }
 
-
-    // Auto-generated setter for totalRewardMultiplier
-    function set_totalRewardMultiplier(uint256 _value) public {
-        totalRewardMultiplier = _value;
-    }
-
-    // Auto-generated setter for userInfo
-    function set_userInfo(address _key, UserInfo memory _value) public {
-        userInfo[_key] = _value;
-    }
-
-    // Auto-generated setter for allowed
+    // Setter for allowed mapping
     function set_allowed(address _key, bool _value) public {
         allowed[_key] = _value;
+    }
+
+    // Setter for totalRewardMultiplier
+    function set_totalRewardMultiplier(uint256 _value) public {
+        totalRewardMultiplier = _value;
     }
 }
