@@ -2,17 +2,24 @@
   "contract_name": "PercentageFeeModel_c",
   "state_slots": {
     "earlyWithdrawFeeOverrideForDeposit": {
-      "1": {
-        "1": 30
+      "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2": {
+        "1": {
+          "isOverridden": true,
+          "fee": 30
+        }
       }
     },
     "earlyWithdrawFeeOverrideForPool": {
-      "1": 20
+      "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2": {
+        "isOverridden": true,
+        "fee": 20
+      }
     },
     "earlyWithdrawFee": 10
   },
   "state_arrays": {},
   "inputs": [
+    "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2",
     1,
     10
   ]

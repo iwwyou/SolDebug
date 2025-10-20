@@ -14,6 +14,10 @@ contract BEP20 {
         return true;
     }    
 
+    
+
+    
+
     // Auto-generated setter for allowed (nested mapping)
     function set_allowed(address _key1, address _key2, uint256 _value) public {
         allowed[_key1][_key2] = _value;

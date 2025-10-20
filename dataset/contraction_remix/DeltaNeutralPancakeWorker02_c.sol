@@ -23,21 +23,7 @@ contract DeltaNeutralPancakeWorker02 {
             path[2] = address(baseToken);
         }
         return path;
-    }
-
-    // Auto-generated setter for array reinvestPath
-    function _addReinvestPathAt(address _value, uint256 _index) public {
-        uint256 currentLength = reinvestPath.length;
-
-        if (currentLength == 0 || currentLength - 1 < _index) {
-            uint256 additionalCount = _index - currentLength + 1;
-            for (uint256 i = 0; i < additionalCount; i++) {
-                reinvestPath.push();
-            }
-        }
-        reinvestPath[_index] = _value;
-    }
-
+    }    
 
     // Auto-generated setter for wNative
     function set_wNative(address _value) public {
@@ -47,5 +33,19 @@ contract DeltaNeutralPancakeWorker02 {
     // Auto-generated setter for cake
     function set_cake(address _value) public {
         cake = _value;
+    }
+
+    // Auto-generated setter for baseToken
+    function set_baseToken(address _value) public {
+        baseToken = _value;
+    }
+
+    // Auto-generated setter for reinvestPath (array)
+    function set_reinvestPath(uint256 _index, address _value) public {
+        // Expand array if necessary
+        while (reinvestPath.length <= _index) {
+            reinvestPath.push();
+        }
+        reinvestPath[_index] = _value;
     }
 }

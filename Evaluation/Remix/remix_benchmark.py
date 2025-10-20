@@ -271,8 +271,87 @@ class RemixBenchmark:
             print(f"  [ERROR] Compilation failed: {e}")
             raise
 
-    def _deploy_contract(self):
-        """Deploy contract to JavaScript VM"""
+    def _get_current_account(self):
+        """Get currently selected account address from Remix"""
+        default_account = "0x5B38Da6a701c568545dCfcB03FcB875f56beddC4"  # Remix default Account 1
+
+        try:
+            # Try multiple methods to get the account address
+            current_account = self.driver.execute_script("""
+                try {
+                    // Method 1: Try copy button content attribute
+                    const accountLabel = document.querySelector('label.udapp_settingsLabel');
+                    if (accountLabel) {
+                        const copyIcon = accountLabel.querySelector('i.fa-copy[content]');
+                        if (copyIcon) {
+                            const content = copyIcon.getAttribute('content');
+                            if (content) return content;
+                        }
+                    }
+
+                    // Method 2: Try to get from the select element value
+                    const accountSelect = document.querySelector('[data-id="settingsSelectEnvOptions"]');
+                    if (accountSelect) {
+                        const selectedOption = accountSelect.options[accountSelect.selectedIndex];
+                        if (selectedOption && selectedOption.value) {
+                            // Extract address from value if it contains one
+                            const match = selectedOption.value.match(/(0x[a-fA-F0-9]{40})/);
+                            if (match) return match[1];
+                        }
+                    }
+
+                    // Method 3: Try to get from runTabView account select
+                    const runAccountSelect = document.querySelector('select[data-id="runTabSelectAccount"]');
+                    if (runAccountSelect) {
+                        const value = runAccountSelect.value;
+                        if (value && value.startsWith('0x') && value.length >= 42) {
+                            return value.substring(0, 42);
+                        }
+                    }
+
+                    // Method 4: Look for account text in the UI
+                    const accountTexts = Array.from(document.querySelectorAll('*')).filter(el => {
+                        const text = el.textContent || '';
+                        return text.match(/0x[a-fA-F0-9]{40}/);
+                    });
+
+                    for (const el of accountTexts) {
+                        const match = el.textContent.match(/(0x[a-fA-F0-9]{40})/);
+                        if (match) {
+                            // Verify it's likely an account (not a contract address)
+                            const context = el.textContent.toLowerCase();
+                            if (context.includes('account') || el.closest('[data-id*="account"]')) {
+                                return match[1];
+                            }
+                        }
+                    }
+
+                    return null;
+                } catch (e) {
+                    console.error('[ACCOUNT] JavaScript error:', e);
+                    return null;
+                }
+            """)
+
+            if current_account:
+                print(f"  [INFO] Current Remix account: {current_account}")
+                return current_account
+            else:
+                print(f"  [WARNING] Could not get current account, using Remix default: {default_account}")
+                return default_account
+        except Exception as e:
+            # Simplify error message - just show the error type, not the full stacktrace
+            error_msg = str(e).split('\n')[0] if '\n' in str(e) else str(e)
+            print(f"  [WARNING] Error getting current account: {error_msg}")
+            print(f"  [INFO] Using default account: {default_account}")
+            return default_account
+
+    def _deploy_contract(self, deploy_value=None):
+        """Deploy contract to JavaScript VM
+
+        Args:
+            deploy_value: Amount of Wei to send with deployment (for payable constructors)
+        """
         try:
             # Handle any lingering popups before clicking
             self._handle_popups()
@@ -293,6 +372,15 @@ class RemixBenchmark:
                 env_select.click()
                 vm_option = self.driver.find_element(By.XPATH, "//option[contains(text(), 'Remix VM')]")
                 vm_option.click()
+
+            # Set Value field if deploy_value is provided
+            if deploy_value is not None and deploy_value != "0":
+                print(f"  [INFO] Setting deploy value: {deploy_value} Wei")
+                value_input = self.driver.find_element(By.CSS_SELECTOR, "[data-id='dandrValue']")
+                value_input.clear()
+                value_input.send_keys(str(deploy_value))
+                time.sleep(0.3)
+                print(f"  [OK] Deploy value set to {deploy_value} Wei")
 
             # Click Deploy button (data-id includes function type, so use prefix match)
             deploy_btn = self.driver.find_element(By.CSS_SELECTOR, "[data-id^='Deploy']")
@@ -418,6 +506,47 @@ class RemixBenchmark:
             return
 
         try:
+            # Get current Remix account to replace msg.sender in mappings
+            current_account = self._get_current_account()
+
+            # 1. Handle nested mappings: allowed[_from][msg.sender] or allowance[_from][msg.sender]
+            # Replace msg.sender (inner key) with current account
+            for mapping_name in ["allowed", "allowance"]:
+                if mapping_name in state_slots_data:
+                    value = state_slots_data[mapping_name]
+                    # Check if it's a nested mapping (dict of dict)
+                    if isinstance(value, dict):
+                        first_value = next(iter(value.values()), None)
+                        if isinstance(first_value, dict):
+                            # Nested mapping detected
+                            print(f"  [INFO] Adjusting nested '{mapping_name}' mapping for msg.sender = {current_account}")
+                            adjusted_mapping = {}
+                            for from_addr, inner_mapping in value.items():
+                                # Replace all inner keys with current account (msg.sender)
+                                adjusted_mapping[from_addr] = {}
+                                for _, allowance_value in inner_mapping.items():
+                                    adjusted_mapping[from_addr][current_account] = allowance_value
+                                    print(f"    → {mapping_name}[{from_addr}][{current_account}] = {allowance_value}")
+                            state_slots_data[mapping_name] = adjusted_mapping
+
+            # 2. Handle single-level mappings that check msg.sender: governorMap[msg.sender]
+            # Replace address keys with current account if the key is an address
+            for mapping_name in ["governorMap"]:
+                if mapping_name in state_slots_data:
+                    value = state_slots_data[mapping_name]
+                    # Check if it's a single-level mapping with address keys
+                    if isinstance(value, dict):
+                        first_key = next(iter(value.keys()), None)
+                        # Check if first key is an address (starts with 0x and length 42)
+                        if first_key and isinstance(first_key, str) and first_key.startswith("0x") and len(first_key) == 42:
+                            print(f"  [INFO] Adjusting '{mapping_name}' mapping for msg.sender = {current_account}")
+                            adjusted_mapping = {}
+                            for old_key, mapping_value in value.items():
+                                # Replace address key with current account
+                                adjusted_mapping[current_account] = mapping_value
+                                print(f"    → {mapping_name}[{old_key}] -> {mapping_name}[{current_account}] = {mapping_value}")
+                            state_slots_data[mapping_name] = adjusted_mapping
+
             # Count total slots (including mapping entries)
             total_slots = sum(
                 len(v) if isinstance(v, dict) else 1
@@ -457,9 +586,14 @@ class RemixBenchmark:
                 "input[data-id='multiParamManagerBasicInputField']"
             )
 
-            # Input value
+            # Input value - convert Python bool to Solidity bool
+            if isinstance(value, bool):
+                formatted_value = 'true' if value else 'false'
+            else:
+                formatted_value = str(value)
+
             input_field.clear()
-            input_field.send_keys(str(value))
+            input_field.send_keys(formatted_value)
             time.sleep(0.3)
 
             # Wait for button to be enabled
@@ -489,6 +623,35 @@ class RemixBenchmark:
 
         for key, value in mapping_data.items():
             if isinstance(value, dict):
+                # Check if this is a nested mapping or a struct
+                # Nested mapping: all values are dict with address-like keys
+                # Struct: values are primitive types or mixed types with non-address keys
+                first_value = next(iter(value.values()), None)
+
+                # Check if this looks like a nested mapping
+                # (first value is a primitive and first key looks like an address)
+                is_nested_mapping = False
+                if not isinstance(first_value, dict):
+                    # Check if any key looks like an address (starts with 0x and length 42)
+                    for k in value.keys():
+                        if isinstance(k, str) and k.startswith("0x") and len(k) == 42:
+                            is_nested_mapping = True
+                            break
+
+                    # If not address-like keys, it's likely a struct
+                    if not is_nested_mapping:
+                        # This is a struct (mapping to struct type)
+                        print(f"    Setting {var_name}[{key}] = {value} (struct) via {setter_function}")
+                        try:
+                            self._call_setter_with_params(setter_function, [key, value])
+                            print(f"      [OK] {var_name}[{key}] setter called")
+                        except NoSuchElementException:
+                            print(f"      [SKIP] Could not find setter for {var_name}")
+                            break
+                        except Exception as e:
+                            print(f"      [ERROR] Error setting {var_name}[{key}]: {e}")
+                        continue
+
                 # Nested mapping: iterate over nested keys
                 for nested_key, nested_value in value.items():
                     print(f"    Setting {var_name}[{key}][{nested_key}] = {nested_value} via {setter_function}")
@@ -505,12 +668,65 @@ class RemixBenchmark:
                 print(f"    Setting {var_name}[{key}] = {value} via {setter_function}")
                 try:
                     self._call_setter_with_params(setter_function, [key, value])
-                    print(f"      [OK] {var_name}[{key}] set successfully")
+                    print(f"      [OK] {var_name}[{key}] setter called")
+
+                    # Verify the value was set by calling the getter
+                    self._verify_mapping_value(var_name, key, value)
                 except NoSuchElementException:
                     print(f"      [SKIP] Could not find setter for {var_name}")
                     break
                 except Exception as e:
                     print(f"      [ERROR] Error setting {var_name}[{key}]: {e}")
+
+    def _verify_mapping_value(self, var_name, key, expected_value):
+        """Verify that a mapping value was set correctly by calling the getter"""
+        try:
+            # Find the getter button for this mapping (public mappings have auto-generated getters)
+            getter_selector = f"[data-id='{var_name} - call-wrapper']"
+
+            try:
+                getter_wrapper = self.driver.find_element(By.CSS_SELECTOR, getter_selector)
+
+                # Find the parent container
+                parent_container = getter_wrapper.find_element(By.XPATH, "..")
+
+                # Find input field
+                input_field = parent_container.find_element(
+                    By.CSS_SELECTOR,
+                    "input[data-id='multiParamManagerBasicInputField']"
+                )
+
+                # Input the key to query
+                input_field.clear()
+                input_field.send_keys(str(key))
+                time.sleep(0.2)
+
+                # Click getter button
+                button_selector = f"[data-id='{var_name} - call']"
+                getter_btn = self.driver.find_element(By.CSS_SELECTOR, button_selector)
+                getter_btn.click()
+                time.sleep(0.3)
+
+                # Try to read the result
+                try:
+                    result_element = parent_container.find_element(
+                        By.CSS_SELECTOR,
+                        "[data-id='udappNotify']"
+                    )
+                    result_text = result_element.text
+
+                    # Check if result matches expected value
+                    if str(expected_value).lower() in result_text.lower():
+                        print(f"      [VERIFIED] {var_name}[{key}] = {expected_value}")
+                    else:
+                        print(f"      [WARNING] {var_name}[{key}] verification failed! Expected: {expected_value}, Got: {result_text}")
+                except:
+                    print(f"      [INFO] Could not read getter result for {var_name}[{key}]")
+
+            except NoSuchElementException:
+                print(f"      [INFO] No getter found for {var_name} (verification skipped)")
+        except Exception as e:
+            print(f"      [INFO] Verification skipped: {e}")
 
     def _call_setter_with_params(self, setter_function, params):
         """Call a setter function with multiple parameters"""
@@ -528,7 +744,49 @@ class RemixBenchmark:
         )
 
         # Input parameters as comma-separated string
-        input_str = ','.join([str(p) for p in params])
+        # IMPORTANT: Convert Python types to Solidity format
+        formatted_params = []
+        for i, p in enumerate(params):
+            if isinstance(p, bool):
+                # Convert Python bool to Solidity bool (lowercase)
+                formatted_params.append('true' if p else 'false')
+            elif isinstance(p, dict):
+                # Convert dict (struct) to array format for Remix
+                # Remix accepts structs as arrays of values in field order
+                # Example: {"lpToken":"0x...","isEnabled":true,...} -> ["0x...",true,...]
+                struct_values = list(p.values())
+                formatted_struct_values = []
+                for v in struct_values:
+                    if isinstance(v, bool):
+                        formatted_struct_values.append('true' if v else 'false')
+                    elif isinstance(v, str):
+                        # For address (starts with 0x), no quotes needed
+                        # For other strings, quotes needed
+                        if v.startswith("0x"):
+                            formatted_struct_values.append(v)
+                        else:
+                            formatted_struct_values.append(f'"{v}"')
+                    else:
+                        formatted_struct_values.append(str(v))
+                # Create array string without outer quotes
+                array_str = '[' + ','.join(formatted_struct_values) + ']'
+                formatted_params.append(array_str)
+                print(f"      [INFO] Converted struct to array: {array_str}")
+            elif isinstance(p, str) and p.startswith("0x"):
+                # Check if this might need bytes4 conversion
+                # If it's an address-length hex string (42 chars) and this is a known bytes4 parameter
+                if len(p) == 42 and setter_function == "set__quorums" and i == 1:
+                    # Convert address to bytes4 (first 4 bytes = 10 chars including 0x)
+                    bytes4_value = p[:10]
+                    formatted_params.append(bytes4_value)
+                    print(f"      [INFO] Converted address to bytes4: {p} -> {bytes4_value}")
+                else:
+                    formatted_params.append(str(p))
+            else:
+                formatted_params.append(str(p))
+
+        input_str = ','.join(formatted_params)
+        print(f"      [DEBUG] Input: {input_str}")
         input_field.clear()
         input_field.send_keys(input_str)
         time.sleep(0.3)
@@ -543,6 +801,21 @@ class RemixBenchmark:
         setter_btn = self.driver.find_element(By.CSS_SELECTOR, button_selector)
         setter_btn.click()
         time.sleep(0.5)
+
+        # Check if transaction was reverted by looking at terminal
+        try:
+            revert_detected = self.driver.execute_script("""
+                const terminal = document.querySelector('#terminal-view');
+                if (terminal) {
+                    const lastLog = terminal.textContent;
+                    return lastLog.includes('revert') || lastLog.includes('reverted');
+                }
+                return false;
+            """)
+            if revert_detected:
+                print(f"      [WARNING] Transaction may have reverted!")
+        except:
+            pass
 
     def _set_state_arrays(self, state_arrays_data):
         """
@@ -571,37 +844,11 @@ class RemixBenchmark:
 
                 for index, value in enumerate(values):
                     try:
-                        # Find the wrapper for this function
-                        wrapper_selector = f"[data-id='{func_name} - transact (not payable)-wrapper']"
-                        wrapper = self.driver.find_element(By.CSS_SELECTOR, wrapper_selector)
-
-                        # Find the parent container (udapp_contractActionsContainerSingle) that contains both wrapper and input
-                        parent_container = wrapper.find_element(By.XPATH, "..")
-
-                        # Find input field as sibling within the parent container
-                        input_field = parent_container.find_element(
-                            By.CSS_SELECTOR,
-                            "input[data-id='multiParamManagerBasicInputField']"
-                        )
-
-                        # Input: value, index
-                        input_str = f"{value},{index}"
-                        input_field.clear()
-                        input_field.send_keys(input_str)
-                        time.sleep(0.3)  # Wait for input to register
-
-                        # Wait for button to be enabled
-                        button_selector = f"[data-id='{func_name} - transact (not payable)']"
-                        WebDriverWait(self.driver, 5).until(
-                            lambda d: not d.find_element(By.CSS_SELECTOR, button_selector).get_attribute('disabled')
-                        )
-
-                        # Click function button
-                        func_btn = self.driver.find_element(By.CSS_SELECTOR, button_selector)
-                        func_btn.click()
-                        time.sleep(0.5)  # Wait for transaction
-
-                        print(f"      [OK] {array_name}[{index}] = {value}")
+                        # Use _call_setter_with_params to handle both primitive and struct types
+                        # The function signature is: _add{ArrayName}At(value, index)
+                        print(f"      Setting {array_name}[{index}] = {value}")
+                        self._call_setter_with_params(func_name, [value, index])
+                        print(f"      [OK] {array_name}[{index}] set successfully")
 
                     except NoSuchElementException:
                         print(f"      [SKIP] Could not find function {func_name}")
@@ -617,13 +864,38 @@ class RemixBenchmark:
     def _execute_function(self, function_name, inputs):
         """Execute target function and return transaction hash"""
         try:
-            # Find the wrapper for this specific function
-            wrapper_selector = f"[data-id='{function_name} - transact (not payable)-wrapper']"
-            print(f"  [INFO] Looking for function wrapper: {wrapper_selector}")
+            # Try to detect function button type automatically
+            # Possible types: transact (not payable), call, transact (payable)
+            button_types = [
+                ('transact (not payable)', 'transact'),
+                ('call', 'call'),
+                ('transact (payable)', 'transact')
+            ]
 
-            wrapper = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, wrapper_selector))
-            )
+            wrapper = None
+            button_type_found = None
+
+            print(f"  [INFO] Detecting button type for function: {function_name}")
+
+            for button_type, action_type in button_types:
+                wrapper_selector = f"[data-id='{function_name} - {button_type}-wrapper']"
+                try:
+                    wrapper = self.driver.find_element(By.CSS_SELECTOR, wrapper_selector)
+                    button_type_found = button_type
+                    print(f"  [OK] Found function button type: {button_type}")
+                    break
+                except NoSuchElementException:
+                    continue
+
+            if wrapper is None:
+                # If no specific wrapper found, try to find any button with function name
+                print(f"  [WARNING] Standard button types not found, searching for any button...")
+                all_buttons = self.driver.find_elements(By.CSS_SELECTOR, f"[data-id*='{function_name}']")
+                if all_buttons:
+                    print(f"  [INFO] Found {len(all_buttons)} potential buttons:")
+                    for btn in all_buttons:
+                        print(f"    - {btn.get_attribute('data-id')}")
+                raise Exception(f"Could not find button for function '{function_name}'")
 
             # If function has inputs, fill them
             if inputs:
@@ -636,8 +908,21 @@ class RemixBenchmark:
                     "input[data-id='multiParamManagerBasicInputField']"
                 )
 
-                # Convert inputs to comma-separated string
-                input_str = ','.join([str(v) for v in inputs]) if isinstance(inputs, list) else str(inputs)
+                # Format inputs (handle bytes4 conversion if needed)
+                formatted_inputs = []
+                if isinstance(inputs, list):
+                    for i, v in enumerate(inputs):
+                        # Check if this is a bytes4 parameter for quorums function
+                        if function_name == "quorums" and i == 1 and isinstance(v, str) and v.startswith("0x"):
+                            # Ensure it's bytes4 format (10 chars)
+                            if len(v) != 10:
+                                v = v[:10]
+                                print(f"  [INFO] Truncated to bytes4: {v}")
+                        formatted_inputs.append(str(v))
+                    input_str = ','.join(formatted_inputs)
+                else:
+                    input_str = str(inputs)
+
                 print(f"  [INFO] Entering parameters: {input_str}")
 
                 function_input.clear()
@@ -645,12 +930,15 @@ class RemixBenchmark:
                 time.sleep(0.3)  # Wait for input to register
 
             # Wait for button to be enabled (it gets enabled after input)
-            button_selector = f"[data-id='{function_name} - transact (not payable)']"
+            button_selector = f"[data-id='{function_name} - {button_type_found}']"
             print(f"  [INFO] Waiting for button to be enabled...")
 
-            WebDriverWait(self.driver, 10).until(
-                lambda d: not d.find_element(By.CSS_SELECTOR, button_selector).get_attribute('disabled')
-            )
+            try:
+                WebDriverWait(self.driver, 10).until(
+                    lambda d: not d.find_element(By.CSS_SELECTOR, button_selector).get_attribute('disabled')
+                )
+            except TimeoutException:
+                print(f"  [WARNING] Button enable timeout, attempting to click anyway...")
 
             # Click function button to execute
             function_btn = self.driver.find_element(By.CSS_SELECTOR, button_selector)
@@ -659,10 +947,13 @@ class RemixBenchmark:
             # Wait for transaction to complete
             time.sleep(0.5)
 
-            print(f"  [OK] Function '{function_name}' executed")
+            print(f"  [OK] Function '{function_name}' executed (type: {button_type_found})")
             return True
         except Exception as e:
             print(f"  [ERROR] Function execution failed: {e}")
+            import traceback
+            print(f"  [ERROR] Traceback:")
+            traceback.print_exc()
             raise
 
     def _is_debugger_loaded(self):
@@ -870,36 +1161,73 @@ class RemixBenchmark:
 
             # If auto-clicks failed, request manual click
             if not tx_hash_loaded:
-                print(f"\n{'='*60}", flush=True)
-                print(f"  [MANUAL] Automatic clicks failed. Please manually click the Debug button", flush=True)
-                print(f"  [MANUAL] (Look for the 'Debug' button in the terminal area)", flush=True)
-                print(f"  [MANUAL] The button is highlighted in YELLOW with RED border", flush=True)
-                print(f"  [MANUAL] Waiting for your click (timeout: 60s)...", flush=True)
-                print(f"{'='*60}\n", flush=True)
+                # Enhanced visual highlighting with animation
+                print(f"\n{'='*80}", flush=True)
+                print(f"{'='*80}", flush=True)
+                print(f"  ⚠️  MANUAL ACTION REQUIRED  ⚠️", flush=True)
+                print(f"{'='*80}", flush=True)
+                print(f"  Automatic debug button clicks failed!", flush=True)
+                print(f"  ", flush=True)
+                print(f"  Please MANUALLY CLICK the Debug button:", flush=True)
+                print(f"  → The button is in the TERMINAL area at the bottom", flush=True)
+                print(f"  → Look for a button with YELLOW background and RED pulsing border", flush=True)
+                print(f"  → The button text says 'Debug'", flush=True)
+                print(f"  ", flush=True)
+                print(f"  Waiting for your click (timeout: 60 seconds)...", flush=True)
+                print(f"{'='*80}", flush=True)
+                print(f"{'='*80}\n", flush=True)
 
-                # Highlight the button
+                # Enhanced highlighting with pulsing animation
                 try:
                     self.driver.execute_script("""
                         const btn = arguments[0];
+
+                        // Enhanced styling
                         btn.style.border = '5px solid red';
                         btn.style.backgroundColor = 'yellow';
                         btn.style.fontWeight = 'bold';
+                        btn.style.fontSize = '16px';
+                        btn.style.padding = '8px 16px';
+                        btn.style.boxShadow = '0 0 20px rgba(255, 0, 0, 0.8)';
+                        btn.style.zIndex = '10000';
+                        btn.style.position = 'relative';
+
+                        // Add pulsing animation
+                        btn.style.animation = 'pulse 1s infinite';
+
+                        // Inject animation keyframes if not already present
+                        if (!document.getElementById('pulse-animation-style')) {
+                            const style = document.createElement('style');
+                            style.id = 'pulse-animation-style';
+                            style.textContent = `
+                                @keyframes pulse {
+                                    0% { box-shadow: 0 0 20px rgba(255, 0, 0, 0.8); transform: scale(1); }
+                                    50% { box-shadow: 0 0 40px rgba(255, 0, 0, 1); transform: scale(1.05); }
+                                    100% { box-shadow: 0 0 20px rgba(255, 0, 0, 0.8); transform: scale(1); }
+                                }
+                            `;
+                            document.head.appendChild(style);
+                        }
+
+                        // Scroll button into view
                         btn.scrollIntoView({behavior: 'smooth', block: 'center'});
                     """, debug_btns[actual_index])
-                except:
-                    pass
+                except Exception as e:
+                    print(f"  [WARNING] Could not apply enhanced highlighting: {e}", flush=True)
 
-                # Wait for manual click
+                # Wait for manual click with countdown
                 manual_wait_start = time.time()
                 manual_timeout = 60
                 manual_clicked = False
+                last_countdown_time = manual_wait_start
 
                 while time.time() - manual_wait_start < manual_timeout:
                     # Check if transaction hash loaded
                     try:
                         current_tx_hash = self.driver.find_element(By.CSS_SELECTOR, "[data-id='debuggerTransactionInput']").get_attribute('value') or ''
                         if current_tx_hash:
-                            print(f"  [OK] Manual click successful - transaction hash loaded: {current_tx_hash}", flush=True)
+                            print(f"\n  ✅ [OK] Manual click successful!", flush=True)
+                            print(f"  [INFO] Transaction hash loaded: {current_tx_hash}", flush=True)
                             tx_hash_loaded = True
                             manual_clicked = True
                             break
@@ -908,24 +1236,38 @@ class RemixBenchmark:
 
                     # Also check if debugger loaded
                     if self._is_debugger_loaded():
-                        print(f"  [OK] Manual click successful - debugger loaded", flush=True)
+                        print(f"\n  ✅ [OK] Manual click successful - debugger loaded!", flush=True)
                         manual_clicked = True
                         break
+
+                    # Show countdown every 10 seconds
+                    elapsed = time.time() - manual_wait_start
+                    if time.time() - last_countdown_time >= 10:
+                        remaining = manual_timeout - elapsed
+                        print(f"  ⏳ Still waiting for manual click... ({remaining:.0f}s remaining)", flush=True)
+                        last_countdown_time = time.time()
 
                     time.sleep(0.5)
 
                 if not manual_clicked:
-                    print(f"  [ERROR] Manual click timeout", flush=True)
+                    print(f"\n  ❌ [ERROR] Manual click timeout (60s exceeded)", flush=True)
+                    print(f"  [ERROR] Please check if the Debug button is visible in the terminal area", flush=True)
                 else:
                     time.sleep(2)  # Wait for debugger to stabilize
 
-                # Remove highlight
+                # Remove highlight and animation
                 try:
                     self.driver.execute_script("""
                         const btn = arguments[0];
                         btn.style.border = '';
                         btn.style.backgroundColor = '';
                         btn.style.fontWeight = '';
+                        btn.style.fontSize = '';
+                        btn.style.padding = '';
+                        btn.style.boxShadow = '';
+                        btn.style.zIndex = '';
+                        btn.style.animation = '';
+                        btn.style.position = '';
                     """, debug_btns[actual_index])
                 except:
                     pass
@@ -1115,7 +1457,7 @@ class RemixBenchmark:
             print(f"  [ERROR] Variable extraction failed: {e}")
             return {}, 0
 
-    def measure_debug_latency(self, contract_filename, contract_code, function_name, inputs=None, state_slots=None, state_arrays=None):
+    def measure_debug_latency(self, contract_filename, contract_code, function_name, inputs=None, state_slots=None, state_arrays=None, deploy_value=None):
         """
         Measure complete debugging latency for a contract function
 
@@ -1126,11 +1468,29 @@ class RemixBenchmark:
             inputs: Function inputs (optional)
             state_slots: State slot setup data (optional)
             state_arrays: State array setup data (optional)
+            deploy_value: Amount of Wei to send with deployment (optional)
 
         Returns:
             dict with timing breakdowns and metrics
         """
-        results = {}
+        # Initialize results with None for all fields (in case of failure)
+        results = {
+            'setup_time_ms': None,
+            'compile_time_ms': None,
+            'deploy_time_ms': None,
+            'state_slot_setup_time_ms': None,
+            'num_state_slots': None,
+            'num_state_arrays': None,
+            'execution_time_ms': None,
+            'debug_open_time_ms': None,
+            'byteop_count': None,
+            'jump_to_end_time_ms': None,
+            'total_time_ms': None,
+            'pure_debug_time_ms': None,
+            'success': False,
+            'error': None
+        }
+
         total_start = time.perf_counter()
 
         try:
@@ -1150,7 +1510,7 @@ class RemixBenchmark:
 
             # 3. Deploy
             deploy_start = time.perf_counter()
-            self._deploy_contract()
+            self._deploy_contract(deploy_value=deploy_value)
             results['deploy_time_ms'] = (time.perf_counter() - deploy_start) * 1000
 
             # 4. Set state slots if needed
@@ -1233,14 +1593,14 @@ def load_dataset():
 
 
 def load_input_file(contract_filename):
-    """Load input data (state slots, arrays, inputs) from JSON file"""
+    """Load input data (state slots, arrays, inputs, deploy_value) from JSON file"""
     import os
     input_filename = contract_filename.replace('.sol', '_input.json')
     input_path = os.path.join('..', '..', 'dataset', 'contraction_remix', input_filename)
 
     if not os.path.exists(input_path):
         print(f"  [WARNING] Input file not found: {input_filename}")
-        return None, None, None
+        return None, None, None, None
 
     with open(input_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
@@ -1248,8 +1608,166 @@ def load_input_file(contract_filename):
     state_slots = data.get('state_slots', {})
     state_arrays = data.get('state_arrays', {})
     inputs = data.get('inputs', [])
+    deploy_value = data.get('deploy_value', None)
 
-    return state_slots, state_arrays, inputs
+    return state_slots, state_arrays, inputs, deploy_value
+
+
+def save_result_to_file(result, csv_file='remix_benchmark_results.csv', json_file='remix_benchmark_results.json'):
+    """
+    Save a single result to CSV and JSON files (append mode)
+    This ensures results are preserved even if the script is interrupted
+    """
+    import os
+
+    # Create DataFrame from single result
+    result_df = pd.DataFrame([result])
+
+    # Append to CSV
+    if os.path.exists(csv_file):
+        # Append to existing file
+        result_df.to_csv(csv_file, mode='a', header=False, index=False)
+    else:
+        # Create new file with header
+        result_df.to_csv(csv_file, mode='w', header=True, index=False)
+
+    # For JSON, we need to read, append, and write
+    if os.path.exists(json_file):
+        with open(json_file, 'r', encoding='utf-8') as f:
+            try:
+                all_data = json.load(f)
+            except json.JSONDecodeError:
+                all_data = []
+    else:
+        all_data = []
+
+    all_data.append(result)
+
+    with open(json_file, 'w', encoding='utf-8') as f:
+        json.dump(all_data, f, indent=2)
+
+    print(f"  [SAVED] Result saved to {csv_file} and {json_file}")
+
+
+def run_single_contract(contract_filename, num_runs=1):
+    """
+    Run benchmark for a single contract
+
+    Args:
+        contract_filename: Contract file to test (e.g., "BEP20_c.sol")
+        num_runs: Number of times to run the test
+
+    Returns:
+        DataFrame with results
+    """
+    import os
+
+    # Load dataset to get contract info
+    df = load_dataset()
+
+    # Find the contract in dataset
+    contract_row = df[df['Sol_File_Name'] == contract_filename]
+
+    if contract_row.empty:
+        print(f"[ERROR] Contract not found in dataset: {contract_filename}")
+        print("\nAvailable contracts:")
+        for name in df['Sol_File_Name'].unique():
+            print(f"  - {name}")
+        return pd.DataFrame()
+
+    # Get contract info
+    contract_row = contract_row.iloc[0]
+    contract_name = contract_row['Contract_Name']
+    function_name = contract_row['Function_Name']
+    annotation_targets = contract_row['Annotation_Targets']
+    state_slots_count = contract_row['State_Slots']
+
+    print(f"\n{'='*60}")
+    print(f"SINGLE CONTRACT BENCHMARK")
+    print(f"{'='*60}")
+    print(f"File: {contract_filename}")
+    print(f"Contract: {contract_name}")
+    print(f"Function: {function_name}")
+    print(f"Runs: {num_runs}")
+    print(f"{'='*60}\n")
+
+    # Results files
+    csv_file = 'remix_benchmark_results.csv'
+    json_file = 'remix_benchmark_results.json'
+
+    # Create benchmark instance
+    benchmark = RemixBenchmark(headless=False)
+    all_results = []
+
+    try:
+        # Load contract code
+        contract_path = os.path.join('..', '..', 'dataset', 'contraction_remix', contract_filename)
+
+        if not os.path.exists(contract_path):
+            print(f"[ERROR] Contract file not found: {contract_path}")
+            return pd.DataFrame()
+
+        with open(contract_path, 'r', encoding='utf-8') as f:
+            contract_code = f.read()
+
+        # Load input file (state slots, arrays, inputs, deploy_value)
+        state_slots, state_arrays, inputs, deploy_value = load_input_file(contract_filename)
+
+        if state_slots is None and state_arrays is None and not inputs:
+            print(f"[WARNING] No input data found for contract: {contract_name}")
+
+        print(f"Input data loaded:")
+        print(f"  - State slots: {len(state_slots) if state_slots else 0}")
+        print(f"  - State arrays: {len(state_arrays) if state_arrays else 0}")
+        print(f"  - Function inputs: {len(inputs) if inputs else 0}")
+        print(f"  - Deploy value: {deploy_value if deploy_value else 0} Wei")
+
+        # Run multiple times
+        for run in range(num_runs):
+            print(f"\n--- Run {run + 1}/{num_runs} ---")
+
+            result = benchmark.measure_debug_latency(
+                contract_filename=contract_filename,
+                contract_code=contract_code,
+                function_name=function_name,
+                inputs=inputs,
+                state_slots=state_slots,
+                state_arrays=state_arrays,
+                deploy_value=deploy_value
+            )
+
+            # Add metadata
+            result['contract_name'] = contract_name
+            result['function_name'] = function_name
+            result['annotation_targets'] = annotation_targets
+            result['expected_state_slots'] = state_slots_count
+            result['run_number'] = run + 1
+
+            all_results.append(result)
+
+            # Save result immediately
+            save_result_to_file(result, csv_file, json_file)
+
+            # Reset for next run
+            if run < num_runs - 1:
+                benchmark.reset()
+                time.sleep(2)
+
+    finally:
+        # Close browser
+        benchmark.close()
+
+    # Create DataFrame
+    results_df = pd.DataFrame(all_results)
+
+    print(f"\n{'='*60}")
+    print(f"[OK] Single contract benchmark completed")
+    print(f"Results saved to:")
+    print(f"  - {csv_file}")
+    print(f"  - {json_file}")
+    print(f"{'='*60}\n")
+
+    return results_df
 
 
 def run_benchmark_suite(num_runs=3, sample_size=None, start_from=None):
@@ -1295,6 +1813,10 @@ def run_benchmark_suite(num_runs=3, sample_size=None, start_from=None):
 
     all_results = []
 
+    # File paths
+    csv_file = 'remix_benchmark_results.csv'
+    json_file = 'remix_benchmark_results.json'
+
     for idx, row in df.iterrows():
         contract_name = row['Contract_Name']
         sol_file = row['Sol_File_Name']
@@ -1321,8 +1843,8 @@ def run_benchmark_suite(num_runs=3, sample_size=None, start_from=None):
         with open(contract_path, 'r', encoding='utf-8') as f:
             contract_code = f.read()
 
-        # Load input file (state slots, arrays, inputs)
-        state_slots, state_arrays, inputs = load_input_file(contract_filename)
+        # Load input file (state slots, arrays, inputs, deploy_value)
+        state_slots, state_arrays, inputs, deploy_value = load_input_file(contract_filename)
 
         if state_slots is None and state_arrays is None and not inputs:
             print(f"[WARNING] No input data found, skipping contract: {contract_name}")
@@ -1332,6 +1854,7 @@ def run_benchmark_suite(num_runs=3, sample_size=None, start_from=None):
         print(f"  - State slots: {len(state_slots) if state_slots else 0}")
         print(f"  - State arrays: {len(state_arrays) if state_arrays else 0}")
         print(f"  - Function inputs: {len(inputs) if inputs else 0}")
+        print(f"  - Deploy value: {deploy_value if deploy_value else 0} Wei")
 
         # Run multiple times
         for run in range(num_runs):
@@ -1343,7 +1866,8 @@ def run_benchmark_suite(num_runs=3, sample_size=None, start_from=None):
                 function_name=function_name,
                 inputs=inputs,
                 state_slots=state_slots,
-                state_arrays=state_arrays
+                state_arrays=state_arrays,
+                deploy_value=deploy_value
             )
 
             # Add metadata
@@ -1354,6 +1878,9 @@ def run_benchmark_suite(num_runs=3, sample_size=None, start_from=None):
             result['run_number'] = run + 1
 
             all_results.append(result)
+
+            # IMPORTANT: Save result immediately to preserve it even if interrupted
+            save_result_to_file(result, csv_file, json_file)
 
             # Reset for next run
             if run < num_runs - 1:
@@ -1367,49 +1894,39 @@ def run_benchmark_suite(num_runs=3, sample_size=None, start_from=None):
     # Close browser
     benchmark.close()
 
-    # Save results (merge with existing results if any)
-    results_df = pd.DataFrame(all_results)
-
-    # Load existing results if CSV file exists
+    # Clean up results file (remove duplicates and sort)
     import os
-    csv_file = 'remix_benchmark_results.csv'
-    json_file = 'remix_benchmark_results.json'
 
     if os.path.exists(csv_file):
-        print(f"\n[INFO] Found existing results file, merging with new results...")
-        existing_df = pd.read_csv(csv_file)
-
-        # Combine existing and new results
-        # Remove duplicates: keep new results if same contract+function+run exists
-        combined_df = pd.concat([existing_df, results_df], ignore_index=True)
+        print(f"\n[INFO] Cleaning up results file...")
+        results_df = pd.read_csv(csv_file)
 
         # Remove duplicates based on contract_name, function_name, and run_number
-        # Keep the last occurrence (new results override old ones)
-        combined_df = combined_df.drop_duplicates(
+        # Keep the last occurrence (most recent run)
+        results_df = results_df.drop_duplicates(
             subset=['contract_name', 'function_name', 'run_number'],
             keep='last'
         )
 
         # Sort by contract_name and run_number for better readability
-        combined_df = combined_df.sort_values(
+        results_df = results_df.sort_values(
             by=['contract_name', 'run_number']
         ).reset_index(drop=True)
 
-        print(f"[INFO] Previous results: {len(existing_df)} rows")
-        print(f"[INFO] New results: {len(results_df)} rows")
-        print(f"[INFO] Combined results: {len(combined_df)} rows")
+        # Save cleaned results
+        results_df.to_csv(csv_file, index=False)
+        results_df.to_json(json_file, orient='records', indent=2)
 
-        results_df = combined_df
-
-    # Save combined results
-    results_df.to_csv(csv_file, index=False)
-    results_df.to_json(json_file, orient='records', indent=2)
+        print(f"[INFO] Final results: {len(results_df)} rows")
+    else:
+        results_df = pd.DataFrame(all_results)
 
     print(f"\n{'='*60}")
     print(f"[OK] Benchmark suite completed")
     print(f"Results saved to:")
-    print(f"  - remix_benchmark_results.csv")
-    print(f"  - remix_benchmark_results.json")
+    print(f"  - {csv_file}")
+    print(f"  - {json_file}")
+    print(f"  (Results are saved incrementally after each run)")
     print(f"{'='*60}\n")
 
     return results_df
@@ -1444,11 +1961,32 @@ if __name__ == "__main__":
             print("Press Ctrl+C within 5 seconds to cancel...\n")
             time.sleep(5)
             results = run_benchmark_suite(num_runs=1, sample_size=None, start_from=start_from_file)
+        elif sys.argv[1] == '--only':
+            # Run only a specific contract
+            if len(sys.argv) < 3:
+                print("ERROR: --only requires a filename argument")
+                print("Usage: python remix_benchmark.py --only BEP20_c.sol")
+                sys.exit(1)
+            contract_file = sys.argv[2]
+            num_runs = int(sys.argv[3]) if len(sys.argv) > 3 else 1
+            print(f"\n>> Running benchmark for single contract: {contract_file}")
+            print(f"   Number of runs: {num_runs}")
+            print("Press Ctrl+C within 5 seconds to cancel...\n")
+            time.sleep(5)
+            results = run_single_contract(contract_file, num_runs=num_runs)
         else:
-            print("Usage: python remix_benchmark.py [--full|--quick|--start-from FILENAME]")
-            print("  --full:       Measure all 30 contracts (recommended for final results)")
-            print("  --quick:      Test with 3 contracts only (for testing)")
-            print("  --start-from: Start from a specific contract file (e.g., AvatarArtMarketPlace_c.sol)")
+            print("Usage: python remix_benchmark.py [OPTIONS]")
+            print("\nOptions:")
+            print("  --full                 Measure all 30 contracts (recommended for final results)")
+            print("  --quick                Test with 3 contracts only (for testing)")
+            print("  --start-from FILENAME  Start from a specific contract file")
+            print("  --only FILENAME [RUNS] Run only a specific contract (default: 1 run)")
+            print("\nExamples:")
+            print("  python remix_benchmark.py --full")
+            print("  python remix_benchmark.py --quick")
+            print("  python remix_benchmark.py --start-from BEP20_c.sol")
+            print("  python remix_benchmark.py --only BEP20_c.sol")
+            print("  python remix_benchmark.py --only BEP20_c.sol 3")
             sys.exit(1)
     else:
         # Default: Full benchmark
@@ -1467,15 +2005,21 @@ if __name__ == "__main__":
         print("="*60)
         print(f"Total measurements: {len(results)}")
         print(f"Unique contracts: {results['contract_name'].nunique()}")
-        print(f"\nLatency Metrics:")
-        print(f"  Average Pure Debug Time: {results['pure_debug_time_ms'].mean():.2f}ms")
-        print(f"  Median Pure Debug Time:  {results['pure_debug_time_ms'].median():.2f}ms")
-        print(f"  Min Pure Debug Time:     {results['pure_debug_time_ms'].min():.2f}ms")
-        print(f"  Max Pure Debug Time:     {results['pure_debug_time_ms'].max():.2f}ms")
-        print(f"\nByteOp Metrics:")
-        print(f"  Average ByteOp Count: {results['byteop_count'].mean():.0f}")
-        print(f"  Median ByteOp Count:  {results['byteop_count'].median():.0f}")
-        print(f"  Min ByteOp Count:     {results['byteop_count'].min():.0f}")
-        print(f"  Max ByteOp Count:     {results['byteop_count'].max():.0f}")
-        print(f"\nSuccess Rate: {results['success'].mean() * 100:.1f}%")
+
+        # Filter successful results for metrics
+        successful = results[results['pure_debug_time_ms'].notna()]
+
+        if len(successful) > 0:
+            print(f"\nLatency Metrics:")
+            print(f"  Average Pure Debug Time: {successful['pure_debug_time_ms'].mean():.2f}ms")
+            print(f"  Median Pure Debug Time:  {successful['pure_debug_time_ms'].median():.2f}ms")
+            print(f"  Min Pure Debug Time:     {successful['pure_debug_time_ms'].min():.2f}ms")
+            print(f"  Max Pure Debug Time:     {successful['pure_debug_time_ms'].max():.2f}ms")
+            print(f"\nByteOp Metrics:")
+            print(f"  Average ByteOp Count: {successful['byteop_count'].mean():.0f}")
+            print(f"  Median ByteOp Count:  {successful['byteop_count'].median():.0f}")
+            print(f"  Min ByteOp Count:     {successful['byteop_count'].min():.0f}")
+            print(f"  Max ByteOp Count:     {successful['byteop_count'].max():.0f}")
+
+        print(f"\nSuccess Rate: {(len(successful)/len(results) * 100):.1f}% ({len(successful)}/{len(results)})")
         print("="*60)

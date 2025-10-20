@@ -14,7 +14,7 @@ contract Dai {
 
     function transferFrom(address src, address dst, uint wad) public returns (bool) {
         require(balanceOf[src] >= wad, "Dai/insufficient-balance");
-        if (src != msg.sender && allowance[src][msg.sender] != uint(-1)) {
+        if (src != msg.sender && allowance[src][msg.sender] != type(uint256).max) {
             require(allowance[src][msg.sender] >= wad, "Dai/insufficient-allowance");
             allowance[src][msg.sender] = sub(allowance[src][msg.sender], wad);
         }

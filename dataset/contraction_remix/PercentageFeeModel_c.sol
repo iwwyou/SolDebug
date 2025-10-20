@@ -33,14 +33,21 @@ contract PercentageFeeModel {
         }
         return (withdrawnDepositAmount * feeRate) / PRECISION;
     }
+    
+
+    
+
+    
+
+    
 
     // Auto-generated setter for earlyWithdrawFeeOverrideForDeposit (nested mapping)
-    function set_earlyWithdrawFeeOverrideForDeposit(address _key1, uint64 _key2, FeeOverride _value) public {
+    function set_earlyWithdrawFeeOverrideForDeposit(address _key1, uint64 _key2, FeeOverride memory _value) public {
         earlyWithdrawFeeOverrideForDeposit[_key1][_key2] = _value;
     }
 
     // Auto-generated setter for earlyWithdrawFeeOverrideForPool (mapping)
-    function set_earlyWithdrawFeeOverrideForPool(address _key, FeeOverride _value) public {
+    function set_earlyWithdrawFeeOverrideForPool(address _key, FeeOverride memory _value) public {
         earlyWithdrawFeeOverrideForPool[_key] = _value;
     }
 

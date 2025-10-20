@@ -9,6 +9,8 @@ contract BitBookStake {
         return getPercentage[_from][_to];
     }
 
+    
+
     // Auto-generated setter for getPercentage (nested mapping)
     function set_getPercentage(uint256 _key1, uint256 _key2, uint256 _value) public {
         getPercentage[_key1][_key2] = _value;

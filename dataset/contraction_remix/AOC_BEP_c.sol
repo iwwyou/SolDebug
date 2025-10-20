@@ -34,4 +34,27 @@ contract AOC_BEP {
             }
         }
     }
+    
+    
+
+    
+
+    
+
+    
+
+    // Auto-generated setter for userInfo (mapping)
+    function set_userInfo(address _key, UserInfo memory _value) public {
+        userInfo[_key] = _value;
+    }
+
+    // Auto-generated setter for levels (mapping)
+    function set_levels(uint256 _key, Level memory _value) public {
+        levels[_key] = _value;
+    }
+
+    // Auto-generated setter for _balances (mapping)
+    function set__balances(address _key, uint256 _value) public {
+        _balances[_key] = _value;
+    }
 }

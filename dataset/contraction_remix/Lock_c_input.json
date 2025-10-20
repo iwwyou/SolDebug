@@ -1,10 +1,18 @@
 {
   "contract_name": "Lock_c",
   "state_slots": {
+    "data": {
+      "0x5B38Da6a701c568545dCfcB03FcB875f56beddC4": {
+        "total": 1000,
+        "pending": 100,
+        "estUnlock": 50,
+        "unlockedAmounts": 200
+      }
+    },
     "startLock": 300,
     "unlockDuration": 1,
     "lockedTime": 600
   },
   "state_arrays": {},
-  "inputs": []
+  "inputs": ["0x5B38Da6a701c568545dCfcB03FcB875f56beddC4"]
 }

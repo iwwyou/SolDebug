@@ -18,4 +18,12 @@ contract ThorusBond {
             return info.remainingPayout;
         return info.remainingPayout * secondsSinceLastInteraction / info.remainingVestingSeconds;
     }
+    
+
+    
+
+    // Auto-generated setter for userInfo (mapping)
+    function set_userInfo(address _key, UserInfo memory _value) public {
+        userInfo[_key] = _value;
+    }
 }

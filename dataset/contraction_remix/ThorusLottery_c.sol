@@ -23,31 +23,22 @@ contract ThorusLottery {
         return false;
     }
 
-    // Auto-generated setter for array tickets
-    function _addTicketsAt(Ticket _value, uint256 _index) public {
-        uint256 currentLength = tickets.length;
-
-        if (currentLength == 0 || currentLength - 1 < _index) {
-            uint256 additionalCount = _index - currentLength + 1;
-            for (uint256 i = 0; i < additionalCount; i++) {
-                tickets.push();
-            }
+    // Auto-generated setter for tickets array
+    function _addTicketsAt(Ticket memory _value, uint256 _index) public {
+        if (_index >= tickets.length) {
+            tickets.push(_value);
+        } else {
+            tickets[_index] = _value;
         }
-        tickets[_index] = _value;
     }
 
-
-    // Auto-generated setter for array ticketNumbers
+    // Auto-generated setter for ticketNumbers array
     function _addTicketNumbersAt(uint256 _value, uint256 _index) public {
-        uint256 currentLength = ticketNumbers.length;
-
-        if (currentLength == 0 || currentLength - 1 < _index) {
-            uint256 additionalCount = _index - currentLength + 1;
-            for (uint256 i = 0; i < additionalCount; i++) {
-                ticketNumbers.push();
-            }
+        if (_index >= ticketNumbers.length) {
+            ticketNumbers.push(_value);
+        } else {
+            ticketNumbers[_index] = _value;
         }
-        ticketNumbers[_index] = _value;
     }
 
     // Setter for firstWinningNumber
@@ -59,5 +50,5 @@ contract ThorusLottery {
     function set_lastWinningNumber(uint256 _value) public {
         lastWinningNumber = _value;
     }
-
+    
 }

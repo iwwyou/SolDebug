@@ -5,23 +5,31 @@ contract WASTLR {
     mapping (address => uint256) public balanceOf;
     mapping (address => mapping (address => uint256)) public allowance;
 
+    // Allow contract to receive Ether on deployment
+    constructor() payable {}
+
     function withdrawFrom(address from, address payable to, uint256 value) external {
-        if (from != msg.sender) {         
+        if (from != msg.sender) {
             uint256 allowed = allowance[from][msg.sender];
             if (allowed != type(uint256).max) {
                 require(allowed >= value, "WASTR: request exceeds allowance");
                 uint256 reduced = allowed - value;
-                allowance[from][msg.sender] = reduced;             
+                allowance[from][msg.sender] = reduced;
             }
-        }        
-     
+        }
+
         uint256 balance = balanceOf[from];
         require(balance >= value, "WASTR: burn amount exceeds balance");
-        balanceOf[from] = balance - value; 
-             
+        balanceOf[from] = balance - value;
+
         (bool success, ) = to.call{value: value}("");
         require(success, "WASTR: Ether transfer failed");
     }
+
+    // Allow contract to receive Ether
+    receive() external payable {}
+
+
 
     // Auto-generated setter for allowance (nested mapping)
     function set_allowance(address _key1, address _key2, uint256 _value) public {

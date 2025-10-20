@@ -52,4 +52,13 @@ contract GovStakingStorage {
     function set_totalRewardMultiplier(uint256 _value) public {
         totalRewardMultiplier = _value;
     }
+    
+    
+
+    
+
+    // Auto-generated setter for userInfo (mapping)
+    function set_userInfo(address _key, UserInfo memory _value) public {
+        userInfo[_key] = _value;
+    }
 }

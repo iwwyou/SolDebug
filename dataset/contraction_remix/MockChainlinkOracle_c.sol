@@ -46,6 +46,36 @@ contract MockChainlinkOracle {
         }
         return getRoundData(uint80(roundId));
     }
+    
+
+    
+
+    
+
+    
+
+    // Auto-generated setter for entries (mapping)
+    function set_entries(uint256 _key, Entry memory _value) public {
+        entries[_key] = _value;
+    }
+
+    // Helper setter for entries with individual parameters (Selenium-friendly)
+    function set_entries_simple(
+        uint256 _key,
+        uint80 _roundId,
+        int256 _answer,
+        uint256 _startedAt,
+        uint256 _updatedAt,
+        uint80 _answeredInRound
+    ) public {
+        entries[_key] = Entry({
+            roundId: _roundId,
+            answer: _answer,
+            startedAt: _startedAt,
+            updatedAt: _updatedAt,
+            answeredInRound: _answeredInRound
+        });
+    }
 
     // Auto-generated setter for roundId
     function set_roundId(uint80 _value) public {

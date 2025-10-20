@@ -23,13 +23,17 @@ contract Amoss {
         _afterTokenTransfer(account, address(0), amount);
     }
 
-    // Auto-generated setter for _totalSupply
-    function set__totalSupply(uint256 _value) public {
-        _totalSupply = _value;
-    }
+    
+
+    
 
     // Auto-generated setter for _balances (mapping)
     function set__balances(address _key, uint256 _value) public {
         _balances[_key] = _value;
+    }
+
+    // Auto-generated setter for _totalSupply
+    function set__totalSupply(uint256 _value) public {
+        _totalSupply = _value;
     }
 }

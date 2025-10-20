@@ -26,6 +26,10 @@ contract EdenToken {
         return true;
     }
 
+    
+
+    
+
     // Auto-generated setter for allowance (nested mapping)
     function set_allowance(address _key1, address _key2, uint256 _value) public {
         allowance[_key1][_key2] = _value;

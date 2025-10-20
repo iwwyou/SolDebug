@@ -3,7 +3,16 @@
     "allow": [
       "Bash(python:*)",
       "Bash(timeout:*)",
-      "Bash(tee:*)"
+      "Bash(tee:*)",
+      "Bash(dir /b *_input.json)",
+      "Bash(dir /b *_c.sol)",
+      "Bash(dir /b C:UsersisjeonPycharmProjectspythonProjectSolDebugEvaluationRemixremix_benchmark_results*)",
+      "Bash(git -C \"C:\\Users\\isjeon\\PycharmProjects\\pythonProject\\SolDebug\" checkout -- Evaluation/Remix/remix_benchmark_results.csv Evaluation/Remix/remix_benchmark_results.json)",
+      "Bash(git -C \"C:\\Users\\isjeon\\PycharmProjects\\pythonProject\\SolDebug\" diff HEAD Evaluation/Remix/remix_benchmark_results.csv)",
+      "Bash(git -C \"C:\\Users\\isjeon\\PycharmProjects\\pythonProject\\SolDebug\" checkout HEAD -- Evaluation/Remix/remix_benchmark_results.csv Evaluation/Remix/remix_benchmark_results.json)",
+      "Bash(git -C \"C:\\Users\\isjeon\\PycharmProjects\\pythonProject\\SolDebug\" log --oneline -- Evaluation/Remix/remix_benchmark_results.csv)",
+      "Bash(git -C \"C:\\Users\\isjeon\\PycharmProjects\\pythonProject\\SolDebug\" show a53ea03:Evaluation/Remix/remix_benchmark_results.csv)",
+      "Bash(git -C \"C:\\Users\\isjeon\\PycharmProjects\\pythonProject\\SolDebug\" status --short Evaluation/Remix/remix_benchmark_results.*)"
     ],
     "deny": [],
     "ask": []

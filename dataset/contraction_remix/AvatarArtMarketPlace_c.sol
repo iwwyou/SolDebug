@@ -18,18 +18,7 @@ contract AvatarArtMarketplace {
 
         return result;
     }
-
-    // Auto-generated setter for array _tokens
-    function _addTokensAt(uint256 _value, uint256 _index) public {
-        uint256 currentLength = _tokens.length;
-
-        if (currentLength == 0 || currentLength - 1 < _index) {
-            uint256 additionalCount = _index - currentLength + 1;
-            for (uint256 i = 0; i < additionalCount; i++) {
-                _tokens.push();
-            }
         }
         _tokens[_index] = _value;
     }
-
 }

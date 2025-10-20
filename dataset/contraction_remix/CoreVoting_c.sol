@@ -17,13 +17,17 @@ contract CoreVoting {
         }
     }
 
-    // Auto-generated setter for baseQuorum
-    function set_baseQuorum(uint256 _value) public {
-        baseQuorum = _value;
-    }
+    
+
+    
 
     // Auto-generated setter for _quorums (nested mapping)
     function set__quorums(address _key1, bytes4 _key2, uint256 _value) public {
         _quorums[_key1][_key2] = _value;
+    }
+
+    // Auto-generated setter for baseQuorum
+    function set_baseQuorum(uint256 _value) public {
+        baseQuorum = _value;
     }
 }

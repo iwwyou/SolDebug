@@ -29,19 +29,27 @@ contract HubPool {
             unclaimedAccumulatedProtocolFees[l1Token] += protocolFeesCaptured;
         }
     }
+    
+    
 
-    // Auto-generated setter for protocolFeeCapturePct
-    function set_protocolFeeCapturePct(uint256 _value) public {
-        protocolFeeCapturePct = _value;
-    }
+    
+
+    
+
+    
 
     // Auto-generated setter for pooledTokens (mapping)
-    function set_pooledTokens(address _key, PooledToken _value) public {
+    function set_pooledTokens(address _key, PooledToken memory _value) public {
         pooledTokens[_key] = _value;
     }
 
     // Auto-generated setter for unclaimedAccumulatedProtocolFees (mapping)
     function set_unclaimedAccumulatedProtocolFees(address _key, uint256 _value) public {
         unclaimedAccumulatedProtocolFees[_key] = _value;
+    }
+
+    // Auto-generated setter for protocolFeeCapturePct
+    function set_protocolFeeCapturePct(uint256 _value) public {
+        protocolFeeCapturePct = _value;
     }
 }

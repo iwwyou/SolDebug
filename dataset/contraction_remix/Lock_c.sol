@@ -30,6 +30,19 @@ contract Lock {
             _pending += _data.pending;
         }
     }
+    
+    
+
+    
+
+    
+
+    
+
+    // Auto-generated setter for data (mapping)
+    function set_data(address _key, LockedData memory _value) public {
+        data[_key] = _value;
+    }
 
     // Auto-generated setter for startLock
     function set_startLock(uint256 _value) public {
