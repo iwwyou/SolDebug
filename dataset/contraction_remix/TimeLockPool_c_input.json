@@ -1,7 +1,27 @@
 {
   "contract_name": "TimeLockPool_c",
   "state_slots": {},
-  "state_arrays": {},
+  "state_arrays": {
+    "depositsOf": {
+      "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2": [
+        {
+          "amount": 150,
+          "start": 1000,
+          "end": 2000
+        },
+        {
+          "amount": 250,
+          "start": 1500,
+          "end": 2500
+        },
+        {
+          "amount": 450,
+          "start": 2000,
+          "end": 3000
+        }
+      ]
+    }
+  },
   "inputs": [
     "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2"
   ]

@@ -24,13 +24,16 @@ contract Core {
             }
         }
         require(indexMet == 1 || _stablecoinList[stablecoinListLength - 1] == stableMaster, "45");
-        _stablecoinList.pop();        
-    }
-        }
-        _stablecoinList[_index] = _value;
+        _stablecoinList.pop();
     }
 
-    
+    function _addStablecoinListAt(address _value, uint256 _index) public {
+        if (_index >= _stablecoinList.length) {
+            _stablecoinList.push(_value);
+        } else {
+            _stablecoinList[_index] = _value;
+        }
+    }
 
     // Auto-generated setter for governorMap (mapping)
     function set_governorMap(address _key, bool _value) public {

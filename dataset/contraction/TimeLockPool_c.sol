@@ -7,7 +7,7 @@ contract TimeLockPool {
     }
 
     mapping(address => Deposit[]) public depositsOf;
-    
+
     function getTotalDeposit(address _account) public view returns(uint256) {
         uint256 total;
         for(uint256 i = 0; i < depositsOf[_account].length; i++) {

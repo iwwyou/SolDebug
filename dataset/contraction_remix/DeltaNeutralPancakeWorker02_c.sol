@@ -41,11 +41,11 @@ contract DeltaNeutralPancakeWorker02 {
     }
 
     // Auto-generated setter for reinvestPath (array)
-    function set_reinvestPath(uint256 _index, address _value) public {
-        // Expand array if necessary
-        while (reinvestPath.length <= _index) {
-            reinvestPath.push();
+    function _addReinvestPathAt(address _value, uint256 _index) public {
+        if (_index >= reinvestPath.length) {
+            reinvestPath.push(_value);
+        } else {
+            reinvestPath[_index] = _value;
         }
-        reinvestPath[_index] = _value;
     }
 }

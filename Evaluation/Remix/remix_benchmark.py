@@ -624,33 +624,43 @@ class RemixBenchmark:
         for key, value in mapping_data.items():
             if isinstance(value, dict):
                 # Check if this is a nested mapping or a struct
-                # Nested mapping: all values are dict with address-like keys
-                # Struct: values are primitive types or mixed types with non-address keys
+                # Decision logic:
+                # 1. If all values in the dict are primitives (int/str/bool) AND
+                #    all keys look like mapping keys (numeric or address-like),
+                #    then it's a nested mapping
+                # 2. If values are mixed types or keys look like struct field names,
+                #    then it's a struct
+
                 first_value = next(iter(value.values()), None)
+                all_values_primitive = all(
+                    not isinstance(v, (dict, list))
+                    for v in value.values()
+                )
 
-                # Check if this looks like a nested mapping
-                # (first value is a primitive and first key looks like an address)
-                is_nested_mapping = False
-                if not isinstance(first_value, dict):
-                    # Check if any key looks like an address (starts with 0x and length 42)
-                    for k in value.keys():
-                        if isinstance(k, str) and k.startswith("0x") and len(k) == 42:
-                            is_nested_mapping = True
+                # Check if keys look like mapping keys (numeric strings or addresses)
+                keys_look_like_mapping = True
+                for k in value.keys():
+                    if isinstance(k, str):
+                        # Check if it's a numeric string or an address
+                        if not (k.isdigit() or (k.startswith("0x") and len(k) >= 10)):
+                            keys_look_like_mapping = False
                             break
 
-                    # If not address-like keys, it's likely a struct
-                    if not is_nested_mapping:
-                        # This is a struct (mapping to struct type)
-                        print(f"    Setting {var_name}[{key}] = {value} (struct) via {setter_function}")
-                        try:
-                            self._call_setter_with_params(setter_function, [key, value])
-                            print(f"      [OK] {var_name}[{key}] setter called")
-                        except NoSuchElementException:
-                            print(f"      [SKIP] Could not find setter for {var_name}")
-                            break
-                        except Exception as e:
-                            print(f"      [ERROR] Error setting {var_name}[{key}]: {e}")
-                        continue
+                # Nested mapping: all values are primitives and keys look like mapping keys
+                is_nested_mapping = all_values_primitive and keys_look_like_mapping
+
+                if not is_nested_mapping:
+                    # This is a struct (mapping to struct type)
+                    print(f"    Setting {var_name}[{key}] = {value} (struct) via {setter_function}")
+                    try:
+                        self._call_setter_with_params(setter_function, [key, value])
+                        print(f"      [OK] {var_name}[{key}] setter called")
+                    except NoSuchElementException:
+                        print(f"      [SKIP] Could not find setter for {var_name}")
+                        break
+                    except Exception as e:
+                        print(f"      [ERROR] Error setting {var_name}[{key}]: {e}")
+                    continue
 
                 # Nested mapping: iterate over nested keys
                 for nested_key, nested_value in value.items():
@@ -861,6 +871,77 @@ class RemixBenchmark:
         except Exception as e:
             print(f"  [WARNING] State array setup partial failure: {e}")
 
+    def _set_state_mapping_arrays(self, state_arrays_data):
+        """
+        Set mapping to array state variables using _add*At functions
+        state_arrays_data: dict of {mapping_name: {key: [struct_values]}}
+
+        Example:
+        {
+            "depositsOf": {
+                "0xAddress": [
+                    {"amount": 100, "start": 1000, "end": 2000},
+                    {"amount": 200, "start": 1500, "end": 2500}
+                ]
+            }
+        }
+
+        Calls: _addDepositsOfAt(address, amount, start, end, index)
+        """
+        if not state_arrays_data or len(state_arrays_data) == 0:
+            return
+
+        try:
+            print(f"  [SETUP] Setting mapping to array state variables...")
+
+            for mapping_name, mapping_data in state_arrays_data.items():
+                # Check if this is a mapping to array structure (dict of lists)
+                if not isinstance(mapping_data, dict):
+                    continue
+
+                # Check if first value is a list (indicating mapping to array)
+                first_value = next(iter(mapping_data.values()), None)
+                if not isinstance(first_value, list):
+                    continue
+
+                # Generate function name: _add{MappingName}At
+                if mapping_name.startswith('_'):
+                    func_name = f"_add{mapping_name[1].upper() + mapping_name[2:]}At"
+                else:
+                    func_name = f"_add{mapping_name[0].upper() + mapping_name[1:]}At"
+
+                print(f"    Setting mapping array {mapping_name} via {func_name}")
+
+                # Iterate over each key (e.g., address)
+                for key, array_values in mapping_data.items():
+                    print(f"      Setting {mapping_name}[{key}] ({len(array_values)} elements)")
+
+                    for index, struct_value in enumerate(array_values):
+                        try:
+                            # struct_value is a dict like {"amount": 100, "start": 1000, "end": 2000}
+                            # Convert to parameter list: [key, amount, start, end, index]
+                            if isinstance(struct_value, dict):
+                                # Extract struct fields in order
+                                params = [key] + list(struct_value.values()) + [index]
+                            else:
+                                # Simple value
+                                params = [key, struct_value, index]
+
+                            print(f"        Setting {mapping_name}[{key}][{index}] = {struct_value}")
+                            self._call_setter_with_params(func_name, params)
+                            print(f"        [OK] {mapping_name}[{key}][{index}] set successfully")
+
+                        except NoSuchElementException:
+                            print(f"        [SKIP] Could not find function {func_name}")
+                            break
+                        except Exception as e:
+                            print(f"        [ERROR] Error setting {mapping_name}[{key}][{index}]: {e}")
+                            continue
+
+            print(f"  [OK] Mapping arrays configured")
+        except Exception as e:
+            print(f"  [WARNING] Mapping array setup partial failure: {e}")
+
     def _execute_function(self, function_name, inputs):
         """Execute target function and return transaction hash"""
         try:
@@ -940,9 +1021,13 @@ class RemixBenchmark:
             except TimeoutException:
                 print(f"  [WARNING] Button enable timeout, attempting to click anyway...")
 
-            # Click function button to execute
+            # Scroll button into view and click using JavaScript (more reliable)
             function_btn = self.driver.find_element(By.CSS_SELECTOR, button_selector)
-            function_btn.click()
+            print(f"  [INFO] Scrolling button into view and clicking...")
+            self.driver.execute_script("""
+                arguments[0].scrollIntoView({behavior: 'instant', block: 'center'});
+                arguments[0].click();
+            """, function_btn)
 
             # Wait for transaction to complete
             time.sleep(0.5)
@@ -1310,19 +1395,70 @@ class RemixBenchmark:
             print(f"  [ERROR] Failed to open debugger: {e}")
             raise
 
-    def _get_total_steps(self):
-        """Get total number of steps (ByteOp count) from debugger slider"""
+    def _get_vm_trace_step(self):
+        """Get current vm trace step from Step details panel"""
         try:
-            slider = self.driver.find_element(By.CSS_SELECTOR, "[data-id='slider']")
-            max_steps = int(slider.get_attribute("max"))
-            print(f"  [OK] Total steps (ByteOp): {max_steps}")
-            return max_steps
+            # Try multiple methods to read vm trace step from Step details
+            vm_trace_step = self.driver.execute_script("""
+                try {
+                    // Method 1: Parse from JSON (most reliable if available)
+                    const rawContent = document.querySelector('.dropdownrawcontent');
+                    if (rawContent) {
+                        const data = JSON.parse(rawContent.textContent);
+                        if (data["vm trace step"] !== undefined) {
+                            console.log('[VM TRACE] Read from JSON:', data["vm trace step"]);
+                            return data["vm trace step"];
+                        }
+                    }
+
+                    // Method 2: Read from DOM - try multiple selectors
+                    // Based on HTML structure: <li data-id="treeViewLivm trace step">...<span class="m-0 label_value">260</span>
+                    const selectors = [
+                        '[data-id="treeViewLivm trace step"] .label_value span',
+                        '[data-id="treeViewLivm trace step"] span.label_value',
+                        '[data-id="treeViewDivvm trace step"] .label_value span'
+                    ];
+
+                    for (const selector of selectors) {
+                        const element = document.querySelector(selector);
+                        if (element && element.textContent.trim()) {
+                            const value = parseInt(element.textContent.trim());
+                            if (!isNaN(value)) {
+                                console.log('[VM TRACE] Read from DOM selector:', selector, '=', value);
+                                return value;
+                            }
+                        }
+                    }
+
+                    console.warn('[VM TRACE] Could not find vm trace step in Step details');
+                    return null;
+                } catch (e) {
+                    console.error('[VM TRACE] Error reading vm trace step:', e);
+                    return null;
+                }
+            """)
+
+            if vm_trace_step is not None:
+                return vm_trace_step
+            else:
+                raise Exception("Could not read vm trace step from Step details")
+
         except Exception as e:
-            print(f"  [ERROR] Failed to get total steps: {e}")
-            return None
+            # Fallback to slider value if Step details not available
+            print(f"  [WARNING] Could not read vm trace step, using slider value: {e}")
+            try:
+                slider = self.driver.find_element(By.CSS_SELECTOR, "[data-id='slider']")
+                return int(slider.get_attribute("value"))
+            except:
+                return None
 
     def _jump_to_end(self):
-        """Jump to the last step of execution by clicking step over forward until end"""
+        """Jump to the last step of execution by clicking step over forward until end
+        Only counts steps where vm trace step changes (actual ByteOp execution)
+
+        Returns:
+            tuple: (jump_time_ms, start_vm_step, end_vm_step, byteop_step_count)
+        """
         try:
             # Inject performance measurement
             self.driver.execute_script("""
@@ -1331,25 +1467,30 @@ class RemixBenchmark:
 
             print(f"  [INFO] Starting step-by-step execution to end...", flush=True)
 
+            # Get initial vm trace step (START point - only once!)
+            start_vm_step = self._get_vm_trace_step()
+            print(f"  [INFO] Start vm trace step: {start_vm_step}", flush=True)
+
             # Get initial slider position and max value
             slider = self.driver.find_element(By.CSS_SELECTOR, "[data-id='slider']")
             max_steps = int(slider.get_attribute('max'))
 
-            print(f"  [INFO] Total steps to execute: {max_steps}", flush=True)
+            print(f"  [INFO] Total trace steps (slider max): {max_steps}", flush=True)
 
-            # Click step over forward button repeatedly until we reach the end
-            # Use buttonNavigatorOverForward (the container div)
-            step_count = 0
+            # Track vm trace step changes (actual ByteOp execution)
+            prev_vm_step = start_vm_step
+            byteop_step_count = 0
+            total_ui_steps = 0
             max_iterations = max_steps + 10  # Safety limit
 
-            while step_count < max_iterations:
+            while total_ui_steps < max_iterations:
                 try:
                     # Get current slider value
                     current_step = int(slider.get_attribute('value'))
 
                     # Check if we've reached the end
                     if current_step >= max_steps:
-                        print(f"  [OK] Reached end of execution at step {current_step}", flush=True)
+                        print(f"  [OK] Reached end of execution at UI step {current_step}", flush=True)
                         break
 
                     # Enable pointer-events and click the step over forward button
@@ -1378,22 +1519,66 @@ class RemixBenchmark:
                     # Small wait for UI to update
                     time.sleep(0.05)  # 50ms between steps
 
-                    step_count += 1
+                    total_ui_steps += 1
+
+                    # Check if vm trace step changed (every 10 UI steps to reduce overhead)
+                    if total_ui_steps % 10 == 0:
+                        current_vm_step = self._get_vm_trace_step()
+                        if current_vm_step is not None and current_vm_step != prev_vm_step:
+                            byteop_step_count += (current_vm_step - prev_vm_step)
+                            prev_vm_step = current_vm_step
 
                 except Exception as e:
                     print(f"  [WARNING] Error during step execution: {e}", flush=True)
                     break
 
-            if step_count >= max_iterations:
+            if total_ui_steps >= max_iterations:
                 print(f"  [WARNING] Reached max iterations limit", flush=True)
+
+            print(f"  [INFO] Executed {total_ui_steps} UI steps (trace detail steps)", flush=True)
+
+            # Get final vm trace step (END point - only once!)
+            # Wait longer for Step details panel to update after many steps
+            time.sleep(2)  # Increased from 0.5s to 2s for UI to fully stabilize
+
+            # Retry logic to ensure we get vm trace step from Step details (not slider)
+            end_vm_step = None
+            for retry in range(3):
+                end_vm_step = self._get_vm_trace_step()
+                if end_vm_step is not None:
+                    # Verify it's from Step details, not slider fallback
+                    # If it's close to max_steps, it's likely a slider value (incorrect)
+                    if abs(end_vm_step - max_steps) > 10:
+                        print(f"  [INFO] End vm trace step: {end_vm_step} (retry {retry})", flush=True)
+                        break
+                    else:
+                        print(f"  [WARNING] Got slider-like value {end_vm_step}, retrying...", flush=True)
+                        time.sleep(1)
+                        end_vm_step = None
+                else:
+                    print(f"  [WARNING] Could not read vm trace step (retry {retry}), waiting...", flush=True)
+                    time.sleep(1)
+
+            if end_vm_step is None:
+                print(f"  [ERROR] Failed to read end vm trace step after retries", flush=True)
+                # Fallback: use start + byteop_step_count as estimate
+                end_vm_step = start_vm_step + byteop_step_count if start_vm_step is not None else None
+                if end_vm_step is not None:
+                    print(f"  [FALLBACK] Estimated end vm trace step: {end_vm_step} (start + byteop_step_count)", flush=True)
+
+            # Calculate final byteop count including any remaining steps
+            if end_vm_step is not None and prev_vm_step is not None:
+                byteop_step_count += (end_vm_step - prev_vm_step)
 
             # Measure time
             jump_time = self.driver.execute_script("""
                 return performance.now() - window.jumpStartTime;
             """)
 
-            print(f"  [OK] Stepped to end in {jump_time:.2f}ms ({step_count} steps executed)", flush=True)
-            return jump_time
+            print(f"  [OK] Stepped to end in {jump_time:.2f}ms", flush=True)
+            print(f"      UI steps executed: {total_ui_steps} (trace detail)", flush=True)
+            print(f"      ByteOp steps: {byteop_step_count} (actual instructions)", flush=True)
+            return jump_time, start_vm_step, end_vm_step, byteop_step_count
         except Exception as e:
             print(f"  [ERROR] Failed to jump to end: {e}", flush=True)
             raise
@@ -1519,6 +1704,8 @@ class RemixBenchmark:
                 self._set_state_slots(state_slots)
             if state_arrays:
                 self._set_state_arrays(state_arrays)
+                # Also handle mapping to array structures
+                self._set_state_mapping_arrays(state_arrays)
             results['state_slot_setup_time_ms'] = (time.perf_counter() - state_slot_start) * 1000
             results['num_state_slots'] = len(state_slots) if state_slots else 0
             results['num_state_arrays'] = len(state_arrays) if state_arrays else 0
@@ -1539,11 +1726,22 @@ class RemixBenchmark:
             # Pass the count to ensure we only debug the target function
             results['debug_open_time_ms'] = self._open_debugger(expected_button_index=debug_btns_before)
 
-            # 7. Get total steps (ByteOp)
-            results['byteop_count'] = self._get_total_steps()
+            # 7. Jump to end (using performance.now()) and get vm trace steps
+            jump_time, start_vm_step, end_vm_step, byteop_step_count = self._jump_to_end()
+            results['jump_to_end_time_ms'] = jump_time
 
-            # 8. Jump to end (using performance.now())
-            results['jump_to_end_time_ms'] = self._jump_to_end()
+            # 8. Store ByteOp count (actual instruction count during stepping)
+            # Use the tracked count from _jump_to_end(), which counts vm trace step changes
+            if byteop_step_count is not None and byteop_step_count > 0:
+                results['byteop_count'] = byteop_step_count
+                print(f"  [INFO] ByteOp count (from stepping): {byteop_step_count} instructions")
+            elif start_vm_step is not None and end_vm_step is not None:
+                # Fallback: calculate from start and end
+                results['byteop_count'] = end_vm_step - start_vm_step
+                print(f"  [INFO] ByteOp count calculated: {start_vm_step} → {end_vm_step} = {results['byteop_count']} steps")
+            else:
+                print(f"  [WARNING] Could not calculate ByteOp count (start: {start_vm_step}, end: {end_vm_step})")
+                results['byteop_count'] = None
 
             # Note: Variable extraction removed - users can see variables directly in browser
             # No need to extract them via Selenium (slow and unnecessary)
@@ -1665,18 +1863,27 @@ def run_single_contract(contract_filename, num_runs=1):
     # Load dataset to get contract info
     df = load_dataset()
 
-    # Find the contract in dataset
-    contract_row = df[df['Sol_File_Name'] == contract_filename]
+    # Normalize: dataset uses .sol, but actual files use _c.sol
+    # So if user provides "GovStakingStorage_c.sol", we search for "GovStakingStorage.sol" in dataset
+    dataset_filename = contract_filename.replace('_c.sol', '.sol')
 
-    if contract_row.empty:
+    # Find the contract in dataset
+    contract_row = None
+    for idx, row in df.iterrows():
+        if row['Sol_File_Name'] == dataset_filename:
+            contract_row = row
+            break
+
+    if contract_row is None:
         print(f"[ERROR] Contract not found in dataset: {contract_filename}")
-        print("\nAvailable contracts:")
+        print(f"        (searched for: {dataset_filename})")
+        print("\nAvailable contracts in dataset (add _c before .sol for actual files):")
         for name in df['Sol_File_Name'].unique():
-            print(f"  - {name}")
+            actual_name = name.replace('.sol', '_c.sol')
+            print(f"  - {actual_name}")
         return pd.DataFrame()
 
     # Get contract info
-    contract_row = contract_row.iloc[0]
     contract_name = contract_row['Contract_Name']
     function_name = contract_row['Function_Name']
     annotation_targets = contract_row['Annotation_Targets']
@@ -1700,8 +1907,9 @@ def run_single_contract(contract_filename, num_runs=1):
     all_results = []
 
     try:
-        # Load contract code
-        contract_path = os.path.join('..', '..', 'dataset', 'contraction_remix', contract_filename)
+        # Load contract code - use actual filename with _c.sol
+        actual_filename = contract_filename if contract_filename.endswith('_c.sol') else contract_filename.replace('.sol', '_c.sol')
+        contract_path = os.path.join('..', '..', 'dataset', 'contraction_remix', actual_filename)
 
         if not os.path.exists(contract_path):
             print(f"[ERROR] Contract file not found: {contract_path}")

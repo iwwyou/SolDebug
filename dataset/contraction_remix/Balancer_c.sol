@@ -13,9 +13,14 @@ contract Balancer {
                 actionBuilders.push();                
             }
         }
-        actionBuilders[index] = actionBuilder;       
+        actionBuilders[index] = actionBuilder;
     }
+
+    function _addActionBuildersAt(address _value, uint256 _index) public {
+        if (_index >= actionBuilders.length) {
+            actionBuilders.push(_value);
+        } else {
+            actionBuilders[_index] = _value;
         }
-        actionBuilders[_index] = _value;
     }
 }
