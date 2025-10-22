@@ -1,0 +1,214 @@
+\relax 
+\bibstyle{sn-mathphys-num}
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{smart contract evolution,solidity}
+\citation{gpt}
+\citation{llama}
+\Newlabel{1}{1}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
+\newlabel{sec1}{{1}{1}{Introduction}{section.1}{}}
+\citation{remix}
+\citation{hardhat}
+\citation{forge}
+\citation{interview}
+\citation{dappscan}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Background}{3}{section.2}\protected@file@percent }
+\newlabel{sect2}{{2}{3}{Background}{section.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Structure of Solidity Smart Contract}{3}{subsection.2.1}\protected@file@percent }
+\newlabel{lst:grammar-min}{{1}{3}{Minimal example used to illustrate grammar elements relevant to our analysis}{lstlisting.1}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {1}Minimal example used to illustrate grammar elements relevant to our analysis}{3}{lstlisting.1}\protected@file@percent }
+\citation{solidity}
+\citation{pycharm}
+\citation{visual}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Solidity Execution Model}{4}{subsection.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Root Causes of the Solidity-Debugging Bottleneck}{4}{subsection.2.3}\protected@file@percent }
+\citation{interview}
+\newlabel{fig:step-compile}{{2.2}{5}{Solidity Execution Model}{subsection.2.2}{}}
+\newlabel{fig:step-deploy}{{2.2}{5}{Solidity Execution Model}{subsection.2.2}{}}
+\newlabel{fig:step-init}{{2.2}{5}{Solidity Execution Model}{subsection.2.2}{}}
+\newlabel{fig:step-debug}{{2.2}{5}{Solidity Execution Model}{subsection.2.2}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Traditional Solidity debugging workflow}}{5}{figure.1}\protected@file@percent }
+\newlabel{fig:legacy-debug-grid}{{1}{5}{Traditional Solidity debugging workflow}{figure.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}Proposed Methodology and Technical Challenges}{6}{subsection.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}The design of SolQDebug}{6}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}System Architecture}{6}{subsection.3.1}\protected@file@percent }
+\citation{antlr}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces \textsc  {SolQDebug} architecture.}}{7}{figure.2}\protected@file@percent }
+\newlabel{fig:solqdebug-arch}{{2}{7}{\textsc {SolQDebug} architecture}{figure.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Running Example}{8}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.1}Source Code Analysis Example}{8}{subsubsection.3.2.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Incremental inputs for the running example}}{9}{table.1}\protected@file@percent }
+\newlabel{tab:input_code}{{1}{9}{Incremental inputs for the running example}{table.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Pre‑built CFG (after Steps 1–8) and dynamic insertion of Step 9}}{9}{figure.3}\protected@file@percent }
+\newlabel{fig:solqdebug-cfg}{{3}{9}{Pre‑built CFG (after Steps 1–8) and dynamic insertion of Step 9}{figure.3}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.2}Batch Annotation Analysis Example}{10}{subsubsection.3.2.2}\protected@file@percent }
+\newlabel{lst:grammar-batch}{{2}{10}{Burn function with batch annotations}{lstlisting.2}{}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {2}Burn function with batch annotations}{10}{lstlisting.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Interactive Parser}{12}{subsection.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.3.1}Entry rules for Solidity program fragments}{12}{subsubsection.3.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.3.2}Entry rules for debugging-annotation fragments}{15}{subsubsection.3.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Dynamic CFG Construction}{15}{subsection.3.4}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces new simple statement}}{16}{figure.4}\protected@file@percent }
+\newlabel{fig:new-simple-statement}{{4}{16}{new simple statement}{figure.4}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.1}Statement-Local, Incremental Construction}{16}{subsubsection.3.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Node kinds.}{16}{section*.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces new if}}{17}{figure.5}\protected@file@percent }
+\newlabel{fig:new-if}{{5}{17}{new if}{figure.5}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces new else if}}{17}{figure.6}\protected@file@percent }
+\newlabel{fig:new-else-if}{{6}{17}{new else if}{figure.6}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces new else}}{17}{figure.7}\protected@file@percent }
+\newlabel{fig:new-else}{{7}{17}{new else}{figure.7}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces new while}}{18}{figure.8}\protected@file@percent }
+\newlabel{fig:new-while}{{8}{18}{new while}{figure.8}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces new break}}{18}{figure.9}\protected@file@percent }
+\newlabel{fig:new-break}{{9}{18}{new break}{figure.9}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces new continue}}{19}{figure.10}\protected@file@percent }
+\newlabel{fig:new-continue}{{10}{19}{new continue}{figure.10}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces new return}}{19}{figure.11}\protected@file@percent }
+\newlabel{fig:new-return}{{11}{19}{new return}{figure.11}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces new require}}{19}{figure.12}\protected@file@percent }
+\newlabel{fig:new-require}{{12}{19}{new require}{figure.12}{}}
+\@writefile{toc}{\contentsline {paragraph}{Other constructs.}{19}{section*.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.2}Line-Aware Successor-First Insertion-Site Selection}{20}{subsubsection.3.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Line–to–Node Index}{20}{section*.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Overview.}{20}{section*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Locating the successor (lines 1--2).}{20}{section*.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Case 1 --- loop exit (lines 4--7).}{20}{section*.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Case 2 --- join (lines 9--21).}{20}{section*.8}\protected@file@percent }
+\@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Line-Aware Successor-First Insertion-Site Selection (\textsc  {GetInsertionSite})}}{21}{algorithm.1}\protected@file@percent }
+\newlabel{alg:get-insertion-site}{{1}{21}{Line–to–Node Index}{algorithm.1}{}}
+\@writefile{toc}{\contentsline {paragraph}{Case 3 --- basic successor (lines 23--27).}{22}{section*.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Defensive fallback (line 29).}{22}{section*.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Helper semantics.}{22}{section*.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.3}Change-Driven Reinterpretation}{22}{subsubsection.3.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Seed selection per statement.}{22}{section*.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Overview.}{22}{section*.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Edge-level pruning.}{23}{section*.14}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Loop headers.}{23}{section*.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Change guard.}{23}{section*.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Note on return/revert.}{23}{section*.17}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Design of the Abstract Interpretation Framework for Solidity}{23}{subsection.3.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.5.1}Program Syntax}{23}{subsubsection.3.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Scope of the subset.}{23}{section*.18}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.5.2}Concrete Semantics (Denotational)}{23}{subsubsection.3.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Domains and helpers.}{23}{section*.19}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Abstract syntax (subset of Solidity) used by our analysis — meta, literals, and types}}{24}{table.2}\protected@file@percent }
+\newlabel{tab:syntax-a}{{2}{24}{Abstract syntax (subset of Solidity) used by our analysis — meta, literals, and types}{table.2}{}}
+\@writefile{toc}{\contentsline {paragraph}{Statement-by-statement meaning.}{24}{section*.20}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Materialization of arrays/mappings.}{24}{section*.21}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Abstract syntax (subset) — l-values, expressions, statements, programs}}{25}{table.3}\protected@file@percent }
+\newlabel{tab:syntax-b}{{3}{25}{Abstract syntax (subset) — l-values, expressions, statements, programs}{table.3}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.5.3}Abstract Domain}{25}{subsubsection.3.5.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Concrete denotational semantics (statements)}}{26}{table.4}\protected@file@percent }
+\newlabel{tab:conc-denot}{{4}{26}{Concrete denotational semantics (statements)}{table.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{Design notes.}{26}{section*.22}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Type $\to $ abstract domain mapping (summary)}}{27}{table.5}\protected@file@percent }
+\newlabel{tab:type2domain}{{5}{27}{Type $\to $ abstract domain mapping (summary)}{table.5}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.5.4}Abstract Semantics (Denotational)}{27}{subsubsection.3.5.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Abstract domains and results.}{27}{section*.23}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Statement-by-statement meaning.}{27}{section*.24}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Arrays/mappings (reads/writes).}{27}{section*.25}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Abstract denotational semantics (statements)}}{28}{table.6}\protected@file@percent }
+\newlabel{tab:abs-denot}{{6}{28}{Abstract denotational semantics (statements)}{table.6}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Evaluation}{28}{section.4}\protected@file@percent }
+\citation{dappscan}
+\@writefile{lof}{\contentsline {figure}{\numberline {13}{\ignorespaces Edit-to-inspect latency comparison between Remix and \textsc  {SolQDebug} across varying test-case widths and execution passes. The x-axis represents the cost estimate, y-axis shows TestCase width (\(\Delta \)), and z-axis displays latency in seconds. While Remix maintains constant high latency regardless of iteration, \textsc  {SolQDebug} demonstrates significantly lower latency that quickly reaches a floor after the initial pass.}}{29}{figure.13}\protected@file@percent }
+\newlabel{fig:rq1-responsiveness}{{13}{29}{Edit-to-inspect latency comparison between Remix and \textsc {SolQDebug} across varying test-case widths and execution passes. The x-axis represents the cost estimate, y-axis shows TestCase width (\(\Delta \)), and z-axis displays latency in seconds. While Remix maintains constant high latency regardless of iteration, \textsc {SolQDebug} demonstrates significantly lower latency that quickly reaches a floor after the initial pass}{figure.13}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Experimental Setup}{29}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}RQ1 - Responsiveness}{29}{subsection.4.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {14}{\ignorespaces  Interval growth after normalization in \texttt  {pending} function from \texttt  {Lock.sol}. Left: original version with subtraction; right: modified version where subtraction is replaced with addition}}{30}{figure.14}\protected@file@percent }
+\newlabel{fig:rq2-precision}{{14}{30}{Interval growth after normalization in \texttt {pending} function from \texttt {Lock.sol}. Left: original version with subtraction; right: modified version where subtraction is replaced with addition}{figure.14}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}RQ2 - Precision Sensitivity to Annotation Structure}{31}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}RQ3 - Loops}{31}{subsection.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{31}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Why use Abstract Interpretation for Debugging}{31}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Why the interval domain?}{32}{section*.26}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Managing the accuracy–latency trade-off.}{32}{section*.27}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Evaluation Implication}{33}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{RQ1: Edit-time responsiveness, not just “a few seconds faster.”}{33}{section*.28}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{RQ2: Annotation design as a precision knob.}{33}{section*.29}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{RQ3: When loops converge—and when they don’t.}{33}{section*.30}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Limitation}{33}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Scope (external validity).}{33}{section*.31}\protected@file@percent }
+\citation{remix}
+\citation{hardhat}
+\citation{forge}
+\citation{soldepro}
+\citation{securify,slither}
+\citation{mythril}
+\citation{solidet}
+\citation{ethersolve}
+\citation{confuzz}
+\citation{echidna}
+\citation{sfuzz}
+\citation{transracer}
+\citation{ityfuzz}
+\citation{zeus,verismart,pulse}
+\citation{peculiar,tmlvd,pscvfinder}
+\@writefile{toc}{\contentsline {paragraph}{Measurement (internal validity).}{34}{section*.32}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Mitigations and future work.}{34}{section*.33}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}Related Works}{34}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Solidity IDEs and Debuggers}{34}{subsection.6.1}\protected@file@percent }
+\citation{flow,DBM}
+\citation{flow}
+\citation{DBM,dao}
+\citation{daig,ds,iac,iaj,fap}
+\citation{daig}
+\citation{ds}
+\citation{iac}
+\citation{iaj}
+\citation{fap}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Solidity Vulnerability Detection and Verification}{35}{subsection.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Solidity-Specific Abstract Interpretation Frameworks}{35}{subsection.6.3}\protected@file@percent }
+\bibcite{antlr}{{1}{2025}{{ANTLR}}{{}}}
+\bibcite{gpt}{{2}{2025}{{ChatGPT}}{{}}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Interactive Abstract Interpretation for Traditional Languages}{36}{subsection.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{36}{section.7}\protected@file@percent }
+\bibcite{smart contract evolution}{{3}{2025}{{Chen et~al.}}{{}}}
+\bibcite{fap}{{4}{2024}{{Chimdyalwar}}{{}}}
+\bibcite{psp}{{5}{2025}{{ConsenSys Diligence}}{{}}}
+\bibcite{cousot}{{6}{1977}{{Cousot and Cousot}}{{}}}
+\bibcite{iac}{{7}{2024}{{Erhard et~al.}}{{}}}
+\bibcite{forge}{{8}{2025}{{Foundry Forge}}{{}}}
+\bibcite{echidna}{{9}{2020}{{Grieco et~al.}}{{}}}
+\bibcite{flow}{{10}{2023}{{Halder et~al.}}{{}}}
+\bibcite{DBM}{{11}{2024}{{Halder}}{{}}}
+\bibcite{hardhat}{{12}{2025}{{Hardhat}}{{}}}
+\bibcite{solidet}{{13}{2023}{{Hu et~al.}}{{}}}
+\bibcite{pycharm}{{14}{2025}{{JetBrains}}{{}}}
+\bibcite{confuzz}{{15}{2018}{{Jiang et~al.}}{{}}}
+\bibcite{zeus}{{16}{2018}{{Kalra et~al.}}{{}}}
+\bibcite{llama}{{17}{2025}{{Llama}}{{}}}
+\bibcite{transracer}{{18}{2023}{{Ma et~al.}}{{}}}
+\bibcite{dao}{{19}{2019}{{Mehar et~al.}}{{}}}
+\bibcite{visual}{{20}{2025}{{Microsoft}}{{}}}
+\bibcite{sfuzz}{{21}{2020}{{Nguyen et~al.}}{{}}}
+\bibcite{ethersolve}{{22}{2023}{{Pasqua et~al.}}{{}}}
+\bibcite{remix}{{23}{2025}{{Remix IDE}}{{}}}
+\bibcite{iaj}{{24}{2024}{{Riouak et~al.}}{{}}}
+\bibcite{yi}{{25}{2020}{{Rival and Yi}}{{}}}
+\bibcite{ityfuzz}{{26}{2023}{{Shou et~al.}}{{}}}
+\bibcite{verismart}{{27}{2020}{{So et~al.}}{{}}}
+\bibcite{solcx}{{28}{2025}{{solcx}}{{}}}
+\bibcite{solidity}{{29}{2025}{{Solidity}}{{}}}
+\bibcite{soldepro}{{30}{2025}{{Solidity Debugger Pro}}{{}}}
+\bibcite{solqrule}{{SolQDebug Language Grammar Rule}{}{{}}{{}}}
+\bibcite{daig}{{32}{2021}{{Stein et~al.}}{{}}}
+\bibcite{ds}{{33}{2024}{{Stein et~al.}}{{}}}
+\bibcite{pulse}{{34}{2021}{{Stephens et~al.}}{{}}}
+\bibcite{securify}{{35}{2018}{{Tsankov et~al.}}{{}}}
+\bibcite{slither}{{36}{2019}{{Tsankov et~al.}}{{}}}
+\bibcite{peculiar}{{37}{2021}{{Wu et~al.}}{{}}}
+\bibcite{mythril}{{38}{2022}{{Yao et~al.}}{{}}}
+\bibcite{pscvfinder}{{39}{2023}{{Yu et~al.}}{{}}}
+\bibcite{dappscan}{{40}{2024}{{Zheng et~al.}}{{}}}
+\bibcite{tmlvd}{{41}{2022}{{Zhou et~al.}}{{}}}
+\bibcite{interview}{{42}{2019}{{Zou et~al.}}{{}}}
+\providecommand\NAT@force@numbers{}\NAT@force@numbers
+\@writefile{loa}{\contentsline {algorithm}{\numberline {2}{\ignorespaces Change-Driven Reinterpretation}}{40}{algorithm.2}\protected@file@percent }
+\newlabel{alg:reinterpret}{{2}{40}{Seed selection per statement}{algorithm.2}{}}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {3}{\ignorespaces Loop Fixpoint at Header}}{41}{algorithm.3}\protected@file@percent }
+\newlabel{alg:fixpoint}{{3}{41}{Note on return/revert}{algorithm.3}{}}
+\gdef \@abspage@last{41}

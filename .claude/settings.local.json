@@ -14,7 +14,9 @@
       "Bash(git -C \"C:\\Users\\isjeon\\PycharmProjects\\pythonProject\\SolDebug\" show a53ea03:Evaluation/Remix/remix_benchmark_results.csv)",
       "Bash(git -C \"C:\\Users\\isjeon\\PycharmProjects\\pythonProject\\SolDebug\" status --short Evaluation/Remix/remix_benchmark_results.*)",
       "Bash(dir:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(copy \"C:\\Users\\isjeon\\PycharmProjects\\pythonProject\\SolDebug\\paper\\main.tex\" \"C:\\Users\\isjeon\\PycharmProjects\\pythonProject\\SolDebug\\paper\\main_backup.tex\")",
+      "Bash(cp:*)"
     ],
     "deny": [],
     "ask": []
