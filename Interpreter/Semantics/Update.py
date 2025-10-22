@@ -600,11 +600,10 @@ class Update :
                             if idx >= decl_len:
                                 continue  # out of range
 
-                        base_t = caller_object.typeInfo.arrayBaseType
-                        while len(caller_object.elements) <= idx:
-                            caller_object.elements.append(VariableEnv.bottom_from_soltype(base_t))
-
-                    elem = caller_object.elements[idx]
+                        # ArrayVariable의 get_or_create_element() 사용 (TOP 값으로 초기화)
+                        elem = caller_object.get_or_create_element(idx)
+                    else:
+                        elem = caller_object.elements[idx]
                     if isinstance(elem, (StructVariable, ArrayVariable, MappingVariable)):
                         # composite는 처리 불가, 추상화
                         return caller_object
