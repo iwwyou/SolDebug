@@ -431,7 +431,7 @@ and updated abstract states.
 \end{comment}
     To make the architecture concrete, we walk through a small running example that exercises the
     main components of SolQDebug. The system operates as follows. First, each incremental source
-    fragment is interpreted under abstract semantics to compute interval ranges for the variables it
+    fragment is interpreted under abstract semantics to compute interval for the variables it
     touches. Second, the corresponding expression is stored in a CFG node that is inserted at a
     semantically valid point, determined from the edit’s context and the existing control‑flow.
     Third, when batch annotations are present, the entire function is reinterpreted using the
