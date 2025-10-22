@@ -16,7 +16,8 @@
       "Bash(dir:*)",
       "Bash(findstr:*)",
       "Bash(copy \"C:\\Users\\isjeon\\PycharmProjects\\pythonProject\\SolDebug\\paper\\main.tex\" \"C:\\Users\\isjeon\\PycharmProjects\\pythonProject\\SolDebug\\paper\\main_backup.tex\")",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(pdflatex:*)"
     ],
     "deny": [],
     "ask": []

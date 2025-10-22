@@ -16,6 +16,8 @@
 % Graphics and tables
 \usepackage{graphicx}%
 \DeclareGraphicsExtensions{.png,.pdf,.jpg}% PNG first, then PDF
+\usepackage{tikz}%
+\usetikzlibrary{positioning,shapes,arrows.meta}%
 \usepackage{multirow}%
 \usepackage{booktabs}%
 \usepackage{tabularx}
@@ -349,13 +351,12 @@ contract Example {
 
 \begin{figure*}[t]
   \centering
-  % 높이를 0.45\textheight(예시)로 키우고, 종횡비는 유지
   \includegraphics[
-    width=\textwidth,
-    height=0.3\textheight
-    %keepaspectratio  % 종횡비 유지 (생략하면 강제로 늘어남)
+    width=0.95\textwidth,
+    height=0.35\textheight,
+    keepaspectratio
   ]{5. Architecture.png}
-  \caption{\textsc{SolQDebug} architecture.}
+  \caption{\textsc{SolQDebug} architecture}
   \label{fig:solqdebug-arch}
 \end{figure*}
 
@@ -365,9 +366,10 @@ contract Example {
         Solidity code or an inline debug annotation. Rather than expecting complete programs, the
         system is designed to accept fragments ranging from full statements to partial control-flow
         constructs. These edits include partial Solidity fragments and batch annotations, which are
-        processed in isolation without requiring recompilation or transaction replay. The structure
-        of these inputs is described in Section 3.B; here, we outline the four-stage processing
-        pipeline.
+        processed in isolation without requiring recompilation or transaction replay. The system
+        assumes that each line contains at most one statement; compound forms such as
+        \texttt{if (...) return;} are not supported. The structure of these inputs is described in
+        Section 3.B; here, we outline the four-stage processing pipeline.
     
         \textbf{(1) Parsing Module.}
         Each incoming edit first passes through the \textit{Context Analyzer}, which reconstructs a
@@ -396,26 +398,24 @@ contract Example {
         as structs, arrays, and mappings, the container itself is treated as symbolic until a
         specific field, element, or key is accessed. At that point, the interpreter materializes a
         fresh abstract value. If the base type is elementary, it receives the corresponding interval;
-        otherwise, a new symbolic placeholder is propagated. Before each batch run, a Test-case
-        Isolation Manager snapshots the full abstract memory. Once execution completes, the snapshot
-        is restored. This guarantees that consecutive test cases remain isolated and do not
-        interfere with each other, even when global or local bindings are modified.
+        otherwise, a new symbolic placeholder is propagated. Before each batch run, the Snapshot
+        Manager saves the full abstract memory. Once execution completes, the snapshot is restored.
+        This guarantees that consecutive test cases remain isolated and do not interfere with each
+        other, even when global or local bindings are modified.
 
         \textbf{(3) Line-Level Output.}
         After interpretation, the system emits a per-statement summary of relevant variable
         intervals. This includes:
-        
+
         \begin{itemize}
-          \item \textbf{Variable declarations and assignments:} the interval of the updated left-hand side variable.
-          \item \textbf{If, else-if, and else branches:} true-path-pruned intervals for variables in single-variable conditions.
-          \item \textbf{Require and assert statements:} intervals under the assumption that the condition holds.
-          \item \textbf{Function calls:} either the return value (for standalone calls) or the assigned interval (if used on the left-hand side).
-          \item \textbf{Loops:} intervals for variables updated within the loop body after fixpoint convergence.
+          \item \textbf{Variable declarations:} the initial interval of the declared variable.
+          \item \textbf{Assignments:} the updated interval of the left-hand side variable after evaluation.
+          \item \textbf{Return statements:} the interval of the returned value or tuple of values.
+          \item \textbf{Loops:} intervals for variables that changed during loop execution, computed after fixpoint convergence (loop delta).
         \end{itemize}
         
         All outputs are mapped to source line numbers and displayed directly in the Solidity editor,
         providing immediate, deployment-free feedback to developers.
-       
     
     \subsection{Running Example}
 \begin{comment}
@@ -472,7 +472,7 @@ and updated abstract states.
         \}
       \end{tabular} \\
     8 & 19 & delta = 0; \\
-    9 & 21 & totalSupply -= delta; \\
+    9 & 21 & totalSupply -= delta; // new input \\
     \bottomrule
   \end{tabularx}
   \rmfamily
@@ -494,13 +494,52 @@ closing brace is pushed downward. The line numbers shown in the table refer to t
 
 \begin{figure*}[t]
   \centering
-  % 높이를 0.45\textheight(예시)로 키우고, 종횡비는 유지
-  \includegraphics[
-    width=\textwidth,
-    height=0.3\textheight
-    %keepaspectratio  % 종횡비 유지 (생략하면 강제로 늘어남)
-  ]{Source Code CFG.png}
-  \caption{Pre‑built CFG (after Steps 1–8) and dynamic insertion of Step 9}
+  \begin{tikzpicture}[
+    node distance=1.5cm and 2.5cm,
+    block/.style={rectangle, draw, thick, minimum width=3cm, minimum height=1cm, align=center, font=\footnotesize},
+    cond/.style={diamond, draw, thick, aspect=2, minimum width=2cm, minimum height=1cm, align=center, font=\footnotesize},
+    join/.style={rectangle, draw, thick, fill=yellow!20, minimum width=2.5cm, minimum height=0.6cm, align=center, font=\footnotesize},
+    empty/.style={circle, draw, thick, minimum size=0.8cm, font=\large}
+  ]
+
+  % Entry and declarations
+  \node[block] (entry) {ENTRY};
+  \node[block, below=1cm of entry] (decl) {Declarations\\bal, delta\\env: \{bal: $\top$, delta: $\top$\}};
+
+  % Condition node
+  \node[cond, below=1.2cm of decl] (cond) {$bal \geq amount$};
+
+  % Branch paths (simplified)
+  \node[block, below left=1.5cm and 2cm of cond] (true) {... intermediate nodes ...\\(Steps 5--6)};
+  \node[block, below right=1.5cm and 2cm of cond] (false) {... intermediate nodes ...\\(Step 8)};
+
+  % Leaf nodes
+  \node[block, below=1cm of true] (leaf_t) {[Leaf T]\\delta = amount\\env: \{bal:[100,200],\\delta:[50,150]\}};
+  \node[block, below=1cm of false] (leaf_f) {[Leaf F]\\delta = 0\\env: \{bal:[100,200],\\delta:[0,0]\}};
+
+  % Join point (empty node)
+  \node[join, below=2cm of cond, yshift=-2.5cm] (join) {$\sqcup$ Join Node\\(empty)};
+
+  % New node with Step 9
+  \node[block, below=1cm of join, fill=green!15] (step9) {[New Node]\\totalSupply -= delta\\env: \{totalSupply:[850,1000]\}};
+
+  % Exit
+  \node[block, below=1cm of step9] (exit) {EXIT};
+
+  % Edges
+  \draw[->, thick] (entry) -- (decl);
+  \draw[->, thick] (decl) -- (cond);
+  \draw[->, thick] (cond) -| node[above left, pos=0.3] {True} (true);
+  \draw[->, thick] (cond) -| node[above right, pos=0.3] {False} (false);
+  \draw[->, thick] (true) -- (leaf_t);
+  \draw[->, thick] (false) -- (leaf_f);
+  \draw[->, thick] (leaf_t) -| (join);
+  \draw[->, thick] (leaf_f) -| (join);
+  \draw[->, thick] (join) -- node[right] {Step 9 inserted} (step9);
+  \draw[->, thick] (step9) -- (exit);
+
+  \end{tikzpicture}
+  \caption{CFG structure showing Step 9 insertion. Each statement occupies a separate basic node; intermediate nodes along each branch are omitted, showing only the leaf nodes before the join point. The join point node is empty and serves only to merge the environments from both branches}
   \label{fig:solqdebug-cfg}
 \end{figure*}
 
@@ -543,10 +582,10 @@ statement를 함께 기록한다.
         SolQDebug uses the following node semantics and bookkeeping rules:
 
 \begin{itemize}
-  \item \textbf{Basic blocks.} A basic block contains a straight-line sequence of statements. 
-        As statements are evaluated in order, the block maintains the abstract environment 
-        at the end of the block—i.e., the interval for each variable. 
-        For later re-analysis (e.g., under batch annotations), the block also records its statement
+  \item \textbf{Basic nodes.} A basic node contains a straight-line sequence of statements.
+        As statements are evaluated in order, the node maintains the abstract environment
+        at the end of the node—i.e., the interval for each variable.
+        For later re-analysis (e.g., under batch annotations), the node also records its statement
         list.
   \item \textbf{Condition nodes.} A condition node stores only the predicate 
         (e.g., \texttt{bal >= amount}) and does not update the environment at that point.
@@ -567,16 +606,21 @@ statement를 함께 기록한다.
         together with the existing CFG, SolQDebug locates the semantically valid insertion point. 
         In this case the context indicates the join after the if/else, 
         not merely the preceding line (§3.5).
-  \item[\textbf{(3)}] \textbf{Join environment (and localized fixpoint if needed).} 
-        If the insertion point has multiple predecessors, SolQDebug computes the least upper bound 
-        (\(\sqcup\), JoinBranches) of their environments to build a join block and inserts the new
-        statement there.
+  \item[\textbf{(3)}] \textbf{Join environment (and localized fixpoint if needed).}
+        If the insertion point has multiple predecessors, SolQDebug computes the least upper bound
+        (\(\sqcup\), JoinBranches) of their environments to create a join point node.
         If a loop header is on the path, a localized fixpoint is computed at the header before
         joining (§3.5).
-  \item[\textbf{(4)}] \textbf{Evaluation and rewiring.} 
-        The assignment is evaluated once in the join environment to produce the new interval for 
-        \texttt{totalSupply}. The outgoing edges from the two branch leaves are rewired to flow 
-        through the join block and then to the exit.
+  \item[\textbf{(4)}] \textbf{Evaluation and rewiring.}
+        A new basic node is created immediately after the join point node, and the assignment
+        is evaluated in this new node using the joined environment to produce the new interval for
+        \texttt{totalSupply}. The outgoing edges from the two branch leaves are rewired to the
+        join point, which flows into the new node and then to the exit.
+  \item[\textbf{(5)}] \textbf{Reinterpretation from the insertion point.}
+        To maintain soundness of the abstract interpretation, SolQDebug reinterprets all nodes
+        reachable from the newly inserted node. Since the insertion changes the incoming environment
+        for subsequent statements, the \texttt{reinterpret\_From} function propagates the updated
+        environment forward through the CFG, ensuring that all downstream intervals remain valid.
 \end{itemize}
 
         This design allows SolQDebug to reuse all path‑local computations accumulated up to the
@@ -632,7 +676,7 @@ function burn(uint256 amount) public onlyOwner {
 배치 주석이 주어지면 SolQDebug는 다음의 경량 파이프라인을 수행한다. (i) 각 주석 줄을 파싱해 심볼 해석과 타입 점검을 수행한다. (ii) 현재 추상 메모리를 스냅샷한
 뒤, 주석으로 지정된 값들로 초기 환경을 오버레이한다. (iii) 함수 진입점에서 미리 구축된 CFG를 그대로 순회하며 한 번의 추상 해석을 수행한다. 이때 조건 노드는 술어만
 기록하고 환경을 즉시 변경하지 않으며, 참/거짓 후속 블록이 생성될 때 각 경로 환경을 술어/부정 술어에 맞게 프루닝한다. 루프가 있는 경우에는 헤더에서 **국소
-고정점(fixpoint)**을 계산한다. (iv) 분석이 끝나면 스냅샷을 복원하여 실행 간 격리를 보장한다. 이 일련의 과정은 Debugging Isolation Manager가
+고정점(fixpoint)**을 계산한다. (iv) 분석이 끝나면 스냅샷을 복원하여 실행 간 격리를 보장한다. 이 일련의 과정은 Snapshot Manager가
 관리한다.
 
 이때 배치 주석은 CFG 구조를 변화시키지 않는다. 새로운 노드를 삽입하지 않고, 초기 환경만 변경한 뒤 동일 CFG를 재사용한다. 기본 블록은 자신이 담고 있는 문장 리스트와
@@ -686,7 +730,7 @@ and perform abstract interpretation; condition nodes record only the predicate a
 immediately change the environment, while the true/false successor blocks refine (prune) their
 incoming environments under the predicate and its negation; if loops are present, a localized
 fixpoint is computed at the loop header; and (iv) restore the snapshot to guarantee isolation across
-runs. This process is coordinated by the Debugging Isolation Manager.
+runs. This process is coordinated by the Snapshot Manager.
 
 Importantly, batch annotations do not alter the CFG structure. No new nodes are inserted; only the
 initial environment changes, and the same CFG is reused. Each basic block retains its statement list
@@ -914,24 +958,76 @@ catch Error(string memory) {
   \end{enumerate}
 \end{itemize}
 
-\noindent\emph{Context-aware selection.} A lightweight \emph{construct stack} maintained by the
-context analyzer (contract/function/block nesting; unmatched \texttt{if}/\texttt{do}/\texttt{try})
-guides the choice among these entry rules, ensuring that each edit produces a valid subtree and
-keeping the global AST/CFG consistent during live editing.
+\noindent\textbf{Context-aware entry-rule selection}
+\begin{itemize}
+  \item \emph{Construct stack.} The context analyzer maintains a lightweight stack tracking:
+    \begin{itemize}
+      \item Current nesting: contract $\rightarrow$ function $\rightarrow$ block depth
+      \item Unmatched constructs: open \texttt{if}, \texttt{do}, \texttt{try} awaiting their tails
+    \end{itemize}
+  \item \emph{Selection algorithm.}
+    \begin{enumerate}
+      \item Inspect stack top to determine enclosing context
+      \item Match fragment's first token against candidate entry rules
+      \item For two-phase constructs (enum/struct members, \texttt{else}, \texttt{catch}), check if corresponding shell exists
+      \item Select the most specific rule; fall back to \texttt{interactiveSourceUnit} for top-level
+    \end{enumerate}
+  \item \emph{Consistency guarantee.}
+    Each selected rule produces a syntactically well-formed subtree that can be spliced into the global AST/CFG without invalidating existing structure.
+\end{itemize}
 
 \subsubsection{Entry rules for debugging-annotation fragments}
 
 \noindent\textbf{\texttt{debugUnit} — batch-annotation lines inside \texttt{//@Debugging} blocks}
 \begin{itemize}
-  \item \emph{Purpose.} Parses one or more annotation lines that assign abstract values (intervals or symbolic tags) to designated variables, independent of Solidity AST completeness.
-  \item \emph{Examples.}
+  \item \emph{Purpose.} Parses annotation lines that assign abstract values (intervals or symbolic tags) to designated variables, independent of Solidity AST completeness. Enables developers to specify initial states for interactive exploration without deploying contracts.
+
+  \item \emph{Annotation types.}
+    \begin{itemize}
+      \item \texttt{@StateVar}: Assigns values to contract state variables and their nested elements (mappings, arrays, structs)
+      \item \texttt{@LocalVar}: Assigns values to function parameters and local variables
+    \end{itemize}
+
+  \item \emph{Supported L-value patterns.}
+    \begin{itemize}
+      \item Simple variables: \texttt{amount}, \texttt{totalSupply}
+      \item Array/mapping access: \texttt{balances[msg.sender]}, \texttt{arr[0]}
+      \item Struct fields: \texttt{user.balance}, \texttt{data[key].field}
+      \item Nested combinations: \texttt{a[i].x}, \texttt{m[addr].arr[j]}
+    \end{itemize}
+
+  \item \emph{Value specification syntax.}
+    \begin{itemize}
+      \item Integer intervals: \texttt{[100,200]} (normalized to declared bit width: \texttt{uint8} $\rightarrow$ \texttt{[0,255]}, \texttt{int256} $\rightarrow$ \texttt{[$-2^{255}$,$2^{255}$-1]})
+      \item Address intervals: \texttt{[0x0,0xFFFF...FFFF]} (160-bit unsigned, clamped to valid range)
+      \item Boolean intervals: \texttt{[0,1]} representing $\{\mathsf{true},\mathsf{false}\}$, or explicit \texttt{true}/\texttt{false}
+      \item Symbolic values: \texttt{TOP} or omitted (defaults to $\top$, representing all possible values)
+    \end{itemize}
+
+  \item \emph{Block structure and examples.}
 \begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
+// @Debugging BEGIN
 // @StateVar balances[msg.sender] = [100,200]
 // @LocalVar amount = [50,150]
+// @StateVar totalSupply = [1000,1000]
+// @Debugging END
 \end{lstlisting}
-  \emph{Selected entry:} \texttt{debugUnit}.
-  \emph{Internal match:} \texttt{debugStateVar} / \texttt{debugLocalVar}.
-  \item \emph{Usage.} The parsed annotations are consumed by the analysis pipeline to overlay the initial abstract environment and re-interpret the function on the pre-built CFG without recompilation or deployment.
+    Each directive occupies one line. Multiple directives are processed sequentially, building up the initial abstract environment before function reinterpretation begins.
+
+  \item \emph{Selected entry:} \texttt{debugUnit}.
+
+  \item \emph{Internal match:} \texttt{debugStateVar} / \texttt{debugLocalVar}.
+
+  \item \emph{Error handling.}
+    \begin{itemize}
+      \item Type mismatches: Rejected with diagnostic (e.g., assigning string interval to \texttt{uint256})
+      \item Undefined variables: Reported as parse errors referencing the annotation line
+      \item Out-of-bounds intervals: Clamped to type's valid range with warning (e.g., \texttt{uint8} interval \texttt{[0,300]} $\rightarrow$ \texttt{[0,255]})
+      \item Invalid L-values: Rejected if base container type does not support the access pattern
+    \end{itemize}
+
+  \item \emph{Integration with analysis pipeline.}
+    The parsed annotations are consumed by the Snapshot Manager (§3.4.3) to overlay the initial abstract environment. The Abstract Interpreter (§3.5) then re-executes the function on the pre-built CFG without recompilation or deployment, producing line-level interval results under the specified initial conditions.
 \end{itemize}
 
     \subsection{Dynamic CFG Construction}
@@ -944,25 +1040,41 @@ affected region after splicing to update abstract environments.
 
 \subsubsection{Statement-Local, Incremental Construction}
 
-We introduce the node kinds and then summarize how each major statement is translated into a small
-CFG fragment and spliced locally.
+We introduce the node kinds that make up the CFG, then show how each major statement is translated into a small CFG fragment and spliced locally. Every edit operates at an \textsc{insertion site}—the block immediately preceding the new fragment—without restructuring the rest of the graph.
 
-\paragraph{Node kinds.}
+\noindent\textbf{Node kinds.}
 \begin{itemize}
-  \item \textsc{basic node}: holds exactly one statement (e.g., a variable declaration, an assignment, or a function call).
-  \item \textsc{condition node}: represents branching constructs such as \texttt{if}, \texttt{else if}, \texttt{while}, \texttt{require}/\texttt{assert}, and \texttt{try}.
-  \item \textsc{return node}: a statement node whose outgoing edge is immediately rewired to the function’s unique \textsc{return exit}.
-  \item \textsc{error node}: the function’s unique \textsc{error exit} (targets the exceptional path).
-  \item \textsc{fixpoint evaluation node} (\(\phi\)): the loop join used for widening and narrowing.
-  \item \textsc{loop exit node}: the false branch that leaves a loop.
+  \item \textsc{basic node}: Holds exactly one statement (e.g., a variable declaration, an assignment, or a function call).
+  \item \textsc{condition node}: Represents branching constructs such as \texttt{if}, \texttt{else if}, \texttt{while}, \texttt{require}/\texttt{assert}, and \texttt{try}.
+  \item \textsc{return node}: A statement node whose outgoing edge is immediately rewired to the function's unique \textsc{return exit}.
+  \item \textsc{error node}: The function's unique \textsc{error exit} (targets the exceptional path).
+  \item \textsc{fixpoint evaluation node} (\(\phi\)): The loop join used for widening and narrowing.
+  \item \textsc{loop exit node}: The false branch that leaves a loop.
 \end{itemize}
-Every edit operates at an \textsc{insertion site}—the block immediately preceding the new
-fragment—without restructuring the rest of the graph.
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=0.42\linewidth,trim=6pt 6pt 6pt 6pt,clip]{new-simple-statement}
-\caption{new simple statement}
+\begin{tikzpicture}[
+  node distance=1cm,
+  block/.style={rectangle, draw, thick, minimum width=2.5cm, minimum height=0.8cm, align=center, font=\footnotesize},
+  dots/.style={circle, draw=none, minimum size=0.3cm}
+]
+  \node[block] (current) {Current Node};
+  \node[block, below=of current, fill=green!15] (new) {New Statement\\Node};
+  \node[dots, below=of new] (succ) {...};
+
+  \draw[->, thick] (current) -- node[right] {splice} (new);
+  \draw[->, thick] (new) -- node[right] {reconnect} (succ);
+
+  % Before state (left side)
+  \node[block, left=3cm of current] (before_cur) {Current Node};
+  \node[dots, below=of before_cur] (before_succ) {...};
+  \draw[->, thick] (before_cur) -- (before_succ);
+
+  \node[above=0.3cm of before_cur, font=\footnotesize\bfseries] {Before};
+  \node[above=0.3cm of current, font=\footnotesize\bfseries] {After};
+\end{tikzpicture}
+\caption{Simple statement insertion. The builder creates one node and splices it between the current node and the original successors}
 \label{fig:new-simple-statement}
 \end{figure}
 
@@ -975,8 +1087,28 @@ splitting multi‑statement blocks.
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=0.42\linewidth,trim=6pt 6pt 6pt 6pt,clip]{new-if}
-\caption{new if}
+\begin{tikzpicture}[
+  node distance=1.2cm and 1.5cm,
+  block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
+  cond/.style={diamond, draw, thick, aspect=2, minimum width=1.5cm, align=center, font=\footnotesize},
+  join/.style={rectangle, draw, thick, fill=yellow!20, minimum width=2cm, minimum height=0.6cm, align=center, font=\footnotesize},
+  dots/.style={circle, draw=none, minimum size=0.3cm}
+]
+  \node[block] (current) {Current Node};
+  \node[cond, below=of current, fill=green!15] (cond) {guard};
+  \node[block, below left=of cond, fill=green!15] (true) {True\\Node};
+  \node[block, below right=of cond, fill=green!15] (false) {False\\Node};
+  \node[join, below=1.5cm of cond, fill=green!15] (join) {If Join};
+  \node[dots, below=of join] (succ) {...};
+
+  \draw[->, thick] (current) -- (cond);
+  \draw[->, thick] (cond) -| node[above left, pos=0.3] {T} (true);
+  \draw[->, thick] (cond) -| node[above right, pos=0.3] {F} (false);
+  \draw[->, thick] (true) |- (join);
+  \draw[->, thick] (false) |- (join);
+  \draw[->, thick] (join) -- (succ);
+\end{tikzpicture}
+\caption{If statement insertion. The builder creates a \textsc{condition node}, two nodes for true/false arms, and an \textsc{if join}}
 \label{fig:new-if}
 \end{figure}
 
@@ -988,8 +1120,39 @@ original successors. Environments on the two edges are refined by the truth valu
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=\linewidth]{new-else-if}
-\caption{new else if}
+\begin{tikzpicture}[
+  node distance=1.2cm and 2cm,
+  block/.style={rectangle, draw, thick, minimum width=1.8cm, minimum height=0.7cm, align=center, font=\footnotesize},
+  cond/.style={diamond, draw, thick, aspect=2, minimum width=1.3cm, align=center, font=\footnotesize},
+  join/.style={rectangle, draw, thick, fill=yellow!20, minimum width=1.8cm, minimum height=0.6cm, align=center, font=\footnotesize},
+  dots/.style={circle, draw=none, minimum size=0.3cm}
+]
+  \node[block] (current) {Current Node};
+  \node[cond, below=1cm of current] (if_cond) {if guard};
+  \node[block, below left=1.2cm and 2.2cm of if_cond] (if_true) {If True\\Node};
+  \node[dots, below=0.6cm of if_true] (if_dots) {...};
+
+  % else-if branch (highlighted)
+  \node[cond, below right=1.2cm and 2.2cm of if_cond, fill=green!15] (elif_cond) {else-if\\guard};
+  \node[block, below left=1cm and 1.5cm of elif_cond, fill=green!15] (elif_true) {Else-If\\True Node};
+  \node[block, below right=1cm and 1.5cm of elif_cond, fill=green!15] (elif_false) {Else-If\\False Node};
+
+  \node[join, below=2.5cm of elif_cond, fill=green!15] (elif_join) {Else-If Join};
+  \node[join, below=4.5cm of if_cond] (if_join) {If Join};
+  \node[dots, below=0.6cm of if_join] (succ) {...};
+
+  \draw[->, thick] (current) -- (if_cond);
+  \draw[->, thick] (if_cond) -- ++(-2.2,-0.8) -- node[above left, pos=0.1] {T} (if_true);
+  \draw[->, thick] (if_cond) -- ++(2.2,-0.8) -- node[above right, pos=0.1] {F} (elif_cond);
+  \draw[->, thick] (elif_cond) -| node[above left, pos=0.25] {T} (elif_true);
+  \draw[->, thick] (elif_cond) -| node[above right, pos=0.25] {F} (elif_false);
+  \draw[->, thick] (if_dots) -- ++(0,-1.5) -| (if_join);
+  \draw[->, thick] (elif_true) |- (elif_join);
+  \draw[->, thick] (elif_false) |- (elif_join);
+  \draw[->, thick] (elif_join) |- (if_join);
+  \draw[->, thick] (if_join) -- (succ);
+\end{tikzpicture}
+\caption{Else-if statement insertion. The builder replaces the false arm with a new \textsc{condition node}, two nodes, and an \textsc{else-if join}}
 \label{fig:new-else-if}
 \end{figure}
 
@@ -1001,8 +1164,32 @@ shape remains a single diamond toward the if join.
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=0.42\linewidth,trim=6pt 6pt 6pt 6pt,clip]{new-else}
-\caption{new else}
+\begin{tikzpicture}[
+  node distance=1.2cm and 2cm,
+  block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
+  cond/.style={diamond, draw, thick, aspect=2, minimum width=1.5cm, align=center, font=\footnotesize},
+  join/.style={rectangle, draw, thick, fill=yellow!20, minimum width=2cm, minimum height=0.6cm, align=center, font=\footnotesize},
+  dots/.style={circle, draw=none, minimum size=0.3cm}
+]
+  \node[block] (current) {Current Node};
+  \node[cond, below=1cm of current] (cond) {guard};
+  \node[block, below left=1.2cm and 2cm of cond] (true) {True\\Node};
+  \node[dots, below=0.6cm of true] (true_dots) {...};
+  \node[block, below right=1.2cm and 2cm of cond, fill=green!15] (else) {Else\\Node};
+  \node[dots, below=0.6cm of else] (else_dots) {...};
+  \node[join, below=3.5cm of cond] (join) {If Join};
+  \node[dots, below=0.6cm of join] (succ) {...};
+
+  \draw[->, thick] (current) -- (cond);
+  \draw[->, thick] (cond) -| node[above left, pos=0.3] {T} (true);
+  \draw[->, thick] (cond) -| node[above right, pos=0.3] {F} (else);
+  \draw[->, thick] (true) -- (true_dots);
+  \draw[->, thick] (else) -- (else_dots);
+  \draw[->, thick] (true_dots) -- ++(0,-0.5) -| (join);
+  \draw[->, thick] (else_dots) -- ++(0,-0.5) -| (join);
+  \draw[->, thick] (join) -- (succ);
+\end{tikzpicture}
+\caption{Else statement insertion. The builder attaches a node to the false branch of the corresponding \texttt{if}/\texttt{else if}, connecting to the \textsc{if join}}
 \label{fig:new-else}
 \end{figure}
 
@@ -1015,8 +1202,29 @@ matching.
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=0.62\linewidth,trim=6pt 6pt 6pt 6pt,clip]{new-while}
-\caption{new while}
+\begin{tikzpicture}[
+  node distance=1cm and 2.2cm,
+  block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
+  cond/.style={diamond, draw, thick, aspect=2, minimum width=1.5cm, align=center, font=\footnotesize},
+  phi/.style={circle, draw, thick, fill=blue!15, minimum size=1cm, align=center, font=\footnotesize},
+  dots/.style={circle, draw=none, minimum size=0.3cm}
+]
+  \node[block] (current) {Current Node};
+  \node[phi, below=1cm of current, fill=green!15] (phi) {$\phi$};
+  \node[cond, below=1cm of phi, fill=green!15] (cond) {guard};
+  \node[block, below left=1.2cm and 2.2cm of cond, fill=green!15] (body) {Body\\Entry Node};
+  \node[dots, below=0.6cm of body] (body_dots) {...};
+  \node[block, below right=1.2cm and 2.2cm of cond, fill=green!15] (exit) {Loop\\Exit Node};
+  \node[dots, below=0.6cm of exit] (succ) {...};
+
+  \draw[->, thick] (current) -- (phi);
+  \draw[->, thick] (phi) -- (cond);
+  \draw[->, thick] (cond) -| node[above left, pos=0.3] {T} (body);
+  \draw[->, thick] (cond) -| node[above right, pos=0.3] {F} (exit);
+  \draw[->, thick, dashed] (body_dots) -- ++(-1.5,0) |- node[left, pos=0.85] {back edge} (phi);
+  \draw[->, thick] (exit) -- (succ);
+\end{tikzpicture}
+\caption{While loop insertion. The builder creates a \textsc{fixpoint evaluation node} $\phi$, a \textsc{condition node}, a loop body node, and a \textsc{loop exit node}}
 \label{fig:new-while}
 \end{figure}
 
@@ -1029,83 +1237,196 @@ condition(false) \(\rightarrow\) loop exit; the loop exit reconnects to the orig
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=0.42\linewidth,trim=6pt 6pt 6pt 6pt,clip]{new-break}
-\caption{new break}
+\begin{tikzpicture}[
+  node distance=1cm and 2.5cm,
+  block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
+  cond/.style={diamond, draw, thick, aspect=2, minimum width=1.3cm, align=center, font=\footnotesize},
+  phi/.style={circle, draw, thick, fill=blue!15, minimum size=0.8cm, align=center, font=\footnotesize},
+  dots/.style={circle, draw=none, minimum size=0.3cm}
+]
+  \node[phi] (phi) {$\phi$};
+  \node[cond, below=0.8cm of phi] (cond) {guard};
+  \node[block, below left=1cm and 2cm of cond] (body) {Body Node};
+  \node[dots, below=0.5cm of body] (body_dots) {...};
+  \node[block, below=0.5cm of body_dots, fill=green!15] (break) {\texttt{break}};
+  \node[block, below right=1cm and 2cm of cond] (exit) {Loop\\Exit Node};
+  \node[dots, below=0.5cm of exit] (succ) {...};
+
+  \draw[->, thick] (phi) -- (cond);
+  \draw[->, thick] (cond) -| node[above left, pos=0.2] {T} (body);
+  \draw[->, thick] (cond) -| node[above right, pos=0.2] {F} (exit);
+  \draw[->, thick] (body) -- (body_dots);
+  \draw[->, thick] (body_dots) -- (break);
+  \draw[->, thick, dashed] (body_dots) -- ++(-1.2,0) |- node[left, pos=0.8] {back} (phi);
+  \draw[->, thick] (break) -| node[above right, pos=0.6] {redirect} (exit);
+  \draw[->, thick] (exit) -- (succ);
+\end{tikzpicture}
+\caption{Break statement insertion. The \texttt{break} node's outgoing edge is redirected to the \textsc{loop exit node}}
 \label{fig:new-break}
 \end{figure}
 
 Figure~\ref{fig:new-break} shows a \texttt{break}. The statement becomes a \textsc{basic node} whose
-outgoing edge is redirected to the \textsc{loop exit node}. The loop exit’s environment is
+outgoing edge is redirected to the \textsc{loop exit node}. The loop exit's environment is
 conservatively joined with the environment at the break site.
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=0.42\linewidth,trim=6pt 6pt 6pt 6pt,clip]{new-continue}
-\caption{new continue}
+\begin{tikzpicture}[
+  node distance=1cm and 2.5cm,
+  block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
+  cond/.style={diamond, draw, thick, aspect=2, minimum width=1.3cm, align=center, font=\footnotesize},
+  phi/.style={circle, draw, thick, fill=blue!15, minimum size=0.8cm, align=center, font=\footnotesize},
+  dots/.style={circle, draw=none, minimum size=0.3cm}
+]
+  \node[phi] (phi) {$\phi$};
+  \node[cond, below=0.8cm of phi] (cond) {guard};
+  \node[block, below left=1cm and 2cm of cond] (body) {Body Node};
+  \node[dots, below=0.5cm of body] (body_dots) {...};
+  \node[block, below=0.5cm of body_dots, fill=green!15] (continue) {\texttt{continue}};
+  \node[dots, below=0.5cm of continue, gray] (unreachable) {...};
+  \node[block, below right=1cm and 2cm of cond] (exit) {Loop\\Exit Node};
+
+  \draw[->, thick] (phi) -- (cond);
+  \draw[->, thick] (cond) -| node[above left, pos=0.2] {T} (body);
+  \draw[->, thick] (cond) -| node[above right, pos=0.2] {F} (exit);
+  \draw[->, thick] (body) -- (body_dots);
+  \draw[->, thick] (body_dots) -- (continue);
+  \draw[->, thick, dashed, gray] (continue) -- (unreachable);
+  \draw[->, thick, dashed] (continue) -| ++(2,0) |- node[right, pos=0.3] {redirect} (phi);
+\end{tikzpicture}
+\caption{Continue statement insertion. The \texttt{continue} node's outgoing edge is redirected to the loop's \textsc{fixpoint evaluation node} $\phi$}
 \label{fig:new-continue}
 \end{figure}
 
 Figure~\ref{fig:new-continue} shows a \texttt{continue}. The statement becomes a \textsc{basic node}
-whose outgoing edge is redirected to the loop’s \textsc{fixpoint evaluation node} \(\phi\).
-Operationally, this keeps the back‑edge shape and joins the current environment into the loop’s join
+whose outgoing edge is redirected to the loop's \textsc{fixpoint evaluation node} \(\phi\).
+Operationally, this keeps the back‑edge shape and joins the current environment into the loop's join
 state.
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=0.42\linewidth,trim=6pt 6pt 6pt 6pt,clip]{new-return}
-\caption{new return}
+\begin{tikzpicture}[
+  node distance=1cm,
+  block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
+  exit/.style={rectangle, draw, thick, rounded corners, fill=red!15, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
+  dots/.style={circle, draw=none, minimum size=0.3cm}
+]
+  \node[block] (current) {Current Node};
+  \node[block, below=of current, fill=green!15] (return) {\texttt{return}\\Node};
+  \node[exit, below right=0.5cm and 2cm of return] (exit) {RETURN\\EXIT};
+  \node[dots, below left=0.5cm and 0.5cm of return] (detached) {...};
+
+  \draw[->, thick] (current) -- (return);
+  \draw[->, thick, bend left=15] (return) to node[above right] {rewire} (exit);
+  \draw[->, thick, dashed, gray] (return) -- node[left, gray] {detached} (detached);
+\end{tikzpicture}
+\caption{Return statement insertion. The \texttt{return} node is rewired to the function's unique \textsc{return exit}}
 \label{fig:new-return}
 \end{figure}
 
 Figure~\ref{fig:new-return} shows a \texttt{return}. The statement becomes a \textsc{return node}
-and is immediately rewired to the function’s unique \textsc{return exit}; the return value is
+and is immediately rewired to the function's unique \textsc{return exit}; the return value is
 recorded there and the original successors of the current node are detached.
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=0.42\linewidth,trim=6pt 6pt 6pt 6pt,clip]{new-require}
-\caption{new require}
+\begin{tikzpicture}[
+  node distance=1cm and 2cm,
+  block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
+  cond/.style={diamond, draw, thick, aspect=2, minimum width=1.5cm, align=center, font=\footnotesize},
+  exit/.style={rectangle, draw, thick, rounded corners, fill=red!15, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
+  dots/.style={circle, draw=none, minimum size=0.3cm}
+]
+  \node[block] (current) {Current Node};
+  \node[cond, below=of current, fill=green!15] (cond) {predicate};
+  \node[block, below left=of cond, fill=green!15] (true) {True\\Node};
+  \node[exit, below right=of cond] (error) {ERROR\\EXIT};
+  \node[dots, below=of true] (succ) {...};
+
+  \draw[->, thick] (current) -- (cond);
+  \draw[->, thick] (cond) -| node[above left, pos=0.3] {T} (true);
+  \draw[->, thick] (cond) -| node[above right, pos=0.3] {F} (error);
+  \draw[->, thick] (true) -- (succ);
+\end{tikzpicture}
+\caption{Require/assert statement insertion. The builder creates a \textsc{condition node} with true edge to a node and false edge to the \textsc{error exit}}
 \label{fig:new-require}
 \end{figure}
 
 Figure~\ref{fig:new-require} shows \texttt{require}/\texttt{assert}. The builder inserts a
 \textsc{condition node} for the predicate, makes the true edge point to a \textsc{basic node}, and
-connects the false edge directly to the function’s \textsc{error exit}. The true basic then
+connects the false edge directly to the function's \textsc{error exit}. The true basic then
 reconnects to the original successors, forming a one‑sided diamond.
 
-\paragraph{Other constructs.}
-\texttt{for} loops are handled as a \(\phi\) node and condition like \texttt{while}, optionally
-preceded by an initialization node and followed by an increment node on the back edge. \texttt{do\{\}
-\ while} is built in two steps: a body pair is created and closed; later the trailing \texttt{while}
-line attaches a \(\phi\), condition, and loop exit and wires the back edge to the existing body.
-\texttt{try\{ \}\ catch\{ \}} is represented by a \textsc{condition node} tagged as \texttt{try}
-whose true edge goes to the success block and whose false edge is replaced by a catch entry/end pair
-when a matching \texttt{catch} appears.
+\noindent\textbf{Other constructs.} Similar patterns apply to the remaining control-flow constructs:
+\begin{itemize}
+  \item \texttt{for} loops: Handled as a \(\phi\) node and condition like \texttt{while}, optionally preceded by an initialization node and followed by an increment node on the back edge.
+  \item \texttt{do\{\} while}: Built in two steps. First, a body pair is created and closed. Later, the trailing \texttt{while} line attaches a \(\phi\), condition, and loop exit, and wires the back edge to the existing body.
+  \item \texttt{try\{\} catch\{\}}: Represented by a \textsc{condition node} tagged as \texttt{try} whose true edge goes to the success block and whose false edge is replaced by a catch entry/end pair when a matching \texttt{catch} appears.
+\end{itemize}
 
 
         \subsubsection{Line-Aware Successor-First Insertion-Site Selection}
-\paragraph{Line–to–Node Index}
+
 We keep a lightweight line–to–node index to make insertion local. Each newly created node is
 attached to one or two source lines depending on whether the construct is single‑line (terminated by
-“;”) or brace‑delimited.
+";") or brace‑delimited. This index is used only to locate the insertion site; the algorithm below does not mutate the graph.
 
-Single‑line statements (e.g., variable declaration, assignment, function call, require/assert): we
-index the newly created basic or condition node at the statement’s source line.
-
-\texttt{if} / \texttt{else if}: we index the condition node at the guard’s line and the join node at
-the closing line of the selection.
-
-\texttt{else}: we index the basic node of the else arm at the else line and reuse the same join line
-as the preceding guard.
-
-\texttt{while}: we index the condition node at the guard line and the loop‑exit node at the closing
-line of the loop body.
-
-This index is used only to locate the insertion site; the algorithm below does not mutate the graph.
+\noindent\textbf{Line-to-node index mapping.}
+We attach each CFG node to source lines based on the statement type:
+\begin{itemize}
+  \item \textbf{Sequential statements} (variable declaration, assignment, function call, unary operations): Index the statement block at its source line.
+  \item \textbf{Conditional branches} (\texttt{if}/\texttt{else if}): Index the condition node at the guard line and the join node at the closing brace line.
+  \item \textbf{Else branches}: Index the else block at the \texttt{else} line and reuse the preceding guard's join node.
+  \item \textbf{Loops} (\texttt{while}/\texttt{for}): Index the condition node at the guard line and the loop-exit node at the closing brace line.
+  \item \textbf{Loop control} (\texttt{continue}/\texttt{break}): Index the statement block at its source line.
+  \item \textbf{Terminating statements} (\texttt{return}/\texttt{revert}): \texttt{return} creates a new block; \texttt{revert} uses the current block directly.
+  \item \textbf{Assertions} (\texttt{require}/\texttt{assert}): Index the condition node at the statement line.
+  \item \textbf{Exception handling} (\texttt{try}/\texttt{catch}): Index the try condition at the \texttt{try} line and catch entry at the \texttt{catch} line.
+\end{itemize}
 
 
 \begin{algorithm}[!t]
-\caption{Line-Aware Successor-First Insertion-Site Selection (\textsc{GetInsertionSite})}
+\caption{Branch-Context Insertion-Site Selection (\textsc{GetBranchContext})}
+\label{alg:get-branch-context}
+\begin{algorithmic}[1]
+\Require CFG $G=(V,E)$, edit context $\mathit{ctx}\in\{\texttt{else\_if},\texttt{else},\texttt{catch}\}$, current line $L$
+\Ensure Condition node $c\in V$ (and optionally outer join $j\in V$ for \texttt{else\_if}/\texttt{else})
+\State $N \gets \textsc{NodesAtLine}(L)$ \Comment{all CFG nodes indexed at line $L$}
+\If{$N=\emptyset$} \State $N \gets \textsc{NodesAtPreviousLine}(L)$ \Comment{search backward if $L$ is empty} \EndIf
+\State $j_{\mathit{outer}} \gets \bot$
+\If{$\mathit{ctx}\in\{\texttt{else\_if},\texttt{else}\}$}
+  \For{$n\in N$}
+    \If{$\mathsf{isJoin}(n)$} \State $j_{\mathit{outer}} \gets n$ \textbf{ break} \Comment{outer join at current line} \EndIf
+  \EndFor
+\EndIf
+
+\State $\mathit{Queue} \gets N$; $\mathit{Visited} \gets \emptyset$ \Comment{BFS through predecessors}
+\While{$\mathit{Queue}\neq\emptyset$}
+  \State $n \gets \textsc{Dequeue}(\mathit{Queue})$
+  \If{$n\in\mathit{Visited}$} \textbf{continue} \EndIf
+  \State $\mathit{Visited} \gets \mathit{Visited}\cup\{n\}$
+
+  \If{$\mathsf{isCond}(n)$}
+    \State $\tau \gets \textsc{CondType}(n)$ \Comment{type: \texttt{if}, \texttt{else\_if}, \texttt{try}, etc.}
+    \If{$\mathit{ctx}\in\{\texttt{else\_if},\texttt{else}\}$ \textbf{and} $\tau\in\{\texttt{if},\texttt{else\_if}\}$}
+      \If{$j_{\mathit{outer}}=\bot$} \State $j_{\mathit{outer}} \gets \textsc{OuterJoinFromGraph}(n)$ \Comment{fallback} \EndIf
+      \State \Return $(n,\, j_{\mathit{outer}})$
+    \ElsIf{$\mathit{ctx}=\texttt{catch}$ \textbf{and} $\tau=\texttt{try}$}
+      \State \Return $n$
+    \EndIf
+  \EndIf
+
+  \For{$p\in\textsc{Predecessors}(n)$}
+    \If{$p\notin\mathit{Visited}$} \State $\textsc{Enqueue}(\mathit{Queue},p)$ \EndIf
+  \EndFor
+\EndWhile
+
+\State \textbf{error} ``No matching condition node found for context $\mathit{ctx}$''
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[!t]
+\caption{Successor-First Insertion-Site Selection (\textsc{GetInsertionSite})}
 \label{alg:get-insertion-site}
 \begin{algorithmic}[1]
 \Require CFG $G=(V,E)$, edit span ending at line $L$
@@ -1115,179 +1436,175 @@ This index is used only to locate the insertion site; the algorithm below does n
 \State $\ell \gets \textsc{LineOf}(s)$
 
 \If{$\mathsf{isLoopExit}(s)$} \Comment{closing a loop}
-  \State $c \gets \textsc{LoopHeaderForExit}(s)$ \Comment{the unique loop condition whose false-edge targets $s$}
-  \If{$c\neq\bot$} 
-     \State \Return $\textsc{BranchBlock}(c,\mathsf{true})$ \Comment{the loop body entry (true branch of $c$)}
+  \State $N_{\mathit{prev}} \gets \textsc{NodesAtPreviousLine}(L)$ \Comment{search backward from $L$ to find previous nodes}
+  \If{$N_{\mathit{prev}}\neq\emptyset$}
+    \State $c \gets \textsc{LastCondInNodes}(N_{\mathit{prev}})$ \Comment{check if previous line has a condition}
+    \If{$c\neq\bot$}
+       \State \Return $\textsc{BranchBlock}(c,\mathsf{true})$ \Comment{insert in TRUE branch (loop body)}
+    \Else
+       \State \Return $\textsc{Last}(N_{\mathit{prev}})$ \Comment{last node of previous line}
+    \EndIf
+  \Else
+    \State \Return $\textsc{FirstPredecessor}(s)$ \Comment{fallback}
   \EndIf
 
-\ElsIf{$\mathsf{isJoin}(s)$} \Comment{closing a selection or loop body}
-  \State $\mathit{Pred} \gets \textsc{Predecessors}(s)$
-  \If{$\exists p\in \mathit{Pred}: \mathsf{isJoin}(p)$}
-     \State \Return $\textsc{NearestByLine}(\{p\in \mathit{Pred}\mid\mathsf{isJoin}(p)\},\,\ell)$
+\ElsIf{$\mathsf{isJoin}(s)$} \Comment{closing a selection}
+  \State $N_{\mathit{prev}} \gets \textsc{NodesAtPreviousLine}(L)$
+  \If{$N_{\mathit{prev}}\neq\emptyset$}
+    \State $c \gets \textsc{LastCondInNodes}(N_{\mathit{prev}})$
+    \If{$c\neq\bot$}
+       \State \Return $\textsc{BranchBlock}(c,\mathsf{true})$ \Comment{default to TRUE branch for \texttt{if}}
+    \Else
+       \State \Return $\textsc{Last}(N_{\mathit{prev}})$
+    \EndIf
   \Else
-     \State $c \gets \textsc{GuardOnSameLineAs}(s)$ \Comment{last node indexed at $\ell$}
-     \If{$\neg\mathsf{isCond}(c)$} \State $c \gets \textsc{CondOfJoin}(s)$ \Comment{walk join $\leftarrow$ branch $\leftarrow$ cond} \EndIf
-     \If{$c\neq\bot$}
-        \State $t \gets \textsc{BranchHintFromContext}(\ell)$ \textbf{default} $\mathsf{true}$ \Comment{true for \texttt{if}/\texttt{else if}, false for \texttt{else}}
-        \State $b \gets \textsc{BranchBlock}(c,t)$
-        \If{$b\neq\bot$} \State \Return $b$ \EndIf
-     \EndIf
-     \State \Return $\textsc{NearestByLine}(\mathit{Pred},\,\ell)$
+    \State \Return $\textsc{FirstPredecessor}(s)$
   \EndIf
 
 \Else \Comment{basic successor}
   \State $\mathit{Pred} \gets \textsc{Predecessors}(s)$
   \If{$|\mathit{Pred}|=1$} \State \Return the unique element of $\mathit{Pred}$
-  \Else \State \Return $\textsc{NearestByLine}(\mathit{Pred},\,\ell)$ \Comment{never create a join here}
+  \Else \State \Return $\textsc{NearestByLine}(\mathit{Pred},\,L)$ \Comment{choose closest to current line $L$}
   \EndIf
 \EndIf
-
-\State \Return \textsf{ENTRY} \Comment{defensive fallback (should be unreachable)}
 \end{algorithmic}
 \end{algorithm}
 
-\paragraph{Overview.}
-The procedure takes the edit span ending at line \(L\) and returns the \textsc{insertion site}---the
-node immediately preceding the fragment to be spliced. It never mutates the graph. The key idea is
-\textsc{successor-first}: we first locate the earliest CFG node that appears after \(L\) in the
-source and then decide the most local predecessor that should dominate the new fragment.
+We dispatch insertion-site selection based on the edit context:
+\begin{itemize}
+  \item \textbf{Branch contexts} (\texttt{else}/\texttt{else if}/\texttt{catch}) use Algorithm~\ref{alg:get-branch-context} to find the preceding condition node by traversing predecessors.
+  \item \textbf{Regular statements} use Algorithm~\ref{alg:get-insertion-site}, which employs a \textsc{successor-first} strategy: locate the earliest CFG node after the edit span and determine the most local predecessor.
+\end{itemize}
+Both algorithms never mutate the graph and rely solely on the line--to--node index for efficient lookup.
 
-\paragraph{Locating the successor (lines 1--2).}
-\textsc{FirstNodeAfter}(\(L\)) scans lines strictly larger than \(L\) in the line--to--node index
-and returns the first node; if none is found, we use the function's unique \texttt{EXIT}. We also
-read its source line \(\ell\) for proximity decisions.
+\noindent\textbf{Algorithm~\ref{alg:get-branch-context}: Branch-Context Insertion.}
+For \texttt{else}/\texttt{else if}/\texttt{catch}, we must attach the new branch to a previously created condition node. The algorithm:
+\begin{itemize}
+  \item \textbf{Line 1--4:} Retrieves CFG nodes at the current line \(L\) (or searches backward if \(L\) is empty). For \texttt{else\_if}/\texttt{else}, it also identifies the outer join node at \(L\), if present.
+  \item \textbf{Line 9--24:} Performs BFS through CFG predecessors to find the matching condition node: for \texttt{else\_if}/\texttt{else}, it looks for a node of type \texttt{if} or \texttt{else\_if}; for \texttt{catch}, it looks for type \texttt{try}.
+  \item \textbf{Line 11--12:} When the matching condition is found for \texttt{else\_if}/\texttt{else}, the algorithm returns both the condition node and the outer join (if the outer join was not found at line \(L\), a fallback uses the graph structure).
+\end{itemize}
 
-\paragraph{Case 1 --- loop exit (lines 4--7).}
-If \(s\) is a loop--exit node, we jump to the header that owns that exit: \textsc{LoopHeaderForExit}
-(\(s\)) returns the unique loop condition whose false edge points to \(s\). The insertion site is
-the true branch of this header, i.e., the loop body entry, because newly added statements at this
-point belong to the body before the loop closes.
+\noindent\textbf{Algorithm~\ref{alg:get-insertion-site}: Successor-First Insertion.}
+For regular statements, we look ahead to determine the insertion site:
+\begin{itemize}
+  \item \textbf{Line 1--3:} \textsc{FirstNodeAfter}(\(L\)) scans lines strictly larger than \(L\) in the line--to--node index and returns the first node; if none is found, we default to \texttt{EXIT}.
+  \item \textbf{Line 5--14 (loop-exit):} If the successor \(s\) is a loop-exit node, we search backward from \(L\) to find the previous line's nodes. If the previous line contains a condition node (the loop header), we return its TRUE branch (the loop body entry); otherwise, we return the last node of the previous line.
+  \item \textbf{Line 16--23 (join):} If \(s\) is a join node (closing a selection), we apply the same backward search. If a condition node is found, we return its TRUE branch (default for \texttt{if} constructs); otherwise, return the last previous node.
+  \item \textbf{Line 25--28 (basic successor):} If \(s\) is a regular basic node, we return its unique predecessor, or choose the predecessor closest to line \(L\) if multiple exist.
+\end{itemize}
 
-\paragraph{Case 2 --- join (lines 9--21).}
-If \(s\) is a join, we prefer predecessors that are already joins to preserve nesting. Among those,
-\textsc{NearestByLine} picks the one whose source line is closest to \(\ell\). If no predecessor
-join exists, we try to recover the immediate guard. \textsc{GuardOnSameLineAs}(\(s\)) returns the
-last node indexed at \(\ell\); if it is not a condition, \textsc{CondOfJoin}(\(s\)) follows ``join
-\(\leftarrow\) branch \(\leftarrow\) cond'' to find the guard. \textsc{BranchHintFromContext}
-(\(\ell\)) decides whether we are closing the true or false arm: by default true for \texttt{if}
-/\texttt{else-if} and false for \texttt{else}. We then return that branch block if available. As a
-final choice inside this case, we return \textsc{NearestByLine} among all predecessors of \(s\).
-
-\paragraph{Case 3 --- basic successor (lines 23--27).}
-If \(s\) is a regular basic node, the insertion site is normally its unique predecessor. When
-multiple predecessors exist (rare in our skeleton because explicit joins are created earlier), we
-again choose the predecessor whose source line is closest to \(\ell\). We never synthesize a join
-here.
-
-\paragraph{Defensive fallback (line 29).}
-Although unreachable under well--formed skeletons, we return \texttt{ENTRY} as a safety net.
-
-\paragraph{Helper semantics.}
-\textsc{Predecessors}(\(s\)) is the predecessor set; \textsc{NearestByLine}(\(X,\ell\)) returns
-\(\arg\min_{x\in X} \lvert \textsc{LineOf}(x)-\ell \rvert\); \textsc{GuardOnSameLineAs}(\(s\))
-returns the last node attached to \(\ell=\textsc{LineOf}(s)\); \textsc{CondOfJoin}(\(s\)) walks two
-steps up from the join via the branch to the guard; \textsc{BranchBlock}(\(c,t\)) returns the
-successor of condition \(c\) along truth value \(t\); \textsc{BranchHintFromContext}(\(\ell\)) reads
-the edit context to decide whether the closed branch is true or false.
+\noindent\textbf{Helper functions.}
+\begin{itemize}
+  \item \textsc{NodesAtLine}(\(L\)) / \textsc{NodesAtPreviousLine}(\(L\)): Return all CFG nodes indexed at line \(L\) or the first non-empty line before \(L\).
+  \item \textsc{FirstNodeAfter}(\(L\)): Returns the first CFG node indexed at any line \(>L\).
+  \item \textsc{LastCondInNodes}(\(N\)): Scans node list \(N\) in reverse to find the last condition node.
+  \item \textsc{BranchBlock}(\(c,t\)): Returns the successor of condition \(c\) along the edge labeled with truth value \(t\).
+  \item \textsc{OuterJoinFromGraph}(\(c\)): Walks the graph from condition \(c\) through its TRUE branch to find the join node.
+  \item \textsc{NearestByLine}(\(X,\ell\)): Returns \(\arg\min_{x\in X} \lvert \textsc{LineOf}(x)-\ell \rvert\).
+  \item \textsc{Predecessors}(\(s\)), \textsc{FirstPredecessor}(\(s\)): Standard CFG predecessor queries.
+\end{itemize}
 
         
-        \subsubsection{Change-Driven Reinterpretation}
-\paragraph{Seed selection per statement.}
-The builder returns a \texttt{single} seed node per edit (never a sink). We use the following
-mapping:
-\begin{itemize}
-  \item \texttt{simple} (variable declaration, assignment, function call): the newly inserted basic node.
-  \item \texttt{if}: the outer join of the selection.
-  \item \texttt{else if}: the outer join of the enclosing guard (fallback to the local join if the outer join is not yet indexed).
-  \item \texttt{else}: the same outer join as the true arm.
-  \item \texttt{while}/\texttt{for}/\texttt{do\{\}\ while}: the loop exit node (the false branch).
-  \item \texttt{continue}: the loop exit node (its environment is conservatively joined with the site).
-  \item \texttt{break}: the loop exit node (likewise).
-  \item \texttt{return}: a single non-sink dominator that represents the original successors before rewiring to the return exit.\footnote{In the implementation, the builder may enqueue the original successors directly; conceptually this is equivalent to using one dominating seed.} 
-  \item \texttt{require}/\texttt{assert}: the true-branch successor along the normal path (if it would be \texttt{EXIT} only, reinterpretation is vacuous).
-\end{itemize}
+        \subsubsection{Abstract Interpretation for Incremental Analysis}
+
+Our system handles two types of edits during interactive debugging, each triggering a different analysis strategy. Debug annotation input follows a batch-and-flush pattern: annotations are accumulated and processed together, culminating in a full interpretation of the entire function CFG from \texttt{ENTRY} to \texttt{EXIT} (Algorithm~\ref{alg:interpret-full}). This ensures that all annotated inspection points receive freshly computed abstract states. In contrast, source code edits---such as inserting \texttt{require}, assignments, or control structures---are processed immediately: dynamic CFG construction (Algorithms~\ref{alg:get-branch-context} and~\ref{alg:get-insertion-site}) splices the new nodes into the graph, and change-driven reinterpretation (Algorithm~\ref{alg:reinterpret}) propagates updates only along affected paths, providing instant feedback without re-analyzing the entire function. Both strategies invoke the same loop fixpoint subroutine (Algorithm~\ref{alg:fixpoint}) when encountering loop headers.
 
 
 
 \begin{algorithm}[!htbp]
-\caption{Change-Driven Reinterpretation}
-\label{alg:reinterpret}
+\caption{Initial Function Interpretation (\textsc{InterpretFunctionCFG})}
+\label{alg:interpret-full}
 \begin{algorithmic}[1]
-\Require CFG $G=(V,E)$; a single seed node $s$ returned by the builder
-\Ensure Environments updated along forward-reachable paths from $s$
-\State $\textit{WL}\gets\langle\rangle$; \quad $\textit{inQ}\gets\emptyset$; \quad $\textit{Out}\gets$ snapshot map \Comment{initially current $\Env(\cdot)$}
-\State enqueue $s$ into $\textit{WL}$; add $s$ to $\textit{inQ}$ \Comment{builder guarantees $s$ is not a sink}
-\While{$\textit{WL}$ not empty} \Comment{worklist exploration}
-  \State $n \gets \textit{WL}.\textsf{pop}()$; \quad $\textit{inQ}\gets \textit{inQ}\setminus\{n\}$ \Comment{FIFO/LIFO is immaterial}
-  \State $\hat{\sigma}_{in}\gets\bot$ \Comment{accumulator for incoming flow}
-  \ForAll{$p\in\textsc{Predecessors}(n)$} \Comment{edge-level pruning for each incoming edge}
-     \If{$\mathsf{isCond}(p)\ \land\ \mathsf{hasTruthLabel}(p{\to}n)$} \Comment{guarded predecessor}
-        \State $t \gets \textsf{edgeLabel}(p{\to}n)$ \Comment{True/False}
-        \State $\sigma \gets \textsc{Prune}(\Env(p),p.\textsf{cond},t)$ \Comment{refine by guard and truth value}
-        \If{$\textsc{Feasible}(\sigma,p.\textsf{cond},t)$} \State $\hat{\sigma}_{in}\gets \hat{\sigma}_{in}\ \sqcup\ \sigma$ \EndIf \Comment{drop infeasible edges}
-     \Else
-        \State $\hat{\sigma}_{in}\gets \hat{\sigma}_{in}\ \sqcup\ \Env(p)$ \Comment{unconditional predecessor}
+\Require CFG $G=(V,E)$ with designated \texttt{ENTRY} node
+\Ensure All nodes have computed abstract environments
+\State $\textit{WL}\gets\langle\texttt{ENTRY}\rangle$; \quad $\textit{inQ}\gets\{\texttt{ENTRY}\}$; \quad $\textit{Out}\gets$ snapshot map
+
+\While{$\textit{WL}\neq\langle\rangle$}
+  \State $n \gets \textit{WL}.\textsf{pop}()$; \quad $\textit{inQ}\gets \textit{inQ}\setminus\{n\}$
+  \State $\hat{\sigma}_{in}\gets\bot$ \Comment{compute incoming environment from all predecessors}
+  \ForAll{$p\in\textsc{Predecessors}(n)$}
+     \State $\sigma_p \gets \Env(p)$
+     \If{$\mathsf{isCond}(p)\ \land\ \mathsf{hasTruthLabel}(p{\to}n)$}
+        \State $t \gets \textsf{edgeLabel}(p{\to}n)$
+        \State $\sigma_p \gets \textsc{Refine}(\sigma_p,p.\textsf{cond},t)$
+        \If{$\neg\textsc{Feasible}(\sigma_p,p.\textsf{cond},t)$} \State $\sigma_p \gets \bot$ \EndIf
      \EndIf
+     \State $\hat{\sigma}_{in}\gets \hat{\sigma}_{in}\ \sqcup\ \sigma_p$
   \EndFor
-  \If{$\mathsf{isLoopHeader}(n)$} \Comment{handle loops locally by a fresh fixpoint}
-     \State $F \gets \{\,f\in\Succ(n)\mid \mathsf{edgeLabel}(n{\to}f){=}\mathsf{false}\,\}$ \Comment{false (exit) successors}
-     \If{$|F|{=}1\ \land\ \mathsf{isSink}(\text{the sole }f)$} \Comment{trivial fall-through to a sink}
-        \ForAll{$f\in F$} \If{$f\notin \textit{inQ}$} \State enqueue $f$; add $f$ to $\textit{inQ}$ \EndIf \EndFor
-     \Else
-        \State $\textsc{Fixpoint}(n)$ \Comment{compute loop exit env; widening/narrowing at the header's join}
-        \ForAll{$u\in \Succ(\textsc{LoopExit}(n))$} \Comment{resume from the loop exit's successors}
-          \If{$u\notin \textit{inQ}$} \State enqueue $u$; add $u$ to $\textit{inQ}$ \EndIf
-        \EndFor
-     \EndIf
-     \State \textbf{continue} \Comment{skip the standard transfer at the header}
+
+  \If{$\mathsf{isLoopHeader}(n)$}
+     \State $\textit{exitNode} \gets \textsc{Fixpoint}(n)$ \Comment{Algorithm~\ref{alg:fixpoint}}
+     \ForAll{$u\in \Succ(\textit{exitNode})$}
+       \If{$\neg\mathsf{isSink}(u)\ \land\ u\notin \textit{inQ}$} \State $\textit{WL}.\textsf{enqueue}(u)$; \quad $\textit{inQ}\gets\textit{inQ}\cup\{u\}$ \EndIf
+     \EndFor
+     \State \textbf{continue}
   \EndIf
-  \State $\hat{\sigma}_{out}\gets \textsc{Transfer}(n,\hat{\sigma}_{in})$ \Comment{identity on joins/conds; apply statements otherwise}
-  \If{$\hat{\sigma}_{out}\neq \textit{Out}[n]$} \Comment{change guard: propagate only when output changed}
-     \State $\Env(n)\gets \hat{\sigma}_{out}$; \quad $\textit{Out}[n]\gets \hat{\sigma}_{out}$ \Comment{commit the new snapshot}
+
+  \State $\hat{\sigma}_{out}\gets \textsc{Transfer}(n,\hat{\sigma}_{in})$
+  \If{$\hat{\sigma}_{out}\neq \textit{Out}[n]$}
+     \State $\Env(n)\gets \hat{\sigma}_{out}$; \quad $\textit{Out}[n]\gets \hat{\sigma}_{out}$
      \ForAll{$u\in \Succ(n)$}
-        \If{$\neg\mathsf{isSink}(u)\ \land\ u\notin \textit{inQ}$} \State enqueue $u$; add $u$ to $\textit{inQ}$ \EndIf \Comment{do not enqueue sinks}
+        \If{$\neg\mathsf{isSink}(u)\ \land\ u\notin \textit{inQ}$} \State $\textit{WL}.\textsf{enqueue}(u)$; \quad $\textit{inQ}\gets\textit{inQ}\cup\{u\}$ \EndIf
      \EndFor
   \EndIf
 \EndWhile
 \end{algorithmic}
 \end{algorithm}
 
+\begin{algorithm}[!htbp]
+\caption{Change-Driven Reinterpretation (\textsc{ReinterpretFrom})}
+\label{alg:reinterpret}
+\begin{algorithmic}[1]
+\Require CFG $G=(V,E)$; seed set $S$ returned by the builder
+\Ensure Environments updated along forward-reachable paths from $S$
+\State $\textit{WL}\gets\langle\rangle$; \quad $\textit{inQ}\gets\emptyset$; \quad $\textit{Out}\gets$ snapshot map
+\ForAll{$s\in S$} \Comment{filter and enqueue all non-sink seeds}
+  \If{$\neg\mathsf{isSink}(s)\ \land\ s\notin \textit{inQ}$} \State $\textit{WL}.\textsf{enqueue}(s)$; \quad $\textit{inQ}\gets\textit{inQ}\cup\{s\}$ \EndIf
+\EndFor
 
-\paragraph{Overview.}
-Given a single seed node \(s\) provided by the builder, the procedure propagates abstract
-environments forward only along paths that can be affected by the change. It uses a worklist, an
-in-queue membership set, and a per-node snapshot map \(\textit{Out}\) that stores the last observed
-output environment of each node during this reinterpretation.
+\While{$\textit{WL}\neq\langle\rangle$}
+  \State $n \gets \textit{WL}.\textsf{pop}()$; \quad $\textit{inQ}\gets \textit{inQ}\setminus\{n\}$
+  \State $\hat{\sigma}_{in}\gets\bot$ \Comment{compute incoming environment from all predecessors}
+  \ForAll{$p\in\textsc{Predecessors}(n)$}
+     \State $\sigma_p \gets \Env(p)$
+     \If{$\mathsf{isCond}(p)\ \land\ \mathsf{hasTruthLabel}(p{\to}n)$} \Comment{refine by condition}
+        \State $t \gets \textsf{edgeLabel}(p{\to}n)$
+        \State $\sigma_p \gets \textsc{Refine}(\sigma_p,p.\textsf{cond},t)$ \Comment{apply path constraint}
+        \If{$\neg\textsc{Feasible}(\sigma_p,p.\textsf{cond},t)$} \State $\sigma_p \gets \bot$ \EndIf \Comment{prune infeasible}
+     \EndIf
+     \State $\hat{\sigma}_{in}\gets \hat{\sigma}_{in}\ \sqcup\ \sigma_p$
+  \EndFor
 
-\paragraph{Edge-level pruning.}
-For each predecessor \(p\) of the current node \(n\), we compute the incoming contribution as
-follows. If \(p\) is a condition and the edge \(p{\to}n\) carries a truth label, we refine \(\Env(p)
-\) with respect to the guard and the edge's truth value, and include it only if the branch is
-feasible. Otherwise, we join \(\Env(p)\) directly. The result \(\hat{\sigma}_{in}\) is the join of
-all feasible incoming flows.
+  \If{$\mathsf{isLoopHeader}(n)$} \Comment{handle loop by local fixpoint}
+     \State $\textit{exitNode} \gets \textsc{Fixpoint}(n)$ \Comment{compute fixpoint; returns loop-exit node}
+     \ForAll{$u\in \Succ(\textit{exitNode})$}
+       \If{$\neg\mathsf{isSink}(u)\ \land\ u\notin \textit{inQ}$} \State $\textit{WL}.\textsf{enqueue}(u)$; \quad $\textit{inQ}\gets\textit{inQ}\cup\{u\}$ \EndIf
+     \EndFor
+     \State \textbf{continue} \Comment{skip standard transfer for loop header}
+  \EndIf
 
-\paragraph{Loop headers.}
-When \(n\) is a loop header, we distinguish the trivial case where its false successor immediately
-sinks into the function (single false edge to \texttt{EXIT}/\texttt{RETURN}/\texttt{ERROR}) from the
-general case. In the general case we invoke \textsc{Fixpoint}, which computes the fixpoint over the
-loop and updates the environment at the loop exit. We then continue propagation from the successors
-of that exit. This design ensures that changes inside the body trigger a fresh fixpoint once the
-header is reached; no special seed augmentation is required.
+  \State $\hat{\sigma}_{out}\gets \textsc{Transfer}(n,\hat{\sigma}_{in})$ \Comment{apply statement effects}
+  \If{$\hat{\sigma}_{out}\neq \textit{Out}[n]$} \Comment{change detected}
+     \State $\Env(n)\gets \hat{\sigma}_{out}$; \quad $\textit{Out}[n]\gets \hat{\sigma}_{out}$
+     \ForAll{$u\in \Succ(n)$}
+        \If{$\neg\mathsf{isSink}(u)\ \land\ u\notin \textit{inQ}$} \State $\textit{WL}.\textsf{enqueue}(u)$; \quad $\textit{inQ}\gets\textit{inQ}\cup\{u\}$ \EndIf
+     \EndFor
+  \EndIf
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
 
-\paragraph{Change guard.}
-After applying the transfer function to \(n\), we compare the new output \(\hat{\sigma}_{out}\) with
-\(\textit{Out}[n]\). Only if they differ do we update \(\Env(n)\), refresh \(\textit{Out}[n]\), and
-enqueue the non-sink successors. This guard guarantees termination and avoids needless work.
-Importantly, it does not miss downstream effects: if an upstream change alters the incoming
-environment of a node that does not write anything, its output equals the (changed) input, hence
-\(\hat{\sigma}_{out}\) differs from the previous snapshot and successors are still enqueued.
+Algorithm~\ref{alg:interpret-full} performs initial interpretation when debug annotations are first introduced to a function. It begins with the \texttt{ENTRY} node enqueued and propagates abstract environments forward through the entire CFG using a standard worklist iteration. Algorithm~\ref{alg:reinterpret}, in contrast, handles source code edits: the dynamic CFG builder returns one or more seed nodes (never sinks) that mark the insertion points, and the algorithm propagates updates only along forward-reachable paths from these seeds. The choice of seed depends on the statement type: sequential statements (\texttt{assignment}, \texttt{function call}) seed at the newly inserted block; control-flow constructs (\texttt{if}/\texttt{while}/\texttt{for}) seed at their join or loop-exit node to capture all downstream effects; terminating statements (\texttt{return}/\texttt{revert}) seed at the original successors before rewiring; and assertions (\texttt{require}/\texttt{assert}) seed at the true-branch successor. Seeds corresponding to sink nodes (\texttt{EXIT}, \texttt{ERROR}, \texttt{RETURN}) are filtered out because they contribute nothing to downstream analysis.
 
-\paragraph{Note on return/revert.}
-While the implementation may hand multiple old successors back to the engine for \texttt{return}
-/\texttt{revert}, the analysis is equivalent to using a single dominating non-sink seed; the
-algorithm above is presented in this single-seed form for clarity.
+Both algorithms share the same core iteration structure. Each node computes its incoming environment $\hat{\sigma}_{in}$ by joining all predecessor flows. For predecessors that are condition nodes, we apply path-sensitive refinement: the environment is updated according to the condition and the edge's truth label (true or false), and infeasible branches---where the refined environment contradicts the guard---are pruned by setting $\sigma_p$ to $\bot$. This ensures that only feasible execution paths contribute to the analysis.
 
-\begin{algorithm}[!t]
+Loop headers receive special treatment in both algorithms. When the worklist reaches a loop header, we invoke a dedicated fixpoint procedure (Algorithm~\ref{alg:fixpoint}) that recomputes abstract states for the entire loop body using widening and narrowing. The fixpoint returns the loop-exit node, whose successors are then enqueued for further propagation. This design localizes loop effects: in Algorithm~\ref{alg:reinterpret}, any edit inside a loop body naturally triggers a fresh fixpoint once the header is encountered, without requiring the builder to seed every loop-internal change explicitly.
+
+The change guard mechanism is critical for efficiency. After computing the transfer function's result $\hat{\sigma}_{out}$, we compare it with the previous snapshot $\textit{Out}[n]$. Only when a change is detected do we update the node's environment, refresh the snapshot, and enqueue non-sink successors. This guarantees termination and avoids redundant work: if downstream nodes remain unaffected, propagation halts. Crucially, it does not miss any updates, because any upstream alteration that modifies a node's input will also alter its output (even for identity transfers on join or condition nodes), thus triggering further propagation.
+
+\begin{algorithm}[!htbp]
+\footnotesize
 \caption{Loop Fixpoint at Header}
 \label{alg:fixpoint}
 \begin{algorithmic}[1]
@@ -1390,8 +1707,12 @@ algorithm above is presented in this single-seed form for clarity.
 
 \end{comment}
 
+\clearpage
 
     \subsection{Design of the Abstract Interpretation Framework for Solidity}
+
+This section presents the formal framework for our abstract interpretation-based debugger. We begin with the program syntax covering the subset of Solidity we analyze, then define the concrete semantics as a baseline, introduce the abstract domains we use for scalable approximation, and finally describe the abstract semantics that power our incremental debugging analysis.
+
         \subsubsection{Program Syntax}
 
 % ================= Table: Syntax (meta, literals, types) =================
@@ -1408,7 +1729,6 @@ algorithm above is presented in this single-seed form for clarity.
     \midrule
     \multicolumn{3}{@{}l}{\emph{Meta and identifiers}}\\
     $N$ & $\mathsf{BitW}$   & Integer bit width, $N \in \{8,16,\ldots,256\}$. \\
-    $K$ & $\mathsf{BLen}$   & Fixed byte width, $K \in \{1,\ldots,32\}$. \\
     $x$ & $\mathsf{Var}$    & Program variables (state or local). \\
     $f$ & $\mathsf{Field}$  & Struct fields. \\
     $C$ & $\mathsf{Struct}$ & Struct identifiers. \\
@@ -1418,14 +1738,12 @@ algorithm above is presented in this single-seed form for clarity.
     $n$ & $\mathbb{Z}_{2^N}$ & Integer numeral typed by $N$ (signed via unary $-$ when needed). \\
     $b$ & $\mathbb{B}$       & $\{\mathsf{true},\mathsf{false}\}$. \\
     $\mathit{addr}$ & $\mathbb{A}$  & Address literal ($0 \ldots 2^{160}\!-\!1$). \\
-    $\mathit{by}$   & $\mathbb{BY}_K$ & Fixed bytes literal (length $K$); opaque to arithmetic. \\
     \midrule
     \multicolumn{3}{@{}l}{\emph{Types}}\\
     $\tau_b$ & $\mathsf{ValType}$ &
-      $\mathsf{uint}N \mid \mathsf{int}N \mid \mathsf{bool} \mid \mathsf{address} \mid \mathsf{bytes}
-      K$. \\
+      $\mathsf{uint}N \mid \mathsf{int}N \mid \mathsf{bool} \mid \mathsf{address}$. \\
     $\kappa$ & $\mathsf{Key}$ &
-      $\mathsf{uint}N \mid \mathsf{int}N \mid \mathsf{address} \mid \mathsf{bytes}K \mid
+      $\mathsf{uint}N \mid \mathsf{int}N \mid \mathsf{address} \mid
       \mathsf{enum}\ E$. \\
     $\mu$    & $\mathsf{CType}$ &
       $\mathsf{mapping}(\kappa \Rightarrow \tau) \mid \tau[] \mid \mathsf{struct}\ C \mid
@@ -1481,23 +1799,19 @@ algorithm above is presented in this single-seed form for clarity.
   \end{tabularx}
 \end{table}
 
-\paragraph{Scope of the subset.}
-We focus on standard structured constructs (variable declarations, assignments, \textsf{if},
+Our analysis focuses on standard structured constructs including variable declarations, assignments, \textsf{if},
 \textsf{while}, \textsf{do–while}, \textsf{for}, \textsf{return}, \textsf{assert}/\textsf{require},
-\textsf{delete}, and calls as statements).
-Low‑level features (e.g., inline assembly, unchecked arithmetic) are out of scope for this section;
+\textsf{delete}, and calls as statements. Low‑level features such as inline assembly and unchecked arithmetic are out of scope for this section;
 modifiers are assumed to be desugared into the control flow.
 
     
 \subsubsection{Concrete Semantics (Denotational)}
 
-\paragraph{Domains and helpers.}
-Let stores be $\sigma:\mathsf{Var}\rightharpoonup \mathsf{CVal}$.
+We define the concrete semantics denotationally to establish a baseline for correctness. Let stores be $\sigma:\mathsf{Var}\rightharpoonup \mathsf{CVal}$.
 L-value resolution $\mathrm{loc}_\sigma(\mathit{lv})=\ell$ and write $\mathrm{write}(\sigma,\ell,v)$
-update the store (arrays/mappings lazily materialize missing cells).
-Expressions are pure: $\llbracket e\rrbracket_\sigma\in\mathsf{Val}$.
-
-We model control effects through an \emph{outcome} domain
+update the store, where arrays and mappings lazily materialize missing cells on access.
+Expressions are pure and evaluate to values: $\llbracket e\rrbracket_\sigma\in\mathsf{Val}$.
+To model control effects such as early returns and assertion failures, we introduce an outcome domain
 \[
 \mathsf{Res} \;::=\; \Norm(\sigma) \;\mid\; \Ret(v,\sigma) \;\mid\; \Abort
 \]
@@ -1509,9 +1823,7 @@ with a sequencing (Kleisli) operator
 \Abort\ \triangleright\ K &:= \Abort.
 \end{aligned}
 \]
-We write $\llbracket s\rrbracket:\sigma\mapsto \mathsf{Res}$ for the denotation of statements.
-
-\paragraph{Statement-by-statement meaning.}
+We write $\llbracket s\rrbracket:\sigma\mapsto \mathsf{Res}$ for the denotation of statements. Table~\ref{tab:conc-denot} defines the concrete semantics for each statement form.
 \begin{table}[t]
   \caption{Concrete denotational semantics (statements)}
   \label{tab:conc-denot}
@@ -1584,16 +1896,11 @@ We write $\llbracket s\rrbracket:\sigma\mapsto \mathsf{Res}$ for the denotation 
   \end{tabularx}
 \end{table}
 
-\paragraph{Materialization of arrays/mappings.}
-$\mathrm{loc}_\sigma(a[i])$ for dynamic arrays extends $a$ up to $i$ with default cells if needed;
-$\mathrm{loc}_\sigma(m[k])$ creates $m[k]$ lazily if absent. These conventions are used by both
-reads and writes.
+For arrays and mappings, $\mathrm{loc}_\sigma(a[i])$ extends dynamic array $a$ up to index $i$ with default cells if needed,
+and $\mathrm{loc}_\sigma(m[k])$ creates mapping entry $m[k]$ lazily if absent. These conventions apply to both
+reads and writes. Note that \textsf{for} and \textsf{do-while} loops are desugared to \textsf{while} in our framework, and we
+treat \textsf{require} identically to \textsf{assert} at the level of control effects since both abort on failure.
 
-\medskip
-\noindent\emph{Notes.} \textsf{for}/\textsf{do-while} are standardly desugared to \textsf{while}. We
-identify \textsf{require} with \textsf{assert} at the level of control effects (both abort on
-failure).
-        
         \subsubsection{Abstract Domain}
 
 % ---------- Macros for atomic abstract values ----------
@@ -1601,15 +1908,18 @@ failure).
 \newcommand{\Zhat}[1]{\widehat{\mathbb{Z}}_{#1}}
 
 \noindent\textbf{Atomic abstract values.}
+We use interval domains for integer types and a specialized set domain for address types:
 \begin{align*}
 \Uhat{N} &:= \{[\ell,u] \mid 0 \le \ell \le u \le 2^N{-}1\} \ \cup\ \{\bot,\top_N\},\\
 \Zhat{N} &:= \{[\ell,u] \mid -2^{N-1} \le \ell \le u \le 2^{N-1}{-}1\} \ \cup\ \{\bot,\top_N^{\pm}\},
 \\
 \widehat{\mathbb{B}} &:= \{\bot,\widehat{\mathsf{false}},\widehat{\mathsf{true}},\top\},\qquad
-\widehat{\mathbb{A}} := \Uhat{160},\\
-\widehat{\mathbb{BY}}_K &:= \{\bot,\top_K\},\qquad
-\widehat{\mathsf{Enum}}(E) := \{[\ell,u]\mid 0\le \ell \le u \le |E|-1\}\cup\{\bot,[0,|E|-1]\}.
+\widehat{\mathbb{A}} := \wp_{\le K}(\mathbb{A}) \cup \{\top\},\\
+\widehat{\mathsf{Enum}}(E) &:= \{[\ell,u]\mid 0\le \ell \le u \le |E|-1\}\cup\{\bot,[0,|E|-1]\}.
 \end{align*}
+Here $\widehat{\mathbb{A}}$ represents the address domain as a set abstraction with at most $K$ concrete address identifiers,
+generalizing to $\top$ when capacity is exceeded. This enables precise tracking of contract addresses in debugging scenarios
+while maintaining scalability.
 
 \noindent\textbf{Order/Join/Meet.}\;
 For intervals,
@@ -1629,28 +1939,30 @@ dual pattern.
 
 \medskip
 \noindent\textbf{Composite values.}
+Our framework supports Solidity's composite data structures through careful abstraction:
 \begin{itemize}[leftmargin=1.25em]
   \item \emph{Structs}:\;
   $\widehat{\mathsf{Struct}}(C) = \prod_{f\in\mathsf{fields}(C)} \widehat{\mathsf{Val}}_f$
-  (pointwise order).
+  represents structs as products over their fields with pointwise order, enabling field-sensitive analysis.
   \item \emph{Arrays (on‑access materialization)}:\;
   $\widehat{\mathsf{Arr}}(\tau) = (\hat{\ell},\hat{d},M)$ where
-  $\hat{\ell}\in \Uhat{256}$ is a length summary,
-  $\hat{d}\in \widehat{\tau}$ a default element,
-  and $M:\mathbb{N}_{\text{fin}}\rightharpoonup \widehat{\tau}$ a finite map for observed indices
-  (strong updates).
+  $\hat{\ell}\in \Uhat{256}$ is an abstract length,
+  $\hat{d}\in \widehat{\tau}$ is a default element value,
+  and $M:\mathbb{N}_{\text{fin}}\rightharpoonup \widehat{\tau}$ is a finite map tracking observed indices.
+  This design enables strong updates for known indices while maintaining soundness for unknown accesses.
   \item \emph{Mappings (on‑access materialization)}:\;
   $\widehat{\mathsf{Map}}(\kappa\Rightarrow\tau) = (\hat{d},M)$ with default $\hat{d}
   \in\widehat{\tau}$ and finite $M:\widehat{\kappa}_{\text{fin}}\rightharpoonup \widehat{\tau}$.
-  \item \emph{Enums}:\; bounded unsigned intervals over $[0,|E|-1]$.
+  Mappings materialize entries on first access, supporting both concrete keys (for strong updates) and symbolic keys (for weak updates).
+  \item \emph{Enums}:\; represented as bounded unsigned intervals over $[0,|E|-1]$.
 \end{itemize}
 
 \medskip
 \noindent\textbf{Value domains and store.}
+The complete abstract value hierarchy is:
 \[
 \widehat{\mathsf{Val}} \;::=\; \bigcup_{N}(\Uhat{N}\cup\Zhat{N})\ \cup\ \widehat{\mathbb{B}}
-\ \cup\ \widehat{\mathbb{A}}\ \cup\ \bigcup_{K=1}^{32}\widehat{\mathbb{BY}}
-_K\ \cup\ \widehat{\mathsf{Enum}}(E),
+\ \cup\ \widehat{\mathbb{A}}\ \cup\ \widehat{\mathsf{Enum}}(E),
 \]
 \[
 \widehat{\mathsf{CVal}} \;::=\; \widehat{\mathsf{Val}} \;\mid\; \widehat{\mathsf{Struct}}(C) \;\mid\;
@@ -1658,6 +1970,8 @@ _K\ \cup\ \widehat{\mathsf{Enum}}(E),
 \qquad
 \hat{\sigma}:\mathsf{Var}\rightharpoonup \widehat{\mathsf{CVal}} \ (\text{pointwise order/join}).
 \]
+The abstract store $\hat{\sigma}$ maps variables to abstract values with pointwise ordering and join operations,
+providing the foundation for our flow-sensitive analysis.
 
 % ================= Table: Type-to-domain mapping (compact) =================
 \begin{table}[t]
@@ -1674,8 +1988,7 @@ _K\ \cup\ \widehat{\mathsf{Enum}}(E),
     $\mathsf{uint}N$ & $\Uhat{N}$ \quad($N\!\in\!\{8,\dots,256\}$) \\
     $\mathsf{int}N$  & $\Zhat{N}$ \\
     $\mathsf{bool}$  & $\widehat{\mathbb{B}}$ \\
-    $\mathsf{address}$ & $\Uhat{160}$ \\
-    $\mathsf{bytes}K$ & $\widehat{\mathbb{BY}}_K$ (opaque) \\
+    $\mathsf{address}$ & $\widehat{\mathbb{A}}$ (set domain) \\
     $\mathsf{enum}\ E$ & $\widehat{\mathsf{Enum}}(E)$ \\
     $\tau[]$ & $\widehat{\mathsf{Arr}}(\tau)$ \\
     $\mathsf{mapping}(\kappa\Rightarrow\tau)$ & $\widehat{\mathsf{Map}}(\kappa\Rightarrow\tau)$ \\
@@ -1684,23 +1997,20 @@ _K\ \cup\ \widehat{\mathsf{Enum}}(E),
   \end{tabular}
 \end{table}
 
-\paragraph{Design notes.}
-Addresses are modeled as 160‑bit unsigned intervals; strings and dynamic bytes are treated as opaque
-(symbolic) values when they arise in programs.
-Arrays and mappings use finite observed maps with defaults, ensuring soundness under unknown
-indices/keys while enabling strong updates for observed ones.
+Table~\ref{tab:type2domain} summarizes the mapping from Solidity types to abstract domains.
+Addresses use a set domain that tracks up to $K$ concrete identifiers before generalizing to $\top$,
+providing precise aliasing information for contract addresses commonly encountered in debugging.
+Arrays and mappings employ finite observed maps with default values, ensuring soundness under unknown
+indices or keys while enabling strong updates for observed accesses.
 
         % 3.5.x  Abstract Semantics (Denotational)
 % =====================================================================
 \subsubsection{Abstract Semantics (Denotational)}
 
-\paragraph{Abstract domains and results.}
-Let $\hat{\sigma}:\mathsf{Var}\rightharpoonup \widehat{\mathsf{CVal}}$ be the abstract store
-(cf.\ Abstract Domain). Expressions evaluate to abstract values
+We lift the concrete semantics to abstract domains systematically. Let $\hat{\sigma}:\mathsf{Var}\rightharpoonup \widehat{\mathsf{CVal}}$ be the abstract store. Expressions evaluate to abstract values
 $\llbracket e\rrbracket^\sharp_{\hat{\sigma}}\in \widehat{\mathsf{Val}}$
-with bit-width–aware interval arithmetic, booleans, addresses, and composites.
-
-Abstract outcomes:
+using bit-width–aware interval arithmetic for integers, set operations for addresses, and standard operations for booleans and composites.
+Abstract outcomes mirror the concrete case:
 \[
 \widehat{\mathsf{Res}} \;::=\; \widehat{\Norm}(\hat{\sigma}) \;\mid\; \widehat{\Ret}(\hat{v},
 \hat{\sigma}) \;\mid\; \widehat{\Abort},
@@ -1714,11 +2024,9 @@ ordered componentwise, with sequencing
 \widehat{\Abort}\ \triangleright^\sharp\ K &:= \widehat{\Abort}.
 \end{aligned}
 \]
-Branch refinement $\mathrm{refine}(\hat{\sigma},p,b)$ narrows operands of $p$ by interval meets;
-abstract write
-$\widehat{\mathrm{write}}(\hat{\sigma},\mathit{lv},\hat{v})$ is \emph{strong} if the target cell is
-unique (e.g., singleton index/key), otherwise \emph{weak} (join with the old value).
-
+Branch refinement $\mathrm{refine}(\hat{\sigma},p,b)$ narrows operands of condition $p$ using interval meets to improve precision along branches.
+Abstract writes distinguish between \emph{strong} updates when the target is unique (e.g., singleton index or concrete key)
+and \emph{weak} updates that join the new value with the existing value when the target is uncertain.
 For joining branch outcomes we use
 \[
 \mathrm{joinRes}(r_1,r_2)=
@@ -1729,8 +2037,7 @@ For joining branch outcomes we use
 \text{the obvious mixed cases: componentwise join and/or carry }\widehat{\Abort}.
 \end{cases}
 \]
-
-\paragraph{Statement-by-statement meaning.}
+Table~\ref{tab:abs-denot} defines the abstract semantics for each statement form.
 \begin{table}[t]
   \caption{Abstract denotational semantics (statements)}
   \label{tab:abs-denot}
@@ -1814,11 +2121,11 @@ For joining branch outcomes we use
   \end{tabularx}
 \end{table}
 
-\paragraph{Arrays/mappings (reads/writes).}
-Reading with a singleton index/key returns the cell; with a range/non-singleton key, return the join
-of materialized cells (or the element type top if none). Dynamic array \texttt{length} is a
-singleton when observed; otherwise conservatively $\top_{\mathsf{uint256}}$. Writes follow the same
-singleton/non-singleton criterion for strong/weak updates.
+For array and mapping accesses, reading with a singleton index or concrete key returns the corresponding cell,
+while reading with a range or symbolic key returns the join of all materialized cells, or the element type's $\top$ if none exist.
+Dynamic array \texttt{length} is tracked as a singleton interval when observed; otherwise it is conservatively approximated as $\top_{\mathsf{uint256}}$.
+Writes follow the same singleton versus non-singleton criterion: concrete indices and keys enable strong updates that precisely overwrite values,
+while symbolic or range indices trigger weak updates that join new values with existing ones to maintain soundness.
 
 \section{Evaluation}
 To evaluate how \textsc{SolQDebug} performs in practical debugging scenarios, we organize our study
@@ -1851,8 +2158,18 @@ The dataset is derived from DAppSCAN~\cite{dappscan}, a large-scale real-world b
 contract analysis. From 3,345 Solidity files using \texttt{>=0.8.0}, we sample 128 contracts across
 three size brackets (1–10 KB, 11–20 KB, and over 20 KB). After filtering out logic-free functions (e.
 g., those containing only assignments or return statements), we retain 242 single-transaction
-handlers. From these, we select 13 representative examples covering key Solidity idioms, including
+handlers. From these, we select 30 representative examples covering key Solidity idioms, including
 structs, mappings, dynamic arrays, control flow, and arithmetic logic.
+
+Since Remix IDE lacks built-in automated benchmarking capabilities, we developed \texttt{
+remix\_benchmark}, a Selenium-based automation framework that programmatically drives the Remix web
+interface to measure edit-to-inspect latency. For each test function, \texttt{remix\_benchmark}
+automates the full workflow: compilation, contract deployment, state variable initialization via
+manual storage slot assignment, parameter entry, transaction execution, and step-through debugging.
+We measure two latency metrics: \textit{pure debug time}, capturing only the debugger step-through
+duration, and \textit{total time}, which includes compilation, deployment, and state setup overhead.
+The difference between these metrics reflects the additional manual effort required in traditional
+debugging workflows.
 
 Although \textsc{SolQDebug} is designed for interactive use within a Solidity editor, all
 experiments simulate this behavior in a controlled scripting environment. For each function, we
@@ -1862,9 +2179,9 @@ reproducible conditions.
 
 
 \subsection{RQ1 - Responsiveness}
-To evaluate responsiveness, we measure edit to inspect latency—defined as the time from a code
+To evaluate responsiveness, we measure edit-to-inspect latency—defined as the time from a code
 change to the appearance of updated variable information—under a single contract, single transaction
-scenario..
+scenario.
 
 \begin{figure}[t]
   \centering
@@ -1872,46 +2189,34 @@ scenario..
   \caption{Edit-to-inspect latency comparison between Remix and \textsc{SolQDebug} across varying test-case widths and execution passes. The x-axis represents the cost estimate, y-axis shows TestCase width (\(\Delta\)), and z-axis displays latency in seconds. While Remix maintains constant high latency regardless of iteration, \textsc{SolQDebug} demonstrates significantly lower latency that quickly reaches a floor after the initial pass.}
   \label{fig:rq1-responsiveness}
 \end{figure}
-    
-    For Remix, this delay includes a full compile–deploy–execute cycle and is modeled as
-    \begin{align*}
-    \textstyle
-    T_{\text{Remix}} = 
-      \underbrace{3}_{\text{compile+deploy}} +
-      \underbrace{2N_s}_{\text{state setup}} +
-      \underbrace{2}_{\text{parameter entry}} +
-      \underbrace{\tfrac{\text{ops}}{6}}_{\text{EVM trace}} \quad\text{s}
-    \end{align*}
-    where \(N_s\) is the number of storage variables that must be manually initialized, and
-    \textit{ops} is the number of executed bytecode operations. Since Remix replays the same steps
-    on every run, the second pass offers no gain: \(T^{(2)}_{\text{Remix}} = T^{(1)}_{\text{Remix}}\)
-    .
-    
-    In contrast, \textsc{SolQDebug} updates only the affected region and developer-supplied
-    annotations. Its latency is modeled as
-    \[
-    T^{(1)}_{\text{SolQ}} = 10v + c_f, \qquad
-    T^{(2)}_{\text{SolQ}} = 5v + c_f \quad\text{s},
-    \]
-    where \(v\) is the number of annotated variables and \(c_f\) is a fixed per-function overhead.
-    The coefficients reflect annotation time: first-pass latency includes fresh annotation for each
-    variable (approx. 10 ms per variable), while the second pass assumes partial reuse, as
-    previously annotated variables may be modified rather than newly added. This reflects a
-    realistic debugging workflow in which only a subset of inputs change between passes. Empirically,
-    \(c_f\) remains under 0.18 seconds across all tested functions (median: 21 ms, max: 170 ms),
-    confirming that annotation width dominates latency.
-    
-    We evaluated 13 functions (see Table 1) across 4 test-case widths \(\Delta \in \{0, 2, 5, 10\}\)
-    and two passes. Remix required 17.4–41.3 seconds per run (median: 26.2 s), independent of
-    iteration. \textsc{SolQDebug}, by contrast, completed its first pass in 8–62 ms (median: 14 ms),
-    and the second in 5–35 ms. Fig. 6 visualizes this gap in 3D space using a model-derived x-axis
-    (cost estimate), y-axis (TestCase width), and z-axis (latency). While Remix latency scales
-    linearly with test-case complexity, \textsc{SolQDebug} quickly reaches a latency floor after the
-    initial pass.
-    
-    Since batch execution contributes at most 100 ms, future optimizations should prioritize
-    reducing \(v\)—e.g., via annotation templates—rather than optimizing the interpreter core.
 
+We evaluated 30 functions across 4 test-case widths \(\Delta \in \{0, 2, 5, 10\}\), yielding 120
+total measurements for \textsc{SolQDebug}. For Remix, we measured each function once using \texttt{
+remix\_benchmark}, capturing both pure debug time (debugger step-through only) and total time (
+including compilation, deployment, and state initialization).
+
+For Remix, the pure debug time ranged from 25.1 to 124.6 seconds (median: 53.0 s), reflecting the
+time required to step through bytecode operations in the debugger. The total time, however, ranged
+from 71.1 to 168.3 seconds (median: 98.1 s), as it includes approximately 35 seconds for
+compilation and deployment, plus 0–11.8 seconds for manual state variable initialization (median:
+2.9 s). Functions requiring more state slots incur proportionally higher setup overhead, with state
+initialization time growing linearly with the number of storage variables.
+
+In contrast, \textsc{SolQDebug} completed analysis in 0.03–5.09 seconds (median: 0.15 s) across all
+120 measurements, requiring no compilation, deployment, or state setup. Fig.~\ref{fig:rq1-
+responsiveness} visualizes this performance gap: Remix pure debug time alone exceeds \textsc{
+SolQDebug}'s total latency by a median factor of \textasciitilde350$\times$, while total Remix
+latency (including setup) exceeds it by \textasciitilde650$\times$. This demonstrates that \textsc{
+SolQDebug} eliminates the compile–deploy–setup cycle entirely, enabling immediate feedback during
+code editing.
+
+\medskip
+\noindent\fbox{%
+\begin{minipage}{0.96\linewidth}
+\textbf{Answer to RQ1:}
+\textsc{SolQDebug} achieves sub-second edit-to-inspect latency (median: 0.15 s), eliminating 350$\times$–650$\times$ overhead from Remix's compile–deploy–debug cycle. This enables immediate, interactive feedback during code editing without transaction execution.
+\end{minipage}%
+}
 
 \subsection{RQ2 - Precision Sensitivity to Annotation Structure}
 
@@ -1950,6 +2255,14 @@ or overlapping—has a stronger influence on interval growth than the choice bet
 subtraction. Overlapping inputs consistently result in smaller output ranges, reducing the degree of
 over-approximation as input width increases.
 
+\medskip
+\noindent\fbox{%
+\begin{minipage}{0.96\linewidth}
+\textbf{Answer to RQ2:}
+In division-normalized arithmetic patterns, the structure of input interval annotations (overlapping vs.\ disjoint) has a stronger influence on precision than the choice of arithmetic operator (addition vs.\ subtraction). Overlapping intervals consistently reduce over-approximation by up to 3$\times$ compared to disjoint inputs, suggesting developers should align annotation ranges with expected input correlations to improve precision without sacrificing responsiveness.
+\end{minipage}%
+}
+
 \subsection{RQ3 - Loops}
 Two loop patterns emerge from the benchmarks. In the first, the loop condition itself bounds the
 updated variable, and the loop body performs only direct assignments. In such cases, abstract
@@ -1968,6 +2281,13 @@ iterates from 1 to 4, and the interval for \texttt{level} stabilizes at \([1,4]\
     by symbolic input, or loops that iterate over data-driven structures such as mappings or dynamic
     lists.
 
+\medskip
+\noindent\fbox{%
+\begin{minipage}{0.96\linewidth}
+\textbf{Answer to RQ3:}
+\textsc{SolQDebug} achieves precise analysis for loops with bounded indices and direct assignments, where abstract interpretation converges naturally. However, precision degrades for loops interacting with external state, conditionally populated data structures, or data-driven iteration (mappings, dynamic arrays), where widening-based approximation becomes unavoidable. Developers should annotate state dependencies carefully to help the analyzer distinguish between statically bounded and potentially unbounded iterations.
+\end{minipage}%
+}
 
 \section{Discussion}
 
@@ -1991,31 +2311,28 @@ iterates from 1 to 4, and the interval for \texttt{level} stabilizes at \([1,4]\
     to bridge the gap between writing code and running tests or verification—offering immediate,
     sound, conservative feedback with low annotation overhead.
 
-    \paragraph{Why the interval domain?}
     For debugging, intervals strike a practical balance between precision and speed. They (i) align
-    with developers’ mental model of “possible ranges,” (ii) expose boundary effects (e.g., overflow
+    with developers' mental model of "possible ranges," (ii) expose boundary effects (e.g., overflow
     thresholds, guard satisfaction regions) without committing to a single concrete input, and (iii)
     compose predictably through joins and widenings. In our setting, intervals are also a natural
     surface for annotations: developers can \emph{shape} symbolic inputs (e.g., make them
     overlapping or disjoint) and directly see how that affects control flow and computed ranges.
 
-    \paragraph{Managing the accuracy–latency trade-off.}
-    AI’s precision is conservative by design; edit-time usability depends on giving developers
+    AI's precision is conservative by design; edit-time usability depends on giving developers
     simple levers to steer precision without sacrificing responsiveness. We expose three such levers
     that proved effective in our study:
     \begin{itemize}
       \item \textbf{Annotation structure.} Overlapping operand intervals often bound output ranges more tightly than disjoint ones in division-normalized arithmetic (cf.\ RQ2). This reduces false alarms with no runtime cost.
-      \item \textbf{Annotation width.} Narrower inputs shrink joins and delay widening; developers can start narrow and broaden gradually (“zoom out”) to probe stability.
+      \item \textbf{Annotation width.} Narrower inputs shrink joins and delay widening; developers can start narrow and broaden gradually ("zoom out") to probe stability.
       \item \textbf{Guard-guided narrowing.} Making explicit the intended \texttt{require}/\texttt{if} guards in annotations tightens feasible states early and improves precision along the taken branch at negligible cost.
     \end{itemize}
     Where stricter precision is essential (e.g., inside data-driven loops), the workflow can
     temporarily fall back to concrete inputs for local inspection, then return to intervals for
-    broader exploration. This “concrete when needed, symbolic by default” rhythm preserves
+    broader exploration. This "concrete when needed, symbolic by default" rhythm preserves
     interactivity while keeping results actionable.
     \vspace{0.25em}
 
     \subsection{Evaluation Implication}
-    \paragraph{RQ1: Edit-time responsiveness, not just “a few seconds faster.”}
     Traditional debuggers (e.g., Remix, Hardhat Debug) require compile–deploy–execute per iteration,
     typically taking tens of seconds. In contrast, our interpreter updates in milliseconds (median
     \(\sim\)14\,ms on the first pass and 5–35\,ms on the second), yielding \emph{orders-of-magnitude}
@@ -2024,50 +2341,42 @@ iterates from 1 to 4, and the interval for \texttt{level} stabilizes at \([1,4]\
     summarizes many concrete executions; developers can see when guards always hold/fail for an
     interval, when a branch becomes unreachable, or when a value may cross a critical threshold—all
     without leaving the editor. In short, \textsc{SolQDebug} complements runtime debuggers by moving
-    fast, informative checks \emph{into} the authoring loop.
-    
-    \paragraph{RQ2: Annotation design as a precision knob.}
+    fast, informative checks \emph{into} the authoring loop (RQ1).
+
     RQ2 shows that, in division-normalized patterns common in Solidity, \emph{how} intervals are
     shaped can matter more than \emph{which} arithmetic operator is used. Overlapping inputs
     systematically produced smaller output ranges than disjoint inputs, delaying or avoiding early
-    widening. Practical takeaway: when investigating arithmetic joins, start with partially
-    overlapping intervals and widen only as needed; keep operands aligned where normalization is
-    present.
-    
-    \paragraph{RQ3: When loops converge—and when they don’t.}
+    widening. When investigating arithmetic joins, start with partially overlapping intervals and
+    widen only as needed; keep operands aligned where normalization is present.
+
     Widening can degrade precision in loops, but RQ3 highlights that not all loop updates lead to
     divergence. Loops whose updated variables are bounded by the loop index (or by monotone guards)
     often converge to tight ranges quickly; data-driven loops over symbolic containers tend to widen
-    early. Practical takeaway: (i) prefer index-bounded annotations (e.g., bound the iteration count
-    or accessed keys) for loop-local exploration, (ii) materialize only the keys or indices the loop
-    actually touches, and (iii) where necessary, switch to concrete inputs for a small slice of the
-    loop to confirm behavior, then return to symbolic exploration.
-    
+    early. Practical implications include: (i) prefer index-bounded annotations (e.g., bound the
+    iteration count or accessed keys) for loop-local exploration, (ii) materialize only the keys or
+    indices the loop actually touches, and (iii) where necessary, switch to concrete inputs for a
+    small slice of the loop to confirm behavior, then return to symbolic exploration.
+
     Overall, these findings suggest a debugging workflow that starts symbolic and broad, then
     \emph{shapes} annotations to tighten precision where it matters (overlap, narrow, guard-guided),
     and finally uses concrete spot checks only for stubborn hot spots (e.g., deeply data-dependent
     loops).
 
     \subsection{Limitation}
-    Our current scope and measurements introduce several limitations.
-    
-    \paragraph{Scope (external validity).}
-    We focus on single-contract, single-transaction functions. Inter-contract calls,
-    multi-transaction workflows, proxies, and inheritance hierarchies are out of scope in the
-    present implementation. As a result, we have not yet conducted a developer study in larger
-    project settings; the usability and interpretability of edit-time feedback across multi-contract
-    workflows remain unvalidated.
-    
-    \paragraph{Measurement (internal validity).}
-    Latency numbers combine interpreter execution time (timed in Python) with an estimate for
-    annotation effort per variable (manual input). This procedure ignores UI-event latency and
+    Our current scope and measurements introduce several limitations. First, we focus on
+    single-contract, single-transaction functions. Inter-contract calls, multi-transaction workflows,
+    proxies, and inheritance hierarchies are out of scope in the present implementation. As a result,
+    we have not yet conducted a developer study in larger project settings; the usability and
+    interpretability of edit-time feedback across multi-contract workflows remain unvalidated.
+
+    Second, our latency numbers combine interpreter execution time (timed in Python) with an estimate
+    for annotation effort per variable (manual input). This procedure ignores UI-event latency and
     cursor dynamics, and it assumes a consistent operator for annotation entry. Likewise, our
     precision metric (\(F_{90}\): 90th percentile of exit-/input-width inflation) captures a salient
-    aspect of interval growth but does not reflect all developer notions of “useful precision.”
+    aspect of interval growth but does not reflect all developer notions of "useful precision."
     These choices provide a consistent basis for tool-level comparison but may under- or
     over-estimate end-to-end IDE latency or perceived precision.
-    
-    \paragraph{Mitigations and future work.}
+
     We plan to (i) extend the analysis to inter-contract calls and multi-transaction scenarios, (ii)
     instrument editor events to directly measure human-in-the-loop latency and refine the annotation
     cost model, and (iii) run a controlled developer study once multi-contract support stabilizes.
