@@ -12,10 +12,12 @@
 \usepackage{amsopn}%
 \usepackage{amstext}%
 \usepackage{mathrsfs}%
+\usepackage{stmaryrd}% For llbracket, rrbracket
 
 % Graphics and tables
 \usepackage{graphicx}%
 \DeclareGraphicsExtensions{.png,.pdf,.jpg}% PNG first, then PDF
+\usepackage{subcaption}% For subfigure environment
 \usepackage{tikz}%
 \usetikzlibrary{positioning,shapes,arrows.meta}%
 \usepackage{multirow}%
@@ -30,6 +32,8 @@
 
 % Other packages
 \usepackage[title]{appendix}%
+\usepackage{placeins}% For \FloatBarrier to control figure placement
+\usepackage{float}% For [H] option to force exact placement
 \usepackage{xcolor}%
 \usepackage{textcomp}%
 % \usepackage{manyfoot}% Package not available in MiKTeX
@@ -50,7 +54,8 @@
 \raggedbottom
 
 % 예: (Abbott 1991; Barakat et al. 1995) 꼴
-\bibpunct{(}{)}{;}{a}{}{ } % 저자–연도 사이 쉼표 제거
+% Using numerical style to match sn-mathphys-num document class
+\bibpunct{(}{)}{;}{n}{}{ } % n = numerical citations
 
 % --- URL 줄바꿈 개선(긴 URL 자동 줄바꿈) ---
 \usepackage[hyphens]{url}
@@ -66,6 +71,10 @@
 % natbib 계열 문서라면 \bibhang 사용 가능(행걸이 폭)
 \setlength{\bibhang}{2em}
 
+% Custom math commands
+\newcommand{\Abort}{\mathsf{Abort}}
+\newcommand{\Norm}{\mathsf{Norm}}
+\newcommand{\Ret}{\mathsf{Ret}}
 
 \begin{document}
 
@@ -243,22 +252,37 @@ contract Example {
 
 \begin{figure*}[!t]
   \centering
-  \setlength{\tabcolsep}{3pt}
-  \renewcommand{\arraystretch}{1}
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth,keepaspectratio]{1. Compile.png}
+    \caption{Compile}
+    \label{fig:step-compile}
+  \end{subfigure}%
+  \hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth,keepaspectratio]{2. Deploy.png}
+    \caption{Deploy related contracts}
+    \label{fig:step-deploy}
+  \end{subfigure}
 
-  \begin{tabular}{cc}
-    \subcaptionbox{Compile\label{fig:step-compile}}
-      {\includegraphics[width=.47\textwidth]{1. Compile.png}} &
-    \subcaptionbox{Deploy related contracts\label{fig:step-deploy}}
-      {\includegraphics[width=.47\textwidth]{2. Deploy.png}} \\[4pt]
-    \subcaptionbox{Send preparatory transactions\label{fig:step-init}}
-      {\includegraphics[width=.47\textwidth]{3. Execution.png}} &
-    \subcaptionbox{Bytecode-level debugging\label{fig:step-debug}}
-      {\includegraphics[width=.47\textwidth]{4. Debug.png}}
-  \end{tabular}
+  \vspace{1em}
+
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth,keepaspectratio]{3. Execution.png}
+    \caption{Send preparatory transactions}
+    \label{fig:step-init}
+  \end{subfigure}%
+  \hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth,keepaspectratio]{4. Debug.png}
+    \caption{Bytecode-level debugging}
+    \label{fig:step-debug}
+  \end{subfigure}
 
   \caption{Traditional Solidity debugging workflow}
-
   \label{fig:legacy-debug-grid}
 \end{figure*}
        
@@ -362,46 +386,42 @@ contract Example {
 
 \section{The design of SolQDebug}
     \subsection{System Architecture}
-        \textsc{SolQDebug} receives incremental edits as its primary input—typically a snippet of
-        Solidity code or an inline debug annotation. Rather than expecting complete programs, the
-        system is designed to accept fragments ranging from full statements to partial control-flow
-        constructs. These edits include partial Solidity fragments and batch annotations, which are
-        processed in isolation without requiring recompilation or transaction replay. The system
-        assumes that each line contains at most one statement; compound forms such as
-        \texttt{if (...) return;} are not supported. The structure of these inputs is described in
-        Section 3.B; here, we outline the four-stage processing pipeline.
-    
+        \textsc{SolQDebug} processes code incrementally, analyzing either a single Solidity
+        statement or a batch debug annotation as it is written. Unlike traditional debuggers,
+        \textsc{SolQDebug} performs static analysis on isolated fragments—eliminating the need
+        for complete program compilation or on-chain transaction execution. The analysis proceeds
+        through two main modules:
+
         \textbf{(1) Parsing Module.}
         Each incoming edit first passes through the \textit{Context Analyzer}, which reconstructs a
         source-level snapshot surrounding the modified lines, determines the enclosing contract or
         function, and selects the appropriate interactive grammar rule. Subsequently, the
-        Interactive Parser, built atop ~\citet{antlr}, applies an extended grammar that incorporates
-        seven additional reduction rules to support isolated Solidity constructs such as expressions,
-        statements, and definitions. A separate rule is dedicated to debug annotations, allowing
-        single-line analysis directives to be parsed as valid units. To ensure syntactic integrity,
-        the reconstructed source is also verified using the Solidity compiler before analysis
-        proceeds. This allows the system to reject malformed fragments early and maintain
-        consistency across the abstract syntax tree and control-flow graph. Debug annotations are
-        parsed as valid syntactic units and forwarded for interpretation; their semantic effects are
-        described in the analysis stage.
+        \textit{Interactive Parser}, implemented using ~\citet{antlr}, applies an extended grammar
+        that incorporates seven additional reduction rules to support isolated Solidity constructs
+        such as expressions, statements, and definitions. A separate rule is dedicated to debug
+        annotations, allowing single-line analysis directives to be parsed as valid units. To ensure
+        syntactic integrity, the reconstructed source is also verified using the Solidity compiler
+        before analysis proceeds. This allows the system to reject malformed fragments early and
+        maintain consistency across the abstract syntax tree and control-flow graph. Debug
+        annotations are parsed as valid syntactic units and forwarded for interpretation; their
+        semantic effects are described in the analysis stage.
 
         \textbf{(2) Analysis Module.}
-        Each parsed statement is enriched with contextual metadata. This includes its enclosing
-        contract and function, its semantic role (e.g., declaration or condition), and its static
-        type. The statement is then forwarded to the Dynamic CFG Builder, which inserts a basic
-        block at the precise edit point and rewires the surrounding control edges accordingly.
-        Conditional branches merge incoming states using $\sqcup$, and loop headers are updated via
-        localized fixpoint computation. The Abstract Interpreter propagates abstract values using a
-        classic interval lattice. Types such as uintN and intN are interpreted as $N$-bit intervals.
-        Boolean values are modeled as $\{0,1\}$ intervals, and addresses as 160-bit unsigned
-        intervals. Byte arrays and strings remain symbolic throughout. For composite containers such
-        as structs, arrays, and mappings, the container itself is treated as symbolic until a
-        specific field, element, or key is accessed. At that point, the interpreter materializes a
-        fresh abstract value. If the base type is elementary, it receives the corresponding interval;
-        otherwise, a new symbolic placeholder is propagated. Before each batch run, the Snapshot
-        Manager saves the full abstract memory. Once execution completes, the snapshot is restored.
-        This guarantees that consecutive test cases remain isolated and do not interfere with each
-        other, even when global or local bindings are modified.
+        The Analysis Module operates in three coordinated stages. First, each parsed statement is
+        enriched with contextual metadata—including its enclosing contract and function, its semantic
+        role (e.g., declaration or condition), and its static type—before being passed to the
+        \textit{Dynamic CFG Builder}. The CFG Builder maintains an incremental control-flow graph
+        that evolves with each edit: it inserts a new basic block at the precise edit location,
+        rewires incoming and outgoing control edges, and propagates abstract states along the updated
+        paths. When conditional branches converge, incoming states are merged using the join operator
+        ($\sqcup$); loop headers trigger localized fixpoint computation to ensure convergence.
+        Second, the \textit{Abstract Interpreter} traverses the updated CFG and computes abstract
+        values at each program point. The analysis employs a combination of interval and set domains:
+        numeric types are represented as intervals, addresses as symbolic sets, and composite types
+        (structs, arrays, mappings) are lazily materialized upon field or element access. Third, the
+        \textit{Snapshot Manager} preserves and restores the abstract memory state before and after
+        each batch of debug annotations. This isolation mechanism ensures that consecutive test cases
+        do not interfere with one another, even when they modify shared or local bindings.
 
         \textbf{(3) Line-Level Output.}
         After interpretation, the system emits a per-statement summary of relevant variable
@@ -492,9 +512,9 @@ lines at once (e.g., function … \{ and the matching \}). As the body is filled
 closing brace is pushed downward. The line numbers shown in the table refer to the listing
 ~\ref{lst:grammar-min}; intermediate edits may temporarily place the closing brace earlier.
 
-\begin{figure*}[t]
+\begin{figure*}[!htbp]
   \centering
-  \begin{tikzpicture}[
+  \begin{tikzpicture}[scale=0.85, transform shape,
     node distance=1.5cm and 2.5cm,
     block/.style={rectangle, draw, thick, minimum width=3cm, minimum height=1cm, align=center, font=\footnotesize},
     cond/.style={diamond, draw, thick, aspect=2, minimum width=2cm, minimum height=1cm, align=center, font=\footnotesize},
@@ -718,9 +738,9 @@ resulting bounds.
 
 An annotation block is written between \verb|//@Debugging BEGIN| and \verb|//@Debugging END|, with
 one directive per line of the form “target L‑value \(\leftarrow\) abstract value (interval or
-symbolic).” Targets may be global, state, or local variables, and nested L‑values (e.g.,
+symbolic)." Targets may be global, state, or local variables, and nested L‑values (e.g.,
 \(\texttt{a[i].x}\), \(\texttt{balances[addr]}\)) are allowed. Integers are normalized to intervals
-respecting their declared bit width; addresses are interpreted as 160‑bit unsigned intervals;
+respecting their declared bit width; addresses are tracked as symbolic identifiers (set domain);
 booleans as \(\{0,1\}\).
 
 Given a batch block, \textsc{SolQDebug} executes a lightweight pipeline: (i) parse each line,
@@ -781,255 +801,97 @@ via a simple comment syntax, enabling the developer to explore an intended input
 \textsc{SolQDebug} reuses the CFG and performs a single‑pass reinterpretation, delivering
 lightweight yet semantically sound results. Formal details and algorithms appear in §3.3 and §3.5.
 
+\FloatBarrier
 \subsection{Interactive Parser}
 The standard Solidity parser accepts only whole files (\texttt{sourceUnit} $\rightarrow$ \texttt{EOF}
 ) and thus rejects partial fragments produced during editing. \textsc{SolQDebug}'s interactive
-parser chooses fragment-specific entry rules based on the current editing context and parses each
-fragment into a syntactically well-formed subtree suitable for incremental analysis. The entry rules
-fall into two groups: (A) rules for Solidity program fragments (functions, blocks, and other
-constructs) and (B) rules for debugging-annotation blocks (\texttt{debugUnit}). We illustrate both
-groups with representative inputs.
+parser extends the official Solidity grammar (defined in \texttt{Solidity.g4}~\cite{antlr}) with
+additional entry rules that accept isolated code fragments based on the current editing context. Each
+fragment is parsed into a syntactically well-formed subtree suitable for incremental analysis without
+requiring a complete source file.
 
-\subsubsection{Entry rules for Solidity program fragments}
+The interactive parser is built upon ANTLR4~\cite{antlr} and introduces seven specialized entry
+rules for Solidity program fragments, plus one dedicated rule for batch-annotation blocks. The
+Context Analyzer determines the appropriate entry rule by inspecting the surrounding source context
+(e.g., whether the cursor is inside a function body, at top level, or within a struct definition) and
+selecting the most specific rule. This design allows developers to write and analyze code
+incrementally—statement by statement—while maintaining full syntactic consistency with the Solidity
+specification.
 
-\noindent\textbf{1) \texttt{interactiveSourceUnit} — top-level declaration fragments}
-\begin{itemize}
-  \item \emph{Purpose.} Accepts top-level snippets such as function headers with empty bodies, contracts, interfaces, libraries, pragmas, imports, and state variables. Editors typically auto-insert a closing brace when ``\{'' is typed, so a ``skeleton'' declaration arrives as two lines.
-  \item \emph{Example (cf.\ Table~\ref{tab:input_code}, Step~1).}
+Table~\ref{tab:interactive-rules} summarizes the entry rules. Each rule handles specific code
+fragments encountered during live editing. For instance, when a developer types a function header
+followed by an auto-inserted closing brace, \texttt{interactiveSourceUnit} accepts the skeleton
+definition. As statements are added inside the body, \texttt{interactiveBlockUnit} parses them
+individually. Two-phase constructs such as enums, structs, \texttt{if}/\texttt{else}, and
+\texttt{try}/\texttt{catch} are handled by dedicated rules that recognize when the first part (e.g.,
+\texttt{enum Status \{\}}) has been declared and the second part (e.g., member items
+\texttt{Pending, Shipped}) is being added incrementally.
+
+\begin{table}[t]
+\centering
+\caption{Interactive parser entry rules}
+\label{tab:interactive-rules}
+\small
+\begin{tabular}{@{}lp{9cm}@{}}
+\toprule
+\textbf{Entry Rule} & \textbf{Purpose} \\
+\midrule
+\texttt{interactiveSourceUnit} & Top-level declarations: functions, contracts, interfaces, libraries, state variables, pragmas, imports \\
+\texttt{interactiveEnumUnit} & Enum member items added after the enum shell is defined \\
+\texttt{interactiveStructUnit} & Struct member declarations added after the struct shell is defined \\
+\texttt{interactiveBlockUnit} & Statements and control-flow skeletons inside function bodies \\
+\texttt{interactiveDoWhileUnit} & The \texttt{while} tail of a \texttt{do\{...\}} loop \\
+\texttt{interactiveIfElseUnit} & \texttt{else} or \texttt{else if} branches following an \texttt{if} \\
+\texttt{interactiveCatchClauseUnit} & \texttt{catch} clauses following a \texttt{try} statement \\
+\texttt{debugUnit} & Batch-annotation lines (\texttt{@StateVar}, \texttt{@LocalVar}) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textbf{Representative example.}
+Consider the \texttt{burn} function from Listing~\ref{lst:grammar-min}. When the developer first
+types the function header, the parser invokes \texttt{interactiveSourceUnit} to accept:
 \begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
 function burn(uint256 amount) public onlyOwner {
 }
 \end{lstlisting}
-  \emph{Selected entry:} \texttt{interactiveSourceUnit}.
-  \emph{Internal match:} \texttt{interactiveFunctionElement} $\rightarrow$
-  \texttt{functionDefinition}.
-  \item \emph{Other top-level examples.}
-\begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
-contract Example {}
-uint256 public totalSupply = 1000;
-\end{lstlisting}
-  \emph{Selected entry:} \texttt{interactiveSourceUnit} (matching \texttt{contractDefinition} /
-  \texttt{stateVariableDeclaration}).
-\end{itemize}
-
-\noindent\textbf{2) \texttt{interactiveEnumUnit} — enum \emph{member} lists added incrementally}
-\begin{itemize}
-  \item \emph{Two-phase input.}
-  \begin{enumerate}
-    \item First, the empty enum \emph{shell} at top level:
-\begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
-enum Status {}
-\end{lstlisting}
-    \emph{Selected entry:} \texttt{interactiveSourceUnit}.
-    \emph{Internal match:} \texttt{interactiveStateVariableElement} $\rightarrow$
-    \texttt{interactiveEnumDefinition}.
-    \item Then, members are supplied in subsequent fragments:
-\begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
-Pending, Shipped
-\end{lstlisting}
-\begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
-Delivered
-\end{lstlisting}
-    \emph{Selected entry:} \texttt{interactiveEnumUnit}.
-    \emph{Internal match:} \texttt{interactiveEnumItems}.
-  \end{enumerate}
-  \item \emph{Rationale.} The enum \emph{definition shell} and \emph{member items} are parsed by different entry rules, allowing members to be typed incrementally after the shell is present.
-\end{itemize}
-
-\noindent\textbf{3) \texttt{interactiveStructUnit} — struct \emph{member} declarations added
-incrementally}
-\begin{itemize}
-  \item \emph{Two-phase input.}
-  \begin{enumerate}
-    \item First, the empty struct \emph{shell}:
-\begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
-struct A {}
-\end{lstlisting}
-    \emph{Selected entry:} \texttt{interactiveSourceUnit}.
-    \emph{Internal match:} \texttt{interactiveStateVariableElement} $\rightarrow$
-    \texttt{interactiveStructDefinition}.
-    \item Then, members are added one line at a time:
-\begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
-uint a;
-address owner;
-\end{lstlisting}
-    \emph{Selected entry:} \texttt{interactiveStructUnit}.
-    \emph{Internal match:} \texttt{structMember}.
-  \end{enumerate}
-\end{itemize}
-
-\noindent\textbf{4) \texttt{interactiveBlockUnit} — block-local statements and skeleton control
-flow}
-\begin{itemize}
-  \item \emph{Purpose.} Accepts semicolon-terminated statements and fully-braced control-flow skeletons typed inside a block or function body.
-  \item \emph{Examples (cf.\ Table~\ref{tab:input_code}, Steps~2,3,5,6,8,9).}
+As statements are added line-by-line inside the body, \texttt{interactiveBlockUnit} parses each one:
 \begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
 uint256 bal = balances[msg.sender];
 uint256 delta;
-balances[msg.sender] = bal - amount;
-delta = amount;
-delta = 0;
-totalSupply -= delta;
 \end{lstlisting}
-  \emph{Selected entry:} \texttt{interactiveBlockUnit}.
-  \emph{Internal match:} \texttt{interactiveBlockItem} $\rightarrow$ \texttt{interactiveStatement}
-  $\rightarrow$ \texttt{interactiveSimpleStatement}.
-  \item \emph{If-skeleton (cf.\ Table~\ref{tab:input_code}, Step~4).}
+When the developer types an \texttt{if} skeleton, \texttt{interactiveBlockUnit} matches it as
+\texttt{interactiveIfStatement}:
 \begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
 if (bal >= amount) {
 }
 \end{lstlisting}
-  \emph{Selected entry:} \texttt{interactiveBlockUnit}.
-  \emph{Internal match:} \texttt{interactiveBlockItem} $\rightarrow$ \texttt{interactiveIfStatement}
-  .
-\end{itemize}
+Later, if an \texttt{else} branch is added, \texttt{interactiveIfElseUnit} recognizes it and
+attaches it to the preceding \texttt{if} using the construct stack maintained by the Context
+Analyzer.
 
-\noindent\textbf{5) \texttt{interactiveDoWhileUnit} — the \emph{while-tail} of a \texttt{do\{...\}}
-loop}
-\begin{itemize}
-  \item \emph{Two-phase input.}
-  \begin{enumerate}
-    \item First, the \texttt{do} body skeleton:
-\begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
-do {
-}
-\end{lstlisting}
-    \emph{Selected entry:} \texttt{interactiveBlockUnit}.
-    \emph{Internal match:} \texttt{interactiveBlockItem} $\rightarrow$
-    \texttt{interactiveDoWhileDoStatement}.
-    \item Then, the \texttt{while} tail is typed later:
-\begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
-while (i < n);
-\end{lstlisting}
-    \emph{Selected entry:} \texttt{interactiveDoWhileUnit}.
-    \emph{Internal match:} \texttt{interactiveDoWhileWhileStatement}.
-  \end{enumerate}
-\end{itemize}
-
-\noindent\textbf{6) \texttt{interactiveIfElseUnit} — \texttt{else} / \texttt{else if} tails}
-\begin{itemize}
-  \item \emph{Two-phase input.}
-  \begin{enumerate}
-    \item First, the \texttt{if} skeleton (as above, parsed by \texttt{interactiveBlockUnit}).
-\begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
-if (cond) {
-}
-\end{lstlisting}
-    \item Then, the tail is added:
-\begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
-else {
-}
-\end{lstlisting}
-    or
-\begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
-else if (guard) {
-}
-\end{lstlisting}
-    \emph{Selected entry:} \texttt{interactiveIfElseUnit}.
-    \emph{Internal match:} \texttt{interactiveElseStatement}.
-  \end{enumerate}
-  \item \emph{Context handling.} The parser uses the construct stack to attach the tail to the closest unmatched \texttt{if}, not merely the preceding line.
-\end{itemize}
-
-\noindent\textbf{7) \texttt{interactiveCatchClauseUnit} — \texttt{catch} clauses following a
-\texttt{try}}
-\begin{itemize}
-  \item \emph{Two-phase input.}
-  \begin{enumerate}
-    \item First, the \texttt{try} skeleton:
-\begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
-try doSomething() {
-}
-\end{lstlisting}
-    \emph{Selected entry:} \texttt{interactiveBlockUnit}.
-    \emph{Internal match:} \texttt{interactiveTryStatement}.
-    \item Then, one or more \texttt{catch} clauses:
-\begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
-catch {
-}
-\end{lstlisting}
-    or
-\begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
-catch Error(string memory) {
-}
-\end{lstlisting}
-    \emph{Selected entry:} \texttt{interactiveCatchClauseUnit}.
-    \emph{Internal match:} \texttt{interactiveCatchClause}.
-  \end{enumerate}
-\end{itemize}
-
-\noindent\textbf{Context-aware entry-rule selection}
-\begin{itemize}
-  \item \emph{Construct stack.} The context analyzer maintains a lightweight stack tracking:
-    \begin{itemize}
-      \item Current nesting: contract $\rightarrow$ function $\rightarrow$ block depth
-      \item Unmatched constructs: open \texttt{if}, \texttt{do}, \texttt{try} awaiting their tails
-    \end{itemize}
-  \item \emph{Selection algorithm.}
-    \begin{enumerate}
-      \item Inspect stack top to determine enclosing context
-      \item Match fragment's first token against candidate entry rules
-      \item For two-phase constructs (enum/struct members, \texttt{else}, \texttt{catch}), check if corresponding shell exists
-      \item Select the most specific rule; fall back to \texttt{interactiveSourceUnit} for top-level
-    \end{enumerate}
-  \item \emph{Consistency guarantee.}
-    Each selected rule produces a syntactically well-formed subtree that can be spliced into the global AST/CFG without invalidating existing structure.
-\end{itemize}
-
-\subsubsection{Entry rules for debugging-annotation fragments}
-
-\noindent\textbf{\texttt{debugUnit} — batch-annotation lines inside \texttt{//@Debugging} blocks}
-\begin{itemize}
-  \item \emph{Purpose.} Parses annotation lines that assign abstract values (intervals or symbolic tags) to designated variables, independent of Solidity AST completeness. Enables developers to specify initial states for interactive exploration without deploying contracts.
-
-  \item \emph{Annotation types.}
-    \begin{itemize}
-      \item \texttt{@StateVar}: Assigns values to contract state variables and their nested elements (mappings, arrays, structs)
-      \item \texttt{@LocalVar}: Assigns values to function parameters and local variables
-    \end{itemize}
-
-  \item \emph{Supported L-value patterns.}
-    \begin{itemize}
-      \item Simple variables: \texttt{amount}, \texttt{totalSupply}
-      \item Array/mapping access: \texttt{balances[msg.sender]}, \texttt{arr[0]}
-      \item Struct fields: \texttt{user.balance}, \texttt{data[key].field}
-      \item Nested combinations: \texttt{a[i].x}, \texttt{m[addr].arr[j]}
-    \end{itemize}
-
-  \item \emph{Value specification syntax.}
-    \begin{itemize}
-      \item Integer intervals: \texttt{[100,200]} (normalized to declared bit width: \texttt{uint8} $\rightarrow$ \texttt{[0,255]}, \texttt{int256} $\rightarrow$ \texttt{[$-2^{255}$,$2^{255}$-1]})
-      \item Address intervals: \texttt{[0x0,0xFFFF...FFFF]} (160-bit unsigned, clamped to valid range)
-      \item Boolean intervals: \texttt{[0,1]} representing $\{\mathsf{true},\mathsf{false}\}$, or explicit \texttt{true}/\texttt{false}
-      \item Symbolic values: \texttt{TOP} or omitted (defaults to $\top$, representing all possible values)
-    \end{itemize}
-
-  \item \emph{Block structure and examples.}
+\noindent\textbf{Batch annotations.}
+The \texttt{debugUnit} rule parses annotation lines that specify initial abstract values for state
+and local variables. These annotations enable developers to configure symbolic input scenarios
+without deploying contracts. For example:
 \begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
 // @Debugging BEGIN
 // @StateVar balances[msg.sender] = [100,200]
 // @LocalVar amount = [50,150]
-// @StateVar totalSupply = [1000,1000]
 // @Debugging END
 \end{lstlisting}
-    Each directive occupies one line. Multiple directives are processed sequentially, building up the initial abstract environment before function reinterpretation begins.
+Each directive assigns an interval or symbolic value to a variable. The parser supports nested access
+patterns (e.g., \texttt{balances[msg.sender]}, \texttt{user.balance}, \texttt{arr[i].field}) and
+various value types (integer intervals, symbolic addresses, boolean values). Type checking is
+performed at parse time, and out-of-bounds intervals are clamped to the declared type's valid range
+with a warning. The Snapshot Manager (§3.4.3) consumes these annotations to overlay the initial
+abstract environment before function reinterpretation.
 
-  \item \emph{Selected entry:} \texttt{debugUnit}.
+The complete grammar specification, including production rules and formal syntax for all entry points,
+is provided in Appendix~\ref{appendix:interactive-grammar}. Implementation details such as
+context-stack management and entry-rule selection algorithms are also documented there.
 
-  \item \emph{Internal match:} \texttt{debugStateVar} / \texttt{debugLocalVar}.
-
-  \item \emph{Error handling.}
-    \begin{itemize}
-      \item Type mismatches: Rejected with diagnostic (e.g., assigning string interval to \texttt{uint256})
-      \item Undefined variables: Reported as parse errors referencing the annotation line
-      \item Out-of-bounds intervals: Clamped to type's valid range with warning (e.g., \texttt{uint8} interval \texttt{[0,300]} $\rightarrow$ \texttt{[0,255]})
-      \item Invalid L-values: Rejected if base container type does not support the access pattern
-    \end{itemize}
-
-  \item \emph{Integration with analysis pipeline.}
-    The parsed annotations are consumed by the Snapshot Manager (§3.4.3) to overlay the initial abstract environment. The Abstract Interpreter (§3.5) then re-executes the function on the pre-built CFG without recompilation or deployment, producing line-level interval results under the specified initial conditions.
-\end{itemize}
-
+\FloatBarrier
     \subsection{Dynamic CFG Construction}
 
 This section explains how we dynamically extend the control‑flow graph while a user edits code. We
@@ -1052,9 +914,16 @@ We introduce the node kinds that make up the CFG, then show how each major state
   \item \textsc{loop exit node}: The false branch that leaves a loop.
 \end{itemize}
 
-\begin{figure}[!t]
+Figure~\ref{fig:new-simple-statement} shows a simple statement. The builder creates one
+\textsc{basic node} and splices it between the current node and the original successors. Incoming
+environment is copied from the current node; all outgoing edges of the current node are reattached
+to the new basic node. We deliberately store \emph{exactly one} statement per basic node so that
+mid‑line insertions become \(O(1)\) splices via the editor‑to‑CFG line map, without scanning or
+splitting multi‑statement blocks.
+
+\begin{figure}[H]
 \centering
-\begin{tikzpicture}[
+\begin{tikzpicture}[scale=0.8, transform shape,
   node distance=1cm,
   block/.style={rectangle, draw, thick, minimum width=2.5cm, minimum height=0.8cm, align=center, font=\footnotesize},
   dots/.style={circle, draw=none, minimum size=0.3cm}
@@ -1078,16 +947,15 @@ We introduce the node kinds that make up the CFG, then show how each major state
 \label{fig:new-simple-statement}
 \end{figure}
 
-Figure~\ref{fig:new-simple-statement} shows a simple statement. The builder creates one
-\textsc{basic node} and splices it between the current node and the original successors. Incoming
-environment is copied from the current node; all outgoing edges of the current node are reattached
-to the new basic node. We deliberately store \emph{exactly one} statement per basic node so that
-mid‑line insertions become \(O(1)\) splices via the editor‑to‑CFG line map, without scanning or
-splitting multi‑statement blocks.
+Figure~\ref{fig:new-if} shows an \texttt{if}. The builder inserts a \textsc{condition node} for the
+guard, two \textsc{basic nodes} for the true/false arms, and an \textsc{if join}. Edges: current
+\(\rightarrow\) condition; condition \(\rightarrow\) true basic (true edge) and \(\rightarrow\)
+false basic (false edge); both basics \(\rightarrow\) if join; the if join reconnects to the
+original successors. Environments on the two edges are refined by the truth value of the guard.
 
-\begin{figure}[!t]
+\begin{figure}[H]
 \centering
-\begin{tikzpicture}[
+\begin{tikzpicture}[scale=0.8, transform shape,
   node distance=1.2cm and 1.5cm,
   block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
   cond/.style={diamond, draw, thick, aspect=2, minimum width=1.5cm, align=center, font=\footnotesize},
@@ -1112,15 +980,18 @@ splitting multi‑statement blocks.
 \label{fig:new-if}
 \end{figure}
 
-Figure~\ref{fig:new-if} shows an \texttt{if}. The builder inserts a \textsc{condition node} for the
-guard, two \textsc{basic nodes} for the true/false arms, and an \textsc{if join}. Edges: current
-\(\rightarrow\) condition; condition \(\rightarrow\) true basic (true edge) and \(\rightarrow\)
-false basic (false edge); both basics \(\rightarrow\) if join; the if join reconnects to the
-original successors. Environments on the two edges are refined by the truth value of the guard.
 
-\begin{figure}[!t]
+
+
+Figure~\ref{fig:new-else-if} shows an \texttt{else if}. The builder removes the previously created
+false arm of the nearest preceding \texttt{if}/\texttt{else if} at the same nesting depth and
+splices a fragment consisting of a new \textsc{condition node}, two \textsc{basic nodes}, and an
+\textsc{else‑if join}. The else‑if join is connected to the existing \textsc{if join} so the overall
+shape remains a single diamond toward the if join.
+
+\begin{figure}[H]
 \centering
-\begin{tikzpicture}[
+\begin{tikzpicture}[scale=0.8, transform shape,
   node distance=1.2cm and 2cm,
   block/.style={rectangle, draw, thick, minimum width=1.8cm, minimum height=0.7cm, align=center, font=\footnotesize},
   cond/.style={diamond, draw, thick, aspect=2, minimum width=1.3cm, align=center, font=\footnotesize},
@@ -1156,15 +1027,18 @@ original successors. Environments on the two edges are refined by the truth valu
 \label{fig:new-else-if}
 \end{figure}
 
-Figure~\ref{fig:new-else-if} shows an \texttt{else if}. The builder removes the previously created
-false arm of the nearest preceding \texttt{if}/\texttt{else if} at the same nesting depth and
-splices a fragment consisting of a new \textsc{condition node}, two \textsc{basic nodes}, and an
-\textsc{else‑if join}. The else‑if join is connected to the existing \textsc{if join} so the overall
-shape remains a single diamond toward the if join.
 
-\begin{figure}[!t]
+
+Figure~\ref{fig:new-else} shows an \texttt{else}. No new condition is created; the builder attaches
+a \textsc{basic node} to the false branch of the corresponding \texttt{if}/\texttt{else if} and
+connects it to the same \textsc{if join} as the true branch. The figure assumes a canonical
+\texttt{if}/\texttt{else if}/\texttt{else} chain. For nested patterns (e.g., \texttt{if \{ if \{\}
+else \{\} \}}), the else attaches to the false arm of its matching guard according to standard block
+matching.
+
+\begin{figure}[H]
 \centering
-\begin{tikzpicture}[
+\begin{tikzpicture}[scale=0.8, transform shape,
   node distance=1.2cm and 2cm,
   block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
   cond/.style={diamond, draw, thick, aspect=2, minimum width=1.5cm, align=center, font=\footnotesize},
@@ -1193,16 +1067,43 @@ shape remains a single diamond toward the if join.
 \label{fig:new-else}
 \end{figure}
 
-Figure~\ref{fig:new-else} shows an \texttt{else}. No new condition is created; the builder attaches
-a \textsc{basic node} to the false branch of the corresponding \texttt{if}/\texttt{else if} and
-connects it to the same \textsc{if join} as the true branch. The figure assumes a canonical
-\texttt{if}/\texttt{else if}/\texttt{else} chain. For nested patterns (e.g., \texttt{if \{ if \{\}
-else \{\} \}}), the else attaches to the false arm of its matching guard according to standard block
-matching.
 
-\begin{figure}[!t]
+
+Figure~\ref{fig:new-while} shows a \texttt{while}. The builder creates a \textsc{fixpoint evaluation
+node} \(\phi\), a \textsc{condition node}, a true‑arm \textsc{basic node} as the loop‑body entry,
+and a \textsc{loop exit node} (false arm). Rewiring: current \(\rightarrow \phi \rightarrow\)
+condition; condition(true) \(\rightarrow\) body; body \(\rightarrow \phi\) (back edge);
+condition(false) \(\rightarrow\) loop exit; the loop exit reconnects to the original successors.
+
+\begin{figure}[H]
 \centering
-\begin{tikzpicture}[
+\begin{tikzpicture}[scale=0.8, transform shape,
+  node distance=1cm and 2cm,
+  block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
+  cond/.style={diamond, draw, thick, aspect=2, minimum width=1.5cm, align=center, font=\footnotesize},
+  exit/.style={rectangle, draw, thick, rounded corners, fill=red!15, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
+  dots/.style={circle, draw=none, minimum size=0.3cm}
+]
+  \node[block] (current) {Current Node};
+  \node[cond, below=of current, fill=green!15] (cond) {predicate};
+  \node[block, below left=of cond, fill=green!15] (true) {True\\Node};
+  \node[exit, below right=of cond] (error) {ERROR\\EXIT};
+  \node[dots, below=of true] (succ) {...};
+
+  \draw[->, thick] (current) -- (cond);
+  \draw[->, thick] (cond) -| node[above left, pos=0.3] {T} (true);
+  \draw[->, thick] (cond) -| node[above right, pos=0.3] {F} (error);
+  \draw[->, thick] (true) -- (succ);
+\end{tikzpicture}
+\caption{Require/assert statement insertion. The builder creates a \textsc{condition node} with true edge to a node and false edge to the \textsc{error exit}}
+\label{fig:new-require}
+\end{figure}
+ The
+\(\phi\) node stores both the pre‑loop baseline and the running snapshot for widening/narrowing.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.8, transform shape,
   node distance=1cm and 2.2cm,
   block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
   cond/.style={diamond, draw, thick, aspect=2, minimum width=1.5cm, align=center, font=\footnotesize},
@@ -1228,16 +1129,15 @@ matching.
 \label{fig:new-while}
 \end{figure}
 
-Figure~\ref{fig:new-while} shows a \texttt{while}. The builder creates a \textsc{fixpoint evaluation
-node} \(\phi\), a \textsc{condition node}, a true‑arm \textsc{basic node} as the loop‑body entry,
-and a \textsc{loop exit node} (false arm). Rewiring: current \(\rightarrow \phi \rightarrow\)
-condition; condition(true) \(\rightarrow\) body; body \(\rightarrow \phi\) (back edge);
-condition(false) \(\rightarrow\) loop exit; the loop exit reconnects to the original successors. The
-\(\phi\) node stores both the pre‑loop baseline and the running snapshot for widening/narrowing.
 
-\begin{figure}[!t]
+
+Figure~\ref{fig:new-break} shows a \texttt{break}. The statement becomes a \textsc{basic node} whose
+outgoing edge is redirected to the \textsc{loop exit node}. The loop exit's environment is
+conservatively joined with the environment at the break site.
+
+\begin{figure}[H]
 \centering
-\begin{tikzpicture}[
+\begin{tikzpicture}[scale=0.8, transform shape,
   node distance=1cm and 2.5cm,
   block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
   cond/.style={diamond, draw, thick, aspect=2, minimum width=1.3cm, align=center, font=\footnotesize},
@@ -1265,13 +1165,16 @@ condition(false) \(\rightarrow\) loop exit; the loop exit reconnects to the orig
 \label{fig:new-break}
 \end{figure}
 
-Figure~\ref{fig:new-break} shows a \texttt{break}. The statement becomes a \textsc{basic node} whose
-outgoing edge is redirected to the \textsc{loop exit node}. The loop exit's environment is
-conservatively joined with the environment at the break site.
 
-\begin{figure}[!t]
+
+Figure~\ref{fig:new-continue} shows a \texttt{continue}. The statement becomes a \textsc{basic node}
+whose outgoing edge is redirected to the loop's \textsc{fixpoint evaluation node} \(\phi\).
+Operationally, this keeps the back‑edge shape and joins the current environment into the loop's join
+state.
+
+\begin{figure}[H]
 \centering
-\begin{tikzpicture}[
+\begin{tikzpicture}[scale=0.8, transform shape,
   node distance=1cm and 2.5cm,
   block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
   cond/.style={diamond, draw, thick, aspect=2, minimum width=1.3cm, align=center, font=\footnotesize},
@@ -1298,14 +1201,15 @@ conservatively joined with the environment at the break site.
 \label{fig:new-continue}
 \end{figure}
 
-Figure~\ref{fig:new-continue} shows a \texttt{continue}. The statement becomes a \textsc{basic node}
-whose outgoing edge is redirected to the loop's \textsc{fixpoint evaluation node} \(\phi\).
-Operationally, this keeps the back‑edge shape and joins the current environment into the loop's join
-state.
 
-\begin{figure}[!t]
+
+Figure~\ref{fig:new-return} shows a \texttt{return}. The statement becomes a \textsc{return node}
+and is immediately rewired to the function's unique \textsc{return exit}; the return value is
+recorded there and the original successors of the current node are detached.
+
+\begin{figure}[H]
 \centering
-\begin{tikzpicture}[
+\begin{tikzpicture}[scale=0.8, transform shape,
   node distance=1cm,
   block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
   exit/.style={rectangle, draw, thick, rounded corners, fill=red!15, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
@@ -1324,33 +1228,7 @@ state.
 \label{fig:new-return}
 \end{figure}
 
-Figure~\ref{fig:new-return} shows a \texttt{return}. The statement becomes a \textsc{return node}
-and is immediately rewired to the function's unique \textsc{return exit}; the return value is
-recorded there and the original successors of the current node are detached.
 
-\begin{figure}[!t]
-\centering
-\begin{tikzpicture}[
-  node distance=1cm and 2cm,
-  block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
-  cond/.style={diamond, draw, thick, aspect=2, minimum width=1.5cm, align=center, font=\footnotesize},
-  exit/.style={rectangle, draw, thick, rounded corners, fill=red!15, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
-  dots/.style={circle, draw=none, minimum size=0.3cm}
-]
-  \node[block] (current) {Current Node};
-  \node[cond, below=of current, fill=green!15] (cond) {predicate};
-  \node[block, below left=of cond, fill=green!15] (true) {True\\Node};
-  \node[exit, below right=of cond] (error) {ERROR\\EXIT};
-  \node[dots, below=of true] (succ) {...};
-
-  \draw[->, thick] (current) -- (cond);
-  \draw[->, thick] (cond) -| node[above left, pos=0.3] {T} (true);
-  \draw[->, thick] (cond) -| node[above right, pos=0.3] {F} (error);
-  \draw[->, thick] (true) -- (succ);
-\end{tikzpicture}
-\caption{Require/assert statement insertion. The builder creates a \textsc{condition node} with true edge to a node and false edge to the \textsc{error exit}}
-\label{fig:new-require}
-\end{figure}
 
 Figure~\ref{fig:new-require} shows \texttt{require}/\texttt{assert}. The builder inserts a
 \textsc{condition node} for the predicate, makes the true edge point to a \textsc{basic node}, and
@@ -1657,476 +1535,41 @@ The change guard mechanism is critical for efficiency. After computing the trans
 \end{algorithmic}
 \end{algorithm}
 
-\begin{comment}
- 3. 적응적 확대 연산을 이용한 고정점 알고리즘
+\medskip
+\noindent\textbf{Adaptive Widening via Iteration Estimation.}
+Traditional fixpoint algorithms apply widening after a fixed number of visits (typically 2) to ensure termination. Algorithm~\ref{alg:fixpoint} improves precision by computing an \emph{adaptive} threshold $\tau$ tailored to each loop's expected iteration count. Line 4 invokes \textsc{EstimateIterations}, which analyzes the loop condition expression to determine $\tau$:
 
-  본 연구에서 제안하는 고정점 알고리즘은 반복문 분석을 위한    
-   정적 분석 기법으로, 적응적 확대 연산(adaptive
-  widening)과 조기 종료(early termination) 기법을 결합하여
-  정밀도와 효율성을 동시에 향상시킨다.
+\begin{itemize}
+  \item \textbf{Condition structure check:} If the loop condition is a binary comparison with operator $\in \{<, \le, >, \ge, \ne\}$, proceed; otherwise return the conservative default $\tau = 2$.
 
- 
- 3.5.1 적응적 반복 횟수 추정
+  \item \textbf{Operand evaluation:} Evaluate both operands (e.g., loop counter $i$ and bound $n$) in the pre-loop environment $\textit{Start}$. If either evaluates to $\bot$ or a non-interval abstract value (e.g., symbolic address, unevaluated state expression), return $\tau = 2$.
 
-  기존의 고정점 알고리즘이 고정된 임계값(예: 2회)을
-  사용하는 것과 달리, 본 알고리즘은 반복문 조건식을
-  분석하여 동적으로 임계값을 결정한다:
+  \item \textbf{Iteration count computation:} For interval operands $[\ell_1, u_1]$ and $[\ell_2, u_2]$, compute the maximum iteration count based on the operator. For instance, $i < n$ yields $\tau = u_2 - \ell_1$; $i \le n$ yields $\tau = u_2 - \ell_1 + 1$.
 
-  - 조건식의 연산자가 <, ≤, >, ≥, ≠ 중 하나인지 확인한다.      
-  - 양측 피연산자를 초기 환경에서 평가하여 구간(interval)을    
-   얻는다.
-  - 연산자 종류에 따라 예상 반복 횟수를 계산한다. 예를
-  들어, i < n의 경우 n.max - i.min을 계산한다.
-  - 계산된 값을 [2, 20] 범위로 제한하여 안정성을 보장한다.     
+  \item \textbf{Clamping:} Clamp the result to $[2, 20]$ to balance precision and efficiency. Loops with $\tau \le 2$ widen immediately; loops with $\tau \in [3, 20]$ iterate precisely up to $\tau$ visits before widening; loops exceeding 20 are capped to prevent excessive fixpoint rounds.
+\end{itemize}
 
-  이를 통해 반복 횟수가 적은 루프에서는 더 많은 정밀
-  반복을, 반복 횟수가 많은 루프에서는 조기에 확대 연산을       
-  적용하여 효율성을 높인다.
+This mechanism is \emph{annotation-aware} without requiring special logic: when debug annotations materialize array lengths, mapping sizes, or function parameters, the evaluator naturally computes tighter intervals for condition operands, raising $\tau$ and deferring widening. Conversely, unannotated state expressions remain $\bot$, forcing the conservative default and triggering early widening (§\ref{sec:eval}, RQ3).
 
-  3.5.2 조건 수렴 검사
+Additionally, line 8 checks \textsc{CondConverged}, an optional early-stopping heuristic that detects when both condition operands stabilize to singleton intervals across successive iterations, signaling natural convergence and allowing the widening phase to terminate before $\tau$ is exhausted.
 
-  반복문 조건식의 양측 피연산자가 모두
-  단일값(singleton)으로 수렴하고 이전 상태와 동일한 경우,      
-  더 이상의 반복이 불필요함을 감지하여 확대 단계를 조기        
-  종료한다. 이는 불필요한 반복을 방지하여 분석 효율을
-  향상시킨다.
-
-   1. 반복문 노드 추출: 반복문에 속한 모든 노드 집합
-  loop_nodes를 순회를 통해 추출한다.
-  2. 방문 횟수 초기화: 각 노드의 방문 횟수를 기록할 맵
-  visit_count를 초기화한다.
-  3. 입출력 환경 초기화: 각 노드의 입력 환경 in_vars와 출력    
-   환경 out_vars를 초기화한다.
-  4. 초기 환경 계산: 반복문 외부에서 반복문 헤드로 진입하는    
-   선행 노드들의 환경을 합병(join)하여 초기 환경
-  start_env를 계산한다.
-  5. 임계값 추정: 반복문 조건식을 분석하여 예상 반복 횟수를    
-   추정하고, 이를 확대 연산 적용 임계값 threshold로
-  설정한다.
-
-
-\end{comment}
+\medskip
+\noindent\textbf{Abstract Interpretation.}
+At the end of CFG construction, \textsc{SolQDebug} performs abstract interpretation
+to compute sound over-approximations of variable ranges. We employ interval domains
+for integer types ($\widehat{\mathbb{Z}}_N, \widehat{\mathbb{U}}_N$), set abstractions
+for addresses and booleans, and on-demand materialization for composite types
+(arrays, mappings, structs). Standard widening operators ensure termination in loops.
+The complete formal semantics—including program syntax, concrete semantics, abstract
+domains, and abstract transfer functions—are provided in Appendix~\ref{app:semantics}.
 
 \clearpage
 
-    \subsection{Design of the Abstract Interpretation Framework for Solidity}
+% SECTION 3.5 MOVED TO APPENDIX A
+% (Former subsection: Design of the Abstract Interpretation Framework for Solidity)
+% CONTENT MOVED TO APPENDIX A
 
-This section presents the formal framework for our abstract interpretation-based debugger. We begin with the program syntax covering the subset of Solidity we analyze, then define the concrete semantics as a baseline, introduce the abstract domains we use for scalable approximation, and finally describe the abstract semantics that power our incremental debugging analysis.
-
-        \subsubsection{Program Syntax}
-
-% ================= Table: Syntax (meta, literals, types) =================
-\begin{table}[t]
-  \caption{Abstract syntax (subset of Solidity) used by our analysis — meta, literals, and types}
-  \label{tab:syntax-a}
-  \centering
-  \small
-  \setlength{\tabcolsep}{5pt}
-  \renewcommand{\arraystretch}{1.05}
-  \begin{tabularx}{\columnwidth}{@{}l l >{\raggedright\arraybackslash}X@{}}
-    \toprule
-    \textbf{Symbol} & \textbf{Set} & \textbf{Definition / Forms} \\
-    \midrule
-    \multicolumn{3}{@{}l}{\emph{Meta and identifiers}}\\
-    $N$ & $\mathsf{BitW}$   & Integer bit width, $N \in \{8,16,\ldots,256\}$. \\
-    $x$ & $\mathsf{Var}$    & Program variables (state or local). \\
-    $f$ & $\mathsf{Field}$  & Struct fields. \\
-    $C$ & $\mathsf{Struct}$ & Struct identifiers. \\
-    $E$ & $\mathsf{Enum}$   & Enum identifiers. \\
-    \midrule
-    \multicolumn{3}{@{}l}{\emph{Literals}}\\
-    $n$ & $\mathbb{Z}_{2^N}$ & Integer numeral typed by $N$ (signed via unary $-$ when needed). \\
-    $b$ & $\mathbb{B}$       & $\{\mathsf{true},\mathsf{false}\}$. \\
-    $\mathit{addr}$ & $\mathbb{A}$  & Address literal ($0 \ldots 2^{160}\!-\!1$). \\
-    \midrule
-    \multicolumn{3}{@{}l}{\emph{Types}}\\
-    $\tau_b$ & $\mathsf{ValType}$ &
-      $\mathsf{uint}N \mid \mathsf{int}N \mid \mathsf{bool} \mid \mathsf{address}$. \\
-    $\kappa$ & $\mathsf{Key}$ &
-      $\mathsf{uint}N \mid \mathsf{int}N \mid \mathsf{address} \mid
-      \mathsf{enum}\ E$. \\
-    $\mu$    & $\mathsf{CType}$ &
-      $\mathsf{mapping}(\kappa \Rightarrow \tau) \mid \tau[] \mid \mathsf{struct}\ C \mid
-      \mathsf{enum}\ E$, \\
-      & & where $\tau ::= \tau_b \mid \mu$. \\
-    \bottomrule
-  \end{tabularx}
-\end{table}
-
-% ================= Table: Syntax (l-values, expressions, statements) =================
-\begin{table}[t]
-  \caption{Abstract syntax (subset) — l-values, expressions, statements, programs}
-  \label{tab:syntax-b}
-  \centering
-  \small
-  \setlength{\tabcolsep}{5pt}
-  \renewcommand{\arraystretch}{1.05}
-  \begin{tabularx}{\columnwidth}{@{}l l >{\raggedright\arraybackslash}X@{}}
-    \toprule
-    \textbf{Symbol} & \textbf{Set} & \textbf{Definition / Forms} \\
-    \midrule
-    \multicolumn{3}{@{}l}{\emph{L-values and expressions}}\\
-    $\mathit{lv}$ & $\mathsf{LVal}$ &
-      $x \mid \mathit{lv}.f \mid \mathit{lv}[\mathit{idx}] \mid \mathit{lv}[\mathit{key}]$. \\
-    $\mathit{idx}$ & $\mathsf{IdxExp}$ & Numeric index expression (int/uint). \\
-    $\mathit{key}$ & $\mathsf{KeyExp}$ & Mapping key expression of type $\kappa$. \\
-    $a$ & $\mathsf{AExp}$ &
-      $n \mid \mathit{addr} \mid \mathit{lv} \mid -a \mid \sim a \mid a \,\oplus\, a$,\\
-      & &
-      $\oplus \in \{+,-,*,/, \%, \ll, \gg, \&,\;|\;,\wedge\}$. \\
-    $p$ & $\mathsf{BExp}$ &
-      $b \mid a \;\bowtie\; a \mid \neg p \mid p \land p \mid p \lor p$,\\
-      & & $\bowtie \in \{=,\neq,<,\le,>,\ge\}$. \\
-    \midrule
-    \multicolumn{3}{@{}l}{\emph{Statements}}\\
-    $s$ & $\mathsf{Stmt}$ &
-      \begin{tabular}[t]{@{}l@{}}
-      \textsf{skip} \mid $s; s$ \mid $\{\overline{s}\}$ \\
-      $\tau_b\ x;$ \mid $\tau_b\ x = a;$ \mid $\mathit{lv} := a$ \mid \textsf{delete}\; $\mathit{lv}
-      $ \\
-      \textsf{if}\ $p$ \ \textsf{then}\ $s$ \ \textsf{else}\ $s$ \\
-      \textsf{while}\ $p$\ \textsf{do}\ $s$ \mid \textsf{do}\ $s$ \ \textsf{while}\ $p$ \\
-      \textsf{for}($s_0$; $p$?; $u$?)\ $s$ \ (\,$u$ is an update as an assignment/compound\,) \\
-      \textsf{return}\; $a$? \mid \textsf{assert}($p$) \mid \textsf{require}($p$) \\
-      \textsf{call}(\overline{a}) \ (\textit{external or unknown call, as a statement}) \\
-      \end{tabular} \\
-    \midrule
-    \multicolumn{3}{@{}l}{\emph{Programs}}\\
-    $f$ & $\mathsf{Fun}$ &
-      \textsf{function}\ $id(\overline{x:\tau_b})\ s$\quad(\emph{single‑contract, single‑tx};
-      modifiers desugared). \\
-    \bottomrule
-  \end{tabularx}
-\end{table}
-
-Our analysis focuses on standard structured constructs including variable declarations, assignments, \textsf{if},
-\textsf{while}, \textsf{do–while}, \textsf{for}, \textsf{return}, \textsf{assert}/\textsf{require},
-\textsf{delete}, and calls as statements. Low‑level features such as inline assembly and unchecked arithmetic are out of scope for this section;
-modifiers are assumed to be desugared into the control flow.
-
-    
-\subsubsection{Concrete Semantics (Denotational)}
-
-We define the concrete semantics denotationally to establish a baseline for correctness. Let stores be $\sigma:\mathsf{Var}\rightharpoonup \mathsf{CVal}$.
-L-value resolution $\mathrm{loc}_\sigma(\mathit{lv})=\ell$ and write $\mathrm{write}(\sigma,\ell,v)$
-update the store, where arrays and mappings lazily materialize missing cells on access.
-Expressions are pure and evaluate to values: $\llbracket e\rrbracket_\sigma\in\mathsf{Val}$.
-To model control effects such as early returns and assertion failures, we introduce an outcome domain
-\[
-\mathsf{Res} \;::=\; \Norm(\sigma) \;\mid\; \Ret(v,\sigma) \;\mid\; \Abort
-\]
-with a sequencing (Kleisli) operator
-\[
-\begin{aligned}
-\Norm(\sigma)\ \triangleright\ K &:= K(\sigma),\\
-\Ret(v,\sigma)\ \triangleright\ K &:= \Ret(v,\sigma),\\
-\Abort\ \triangleright\ K &:= \Abort.
-\end{aligned}
-\]
-We write $\llbracket s\rrbracket:\sigma\mapsto \mathsf{Res}$ for the denotation of statements. Table~\ref{tab:conc-denot} defines the concrete semantics for each statement form.
-\begin{table}[t]
-  \caption{Concrete denotational semantics (statements)}
-  \label{tab:conc-denot}
-  \centering
-  \small
-  \setlength{\tabcolsep}{6pt}
-  \renewcommand{\arraystretch}{1.12}
-  \begin{tabularx}{\columnwidth}{@{}l X@{}}
-    \toprule
-    \textbf{Statement} & \textbf{Meaning} \\
-    \midrule
-    \textsf{skip} &
-    $\llbracket \textsf{skip}\rrbracket(\sigma)=\Norm(\sigma)$.\\
-
-    $s_1; s_2$ &
-    $\llbracket s_1; s_2\rrbracket(\sigma)=\big(\llbracket s_1\rrbracket(\sigma)\big)
-    \ \triangleright\ (\lambda \sigma'.\,\llbracket s_2\rrbracket(\sigma'))$.\\
-
-    $\{\overline{s}\}$ &
-    Right-associative fold of sequencing over $\overline{s}$.\\
-
-    $\tau\ x;$ &
-    $\llbracket \tau\ x;\rrbracket(\sigma)=\Norm\!\big(\sigma[x\mapsto \mathrm{zero}_\tau]\big)$.\\
-
-    $\tau\ x=e;$ &
-    $\llbracket \tau\ x=e;\rrbracket(\sigma)=\Norm\!\big(\sigma[x\mapsto \llbracket
-    e\rrbracket_\sigma]\big)$.\\
-
-    $\mathit{lv}:=e$ &
-    $\llbracket \mathit{lv}:=e\rrbracket(\sigma)=\Norm\!\big(\mathrm{write}(\sigma,\,\mathrm{loc}
-    _\sigma(\mathit{lv}),\,\llbracket e\rrbracket_\sigma)\big)$.\\
-
-    \textsf{delete}\ $\mathit{lv}$ &
-    $\llbracket \textsf{delete}\ \mathit{lv}\rrbracket(\sigma)=\Norm\!\big(\mathrm{write}(\sigma,\,
-    \mathrm{loc}_\sigma(\mathit{lv}),\,\mathrm{zero}_{\tau(\mathit{lv})})\big)$.\\
-
-    \textsf{if}\ $p$ \textsf{then}\ $s_t$ \textsf{else}\ $s_f$ &
-    $\llbracket \cdot\rrbracket(\sigma)=
-      \begin{cases}
-        \llbracket s_t\rrbracket(\sigma) & \text{if }\llbracket p\rrbracket_\sigma=\mathsf{true},\\
-        \llbracket s_f\rrbracket(\sigma) & \text{if }\llbracket p\rrbracket_\sigma=\mathsf{false}.
-      \end{cases}$\\
-
-    \textsf{while}\ $p$ \textsf{do}\ $s$ &
-    Let $F(H)(\sigma)=
-      \begin{cases}
-        \big(\llbracket s\rrbracket(\sigma)\big)\ \triangleright\ H & \text{if }\llbracket
-        p\rrbracket_\sigma=\mathsf{true},\\
-        \Norm(\sigma) & \text{if }\llbracket p\rrbracket_\sigma=\mathsf{false}.
-      \end{cases}$ Then $\llbracket \textsf{while}\ p\ \textsf{do}\ s\rrbracket=\mathrm{lfp}(F)$.\\
-
-    \textsf{return}\ $e$ &
-    $\llbracket \textsf{return}\ e\rrbracket(\sigma)=\Ret(\llbracket e\rrbracket_\sigma,\,\sigma)$.
-    \\
-
-    \textsf{assert}$(p)$,\ \textsf{require}$(p)$ &
-    $\llbracket \cdot\rrbracket(\sigma)=
-      \begin{cases}
-        \Norm(\sigma) & \text{if }\llbracket p\rrbracket_\sigma=\mathsf{true},\\
-        \Abort & \text{if }\llbracket p\rrbracket_\sigma=\mathsf{false}.
-      \end{cases}$\\
-
-    \textsf{revert}$(\cdots)$ &
-    $\llbracket \textsf{revert}(\cdots)\rrbracket(\sigma)=\Abort$.\\
-
-    \textsf{call}$(\overline{e})$ &
-    Internal calls evaluate the callee's body with parameter binding; external/unknown calls are
-    left unspecified here (treated in the abstract setting by a conservative effect).\\
-    \bottomrule
-  \end{tabularx}
-\end{table}
-
-For arrays and mappings, $\mathrm{loc}_\sigma(a[i])$ extends dynamic array $a$ up to index $i$ with default cells if needed,
-and $\mathrm{loc}_\sigma(m[k])$ creates mapping entry $m[k]$ lazily if absent. These conventions apply to both
-reads and writes. Note that \textsf{for} and \textsf{do-while} loops are desugared to \textsf{while} in our framework, and we
-treat \textsf{require} identically to \textsf{assert} at the level of control effects since both abort on failure.
-
-        \subsubsection{Abstract Domain}
-
-% ---------- Macros for atomic abstract values ----------
-\newcommand{\Uhat}[1]{\widehat{\mathbb{U}}_{#1}}
-\newcommand{\Zhat}[1]{\widehat{\mathbb{Z}}_{#1}}
-
-\noindent\textbf{Atomic abstract values.}
-We use interval domains for integer types and a specialized set domain for address types:
-\begin{align*}
-\Uhat{N} &:= \{[\ell,u] \mid 0 \le \ell \le u \le 2^N{-}1\} \ \cup\ \{\bot,\top_N\},\\
-\Zhat{N} &:= \{[\ell,u] \mid -2^{N-1} \le \ell \le u \le 2^{N-1}{-}1\} \ \cup\ \{\bot,\top_N^{\pm}\},
-\\
-\widehat{\mathbb{B}} &:= \{\bot,\widehat{\mathsf{false}},\widehat{\mathsf{true}},\top\},\qquad
-\widehat{\mathbb{A}} := \wp_{\le K}(\mathbb{A}) \cup \{\top\},\\
-\widehat{\mathsf{Enum}}(E) &:= \{[\ell,u]\mid 0\le \ell \le u \le |E|-1\}\cup\{\bot,[0,|E|-1]\}.
-\end{align*}
-Here $\widehat{\mathbb{A}}$ represents the address domain as a set abstraction with at most $K$ concrete address identifiers,
-generalizing to $\top$ when capacity is exceeded. This enables precise tracking of contract addresses in debugging scenarios
-while maintaining scalability.
-
-\noindent\textbf{Order/Join/Meet.}\;
-For intervals,
-\[
-[\ell_1,u_1] \sqsubseteq [\ell_2,u_2] \iff \ell_2 \le \ell_1 \ \wedge\ u_1 \le u_2,\quad
-[\ell_1,u_1] \sqcup [\ell_2,u_2] = [\min(\ell_1,\ell_2),\max(u_1,u_2)],
-\]
-\[
-[\ell_1,u_1] \sqcap [\ell_2,u_2] =
-\begin{cases}
-[\max(\ell_1,\ell_2),\min(u_1,u_2)] & \text{if }\max(\ell_1,\ell_2)\le \min(u_1,u_2),\\
-\bot & \text{otherwise.}
-\end{cases}
-\]
-Widening $\nabla$ is the standard interval widening (per bit width); narrowing $\Delta$ follows the
-dual pattern.
-
-\medskip
-\noindent\textbf{Composite values.}
-Our framework supports Solidity's composite data structures through careful abstraction:
-\begin{itemize}[leftmargin=1.25em]
-  \item \emph{Structs}:\;
-  $\widehat{\mathsf{Struct}}(C) = \prod_{f\in\mathsf{fields}(C)} \widehat{\mathsf{Val}}_f$
-  represents structs as products over their fields with pointwise order, enabling field-sensitive analysis.
-  \item \emph{Arrays (on‑access materialization)}:\;
-  $\widehat{\mathsf{Arr}}(\tau) = (\hat{\ell},\hat{d},M)$ where
-  $\hat{\ell}\in \Uhat{256}$ is an abstract length,
-  $\hat{d}\in \widehat{\tau}$ is a default element value,
-  and $M:\mathbb{N}_{\text{fin}}\rightharpoonup \widehat{\tau}$ is a finite map tracking observed indices.
-  This design enables strong updates for known indices while maintaining soundness for unknown accesses.
-  \item \emph{Mappings (on‑access materialization)}:\;
-  $\widehat{\mathsf{Map}}(\kappa\Rightarrow\tau) = (\hat{d},M)$ with default $\hat{d}
-  \in\widehat{\tau}$ and finite $M:\widehat{\kappa}_{\text{fin}}\rightharpoonup \widehat{\tau}$.
-  Mappings materialize entries on first access, supporting both concrete keys (for strong updates) and symbolic keys (for weak updates).
-  \item \emph{Enums}:\; represented as bounded unsigned intervals over $[0,|E|-1]$.
-\end{itemize}
-
-\medskip
-\noindent\textbf{Value domains and store.}
-The complete abstract value hierarchy is:
-\[
-\widehat{\mathsf{Val}} \;::=\; \bigcup_{N}(\Uhat{N}\cup\Zhat{N})\ \cup\ \widehat{\mathbb{B}}
-\ \cup\ \widehat{\mathbb{A}}\ \cup\ \widehat{\mathsf{Enum}}(E),
-\]
-\[
-\widehat{\mathsf{CVal}} \;::=\; \widehat{\mathsf{Val}} \;\mid\; \widehat{\mathsf{Struct}}(C) \;\mid\;
-\widehat{\mathsf{Arr}}(\tau) \;\mid\; \widehat{\mathsf{Map}}(\kappa\Rightarrow\tau),
-\qquad
-\hat{\sigma}:\mathsf{Var}\rightharpoonup \widehat{\mathsf{CVal}} \ (\text{pointwise order/join}).
-\]
-The abstract store $\hat{\sigma}$ maps variables to abstract values with pointwise ordering and join operations,
-providing the foundation for our flow-sensitive analysis.
-
-% ================= Table: Type-to-domain mapping (compact) =================
-\begin{table}[t]
-  \caption{Type $\to$ abstract domain mapping (summary)}
-  \label{tab:type2domain}
-  \centering
-  \small
-  \setlength{\tabcolsep}{6pt}
-  \renewcommand{\arraystretch}{1.05}
-  \begin{tabular}{@{}l l@{}}
-    \toprule
-    \textbf{Solidity type} & \textbf{Abstract domain} \\
-    \midrule
-    $\mathsf{uint}N$ & $\Uhat{N}$ \quad($N\!\in\!\{8,\dots,256\}$) \\
-    $\mathsf{int}N$  & $\Zhat{N}$ \\
-    $\mathsf{bool}$  & $\widehat{\mathbb{B}}$ \\
-    $\mathsf{address}$ & $\widehat{\mathbb{A}}$ (set domain) \\
-    $\mathsf{enum}\ E$ & $\widehat{\mathsf{Enum}}(E)$ \\
-    $\tau[]$ & $\widehat{\mathsf{Arr}}(\tau)$ \\
-    $\mathsf{mapping}(\kappa\Rightarrow\tau)$ & $\widehat{\mathsf{Map}}(\kappa\Rightarrow\tau)$ \\
-    $\mathsf{struct}\ C$ & $\widehat{\mathsf{Struct}}(C)$ \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-Table~\ref{tab:type2domain} summarizes the mapping from Solidity types to abstract domains.
-Addresses use a set domain that tracks up to $K$ concrete identifiers before generalizing to $\top$,
-providing precise aliasing information for contract addresses commonly encountered in debugging.
-Arrays and mappings employ finite observed maps with default values, ensuring soundness under unknown
-indices or keys while enabling strong updates for observed accesses.
-
-        % 3.5.x  Abstract Semantics (Denotational)
-% =====================================================================
-\subsubsection{Abstract Semantics (Denotational)}
-
-We lift the concrete semantics to abstract domains systematically. Let $\hat{\sigma}:\mathsf{Var}\rightharpoonup \widehat{\mathsf{CVal}}$ be the abstract store. Expressions evaluate to abstract values
-$\llbracket e\rrbracket^\sharp_{\hat{\sigma}}\in \widehat{\mathsf{Val}}$
-using bit-width–aware interval arithmetic for integers, set operations for addresses, and standard operations for booleans and composites.
-Abstract outcomes mirror the concrete case:
-\[
-\widehat{\mathsf{Res}} \;::=\; \widehat{\Norm}(\hat{\sigma}) \;\mid\; \widehat{\Ret}(\hat{v},
-\hat{\sigma}) \;\mid\; \widehat{\Abort},
-\]
-ordered componentwise, with sequencing
-\[
-\begin{aligned}
-\widehat{\Norm}(\hat{\sigma})\ \triangleright^\sharp\ K &:= K(\hat{\sigma}),\\
-\widehat{\Ret}(\hat{v},\hat{\sigma})\ \triangleright^\sharp\ K &:= \widehat{\Ret}(\hat{v},
-\hat{\sigma}),\\
-\widehat{\Abort}\ \triangleright^\sharp\ K &:= \widehat{\Abort}.
-\end{aligned}
-\]
-Branch refinement $\mathrm{refine}(\hat{\sigma},p,b)$ narrows operands of condition $p$ using interval meets to improve precision along branches.
-Abstract writes distinguish between \emph{strong} updates when the target is unique (e.g., singleton index or concrete key)
-and \emph{weak} updates that join the new value with the existing value when the target is uncertain.
-For joining branch outcomes we use
-\[
-\mathrm{joinRes}(r_1,r_2)=
-\begin{cases}
-\widehat{\Norm}(\hat{\sigma}_1\sqcup \hat{\sigma}_2) & r_i=\widehat{\Norm}(\hat{\sigma}_i),\\
-\widehat{\Ret}(\hat{v}_1\sqcup \hat{v}_2,\ \hat{\sigma}_1\sqcup \hat{\sigma}_2) & r_i=\widehat{\Ret}
-(\hat{v}_i,\hat{\sigma}_i),\\
-\text{the obvious mixed cases: componentwise join and/or carry }\widehat{\Abort}.
-\end{cases}
-\]
-Table~\ref{tab:abs-denot} defines the abstract semantics for each statement form.
-\begin{table}[t]
-  \caption{Abstract denotational semantics (statements)}
-  \label{tab:abs-denot}
-  \centering
-  \small
-  \setlength{\tabcolsep}{6pt}
-  \renewcommand{\arraystretch}{1.12}
-  \begin{tabularx}{\columnwidth}{@{}l X@{}}
-    \toprule
-    \textbf{Statement} & \textbf{Meaning} \\
-    \midrule
-    \textsf{skip} &
-    $\llbracket \textsf{skip}\rrbracket^\sharp(\hat{\sigma})=\widehat{\Norm}(\hat{\sigma})$.\\
-
-    $s_1; s_2$ &
-    $\llbracket s_1; s_2\rrbracket^\sharp(\hat{\sigma})=\big(\llbracket
-    s_1\rrbracket^\sharp(\hat{\sigma})\big)\ \triangleright^\sharp\ (\lambda \hat{\sigma}'.\,
-    \llbracket s_2\rrbracket^\sharp(\hat{\sigma}'))$.\\
-
-    $\tau\ x;$ &
-    $\llbracket \tau\ x;\rrbracket^\sharp(\hat{\sigma})=\widehat{\Norm}\!\big(\hat{\sigma}[x\mapsto
-    \hat{\mathrm{init}}(\tau)]\big)$,\quad
-    where $\hat{\mathrm{init}}$ sets \textsf{int/uint/bool}$\mapsto\bot$, \textsf{address}
-    $\mapsto\top_{160}$, composites to empty summaries.\\
-
-    $\tau\ x=e;$ &
-    $\llbracket \tau\ x=e;\rrbracket^\sharp(\hat{\sigma})=\widehat{\Norm}\!\big(\hat{\sigma}
-    [x\mapsto \alpha_\tau(\llbracket e\rrbracket^\sharp_{\hat{\sigma}})]\big)$.\\
-
-    $\mathit{lv}:=e$ &
-    $\llbracket \mathit{lv}:=e\rrbracket^\sharp(\hat{\sigma})=\widehat{\Norm}
-    \!\big(\widehat{\mathrm{write}}(\hat{\sigma},\,\mathit{lv},\,\llbracket
-    e\rrbracket^\sharp_{\hat{\sigma}})\big)$;\,
-    non-singleton index/key $\Rightarrow$ weak update (join).\\
-
-    \textsf{delete}\ $\mathit{lv}$ &
-    $\llbracket \textsf{delete}\ \mathit{lv}\rrbracket^\sharp(\hat{\sigma})=\widehat{\Norm}
-    \!\big(\widehat{\mathrm{write}}(\hat{\sigma},\,\mathit{lv},\,\hat{\mathrm{zero}}
-    _{\tau(\mathit{lv})})\big)$;\,
-    arrays/maps/structs wiped recursively.\\
-
-    \textsf{if}\ $p$ \textsf{then}\ $s_t$ \textsf{else}\ $s_f$ &
-    Let $\hat{\sigma}_t=\mathrm{refine}(\hat{\sigma},p,\mathsf{true})$ and $\hat{\sigma}
-    _f=\mathrm{refine}(\hat{\sigma},p,\mathsf{false})$. Then
-    $\llbracket \cdot\rrbracket^\sharp(\hat{\sigma})=\mathrm{joinRes}\!\big(\llbracket
-    s_t\rrbracket^\sharp(\hat{\sigma}_t),\ \llbracket s_f\rrbracket^\sharp(\hat{\sigma}_f)\big)$.\\
-
-    \textsf{while}\ $p$ \textsf{do}\ $s$ &
-    Define $G^\sharp(H)(\hat{\sigma})=\mathrm{joinRes}\big(
-      \llbracket s\rrbracket^\sharp(\mathrm{refine}(\hat{\sigma},p,\mathsf{true}))
-      \ \triangleright^\sharp\ H,\;
-      \widehat{\Norm}(\mathrm{refine}(\hat{\sigma},p,\mathsf{false}))
-    \big)$.
-    Then
-    \[
-      \llbracket \textsf{while}\ p\ \textsf{do}\ s\rrbracket^\sharp
-      \;=\;
-      \underbrace{\mathrm{lfp}^{\nabla}(G^\sharp)}_{\text{widening pass}}
-      \;\triangle\; \underbrace{\mathrm{narrow}^{k}}_{\textbf{mandatory},\ k\ge 1},
-    \]
-    i.e., compute the widening-based post-fixpoint and then apply at least one narrowing round to
-    regain precision.\\
-
-    \textsf{return}\ $e$ &
-    $\llbracket \textsf{return}\ e\rrbracket^\sharp(\hat{\sigma})=\widehat{\Ret}(\llbracket
-    e\rrbracket^\sharp_{\hat{\sigma}},\,\hat{\sigma})$.\\
-
-    \textsf{assert}$(p)$,\ \textsf{require}$(p)$ &
-    As guards: if $p$ must-hold $\Rightarrow\ \widehat{\Norm}(\mathrm{refine}(\hat{\sigma},p,
-    \mathsf{true}))$; if $p$ must-fail $\Rightarrow\ \widehat{\Abort}$; otherwise both may happen
-    and $\mathrm{joinRes}$ carries the possibilities.\\
-
-    \textsf{revert}$(\cdots)$ &
-    $\llbracket \textsf{revert}(\cdots)\rrbracket^\sharp(\hat{\sigma})=\widehat{\Abort}$.\\
-
-    \textsf{call}$(\overline{e})$ &
-    Internal calls analyze the callee body under parameter binding (same abstract machinery);
-    external/unknown calls conservatively havoc their footprint or are modeled by $\widehat{\Abort}$
-    per analysis policy.\\
-    \bottomrule
-  \end{tabularx}
-\end{table}
-
-For array and mapping accesses, reading with a singleton index or concrete key returns the corresponding cell,
-while reading with a range or symbolic key returns the join of all materialized cells, or the element type's $\top$ if none exist.
-Dynamic array \texttt{length} is tracked as a singleton interval when observed; otherwise it is conservatively approximated as $\top_{\mathsf{uint256}}$.
-Writes follow the same singleton versus non-singleton criterion: concrete indices and keys enable strong updates that precisely overwrite values,
-while symbolic or range indices trigger weak updates that join new values with existing ones to maintain soundness.
-
+\FloatBarrier
 \section{Evaluation}
 To evaluate how \textsc{SolQDebug} performs in practical debugging scenarios, we organize our study
 around three research questions:
@@ -2154,12 +1597,35 @@ configuration:
     \item \textbf{Implementation Language}: Python  
 \end{itemize}
 
-The dataset is derived from DAppSCAN~\cite{dappscan}, a large-scale real-world benchmark for smart
-contract analysis. From 3,345 Solidity files using \texttt{>=0.8.0}, we sample 128 contracts across
-three size brackets (1–10 KB, 11–20 KB, and over 20 KB). After filtering out logic-free functions (e.
-g., those containing only assignments or return statements), we retain 242 single-transaction
-handlers. From these, we select 30 representative examples covering key Solidity idioms, including
-structs, mappings, dynamic arrays, control flow, and arithmetic logic.
+The dataset is derived from DAppSCAN~\cite{dappscan}, a large-scale
+real-world benchmark for smart contract analysis comprising 3,345
+Solidity files compiled with version \texttt{0.8.0} or higher.
+From this dataset, we selected 30 representative contracts using
+\emph{complexity-driven stratified sampling} to ensure comprehensive
+coverage of debugging scenarios encountered in real-world Solidity
+development.
+
+Our selection criteria focused on three dimensions that directly
+impact debugging complexity: (1) \textbf{computational complexity}—
+diverse arithmetic operations including percentage calculations
+(e.g., DapiServer, GreenHouse), time-based vesting logic
+(e.g., LockupContract, ThorusBond), and conditional capping;
+(2) \textbf{data structure complexity}—complex structs with 5+ fields
+(10 contracts), nested mappings (e.g., BitBookStake, PercentageFeeModel),
+dynamic arrays requiring iteration (7 contracts), and mapping-to-struct
+patterns (12 contracts); and (3) \textbf{control flow complexity}—
+multiple internal function calls (23 contracts), non-trivial loops
+(5 contracts), nested conditionals with early returns
+(e.g., PercentageFeeModel with 3-level override hierarchy),
+and modifier-based access control (4 contracts).
+
+The 30 contracts span multiple DeFi categories including token
+economics (40\%), staking/vesting (30\%), DeFi protocols (20\%),
+and utility contracts (10\%), with lines of code ranging from
+8 to 59 (average: 23 LOC). This sampling strategy ensures coverage
+of key Solidity idioms—structs, mappings, dynamic arrays, control
+flow, and arithmetic logic—representing the diverse debugging
+challenges developers face in practice.
 
 Since Remix IDE lacks built-in automated benchmarking capabilities, we developed \texttt{
 remix\_benchmark}, a Selenium-based automation framework that programmatically drives the Remix web
@@ -2203,8 +1669,7 @@ compilation and deployment, plus 0–11.8 seconds for manual state variable init
 initialization time growing linearly with the number of storage variables.
 
 In contrast, \textsc{SolQDebug} completed analysis in 0.03–5.09 seconds (median: 0.15 s) across all
-120 measurements, requiring no compilation, deployment, or state setup. Fig.~\ref{fig:rq1-
-responsiveness} visualizes this performance gap: Remix pure debug time alone exceeds \textsc{
+120 measurements, requiring no compilation, deployment, or state setup. Fig.~\ref{fig:rq1-responsiveness} visualizes this performance gap: Remix pure debug time alone exceeds \textsc{
 SolQDebug}'s total latency by a median factor of \textasciitilde350$\times$, while total Remix
 latency (including setup) exceeds it by \textasciitilde650$\times$. This demonstrates that \textsc{
 SolQDebug} eliminates the compile–deploy–setup cycle entirely, enabling immediate feedback during
@@ -2264,31 +1729,34 @@ In division-normalized arithmetic patterns, the structure of input interval anno
 }
 
 \subsection{RQ3 - Loops}
-Two loop patterns emerge from the benchmarks. In the first, the loop condition itself bounds the
-updated variable, and the loop body performs only direct assignments. In such cases, abstract
-interpretation converges naturally. For example, \texttt{updateUserInfo} in \textsc{AOC\_BEP}
-iterates from 1 to 4, and the interval for \texttt{level} stabilizes at \([1,4]\).
-    
-    In contrast, loops that interact with external or conditionally populated state tend to diverge
-    under widening. For instance, \texttt{revokeStableMaster} in \textsc{Core} terminates
-    immediately under the contract's default state, but diverges once annotations populate the
-    relevant lists. These lists trigger cascading updates, and their interactions produce
-    imprecision even though the loop count is implicit.
-    
-    In short, loop precision tends to hold when updates are tightly coupled to bounded loop indices,
-    but approximation still arises due to joins at merge points. Precision degrades further when
-    variables are updated independently of the loop condition. This includes dormant paths activated
-    by symbolic input, or loops that iterate over data-driven structures such as mappings or dynamic
-    lists.
+
+Loop precision in \textsc{SolQDebug} depends critically on the evaluability of the loop condition expression. Recall from Algorithm~\ref{alg:fixpoint} (line 4) that \textsc{EstimateIterations} analyzes the condition by evaluating both operands in the pre-loop environment $\textit{Start}$ to compute a widening threshold $\tau$. We identify three distinct patterns in our benchmark contracts, each exhibiting different precision characteristics:
+
+\medskip
+\noindent\textbf{Pattern 1: Constant-Bounded Loops.}
+When loop conditions reference only constants or simple arithmetic, \textsc{EstimateIterations} computes precise thresholds without requiring annotations. For instance, \texttt{updateUserInfo} in \textsc{AOC\_BEP} contains \texttt{for (uint256 i = 1; i <= 4; i++)}, where the condition \texttt{i <= 4} evaluates to $\tau = 4$. Because the actual loop iterates at most 4 times (including early \texttt{break}), widening never triggers, and the interval for \texttt{userInfo[account].level} converges precisely to $[1,4]$. Similarly, \texttt{\_addActionBuilderAt} in \textsc{Balancer} uses \texttt{for (uint8 i = 0; i < additionalCount; i++)}, where \texttt{additionalCount} is a locally computed value. When annotations specify the function inputs (e.g., \texttt{index = 5}, \texttt{currentLength = 2}), the evaluator computes \texttt{additionalCount = 4}, yielding $\tau = 4$ and preventing premature widening.
+
+\medskip
+\noindent\textbf{Pattern 2: State-Dependent Bounds Enabled by Annotations.}
+Solidity loops frequently reference dynamic array lengths or mapping sizes in their conditions. Without symbolic input, these expressions evaluate to $\bot$ or remain symbolic, forcing \textsc{EstimateIterations} to return the conservative default $\tau = 2$. For example, \texttt{getTotalDeposit} in \textsc{TimeLockPool} iterates \texttt{for (uint256 i = 0; i < depositsOf[\_account].length; i++)}. The condition operand \texttt{depositsOf[\_account].length} cannot be statically evaluated, triggering widening after just 2 iterations and causing the accumulator \texttt{total} to widen to $[0, 2^{256}-1]$.
+
+Debug annotations directly address this: by specifying \texttt{// @audit depositsOf[\_account].length = 10}, the analyzer materializes the array with length 10, allowing \textsc{EstimateIterations} to compute $\tau = 10$. Widening is then deferred until the 10th iteration, enabling precise convergence when the actual loop count matches or falls below the annotated bound. The same mechanism applies to \texttt{\_removeFromTokens} in \textsc{AvatarArtMarketplace}, where annotating \texttt{\_tokens.length} allows the threshold to scale proportionally with the input size.
+
+\medskip
+\noindent\textbf{Pattern 3: Data-Dependent Divergence Despite Annotations.}
+Even when annotations provide accurate iteration counts, precision may degrade if the loop body contains data-dependent branches or updates decoupled from the loop index. \texttt{revokeStableMaster} in \textsc{Core} illustrates this: the loop \texttt{for (uint256 i = 0; i < stablecoinListLength - 1; i++)} searches for a specific address in \texttt{\_stablecoinList} and breaks early upon finding it. Although annotating \texttt{\_stablecoinList.length} raises $\tau$ appropriately, the variable \texttt{indexMet} depends on whether the target address exists in the array—a condition orthogonal to the loop index \texttt{i}. If the array is populated via annotations but the target is absent, the loop executes the full iteration count, and \texttt{indexMet} may widen or remain imprecise due to path merging at the conditional assignment. Conversely, if annotations leave the array empty, the loop terminates immediately with precise state but misses the intended exploration.
+
+This pattern reveals a fundamental tension: annotations that populate data structures enable deeper exploration (activating dormant branches, triggering realistic state transitions), but they also introduce variability that the interval domain cannot track precisely. Such loops require either (i) narrower annotations that materialize only the specific keys or indices the developer intends to inspect, or (ii) acceptance that widening will approximate the full range of behaviors.
 
 \medskip
 \noindent\fbox{%
 \begin{minipage}{0.96\linewidth}
 \textbf{Answer to RQ3:}
-\textsc{SolQDebug} achieves precise analysis for loops with bounded indices and direct assignments, where abstract interpretation converges naturally. However, precision degrades for loops interacting with external state, conditionally populated data structures, or data-driven iteration (mappings, dynamic arrays), where widening-based approximation becomes unavoidable. Developers should annotate state dependencies carefully to help the analyzer distinguish between statically bounded and potentially unbounded iterations.
+Loop precision in \textsc{SolQDebug} is governed by the adaptive widening threshold $\tau$, which is computed by evaluating the loop condition in the pre-loop symbolic environment. Constant-bounded loops converge precisely without annotations. State-dependent loops (e.g., iterating over \texttt{array.length}) benefit directly from debug annotations: specifying array sizes or mapping extents allows \textsc{EstimateIterations} to compute accurate thresholds, deferring widening and improving precision proportionally. However, data-dependent loops—where control flow or updates depend on array contents rather than indices—may still diverge under widening despite accurate iteration counts, as the interval domain cannot track element-specific correlations. Developers should annotate iteration bounds for state-dependent loops and use narrower, targeted annotations for data-dependent cases.
 \end{minipage}%
 }
 
+\FloatBarrier
 \section{Discussion}
 
 \subsection{Why use Abstract Interpretation for Debugging}
@@ -2349,13 +1817,22 @@ iterates from 1 to 4, and the interval for \texttt{level} stabilizes at \([1,4]\
     widening. When investigating arithmetic joins, start with partially overlapping intervals and
     widen only as needed; keep operands aligned where normalization is present.
 
-    Widening can degrade precision in loops, but RQ3 highlights that not all loop updates lead to
-    divergence. Loops whose updated variables are bounded by the loop index (or by monotone guards)
-    often converge to tight ranges quickly; data-driven loops over symbolic containers tend to widen
-    early. Practical implications include: (i) prefer index-bounded annotations (e.g., bound the
-    iteration count or accessed keys) for loop-local exploration, (ii) materialize only the keys or
-    indices the loop actually touches, and (iii) where necessary, switch to concrete inputs for a
-    small slice of the loop to confirm behavior, then return to symbolic exploration.
+    RQ3 demonstrates that loop precision is governed by the adaptive widening threshold $\tau$, which
+    depends on whether the loop condition expression can be evaluated in the pre-loop symbolic
+    environment. Constant-bounded loops (\texttt{for (i = 1; i <= 4; ...)}) converge precisely
+    without annotations because \textsc{EstimateIterations} computes exact thresholds.
+    State-dependent loops (\texttt{for (i = 0; i < arr.length; ...)}) benefit directly from
+    annotations: specifying \texttt{arr.length = 10} allows the analyzer to set $\tau = 10$,
+    deferring widening and enabling natural convergence. However, data-dependent loops—where the loop
+    body contains branches or updates decoupled from the index—may still widen despite accurate
+    iteration counts, as the interval domain cannot track element-specific correlations.
+
+    Practical implications: (i) always annotate array lengths, mapping sizes, and iteration bounds
+    for state-dependent loops to raise $\tau$ and delay widening; (ii) for data-dependent loops,
+    use narrower annotations that materialize only the specific keys or elements under inspection,
+    reducing the variability introduced by path merging; (iii) when widening becomes unavoidable
+    (e.g., search loops over large collections), accept the over-approximation or switch to concrete
+    inputs for targeted verification.
 
     Overall, these findings suggest a debugging workflow that starts symbolic and broad, then
     \emph{shapes} annotations to tighten precision where it matters (overlap, narrow, guard-guided),
@@ -2384,7 +1861,7 @@ iterates from 1 to 4, and the interval for \texttt{level} stabilizes at \([1,4]\
     g., applied on demand to hot spots) are promising avenues to improve precision while preserving
     interactivity.
 
-
+\FloatBarrier
 \section{Related Works}
 
     \subsection{Solidity IDEs and Debuggers}
@@ -2484,7 +1961,7 @@ iterates from 1 to 4, and the interval for \texttt{level} stabilizes at \([1,4]\
         recompilation, redeployment, or transaction execution. It bridges the gap between Solidity
         development and the interactive tooling common in traditional programming environments.
 
-
+\FloatBarrier
 \section{Conclusion}
     We introduced SolQDebug, a source-level interactive debugger for Solidity that provides
     millisecond feedback without requiring compilation, deployment, or transaction replay. By
@@ -2502,17 +1979,7 @@ iterates from 1 to 4, and the interval for \texttt{level} stabilizes at \([1,4]\
     (EOF) to support inter-contract debugging when source code is unavailable, as Ethereum moves
     toward structured bytecode formats in upcoming hard forks.
 
-\begin{thebibliography}{1}
-
-\bibitem[ANTLR(2025)]{antlr}
-ANTLR: \url{https://www.antlr.org/} (2025). Accessed September 2025
-
-\bibitem[ChatGPT(2025)]{gpt}
-ChatGPT: \url{https://chatgpt.com/} (2025). Accessed September 2025
-
-\bibitem[Chen et~al.(2025)]{smart contract evolution}
-Chen, X., et al.: Characterizing smart contract evolution. ACM Transactions on Software Engineering
-and Methodology (2025)
+\begin{thebibliography}{99}
 
 \bibitem[Chimdyalwar(2024)]{fap}
 Chimdyalwar, B.: Fast and precise interval analysis on industry code. In: 2024 IEEE 35th
@@ -2675,5 +2142,310 @@ Zou, W., et al.: Smart contract development: challenges and opportunities. IEEE 
 Software Engineering (2019)
 
 \end{thebibliography}
+
+\FloatBarrier
+\newpage
+\appendix
+
+\section{Interactive Parser Grammar Specification}
+\label{appendix:interactive-grammar}
+
+This appendix provides the complete grammar specification for \textsc{SolQDebug}'s interactive parser.
+
+\subsection{Entry Rules for Solidity Program Fragments}
+
+\subsubsection{Rule 1: \texttt{interactiveSourceUnit}}
+\noindent\textbf{Purpose.} Accepts top-level declarations: functions, contracts, interfaces, libraries, state variables, pragmas, and imports.
+
+\noindent\textbf{Grammar:}
+\begin{verbatim}
+interactiveSourceUnit
+  : (interactiveStateVariableElement | interactiveFunctionElement
+    | interfaceDefinition | libraryDefinition | contractDefinition
+    | pragmaDirective | importDirective)* EOF ;
+\end{verbatim}
+
+\subsubsection{Rule 2: \texttt{interactiveEnumUnit}}
+\noindent\textbf{Purpose.} Accepts enum member items added after the enum shell.
+
+\noindent\textbf{Grammar:}
+\begin{verbatim}
+interactiveEnumUnit : (interactiveEnumItems)* EOF;
+interactiveEnumItems : identifier (',' identifier)*;
+\end{verbatim}
+
+\subsubsection{Rule 3: \texttt{interactiveStructUnit}}
+\noindent\textbf{Purpose.} Accepts struct member declarations added after the struct shell.
+
+\noindent\textbf{Grammar:}
+\begin{verbatim}
+interactiveStructUnit : (structMember)* EOF;
+structMember : typeName identifier ';' ;
+\end{verbatim}
+
+\subsubsection{Rule 4: \texttt{interactiveBlockUnit}}
+\noindent\textbf{Purpose.} Accepts statements and control-flow skeletons inside function bodies.
+
+\noindent\textbf{Grammar:}
+\begin{verbatim}
+interactiveBlockUnit : (interactiveBlockItem)* EOF;
+interactiveBlockItem : interactiveStatement | uncheckedBlock;
+\end{verbatim}
+
+\subsubsection{Rule 5: \texttt{interactiveDoWhileUnit}}
+\noindent\textbf{Purpose.} Accepts the \texttt{while} tail of a \texttt{do\{...\}} loop.
+
+\noindent\textbf{Grammar:}
+\begin{verbatim}
+interactiveDoWhileUnit : (interactiveDoWhileWhileStatement)* EOF;
+interactiveDoWhileWhileStatement : 'while' '(' expression ')' ';' ;
+\end{verbatim}
+
+\subsubsection{Rule 6: \texttt{interactiveIfElseUnit}}
+\noindent\textbf{Purpose.} Accepts \texttt{else} or \texttt{else if} branches.
+
+\noindent\textbf{Grammar:}
+\begin{verbatim}
+interactiveIfElseUnit : (interactiveElseStatement)* EOF;
+interactiveElseStatement : 'else' (interactiveIfStatement | '{' '}') ;
+\end{verbatim}
+
+\subsubsection{Rule 7: \texttt{interactiveCatchClauseUnit}}
+\noindent\textbf{Purpose.} Accepts \texttt{catch} clauses following a \texttt{try}.
+
+\noindent\textbf{Grammar:}
+\begin{verbatim}
+interactiveCatchClauseUnit : (interactiveCatchClause)* EOF;
+interactiveCatchClause : 'catch' (identifier? '(' parameterList ')')? '{' '}' ;
+\end{verbatim}
+
+\subsection{Entry Rule for Debugging Annotations}
+
+\subsubsection{\texttt{debugUnit}}
+\noindent\textbf{Purpose.} Parses batch-annotation lines that specify initial abstract values for variables.
+
+\noindent\textbf{Annotation types:}
+\begin{itemize}
+  \item \texttt{@GlobalVar}: Assigns values to global variables (e.g., \texttt{msg.sender}, \texttt{block.timestamp})
+  \item \texttt{@StateVar}: Assigns values to contract state variables
+  \item \texttt{@LocalVar}: Assigns values to function parameters and local variables
+\end{itemize}
+
+\noindent\textbf{Grammar:}
+\begin{verbatim}
+debugUnit : (debugGlobalVar | debugStateVar | debugLocalVar)* EOF;
+debugGlobalVar : '//' '@GlobalVar' identifier ('.' identifier)? '=' globalValue ';' ;
+debugStateVar : '//' '@StateVar' lvalue '=' value ';' ;
+debugLocalVar : '//' '@LocalVar' lvalue '=' value ';' ;
+\end{verbatim}
+
+\noindent\textbf{Supported L-value patterns:} Simple variables, array/mapping access (\texttt{arr[i]}, \texttt{map[key]}), struct fields (\texttt{s.field}), and nested combinations.
+
+\noindent\textbf{Value specification:} Integer intervals \texttt{[l,u]}, symbolic addresses \texttt{symbolicAddress n}, boolean values, and symbolic placeholders.
+
+\section{Abstract Domain and Formal Semantics}
+\label{app:semantics}
+
+This appendix presents the abstract domain definitions and formal semantics used by \textsc{SolQDebug}'s abstract interpreter. The framework is based on interval analysis for numeric types, set domains for addresses, and lazy materialization for composite data structures.
+
+\subsection{Abstract Domain}
+
+\noindent\textbf{Atomic abstract values:}
+\begin{itemize}[leftmargin=1.25em]
+\item \textbf{Unsigned integers:} $\widehat{\mathbb{U}}_N = \{[\ell,u] \mid 0 \le \ell \le u \le 2^N{-}1\} \cup \{\bot,\top_N\}$
+\item \textbf{Signed integers:} $\widehat{\mathbb{Z}}_N = \{[\ell,u] \mid -2^{N-1} \le \ell \le u \le 2^{N-1}{-}1\} \cup \{\bot,\top_N^{\pm}\}$
+\item \textbf{Booleans:} $\widehat{\mathbb{B}} = \{\bot,\widehat{\mathsf{false}},\widehat{\mathsf{true}},\top\}$
+\item \textbf{Addresses:} $\widehat{\mathbb{A}} = \wp_{\le K}(\mathsf{AddrID}) \cup \{\top\}$ (set domain with cap $K=8$)
+\item \textbf{Bytes:} $\widehat{\mathbb{BY}}_K = \{\bot,\top_K\}$ (symbolic/opaque)
+\item \textbf{Enums:} $\widehat{\mathsf{Enum}}(E) = \{[\ell,u]\mid 0\le \ell \le u \le |E|-1\}\cup\{\bot,\top_E\}$
+\end{itemize}
+
+\noindent\textbf{Composite values:}
+\begin{itemize}[leftmargin=1.25em]
+\item \textbf{Structs:} $\widehat{\mathsf{Struct}}(C) = \prod_{f\in\mathsf{fields}(C)} \widehat{\mathsf{Val}}_f$ (pointwise order)
+\item \textbf{Arrays:} $\widehat{\mathsf{Arr}}(\tau) = (\hat{\ell},\hat{d},M)$ where $\hat{\ell}\in \widehat{\mathbb{U}}_{256}$ is length, $\hat{d}$ is default element, $M:\mathbb{N}_{\text{fin}}\rightharpoonup \widehat{\tau}$ stores observed indices
+\item \textbf{Mappings:} $\widehat{\mathsf{Map}}(\kappa\Rightarrow\tau) = (\hat{d},M)$ with default $\hat{d}$ and finite map $M$ for observed keys
+\end{itemize}
+
+\noindent\textbf{Order, join, and meet:}
+For intervals: $[\ell_1,u_1] \sqsubseteq [\ell_2,u_2] \iff \ell_2 \le \ell_1 \land u_1 \le u_2$,
+$[\ell_1,u_1] \sqcup [\ell_2,u_2] = [\min(\ell_1,\ell_2),\max(u_1,u_2)]$,
+$[\ell_1,u_1] \sqcap [\ell_2,u_2] = [\max(\ell_1,\ell_2),\min(u_1,u_2)]$ if non-empty, else $\bot$.
+
+Widening $\nabla$ and narrowing $\Delta$ follow standard interval analysis patterns. For address sets: $S_1 \sqcup S_2 = S_1 \cup S_2$ if $|S_1 \cup S_2| \le K$, else $\top$.
+
+\subsection{Concrete Semantics (Denotational)}
+
+Let stores be $\sigma:\mathsf{Var}\rightharpoonup \mathsf{CVal}$.
+L-value resolution $\mathrm{loc}_\sigma(\mathit{lv})=\ell$ and write $\mathrm{write}(\sigma,\ell,v)$
+update the store. Expressions are pure: $\llbracket e\rrbracket_\sigma\in\mathsf{Val}$.
+
+\noindent\textbf{Outcome domain:}
+\[
+\mathsf{Res} \;::=\; \Norm(\sigma) \;\mid\; \Ret(v,\sigma) \;\mid\; \Abort
+\]
+with sequencing
+\[
+\begin{aligned}
+\Norm(\sigma)\ \triangleright\ K &:= K(\sigma),\\
+\Ret(v,\sigma)\ \triangleright\ K &:= \Ret(v,\sigma),\\
+\Abort\ \triangleright\ K &:= \Abort.
+\end{aligned}
+\]
+
+\begin{table}[t]
+  \caption{Concrete denotational semantics (statements)}
+  \label{tab:conc-denot}
+  \centering
+  \small
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\arraystretch}{1.12}
+  \begin{tabularx}{\columnwidth}{@{}l X@{}}
+    \toprule
+    \textbf{Statement} & \textbf{Meaning} \\
+    \midrule
+    \textsf{skip} &
+    $\llbracket \textsf{skip}\rrbracket(\sigma)=\Norm(\sigma)$\\
+
+    $s_1; s_2$ &
+    $\llbracket s_1; s_2\rrbracket(\sigma)=\big(\llbracket s_1\rrbracket(\sigma)\big)\ \triangleright\ (\lambda \sigma'.\,\llbracket s_2\rrbracket(\sigma'))$\\
+
+    $\tau\ x;$ &
+    $\llbracket \tau\ x;\rrbracket(\sigma)=\Norm\!\big(\sigma[x\mapsto \mathrm{zero}_\tau]\big)$\\
+
+    $\tau\ x=e;$ &
+    $\llbracket \tau\ x=e;\rrbracket(\sigma)=\Norm\!\big(\sigma[x\mapsto \llbracket e\rrbracket_\sigma]\big)$\\
+
+    $\mathit{lv}:=e$ &
+    $\llbracket \mathit{lv}:=e\rrbracket(\sigma)=\Norm\!\big(\mathrm{write}(\sigma,\,\mathrm{loc}_\sigma(\mathit{lv}),\,\llbracket e\rrbracket_\sigma)\big)$\\
+
+    \textsf{delete}\ $\mathit{lv}$ &
+    $\llbracket \textsf{delete}\ \mathit{lv}\rrbracket(\sigma)=\Norm\!\big(\mathrm{write}(\sigma,\,\mathrm{loc}_\sigma(\mathit{lv}),\,\mathrm{zero}_{\tau(\mathit{lv})})\big)$\\
+
+    \textsf{if}\ $p$ \textsf{then}\ $s_t$ \textsf{else}\ $s_f$ &
+    $\llbracket \cdot\rrbracket(\sigma)=
+      \begin{cases}
+        \llbracket s_t\rrbracket(\sigma) & \text{if }\llbracket p\rrbracket_\sigma=\mathsf{true},\\
+        \llbracket s_f\rrbracket(\sigma) & \text{if }\llbracket p\rrbracket_\sigma=\mathsf{false}
+      \end{cases}$\\
+
+    \textsf{while}\ $p$ \textsf{do}\ $s$ &
+    $F(H)(\sigma)=
+      \begin{cases}
+        \big(\llbracket s\rrbracket(\sigma)\big)\ \triangleright\ H & \text{if }\llbracket p\rrbracket_\sigma=\mathsf{true},\\
+        \Norm(\sigma) & \text{if }\llbracket p\rrbracket_\sigma=\mathsf{false}
+      \end{cases}$;
+    $\llbracket \textsf{while}\ p\ \textsf{do}\ s\rrbracket=\mathrm{lfp}(F)$\\
+
+    \textsf{return}\ $e$ &
+    $\llbracket \textsf{return}\ e\rrbracket(\sigma)=\Ret(\llbracket e\rrbracket_\sigma,\,\sigma)$\\
+
+    \textsf{assert}$(p)$,\ \textsf{require}$(p)$ &
+    $\llbracket \cdot\rrbracket(\sigma)=
+      \begin{cases}
+        \Norm(\sigma) & \text{if }\llbracket p\rrbracket_\sigma=\mathsf{true},\\
+        \Abort & \text{if }\llbracket p\rrbracket_\sigma=\mathsf{false}
+      \end{cases}$\\
+
+    \textsf{revert}$(\cdots)$ &
+    $\llbracket \textsf{revert}(\cdots)\rrbracket(\sigma)=\Abort$\\
+
+    \textsf{call}$(\overline{e})$ &
+    Internal: parameter binding; external: unspecified\\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\noindent\textbf{Array/mapping materialization:}
+$\mathrm{loc}_\sigma(a[i])$ extends $a$ up to $i$ with defaults if needed; $\mathrm{loc}_\sigma(m[k])$ creates $m[k]$ lazily if absent.
+
+\subsection{Abstract Semantics (Denotational)}
+
+Let $\hat{\sigma}:\mathsf{Var}\rightharpoonup \widehat{\mathsf{CVal}}$ be the abstract store. Expressions evaluate to
+$\llbracket e\rrbracket^\sharp_{\hat{\sigma}}\in \widehat{\mathsf{Val}}$.
+
+\noindent\textbf{Abstract outcomes:}
+\[
+\widehat{\mathsf{Res}} \;::=\; \widehat{\Norm}(\hat{\sigma}) \;\mid\; \widehat{\Ret}(\hat{v},\hat{\sigma}) \;\mid\; \widehat{\Abort},
+\]
+with sequencing
+\[
+\begin{aligned}
+\widehat{\Norm}(\hat{\sigma})\ \triangleright^\sharp\ K &:= K(\hat{\sigma}),\\
+\widehat{\Ret}(\hat{v},\hat{\sigma})\ \triangleright^\sharp\ K &:= \widehat{\Ret}(\hat{v},\hat{\sigma}),\\
+\widehat{\Abort}\ \triangleright^\sharp\ K &:= \widehat{\Abort}.
+\end{aligned}
+\]
+
+\noindent\textbf{Auxiliary functions:}
+\begin{itemize}[leftmargin=1.25em]
+\item $\mathrm{refine}(\hat{\sigma},p,b)$: narrows operands of $p$ by interval meets
+\item $\widehat{\mathrm{write}}(\hat{\sigma},\mathit{lv},\hat{v})$: strong update if singleton index/key, weak update otherwise
+\item $\mathrm{joinRes}(r_1,r_2)$: componentwise join of abstract outcomes
+\end{itemize}
+
+\begin{table}[t]
+  \caption{Abstract denotational semantics (statements)}
+  \label{tab:abs-denot}
+  \centering
+  \small
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\arraystretch}{1.12}
+  \begin{tabularx}{\columnwidth}{@{}l X@{}}
+    \toprule
+    \textbf{Statement} & \textbf{Meaning} \\
+    \midrule
+    \textsf{skip} &
+    $\llbracket \textsf{skip}\rrbracket^\sharp(\hat{\sigma})=\widehat{\Norm}(\hat{\sigma})$\\
+
+    $s_1; s_2$ &
+    $\llbracket s_1; s_2\rrbracket^\sharp(\hat{\sigma})=\big(\llbracket s_1\rrbracket^\sharp(\hat{\sigma})\big)\ \triangleright^\sharp\ (\lambda \hat{\sigma}'.\,\llbracket s_2\rrbracket^\sharp(\hat{\sigma}'))$\\
+
+    $\tau\ x;$ &
+    $\llbracket \tau\ x;\rrbracket^\sharp(\hat{\sigma})=\widehat{\Norm}\!\big(\hat{\sigma}[x\mapsto \hat{\mathrm{init}}(\tau)]\big)$\\
+
+    $\tau\ x=e;$ &
+    $\llbracket \tau\ x=e;\rrbracket^\sharp(\hat{\sigma})=\widehat{\Norm}\!\big(\hat{\sigma}[x\mapsto \alpha_\tau(\llbracket e\rrbracket^\sharp_{\hat{\sigma}})]\big)$\\
+
+    $\mathit{lv}:=e$ &
+    $\llbracket \mathit{lv}:=e\rrbracket^\sharp(\hat{\sigma})=\widehat{\Norm}\!\big(\widehat{\mathrm{write}}(\hat{\sigma},\,\mathit{lv},\,\llbracket e\rrbracket^\sharp_{\hat{\sigma}})\big)$\\
+
+    \textsf{delete}\ $\mathit{lv}$ &
+    $\llbracket \textsf{delete}\ \mathit{lv}\rrbracket^\sharp(\hat{\sigma})=\widehat{\Norm}\!\big(\widehat{\mathrm{write}}(\hat{\sigma},\,\mathit{lv},\,\hat{\mathrm{zero}}_{\tau(\mathit{lv})})\big)$\\
+
+    \textsf{if}\ $p$ \textsf{then}\ $s_t$ \textsf{else}\ $s_f$ &
+    $\hat{\sigma}_t=\mathrm{refine}(\hat{\sigma},p,\mathsf{true})$, $\hat{\sigma}_f=\mathrm{refine}(\hat{\sigma},p,\mathsf{false})$;
+    $\llbracket \cdot\rrbracket^\sharp(\hat{\sigma})=\mathrm{joinRes}\!\big(\llbracket s_t\rrbracket^\sharp(\hat{\sigma}_t),\ \llbracket s_f\rrbracket^\sharp(\hat{\sigma}_f)\big)$\\
+
+    \textsf{while}\ $p$ \textsf{do}\ $s$ &
+    $G^\sharp(H)(\hat{\sigma})=\mathrm{joinRes}\big(
+      \llbracket s\rrbracket^\sharp(\mathrm{refine}(\hat{\sigma},p,\mathsf{true}))\ \triangleright^\sharp\ H,\;
+      \widehat{\Norm}(\mathrm{refine}(\hat{\sigma},p,\mathsf{false}))
+    \big)$;
+    $\llbracket \textsf{while}\ p\ \textsf{do}\ s\rrbracket^\sharp
+      = \mathrm{lfp}^{\nabla}(G^\sharp) \;\triangle\; \mathrm{narrow}^{k}$\\
+
+    \textsf{return}\ $e$ &
+    $\llbracket \textsf{return}\ e\rrbracket^\sharp(\hat{\sigma})=\widehat{\Ret}(\llbracket e\rrbracket^\sharp_{\hat{\sigma}},\,\hat{\sigma})$\\
+
+    \textsf{assert}$(p)$,\ \textsf{require}$(p)$ &
+    $\widehat{\Norm}(\mathrm{refine}(\hat{\sigma},p,\mathsf{true}))$ if $p$ must-hold; $\widehat{\Abort}$ if $p$ must-fail; $\mathrm{joinRes}$ otherwise\\
+
+    \textsf{revert}$(\cdots)$ &
+    $\llbracket \textsf{revert}(\cdots)\rrbracket^\sharp(\hat{\sigma})=\widehat{\Abort}$\\
+
+    \textsf{call}$(\overline{e})$ &
+    Internal: parameter binding; external: havoc footprint or $\widehat{\Abort}$\\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\noindent\textbf{Expression semantics:}
+Arithmetic ($+,-,*,/,\%$): interval arithmetic with wrapping;
+comparisons ($<,\le,=,\neq,\ge,>$): abstract booleans;
+logical ($\land,\lor,\neg$): three-valued logic.
+
+\noindent\textbf{Array/mapping access:}
+Singleton index/key: strong update; range/non-singleton: join of materialized cells.
 
 \end{document}

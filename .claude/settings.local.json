@@ -17,7 +17,8 @@
       "Bash(findstr:*)",
       "Bash(copy \"C:\\Users\\isjeon\\PycharmProjects\\pythonProject\\SolDebug\\paper\\main.tex\" \"C:\\Users\\isjeon\\PycharmProjects\\pythonProject\\SolDebug\\paper\\main_backup.tex\")",
       "Bash(cp:*)",
-      "Bash(pdflatex:*)"
+      "Bash(pdflatex:*)",
+      "Bash(git -C \"C:\\Users\\isjeon\\PycharmProjects\\pythonProject\\SolDebug\" diff d160984 19968a7 -- paper/main.tex)"
     ],
     "deny": [],
     "ask": []
