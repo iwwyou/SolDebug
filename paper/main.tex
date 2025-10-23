@@ -385,79 +385,51 @@ contract Example {
 \end{figure*}
 
 \section{The design of SolQDebug}
+    \textsc{SolQDebug} processes code incrementally as developers write it, building up
+    an abstract interpretation of the program. The system operates as follows. First, each
+    incoming statement or annotation is interpreted under abstract semantics. Second, the
+    corresponding construct is stored in a CFG node that is inserted at a semantically valid
+    location, determined from the surrounding context and the existing control flow. Third,
+    when batch debug annotations are present, the system reinterprets the function with the
+    annotated values.
+    The following subsections describe the architecture and core mechanisms that enable this incremental analysis.
+
     \subsection{System Architecture}
-        \textsc{SolQDebug} processes code incrementally, analyzing either a single Solidity
-        statement or a batch debug annotation as it is written. Unlike traditional debuggers,
-        \textsc{SolQDebug} performs static analysis on isolated fragments—eliminating the need
-        for complete program compilation or on-chain transaction execution. The analysis proceeds
-        through two main modules:
+        The system accepts either single Solidity statements or batch debug annotations as input.
+        These inputs are processed through two main modules:
 
         \textbf{(1) Parsing Module.}
-        Each incoming edit first passes through the \textit{Context Analyzer}, which reconstructs a
-        source-level snapshot surrounding the modified lines, determines the enclosing contract or
-        function, and selects the appropriate interactive grammar rule. Subsequently, the
-        \textit{Interactive Parser}, implemented using ~\citet{antlr}, applies an extended grammar
-        that incorporates seven additional reduction rules to support isolated Solidity constructs
-        such as expressions, statements, and definitions. A separate rule is dedicated to debug
-        annotations, allowing single-line analysis directives to be parsed as valid units. To ensure
-        syntactic integrity, the reconstructed source is also verified using the Solidity compiler
-        before analysis proceeds. This allows the system to reject malformed fragments early and
-        maintain consistency across the abstract syntax tree and control-flow graph. Debug
-        annotations are parsed as valid syntactic units and forwarded for interpretation; their
-        semantic effects are described in the analysis stage.
+        Each incoming edit passes through the \textit{Context Analyzer}, which extracts the
+        surrounding source context needed to parse the partial statement or annotation. The
+        \textit{Interactive Parser}, built on \citet{antlr}, applies an extended grammar that adds
+        seven reduction rules to the standard Solidity grammar, enabling it to parse partial
+        constructs that would normally fail to compile. Although the extended grammar can parse
+        partial constructs, the system still validates the complete reconstructed source using the
+        official Solidity compiler before proceeding to analysis. This validation ensures semantic
+        consistency and rejects malformed input early.
 
         \textbf{(2) Analysis Module.}
-        The Analysis Module operates in three coordinated stages. First, each parsed statement is
-        enriched with contextual metadata—including its enclosing contract and function, its semantic
-        role (e.g., declaration or condition), and its static type—before being passed to the
-        \textit{Dynamic CFG Builder}. The CFG Builder maintains an incremental control-flow graph
-        that evolves with each edit: it inserts a new basic block at the precise edit location,
-        rewires incoming and outgoing control edges, and propagates abstract states along the updated
-        paths. When conditional branches converge, incoming states are merged using the join operator
-        ($\sqcup$); loop headers trigger localized fixpoint computation to ensure convergence.
-        Second, the \textit{Abstract Interpreter} traverses the updated CFG and computes abstract
-        values at each program point. The analysis employs a combination of interval and set domains:
-        numeric types are represented as intervals, addresses as symbolic sets, and composite types
-        (structs, arrays, mappings) are lazily materialized upon field or element access. Third, the
-        \textit{Snapshot Manager} preserves and restores the abstract memory state before and after
-        each batch of debug annotations. This isolation mechanism ensures that consecutive test cases
-        do not interfere with one another, even when they modify shared or local bindings.
+        The Analysis Module operates through three coordinated components. The \textit{Dynamic CFG
+        Builder} maintains an incremental control-flow graph that is updated as new statements are
+        added: it creates corresponding nodes for each statement and rewires control edges to reflect
+        the updated program structure. The \textit{Abstract Interpreter} incrementally analyzes the
+        updated CFG, reusing previous results and computing abstract values only for affected program
+        points using a combination of interval and set domains. The \textit{Snapshot Manager} ensures
+        that each debug annotation execution starts from a clean state by preserving and restoring
+        the abstract memory, allowing annotations to be modified and re-executed without side effects
+        from previous runs.
 
         \textbf{(3) Line-Level Output.}
-        After interpretation, the system emits a per-statement summary of relevant variable
-        intervals. This includes:
-
-        \begin{itemize}
-          \item \textbf{Variable declarations:} the initial interval of the declared variable.
-          \item \textbf{Assignments:} the updated interval of the left-hand side variable after evaluation.
-          \item \textbf{Return statements:} the interval of the returned value or tuple of values.
-          \item \textbf{Loops:} intervals for variables that changed during loop execution, computed after fixpoint convergence (loop delta).
-        \end{itemize}
-        
-        All outputs are mapped to source line numbers and displayed directly in the Solidity editor,
-        providing immediate, deployment-free feedback to developers.
+        Following analysis, the system produces a per-statement summary showing the computed intervals
+        for variables affected by each statement—including declarations, assignments, and return values.
+        All outputs are mapped to their corresponding source line numbers and displayed inline within
+        the editor, providing immediate feedback as developers write and modify code.
     
     \subsection{Running Example}
-\begin{comment}
-시스템 아키텍처에서 논의된 SolQDebug의 동작 방식을 요약하면 다음과 같다.
-1) Each partial source code fragment is interpreted using abstract semantics to compute variable
-intervals
-2) The corresponding expression (e.g., assignment) is stored in the CFG node, which is inserted at a
-semantically valid point in the control-flow graph based on context information
-3) When batch annotations are present, the full function is reinterpreted using the pre-built CFG
-and updated abstract states.
- 아키텍처의 각 모듈의 동작의 직관적인 이해를 위해 fig.1의 예제 코드 중 burn 함수에 대해 사용자가 부분 코드를 입력할 때마다 수행되는 분석 과정, batch
- annotation을 작성했을 때의 분석 과정을 나타내었다.
-\end{comment}
-    To make the architecture concrete, we walk through a small running example that exercises the
-    main components of SolQDebug. The system operates as follows. First, each incremental source
-    fragment is interpreted under abstract semantics to compute interval for the variables it
-    touches. Second, the corresponding expression is stored in a CFG node that is inserted at a
-    semantically valid point, determined from the edit’s context and the existing control‑flow.
-    Third, when batch annotations are present, the entire function is reinterpreted using the
-    pre‑built CFG with the updated abstract state. We illustrate both modes—incremental source edits
-    and batch annotations—using the burn function from Listing~\ref{lst:grammar-min}, and then refer
-    back to the detailed mechanisms in §§3.3–3.5.
+
+    To make the architecture concrete, we walk through a running example using the burn function
+    from Listing~\ref{lst:grammar-min}. We illustrate both incremental source edits (§3.2.1) and
+    batch annotations (§3.2.2).
 
         \subsubsection{Source Code Analysis Example}
 
@@ -563,91 +535,36 @@ closing brace is pushed downward. The line numbers shown in the table refer to t
   \label{fig:solqdebug-cfg}
 \end{figure*}
 
-\begin{comment}
-그림 3은 표 1의 1–8단계까지가 이미 CFG에 반영된 상태에서, 새로운 입력인 9단계 totalSupply -= delta;가 도착했을 때 분석이 어떤 환경에서 수행되고 결과가
-어떻게 동적으로 삽입되는지를 시각적으로 보여준다. 이때, 함수 burn 안의 내용을 위주로 설명하고자 하였으며 함수 선언에서 onlyOwner와 같은 modifier에 대한 설명은
-이후 3.5에서 기술하였기에 생략되었다.
-
-먼저, SolQDebug는 각 노드를 다음처럼 유지한다.
-
-기본 블록(Basic Block): 분기가 발생하지 않은 statement가 순차적으로 저장되는 블록으로, 블록 내부 문장이 순서대로 평가되면서 환경이 갱신되며 맨 마지막
-statement까지 실행했을 때의 추상 환경(변수 별 Interval)을 저장한다. 또한 batch annotation 작성 시 재분석을 위해 블록이 담고 있는
-statement를 함께 기록한다.
-
-조건 노드(Condition Node): 술어(예: bal >= amount) 자체만 기록을하며, 이 시점에는 변수 값을 갱신하지 않는다.
-
-분기 : 조건 노드의 후속 블록이 만들어질 때, 술어에 따라 각 경로의 환경이 프루닝된다(참 경로는 bal이 amount 이상, 거짓 경로는 그 반대가 되도록 구간이 좁혀짐).
-이후 새로운 문장이 입력으로 들어올 때 프루닝된 환경을 기반으로 분석된다.
-
-이 상태에서 9단계 입력이 들어오면 다음 순서로 처리한다.
-
-의미 해석: totalSupply -= delta;를 인터랙티브 파서로 단일 문장으로 파싱하고 구문·의미를 확정한다(§3.3).
-
-삽입 지점 탐색: 입력의 컨텍스트(라인·포함 구조 스택) 와 기존 CFG를 함께 사용해 유효한 삽입 지점을 찾는다. 단순히 “바로 앞 줄”이 아니라, 현재가 if의 합류 이후라는
-구조 정보를 토대로 삽입 위치를 결정한다(§3.5).
-
-합류 환경 계산: 삽입 지점의 선행 블록이 여러 개면, 각 리프의 추상 환경을 최상한(LUB; JoinBranches) 으로 합쳐 합류 블록을 만들고, 여기에 새 문장을 삽입한다.
-루프가 얽혀 있으면 그 전에 루프 헤더에서 국소 고정점을 먼저 수렴시킨다(§3.5).
-
-평가·재배선: 합류 블록의 환경에서 totalSupply -= delta를 한 번만 평가해 totalSupply의 새로운 구간을 얻고, 기존의 참/거짓 리프가 향하던 간선을 합류
-블록 → Exit으로 재배선한다.
-
-이 절에서는 순차 입력 사례로 설명했지만, else를 나중에 추가하는 등 비순차 입력에도 동일한 절차가 적용되며, 필요 시 기존 간선이 재배선된다.
-\end{comment}
         Figure~\ref{fig:solqdebug-cfg} visualizes the state of the CFG after Steps 1–8 have already
         been integrated and shows how the new input in Step 9 (totalSupply -= delta;) is analyzed
         and inserted.  For clarity, we focus on the function body in this running example and ignore
         the modifier referenced in the header; modifiers and their placement are treated in §3.5.
 
-        SolQDebug uses the following node semantics and bookkeeping rules:
+        SolQDebug maintains three types of CFG nodes:
 
 \begin{itemize}
-  \item \textbf{Basic nodes.} A basic node contains a straight-line sequence of statements.
-        As statements are evaluated in order, the node maintains the abstract environment
-        at the end of the node—i.e., the interval for each variable.
-        For later re-analysis (e.g., under batch annotations), the node also records its statement
-        list.
-  \item \textbf{Condition nodes.} A condition node stores only the predicate 
-        (e.g., \texttt{bal >= amount}) and does not update the environment at that point.
-  \item \textbf{Branch refinement.} When the true/false successors of a condition are created,
-        the incoming environment is pruned along each edge: the true successor refines
-        intervals under the predicate, while the false successor refines them under its negation.
-        Subsequent statements are analyzed under these pruned environments.
+  \item \textbf{Basic nodes} store statement sequences and the abstract environment after execution.
+  \item \textbf{Condition nodes} store predicates without updating the environment.
+  \item \textbf{Branch refinement} prunes environments along each edge: true successors refine
+        intervals under the predicate, false successors under its negation.
 \end{itemize}
 
-        With these rules in place, the arrival of Step~9 proceeds as follows:
+        When Step~9 arrives, SolQDebug processes it as follows:
 
-\begin{itemize}
-  \item[\textbf{(1)}] \textbf{Parsing and semantics.} 
-        The interactive parser recognizes \texttt{totalSupply -= delta;} as a single assignment
-        and constructs its abstract transfer function (§3.3).
-  \item[\textbf{(2)}] \textbf{Finding the insertion point.} 
-        Using the current edit context (line number and the stack of enclosing constructs) 
-        together with the existing CFG, SolQDebug locates the semantically valid insertion point. 
-        In this case the context indicates the join after the if/else, 
-        not merely the preceding line (§3.5).
-  \item[\textbf{(3)}] \textbf{Join environment (and localized fixpoint if needed).}
-        If the insertion point has multiple predecessors, SolQDebug computes the least upper bound
-        (\(\sqcup\), JoinBranches) of their environments to create a join point node.
-        If a loop header is on the path, a localized fixpoint is computed at the header before
-        joining (§3.5).
-  \item[\textbf{(4)}] \textbf{Evaluation and rewiring.}
-        A new basic node is created immediately after the join point node, and the assignment
-        is evaluated in this new node using the joined environment to produce the new interval for
-        \texttt{totalSupply}. The outgoing edges from the two branch leaves are rewired to the
-        join point, which flows into the new node and then to the exit.
-  \item[\textbf{(5)}] \textbf{Reinterpretation from the insertion point.}
-        To maintain soundness of the abstract interpretation, SolQDebug reinterprets all nodes
-        reachable from the newly inserted node. Since the insertion changes the incoming environment
-        for subsequent statements, the \texttt{reinterpret\_From} function propagates the updated
-        environment forward through the CFG, ensuring that all downstream intervals remain valid.
-\end{itemize}
+\begin{enumerate}
+  \item The interactive parser recognizes \texttt{totalSupply -= delta;} as an assignment (§3.3).
+  \item The system locates the insertion point using the edit context and existing CFG—in this case,
+        the join after the if/else (§3.5).
+  \item At the join, the least upper bound (\(\sqcup\)) of branch environments is computed. If loops
+        are present, a localized fixpoint is computed first (§3.5).
+  \item A new node is created with the assignment evaluated in the joined environment. Edges are
+        rewired from branch leaves through the join to the new node.
+  \item All nodes reachable from the insertion are reinterpreted to propagate updated environments.
+\end{enumerate}
 
-        This design allows SolQDebug to reuse all path‑local computations accumulated up to the
-        leaves while maintaining semantic correctness at the insertion site. Although the narrative
-        assumes sequential input, the same procedure applies to out‑of‑order edits (e.g., adding an
-        else later). The insertion‑point search, leaf collection, join/fixpoint handling, and edge
-        rewiring remain unchanged and safely update the existing CFG.
+        This design reuses path-local computations up to the leaves while maintaining semantic
+        correctness. The same procedure handles out-of-order edits (e.g., adding an else block later)
+        by applying the same insertion-point search, join handling, and edge rewiring.
         
         \subsubsection{Batch Annotation Analysis Example}
 
@@ -718,88 +635,50 @@ totalSupply와 같이 명시적 초기값이 주어진 상태변수는 고정 �
 CFG를 재사용하고 단일 패스 재해석을 수행함으로써, 경량이면서도 의미론적으로 정합적인 결과를 제공한다. 자세한 형식적 정의와 알고리즘은 §3.3 및 §3.5에서 논의한다.
 \end{comment}
 
-Batch annotations provide a declarative way for developers to specify initial state and parameters
-as symbolic (interval) values and to obtain line‑level results by reinterpreting the program in a
-single pass over the already built CFG. In this work, “debugging” refers to the interactive
-exploration during pre‑deployment editing in which the developer varies inputs (and state) to
-observe branch reachability, guard validity, and value bounds. Consequently, variables that are not
-given an initial range via annotations remain at the conservative \(\top\), which can make results
-vacuous; this underscores the need for meaningful initialization in debugging. Batch annotations
-supply this initialization in a consistent and reproducible form.
+Batch annotations allow developers to specify initial state and parameters as interval values and
+obtain line-level results by reinterpreting the pre-built CFG in a single pass. Variables without
+annotated ranges remain at \(\top\), making batch annotations essential for meaningful debugging
+feedback.
 
-In the running example, we augment the function \texttt{burn} in Listing~\ref{lst:grammar-min} with
-the following lines:
-//@StateVar \texttt{balances[msg.sender]} = \([100,200]\) and //@LocalVar \texttt{amount} = \([50,
-150]\).
-We set the initial total supply to \(\textit{totalSupply} = 1000\). This choice makes the condition
-\(\textit{bal} \ge \textit{amount}\) partially true, so both the then and else branches are
-reachable; it thereby exposes how pruning at branches and joining after the conditional affect the
-resulting bounds.
+We annotate \texttt{burn} from Listing~\ref{lst:grammar-min} with
+//@StateVar \texttt{balances[msg.sender]} = \([100,200]\) and
+//@LocalVar \texttt{amount} = \([50,150]\), and set \(\textit{totalSupply} = 1000\).
+This makes \(\textit{bal} \ge \textit{amount}\) partially true, allowing both branches to execute.
 
-An annotation block is written between \verb|//@Debugging BEGIN| and \verb|//@Debugging END|, with
-one directive per line of the form “target L‑value \(\leftarrow\) abstract value (interval or
-symbolic)." Targets may be global, state, or local variables, and nested L‑values (e.g.,
-\(\texttt{a[i].x}\), \(\texttt{balances[addr]}\)) are allowed. Integers are normalized to intervals
-respecting their declared bit width; addresses are tracked as symbolic identifiers (set domain);
-booleans as \(\{0,1\}\).
+Annotation blocks are delimited by \verb|//@Debugging BEGIN| and \verb|//@Debugging END|, with each
+line assigning an abstract value to a target L-value. Targets include global, state, and local
+variables, as well as nested accesses like \(\texttt{balances[addr]}\). Values are type-checked and
+normalized to their respective domains (intervals for integers, symbolic sets for addresses).
 
-Given a batch block, \textsc{SolQDebug} executes a lightweight pipeline: (i) parse each line,
-resolve symbols, and type‑check; (ii) snapshot the current abstract memory and overlay the initial
-environment with the annotated values; (iii) traverse the existing CFG once from the function entry
-and perform abstract interpretation; condition nodes record only the predicate and do not
-immediately change the environment, while the true/false successor blocks refine (prune) their
-incoming environments under the predicate and its negation; if loops are present, a localized
-fixpoint is computed at the loop header; and (iv) restore the snapshot to guarantee isolation across
-runs. This process is coordinated by the Snapshot Manager.
+When a batch block is encountered, \textsc{SolQDebug} (i) parses and type-checks each annotation,
+(ii) snapshots the current abstract memory and overlays the annotated values, (iii) reinterprets the
+function's CFG in a single pass with branch pruning and loop fixpoints, and (iv) restores the
+snapshot to isolate successive runs. The Snapshot Manager coordinates this process.
 
-Importantly, batch annotations do not alter the CFG structure. No new nodes are inserted; only the
-initial environment changes, and the same CFG is reused. Each basic block retains its statement list
-and the abstract environment at the end of the block (interval per variable), enabling fast
-reevaluation. The rules for branch pruning, least upper bound (LUB) at joins (JoinBranches), and
-loop fixpoints are identical to those in the source‑code example (§3.2.1). On the pre‑built CFG in
-Figure~\ref{fig:solqdebug-cfg}, a batch run proceeds "entry \(\rightarrow\) branch pruning
-\(\rightarrow\) join \(\rightarrow\) exit" in a single pass.
+Batch annotations do not alter the CFG structure—only the initial environment changes. The same
+branch pruning, join, and fixpoint rules from §3.2.1 apply. On the pre-built CFG
+(Figure~\ref{fig:solqdebug-cfg}), a batch run traverses from entry to exit in a single pass.
 
-The concrete effect of the above annotations is as follows. From the statement \(\textit{bal} =
-\texttt{balances[msg.sender]}\) we obtain
+The annotations yield \(\textit{bal} \in [100,200]\) and \(\textit{amount} \in [50,150]\). Since
+\(\textit{bal} \ge \textit{amount}\) is only partially true, both branches are reachable. After
+branch pruning, the true path produces \(\delta \in [50,150]\) and \(\texttt{balances[msg.sender]}
+\in [0,150]\), while the false path sets \(\delta := 0\) and leaves \(\texttt{balances[msg.sender]}
+\in [100,200]\). At the join:
 \[
-\textit{bal} \in [100,200], \qquad \textit{amount} \in [50,150].
-\]
-The guard \(\textit{bal} \ge \textit{amount}\) is only partially true, thus both branches are
-reachable. After pruning, along the true branch the constraint \(\textit{bal} \ge \textit{amount}\)
-raises the lower bound of \(\textit{bal} - \textit{amount}\) to \(0\), yielding
-\[
-\texttt{balances[msg.sender]} := \textit{bal} - \textit{amount} \;\Rightarrow\; [0,\,200-50] = [0,
-150],
+\delta \in [0,150],
 \qquad
-\delta := \textit{amount} \;\Rightarrow\; [50,150].
+\texttt{balances[msg.sender]} \in [0,200].
 \]
-Along the false branch we only set \(\delta := 0\), and \(\texttt{balances[msg.sender]}\) remains at
-its annotated initial range \([100,200]\). At the join we compute
-\[
-\delta \in [50,150] \sqcup [0,0] = [0,150], 
-\qquad 
-\texttt{balances[msg.sender]} \in [0,150] \sqcup [100,200] = [0,200].
-\]
-We then evaluate the assignment to the total supply once in the join environment. With
-\(\textit{totalSupply} = [1000,1000]\) initially,
-\[
-\textit{totalSupply} -\!= \delta \;\Rightarrow\; [1000,1000] - [0,150] = [850,1000].
-\]
-Thus, by combining branch‑specific pruning with an LUB at the join, even a simple interval domain
-avoids unnecessary blow‑up (e.g., the negative region of \(\textit{bal} - \textit{amount}\) is
-eliminated on the true path) while conservatively aggregating the effects of both paths.
+Finally, \(\textit{totalSupply} -\!= \delta\) yields \([1000,1000] - [0,150] = [850,1000]\). This
+demonstrates how branch pruning and joining prevent unnecessary interval blow-up while
+conservatively aggregating both paths.
 
-Containers (arrays, mappings, structs) are kept at \(\top\) by default and are concretized on access
-or when a specific key/field is annotated. In our example, the mapping entry \(\texttt{balances[msg.
-sender]}\) is concretized by the annotation, and its effects propagate through the branch body and
-the join. State variables with explicit initial values, such as \(\textit{totalSupply}\), start from
-a fixed interval, so a single assignment yields directly interpretable bounds.
+Containers (arrays, mappings, structs) remain at \(\top\) until accessed or annotated. Here,
+\(\texttt{balances[msg.sender]}\) is concretized by annotation and propagated through branches.
+State variables with explicit initial values start from fixed intervals.
 
-In summary, batch annotations standardize the essential debugging act of initial state specification
-via a simple comment syntax, enabling the developer to explore an intended input range in one shot.
-\textsc{SolQDebug} reuses the CFG and performs a single‑pass reinterpretation, delivering
-lightweight yet semantically sound results. Formal details and algorithms appear in §3.3 and §3.5.
+In summary, batch annotations enable developers to specify initial state declaratively and explore
+program behavior in a single pass over the pre-built CFG. Formal details appear in §3.3 and §3.5.
 
 \FloatBarrier
 \subsection{Interactive Parser}
