@@ -619,8 +619,7 @@ Unlike incremental analysis, batch annotations leave the CFG structure unchanged
 The Interactive Parser extends the Solidity language grammar~\citet{solgram} with specialized entry rules
 that accept partial code fragments during incremental editing.
 The parser defines eight specialized entry rules: seven for partial Solidity constructs
-during incremental editing (Table~\ref{tab:interactive-rules}),
-and one for batch-annotation blocks that enable symbolic input scenarios.
+during incremental editing, and one for batch-annotation blocks that enable symbolic input scenarios.
 
 \begin{table}[t]
 \centering
@@ -658,9 +657,16 @@ for the complete grammar hierarchy).
 For instance, typing \texttt{if (condition) \{\,\}} produces a skeletal if-statement.
 In the burn function, when the developer adds the \texttt{else} branch,
 \texttt{interactiveIfElseUnit} attaches it to the existing if-statement.
+This skeleton-based approach allows incremental construction, one construct at a time,
+without requiring syntactic completeness.
 
-The debugUnit rule parses batch-annotation lines that specify initial abstract values for variables, enabling symbolic input scenarios without contract deployment. The grammar defines three annotation types:
-\begin{itemize}[leftmargin=1.5em, itemsep=2pt]
+Beyond these seven interactive rules for Solidity constructs, the parser includes
+a specialized \texttt{debugUnit} rule for testing scenarios.
+The debugUnit rule parses batch-annotation lines that specify initial abstract values for variables,
+enabling symbolic input scenarios without contract deployment.
+The grammar defines three annotation types:
+
+\begin{itemize}[itemsep=2pt]
   \item GlobalVar assigns values to global variables such as msg.sender or block.timestamp
   \item StateVar assigns values to contract state variables, supporting nested access patterns like balances[msg.sender] or user.balance
   \item LocalVar assigns values to function parameters and local variables
@@ -672,38 +678,40 @@ boolean values, and symbolic placeholders for bytes and strings.
 The parser validates type compatibility and range bounds at parse time,
 warning developers if annotated values are incompatible with declared types.
 
-Complete grammar specifications, including all production rules and value formats for annotations,
-appear in Appendix~\ref{appendix:interactive-grammar}.
+The annotation syntax and validation rules are specified in Appendix~\ref{appendix:interactive-grammar},
+with the full ANTLR4 implementation available at~\citet{solqrule}.
 
 \FloatBarrier
     \subsection{Dynamic CFG Construction}
 
-This section explains how we dynamically extend the control-flow graph while a user edits code. We
-proceed in three steps. First, we construct and splice a CFG fragment for each statement form and
-rewire only the neighborhood of the current node. Second, we locate the insertion site (the current
-block) using a successor-first, line-aware selection strategy. Third, we re-interpret only the
-affected region after splicing to update abstract environments.
+Dynamic CFG construction maintains the control-flow graph incrementally as developers insert new statements.
+Rather than rebuilding from scratch, our approach modifies the graph in place.
+We proceed in three steps. First, we construct and splice a CFG fragment for each statement form.
+Second, we locate where to insert it in the existing graph.
+Third, we re-interpret only the affected region to update abstract environments.
+
+Our CFG consists of the following node types:
+\begin{itemize}
+  \item \textsc{entry node}: The unique function entry point where execution begins.
+  \item \textsc{basic node}: Holds exactly one statement (e.g., a variable declaration, an assignment, or a function call).
+  \item \textsc{condition node}: Represents branching constructs such as \texttt{if}, \texttt{else if}, \texttt{while}, \texttt{require}/\texttt{assert}, and \texttt{try}.
+  \item \textsc{join node}: Merges control flow from multiple branches (e.g., \textsc{if join}, \textsc{else-if join}).
+  \item \textsc{fixpoint evaluation node} (\(\phi\)): The loop join point used for widening and narrowing during fixpoint computation.
+  \item \textsc{loop exit node}: The false branch that exits a loop when the guard condition fails.
+  \item \textsc{return node}: A statement node whose outgoing edge is immediately rewired to the function's unique \textsc{return exit}.
+  \item \textsc{error exit}: The function's unique exceptional exit (targets the exceptional path via \texttt{revert}, \texttt{require}, or \texttt{assert} failures).
+  \item \textsc{exit node}: The function's unique normal exit point where execution terminates successfully.
+\end{itemize}
 
 \subsubsection{Statement-Local, Incremental Construction}
 
-We introduce the node kinds that make up the CFG, then show how each major statement is translated into a small CFG fragment and spliced locally. Every edit operates at an \textsc{insertion site}---the block immediately preceding the new fragment---without restructuring the rest of the graph.
+Every insertion operates at the \textsc{current node} without restructuring the rest of the graph. To enable direct insertion, each basic node holds exactly one statement, maintaining a line-to-node mapping.
 
-\noindent\textbf{Node kinds.}
-\begin{itemize}
-  \item \textsc{basic node}: Holds exactly one statement (e.g., a variable declaration, an assignment, or a function call).
-  \item \textsc{condition node}: Represents branching constructs such as \texttt{if}, \texttt{else if}, \texttt{while}, \texttt{require}/\texttt{assert}, and \texttt{try}.
-  \item \textsc{return node}: A statement node whose outgoing edge is immediately rewired to the function's unique \textsc{return exit}.
-  \item \textsc{error node}: The function's unique \textsc{error exit} (targets the exceptional path).
-  \item \textsc{fixpoint evaluation node} (\(\phi\)): The loop join used for widening and narrowing.
-  \item \textsc{loop exit node}: The false branch that leaves a loop.
-\end{itemize}
+Assignments, function calls, and unary operations create a single \textsc{basic node} inserted between the current node and its successors (Figure~\ref{fig:new-simple-statement}). An \texttt{if} statement creates a \textsc{condition node}, true/false \textsc{basic nodes}, and an \textsc{if join} (Figure~\ref{fig:new-if}). An \texttt{else if} replaces the previous false branch with a new condition and its own join, connecting to the outer \textsc{if join} (Figure~\ref{fig:new-else-if}). An \texttt{else} attaches directly to the false branch without creating a new condition node (Figure~\ref{fig:new-else}).
 
-Figure~\ref{fig:new-simple-statement} shows a simple statement. The builder creates one
-\textsc{basic node} and splices it between the current node and the original successors. Incoming
-environment is copied from the current node; all outgoing edges of the current node are reattached
-to the new basic node. We deliberately store \emph{exactly one} statement per basic node so that
-mid-line insertions become \(O(1)\) splices via the editor-to-CFG line map, without scanning or
-splitting multi-statement blocks.
+A \texttt{while} loop creates a \textsc{fixpoint evaluation node} $\phi$, a \textsc{condition node}, a loop body node, and a \textsc{loop exit node}. The body connects back to $\phi$ for fixpoint iteration (Figure~\ref{fig:new-while}). A \texttt{for} loop follows the same pattern with additional initialization and increment nodes. A \texttt{do\{\} while} is built incrementally: the body is created first, then the trailing \texttt{while} attaches the $\phi$ and condition nodes.
+
+A \texttt{break} redirects its outgoing edge to the \textsc{loop exit node} (Figure~\ref{fig:new-break}). A \texttt{continue} redirects to the loop's $\phi$ node (Figure~\ref{fig:new-continue}). A \texttt{return} is immediately rewired to the function's unique \textsc{return exit}, detaching its original successors (Figure~\ref{fig:new-return}). \texttt{require} and \texttt{assert} create a \textsc{condition node} with the true edge connecting to a continuation node and the false edge pointing to the \textsc{error exit} (Figure~\ref{fig:new-require}). A \texttt{try\{\} catch\{\}} follows a similar pattern with catch blocks replacing the false edge.
 
 \begin{figure}[H]
 \centering
@@ -731,12 +739,6 @@ splitting multi-statement blocks.
 \label{fig:new-simple-statement}
 \end{figure}
 
-Figure~\ref{fig:new-if} shows an \texttt{if}. The builder inserts a \textsc{condition node} for the
-guard, two \textsc{basic nodes} for the true/false arms, and an \textsc{if join}. Edges: current
-\(\rightarrow\) condition; condition \(\rightarrow\) true basic (true edge) and \(\rightarrow\)
-false basic (false edge); both basics \(\rightarrow\) if join; the if join reconnects to the
-original successors. Environments on the two edges are refined by the truth value of the guard.
-
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[scale=0.8, transform shape,
@@ -763,12 +765,6 @@ original successors. Environments on the two edges are refined by the truth valu
 \caption{If statement insertion. The builder creates a \textsc{condition node}, two nodes for true/false arms, and an \textsc{if join}}
 \label{fig:new-if}
 \end{figure}
-
-Figure~\ref{fig:new-else-if} shows an \texttt{else if}. The builder removes the previously created
-false arm of the nearest preceding \texttt{if}/\texttt{else if} at the same nesting depth and
-splices a fragment consisting of a new \textsc{condition node}, two \textsc{basic nodes}, and an
-\textsc{else-if join}. The else-if join is connected to the existing \textsc{if join} so the overall
-shape remains a single diamond toward the if join.
 
 \begin{figure}[H]
 \centering
@@ -808,13 +804,6 @@ shape remains a single diamond toward the if join.
 \label{fig:new-else-if}
 \end{figure}
 
-Figure~\ref{fig:new-else} shows an \texttt{else}. No new condition is created; the builder attaches
-a \textsc{basic node} to the false branch of the corresponding \texttt{if}/\texttt{else if} and
-connects it to the same \textsc{if join} as the true branch. The figure assumes a canonical
-\texttt{if}/\texttt{else if}/\texttt{else} chain. For nested patterns (e.g., \texttt{if \{ if \{\}
-else \{\} \}}), the else attaches to the false arm of its matching guard according to standard block
-matching.
-
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[scale=0.8, transform shape,
@@ -846,38 +835,6 @@ matching.
 \label{fig:new-else}
 \end{figure}
 
-Figure~\ref{fig:new-while} shows a \texttt{while}. The builder creates a \textsc{fixpoint evaluation
-node} \(\phi\), a \textsc{condition node}, a true-arm \textsc{basic node} as the loop-body entry,
-and a \textsc{loop exit node} (false arm). Rewiring: current \(\rightarrow \phi \rightarrow\)
-condition; condition(true) \(\rightarrow\) body; body \(\rightarrow \phi\) (back edge);
-condition(false) \(\rightarrow\) loop exit; the loop exit reconnects to the original successors.
-
-\begin{figure}[H]
-\centering
-\begin{tikzpicture}[scale=0.8, transform shape,
-  node distance=1cm and 2cm,
-  block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
-  cond/.style={diamond, draw, thick, aspect=2, minimum width=1.5cm, align=center, font=\footnotesize},
-  exit/.style={rectangle, draw, thick, rounded corners, fill=red!15, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
-  dots/.style={circle, draw=none, minimum size=0.3cm}
-]
-  \node[block] (current) {Current Node};
-  \node[cond, below=of current, fill=green!15] (cond) {predicate};
-  \node[block, below left=of cond, fill=green!15] (true) {True\\Node};
-  \node[exit, below right=of cond] (error) {ERROR\\EXIT};
-  \node[dots, below=of true] (succ) {...};
-
-  \draw[->, thick] (current) -- (cond);
-  \draw[->, thick] (cond) -| node[above left, pos=0.3] {T} (true);
-  \draw[->, thick] (cond) -| node[above right, pos=0.3] {F} (error);
-  \draw[->, thick] (true) -- (succ);
-\end{tikzpicture}
-\caption{Require/assert statement insertion. The builder creates a \textsc{condition node} with true edge to a node and false edge to the \textsc{error exit}}
-\label{fig:new-require}
-\end{figure}
- The
-\(\phi\) node stores both the pre-loop baseline and the running snapshot for widening/narrowing.
-
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[scale=0.8, transform shape,
@@ -905,10 +862,6 @@ condition(false) \(\rightarrow\) loop exit; the loop exit reconnects to the orig
 \caption{While loop insertion. The builder creates a \textsc{fixpoint evaluation node} $\phi$, a \textsc{condition node}, a loop body node, and a \textsc{loop exit node}}
 \label{fig:new-while}
 \end{figure}
-
-Figure~\ref{fig:new-break} shows a \texttt{break}. The statement becomes a \textsc{basic node} whose
-outgoing edge is redirected to the \textsc{loop exit node}. The loop exit's environment is
-conservatively joined with the environment at the break site.
 
 \begin{figure}[H]
 \centering
@@ -940,13 +893,6 @@ conservatively joined with the environment at the break site.
 \label{fig:new-break}
 \end{figure}
 
-
-
-Figure~\ref{fig:new-continue} shows a \texttt{continue}. The statement becomes a \textsc{basic node}
-whose outgoing edge is redirected to the loop's \textsc{fixpoint evaluation node} \(\phi\).
-Operationally, this keeps the back-edge shape and joins the current environment into the loop's join
-state.
-
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[scale=0.8, transform shape,
@@ -976,12 +922,6 @@ state.
 \label{fig:new-continue}
 \end{figure}
 
-
-
-Figure~\ref{fig:new-return} shows a \texttt{return}. The statement becomes a \textsc{return node}
-and is immediately rewired to the function's unique \textsc{return exit}; the return value is
-recorded there and the original successors of the current node are detached.
-
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[scale=0.8, transform shape,
@@ -1003,22 +943,31 @@ recorded there and the original successors of the current node are detached.
 \label{fig:new-return}
 \end{figure}
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.8, transform shape,
+  node distance=1cm and 2cm,
+  block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
+  cond/.style={diamond, draw, thick, aspect=2, minimum width=1.5cm, align=center, font=\footnotesize},
+  exit/.style={rectangle, draw, thick, rounded corners, fill=red!15, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
+  dots/.style={circle, draw=none, minimum size=0.3cm}
+]
+  \node[block] (current) {Current Node};
+  \node[cond, below=of current, fill=green!15] (cond) {predicate};
+  \node[block, below left=of cond, fill=green!15] (true) {True\\Node};
+  \node[exit, below right=of cond] (error) {ERROR\\EXIT};
+  \node[dots, below=of true] (succ) {...};
 
+  \draw[->, thick] (current) -- (cond);
+  \draw[->, thick] (cond) -| node[above left, pos=0.3] {T} (true);
+  \draw[->, thick] (cond) -| node[above right, pos=0.3] {F} (error);
+  \draw[->, thick] (true) -- (succ);
+\end{tikzpicture}
+\caption{Require/assert statement insertion. The builder creates a \textsc{condition node} with true edge to a node and false edge to the \textsc{error exit}}
+\label{fig:new-require}
+\end{figure}
 
-Figure~\ref{fig:new-require} shows \texttt{require}/\texttt{assert}. The builder inserts a
-\textsc{condition node} for the predicate, makes the true edge point to a \textsc{basic node}, and
-connects the false edge directly to the function's \textsc{error exit}. The true basic then
-reconnects to the original successors, forming a one-sided diamond.
-
-\noindent\textbf{Other constructs.} Similar patterns apply to the remaining control-flow constructs:
-\begin{itemize}
-  \item \texttt{for} loops: Handled as a \(\phi\) node and condition like \texttt{while}, optionally preceded by an initialization node and followed by an increment node on the back edge.
-  \item \texttt{do\{\} while}: Built in two steps. First, a body pair is created and closed. Later, the trailing \texttt{while} line attaches a \(\phi\), condition, and loop exit, and wires the back edge to the existing body.
-  \item \texttt{try\{\} catch\{\}}: Represented by a \textsc{condition node} tagged as \texttt{try} whose true edge goes to the success block and whose false edge is replaced by a catch entry/end pair when a matching \texttt{catch} appears.
-\end{itemize}
-
-
-        \subsubsection{Line-Aware Successor-First Insertion-Site Selection}
+\subsubsection{Line-Aware Successor-First Insertion-Site Selection}
 
 We keep a lightweight line--to--node index to make insertion local. Each newly created node is
 attached to one or two source lines depending on whether the construct is single-line (terminated by
