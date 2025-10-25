@@ -53,22 +53,18 @@
 
 \raggedbottom
 
-% 예: (Abbott 1991; Barakat et al. 1995) 꼴
 % Using numerical style to match sn-mathphys-num document class
 \bibpunct{(}{)}{;}{n}{}{ } % n = numerical citations
 
-% --- URL 줄바꿈 개선(긴 URL 자동 줄바꿈) ---
 \usepackage[hyphens]{url}
 \usepackage[colorlinks=true,allcolors=blue]{hyperref}
 \Urlmuskip=0mu plus 1mu
 \def\UrlBreaks{\do\/\do-\do\_\do\.\do\?\do\&}
 
-% --- 레퍼런스(숫자 라벨 숨기고 행걸이 들여쓰기) ---
 \makeatletter
-\renewcommand\@biblabel[1]{} % [1] 같은 숫자 라벨 숨김
+\renewcommand\@biblabel[1]{} % Remove numeric labels like [1]
 \makeatother
-\setlength{\bibsep}{0.2em}   % 항목 간 간격
-% natbib 계열 문서라면 \bibhang 사용 가능(행걸이 폭)
+\setlength{\bibsep}{0.2em}   % Space between bibliography items
 \setlength{\bibhang}{2em}
 
 % Custom math commands
@@ -116,7 +112,7 @@ analysis during development without requiring compilation or deployment.}
     Smart contracts are the backbone of decentralized applications, and Solidity has become the
     dominant language for writing them~\citep{smart contract evolution, solidity}. As contracts grow
     more complex and control more assets, developers must reason about correctness throughout the
-    development cycle—not just at deployment. Large language models (LLMs) such as ~\citet{gpt} or
+    development cycle---not just at deployment. Large language models (LLMs) such as ~\citet{gpt} or
     ~\citet{llama} can assist with code generation but offer no guarantees of correctness.
     Ultimately, developers remain responsible for understanding variable interactions, control flow,
     and numeric boundaries during authoring.
@@ -128,13 +124,13 @@ analysis during development without requiring compilation or deployment.}
     study found that 88.8\% of Solidity developers described debugging as painful, and 69\%
     attributed this to the absence of interactive, source-level tooling~\citet{interview}. Despite
     this widely acknowledged pain point, we find no existing research or tooling that provides
-    interactive feedback during Solidity code authoring—a gap that this paper aims to fill.
+    interactive feedback during Solidity code authoring---a gap that this paper aims to fill.
     
     This paper presents \textsc{SolQDebug}, a source-level interactive Solidity debugger powered by
     abstract interpretation. Rather than replacing runtime debuggers, it complements them by
-    enabling symbolic, per-statement inspection during code authoring—before compilation or
+    enabling symbolic, per-statement inspection during code authoring---before compilation or
     deployment. It targets the Solidity pattern of single-contract, single-transaction execution,
-    where each function is isolated and stateless—ideal for static reasoning but difficult to
+    where each function is isolated and stateless---ideal for static reasoning but difficult to
     simulate manually. To support this, \textsc{SolQDebug} applies interval-based abstract
     interpretation, which generalizes over symbolic inputs, exposes edge-case behaviors, and
     provides sound results with low overhead. This approach gives developers immediate feedback and
@@ -223,7 +219,6 @@ contract Example {
         single-contract, single-transaction scope without introducing parts of the language that our
         evaluation does not exercise.
 
-        
     \subsection{Solidity Execution Model}
         To execute a Solidity contract on the blockchain, it must first be deployed. Deployment
         occurs through a one-time transaction that stores the compiled bytecode on-chain and invokes
@@ -303,13 +298,13 @@ contract Example {
         bytecode level.
         
         This workflow introduces several seconds to minutes of latency per iteration, fundamentally
-        breaking the fast “type-and-inspect” feedback cycle expected in modern development tools. To
+        breaking the fast "type-and-inspect" feedback cycle expected in modern development tools. To
         mitigate this friction, developers often rely on \texttt{emit} logs or event outputs to
         observe intermediate values. However, such instrumentation provides only runtime snapshots
         and lacks the structural insight needed to understand symbolic variation or control-flow
         behavior. Moreover, modifying the expression of interest typically requires recompilation
-        and redeployment, compounding latency and disrupting iteration. The final stage—tracing raw
-        EVM opcodes—is particularly costly, as developers are forced to mentally reconstruct
+        and redeployment, compounding latency and disrupting iteration. The final stage---tracing raw
+        EVM opcodes---is particularly costly, as developers are forced to mentally reconstruct
         source-level semantics. This not only adds execution overhead but also imposes significant
         cognitive burden during fault localization and fix validation.
     
@@ -320,10 +315,10 @@ contract Example {
         effects are irreversible unless external intervention is performed. Re-executing the same
         function along the same control path is nontrivial: developers must either redeploy the
         entire contract to restore the initial state, or manually reconstruct the required
-        preconditions via preparatory transactions—both of which incur significant overhead.
+        preconditions via preparatory transactions---both of which incur significant overhead.
         
         Additionally, if a function includes conditional guards that depend on the current
-        state—such as account balances or counters—then any debugging session must first ensure that
+        state---such as account balances or counters---then any debugging session must first ensure that
         those conditions are satisfied. Fig. 2 illustrates this challenge: the debug target function
         enforces a check on \texttt{\_balances[account]}, requiring developers to manually assign a
         sufficient balance before they can observe the downstream effects on \texttt{\_totalSupply}.
@@ -337,14 +332,14 @@ contract Example {
 
     \subsection{Proposed Methodology and Technical Challenges}
 
-    \textsc{SolQDebug} addresses the two root causes of Solidity’s debugging bottleneck—external
-    latency from blockchain round trips, and internal opacity due to storage-based semantics—through
+    \textsc{SolQDebug} addresses the two root causes of Solidity's debugging bottleneck---external
+    latency from blockchain round trips, and internal opacity due to storage-based semantics---through
     a pair of lightweight but complementary techniques.
     
     \smallskip
     \noindent\textbf{(1) Eliminating blockchain latency via in-editor interpretation.}
     The traditional debugging workflow requires compilation, deployment, transaction-based state
-    setup, and bytecode tracing—each incurring significant latency. \textsc{SolQDebug} replaces this
+    setup, and bytecode tracing---each incurring significant latency. \textsc{SolQDebug} replaces this
     round trip by performing both parsing and abstract interpretation directly inside the Solidity
     Editor. To support live editing, we extend the Solidity grammar with interactive parsing rules
     tailored for isolated statements, expressions, and control-flow blocks. When the developer types
@@ -360,7 +355,7 @@ contract Example {
     \smallskip
     \noindent\textbf{(2) Re-instantiating symbolic state without redeployment.}
     The EVM does not support reverting to a prior state without redeploying the contract or
-    replaying transactions—both of which disrupt iteration. \textsc{SolQDebug} introduces batch
+    replaying transactions---both of which disrupt iteration. \textsc{SolQDebug} introduces batch
     annotations as a lightweight mechanism for symbolic state injection. In essence, this reflects a
     core debugging activity: varying inputs or contract state to observe control-flow outcomes.
     Rather than reconstructing such conditions through live transactions, developers can write
@@ -369,7 +364,7 @@ contract Example {
     
     This approach brings the debugging workflow closer to the source by making state manipulation
     explicit and reproducible within the code itself. Developers can explore alternative execution
-    paths by editing annotations alone—without modifying the contract logic or incurring compilation
+    paths by editing annotations alone---without modifying the contract logic or incurring compilation
     and deployment overhead. It effectively decouples symbolic input configuration from the analysis
     cycle, while preserving the intuitive debugging process developers already follow.
 
@@ -421,17 +416,18 @@ contract Example {
 
         \textbf{(3) Line-Level Output.}
         Following analysis, the system produces a per-statement summary showing the computed intervals
-        for variables affected by each statement—including declarations, assignments, and return values.
+        for variables affected by each statement---including declarations, assignments, and return values.
         All outputs are mapped to their corresponding source line numbers and displayed inline within
         the editor, providing immediate feedback as developers write and modify code.
     
     \subsection{Running Example}
 
-    To make the architecture concrete, we walk through a running example using the burn function
-    from Listing~\ref{lst:grammar-min}. We illustrate both incremental source edits (§3.2.1) and
-    batch annotations (§3.2.2).
+    To illustrate how the proposed architecture functions in practice, we present
+    a concrete example using the \texttt{burn} function from Listing~\ref{lst:grammar-min}.
+    This example demonstrates two key analysis modes: incremental edits (\S{}3.2.1)
+    and batch annotations (\S{}3.2.2).
 
-        \subsubsection{Source Code Analysis Example}
+        \subsubsection{Incremental Source Code Analysis}
 
 \begin{table}[t!]
   \caption{Incremental inputs for the running example}
@@ -470,19 +466,19 @@ contract Example {
   \rmfamily
 \end{table}
 
-\begin{comment}
-Table 1은 listing 1의 코드 중 함수 burn에 대해 개발자가 편집기에서 입력하는 증분 단위를 보여준다. SolQDebug가 받는 입력은 크게 두 유형이다. (i)
-함수 선언이나 if/else처럼 '{' '}' 형태의 블록과 (ii) 세미콜론으로 끝나는 단일 문장 조각이다. 블록 조각은 편집기에서 “{”를 치는 순간 “}”가 자동으로 보완되기
-때문에, 두 줄이 한 번에 들어온다(예: function … { / }). 이후 본문이 채워지면 자동으로 생성된 닫는 중괄호 \}는 뒤로 밀린다.
-\end{comment}
+As shown in Table~\ref{tab:input_code}, the developer incrementally constructs the \texttt{burn}
+function through nine distinct input steps, each introducing a new code fragment.
+\textsc{SolQDebug} accepts two kinds of fragments:
 
-Table~\ref{tab:input_code} lists the incremental fragments a developer types for the function burn
-in Listing ~\ref{lst:grammar-min}. SolQDebug accepts two kinds of fragments: (i) block fragments
-such as a function header or an if/else block, and (ii) single statements that end with a semicolon.
-Most editors auto‑insert a closing brace when ``\{'' is typed, so a block fragment arrives as two
-lines at once (e.g., function … \{ and the matching \}). As the body is filled, the auto‑inserted
-closing brace is pushed downward. The line numbers shown in the table refer to the listing
-~\ref{lst:grammar-min}; intermediate edits may temporarily place the closing brace earlier.
+\begin{itemize}
+  \item \textbf{Block fragments} such as function headers or if/else blocks.
+        When the developer types an opening `\{', most editors auto-insert the closing `\}',
+        so the complete block arrives at once and may span multiple lines
+        (e.g., Step 1 in lines 11--12 of Listing~\ref{lst:grammar-min}).
+
+  \item \textbf{Single statements} ending with semicolons
+        (e.g., Steps 2, 3, 5, 6, 8, and 9).
+\end{itemize}
 
 \begin{figure*}[!htbp]
   \centering
@@ -506,14 +502,14 @@ closing brace is pushed downward. The line numbers shown in the table refer to t
   \node[block, below right=1.5cm and 2cm of cond] (false) {... intermediate nodes ...\\(Step 8)};
 
   % Leaf nodes
-  \node[block, below=1cm of true] (leaf_t) {[Leaf T]\\delta = amount\\env: \{bal:[100,200],\\delta:[50,150]\}};
-  \node[block, below=1cm of false] (leaf_f) {[Leaf F]\\delta = 0\\env: \{bal:[100,200],\\delta:[0,0]\}};
+  \node[block, below=1cm of true] (leaf_t) {[Leaf T]\\delta = amount\\env: \{bal:$\top$,\\delta:$\top$\}};
+  \node[block, below=1cm of false] (leaf_f) {[Leaf F]\\delta = 0\\env: \{bal:$\top$,\\delta:[0,0]\}};
 
-  % Join point (empty node)
-  \node[join, below=2cm of cond, yshift=-2.5cm] (join) {$\sqcup$ Join Node\\(empty)};
+  % Join point
+  \node[block, below=2cm of cond, yshift=-2.5cm, fill=yellow!20] (join) {$\sqcup$ Join Node\\env: \{bal:$\top$,\\delta:$\top$\}};
 
   % New node with Step 9
-  \node[block, below=1cm of join, fill=green!15] (step9) {[New Node]\\totalSupply -= delta\\env: \{totalSupply:[850,1000]\}};
+  \node[block, below=1cm of join, fill=green!15] (step9) {[New Node]\\totalSupply -= delta\\env: \{totalSupply:$\top$\}};
 
   % Exit
   \node[block, below=1cm of step9] (exit) {EXIT};
@@ -531,42 +527,48 @@ closing brace is pushed downward. The line numbers shown in the table refer to t
   \draw[->, thick] (step9) -- (exit);
 
   \end{tikzpicture}
-  \caption{CFG structure showing Step 9 insertion. Each statement occupies a separate basic node; intermediate nodes along each branch are omitted, showing only the leaf nodes before the join point. The join point node is empty and serves only to merge the environments from both branches}
+  \caption{CFG structure showing Step 9 insertion. Each statement occupies a separate basic node; intermediate nodes along each branch are omitted, showing only the leaf nodes before the join point. The join point node computes the least upper bound of environments from both branches}
   \label{fig:solqdebug-cfg}
 \end{figure*}
 
-        Figure~\ref{fig:solqdebug-cfg} visualizes the state of the CFG after Steps 1–8 have already
-        been integrated and shows how the new input in Step 9 (totalSupply -= delta;) is analyzed
-        and inserted.  For clarity, we focus on the function body in this running example and ignore
-        the modifier referenced in the header; modifiers and their placement are treated in §3.5.
-
-        SolQDebug maintains three types of CFG nodes:
-
-\begin{itemize}
-  \item \textbf{Basic nodes} store statement sequences and the abstract environment after execution.
-  \item \textbf{Condition nodes} store predicates without updating the environment.
-  \item \textbf{Branch refinement} prunes environments along each edge: true successors refine
-        intervals under the predicate, false successors under its negation.
-\end{itemize}
-
-        When Step~9 arrives, SolQDebug processes it as follows:
+As the developer types each fragment, \textsc{SolQDebug} incrementally extends the CFG
+and recomputes abstract values only for affected program points.
+Figure~\ref{fig:solqdebug-cfg} visualizes the CFG structure after Steps 1--8 have been integrated.
+We focus on Step~9 (\texttt{totalSupply -= delta;}), which illustrates how the system handles CFG
+insertion after a conditional branch merge. When Step~9 arrives, \textsc{SolQDebug} processes it
+as follows:
 
 \begin{enumerate}
-  \item The interactive parser recognizes \texttt{totalSupply -= delta;} as an assignment (§3.3).
-  \item The system locates the insertion point using the edit context and existing CFG—in this case,
-        the join after the if/else (§3.5).
-  \item At the join, the least upper bound (\(\sqcup\)) of branch environments is computed. If loops
-        are present, a localized fixpoint is computed first (§3.5).
-  \item A new node is created with the assignment evaluated in the joined environment. Edges are
-        rewired from branch leaves through the join to the new node.
-  \item All nodes reachable from the insertion are reinterpreted to propagate updated environments.
+  \item The interactive parser recognizes \texttt{totalSupply -= delta;} as an assignment.
+  \item \textsc{SolQDebug} determines the insertion point by examining the edit context and existing CFG.
+        In this case, the insertion point is after the join node that merges the if/else branches.
+  \item A new CFG node is created for the assignment, and edges are rewired: the join node now
+        flows into this new node, which in turn connects to the exit.
+  \item The new node receives the environment from the join node, which holds the least upper
+        bound (\(\sqcup\)) of environments from both branches.
+  \item \textsc{SolQDebug} reinterprets the new node and all reachable nodes to propagate the
+        updated environment throughout the CFG.
 \end{enumerate}
 
-        This design reuses path-local computations up to the leaves while maintaining semantic
-        correctness. The same procedure handles out-of-order edits (e.g., adding an else block later)
-        by applying the same insertion-point search, join handling, and edge rewiring.
-        
-        \subsubsection{Batch Annotation Analysis Example}
+This reinterpretation maintains soundness: it ensures that all affected nodes reflect the
+updated environment, allowing subsequent edits to directly reuse the computed abstract values
+without re-analyzing the entire program.
+
+        \subsubsection{Batch Annotation Analysis}
+
+While incremental analysis supports the write-compile-debug cycle, developers often need
+to explore how different input ranges affect program behavior. This includes verifying price
+calculations in decentralized exchanges, balance constraints in token transfers, or liquidity
+ratios in automated market makers.
+Batch annotations enable this by letting developers specify initial states declaratively and
+obtain line-level results in a single analysis pass, reusing the CFG constructed during
+incremental edits.
+
+Listing~\ref{lst:grammar-batch} shows the \texttt{burn} function with batch annotations.
+        Annotation blocks are enclosed by \verb|//@Debugging BEGIN| and \verb|//@Debugging END|.
+        Each annotation line specifies a variable type (\texttt{@StateVar} for state variables,
+        \texttt{@LocalVar} for local variables) and assigns an interval value---supporting both
+        simple variables and nested accesses like \texttt{balances[msg.sender]}.
 
 \begin{lstlisting}[language=Solidity, numbers=left, basicstyle=\ttfamily\small, caption={Burn function with batch annotations}, label={lst:grammar-batch}] 
 function burn(uint256 amount) public onlyOwner {
@@ -585,126 +587,40 @@ function burn(uint256 amount) public onlyOwner {
     }
     totalSupply -= delta;
 }
-    
+
 \end{lstlisting}
 
-\begin{comment}
-배치 주석은 개발자가 초기 상태와 파라미터를 상징적(구간) 값으로 선언적으로 지정하고, 이미 구축된 CFG 위에서 단일 패스 재해석을 수행해 줄 단위 결과를 얻기 위한 장치이다.
-본 연구에서의 ‘디버깅’은 배포 전 편집 단계에서 입력(및 상태) 값을 바꾸어 분기 도달성, 가드 유효성, 값 경계를 상호작용적으로 관찰하는 활동을 의미한다. 따라서 주석으로 초기
-범위를 지정하지 않은 변수는 보수적으로
-⊤
-⊤에 머물러 결과가 공허해지기 쉬우며, 이는 디버깅의 본질상 의미 있는 초기화가 필요함을 시사한다. 배치 주석은 이러한 초기화 행위를 일관적이고 재현 가능한 형식으로 제공한다.
+In this example, we annotate \texttt{balances[msg.sender]} with the interval \([100,200]\)
+        and \texttt{amount} with \([50,150]\) to explore how the \texttt{burn} function behaves
+        under different balance and amount scenarios.
 
-본 예제에서는 Listing \ref{lst:grammar-min}의 burn 함수에 다음과 같은 주석을 부여한다.
-//@StateVar balances[msg.sender] = [100,200], //@LocalVar amount = [50,150].
-초기 총발행량은 totalSupply = 1000으로 둔다. 이 선택은 조건 bal >= amount의 참·거짓 양 경로가 모두 실제로 도달 가능하도록 설계되어, 분기 프루닝과
-합류 후 경계 변화가 어떻게 나타나는지를 명확히 보여준다.
+        When a batch annotation block is encountered, \textsc{SolQDebug} follows a lightweight pipeline:
 
-주석 블록은 //@Debugging BEGIN … //@Debugging END 형태로 기술되며, 한 줄마다 “대상 L-값 ← 추상값(구간/심볼릭)”을 지정한다. 대상은
-전역·상태·지역 변수를 포함하고, a[i].x, balances[addr]와 같은 중첩 L-값도 허용된다. 정수형은 선언된 비트폭에 맞춘 구간으로 정규화되고, 주소형은 160비트
-비부호 구간, 불린은
-{
-0
-,
-1
-}
-{0,1}로 해석한다.
+\begin{enumerate}
+  \item \textbf{Parse and validate.} Each annotation line is parsed, type-checked, and converted
+        to the corresponding abstract domain (e.g., intervals for integers).
+  \item \textbf{Snapshot and overlay.} The current abstract memory is saved, and the annotated
+        values are overlaid onto the initial environment.
+  \item \textbf{Single-pass analysis.} \textsc{SolQDebug} re-analyzes the pre-built CFG in a single pass
+        using the annotated values as the initial environment.
+  \item \textbf{Restore snapshot.} After analysis completes, the snapshot is restored to isolate
+        successive annotation runs.
+\end{enumerate}
 
-배치 주석이 주어지면 SolQDebug는 다음의 경량 파이프라인을 수행한다. (i) 각 주석 줄을 파싱해 심볼 해석과 타입 점검을 수행한다. (ii) 현재 추상 메모리를 스냅샷한
-뒤, 주석으로 지정된 값들로 초기 환경을 오버레이한다. (iii) 함수 진입점에서 미리 구축된 CFG를 그대로 순회하며 한 번의 추상 해석을 수행한다. 이때 조건 노드는 술어만
-기록하고 환경을 즉시 변경하지 않으며, 참/거짓 후속 블록이 생성될 때 각 경로 환경을 술어/부정 술어에 맞게 프루닝한다. 루프가 있는 경우에는 헤더에서 **국소
-고정점(fixpoint)**을 계산한다. (iv) 분석이 끝나면 스냅샷을 복원하여 실행 간 격리를 보장한다. 이 일련의 과정은 Snapshot Manager가
-관리한다.
-
-이때 배치 주석은 CFG 구조를 변화시키지 않는다. 새로운 노드를 삽입하지 않고, 초기 환경만 변경한 뒤 동일 CFG를 재사용한다. 기본 블록은 자신이 담고 있는 문장 리스트와
-"블록 끝 시점의 추상 환경(변수별 구간)"을 유지하므로 재평가가 빠르다. 조건 프루닝, 분기 합류 시 LUB(JoinBranches), 루프의 고정점 처리 규칙은 앞선
-Source Code 예제(§3.2.1)와 동일하다. Figure \ref{fig:solqdebug-cfg}의 Pre‑built CFG 위에서, 배치 주석은 "진입 → 분기 프루닝
-→ 합류 → 종료" 흐름을 그대로 따라 단일 패스로 재분석됨을 시각적으로 확인할 수 있다.
-
-
-이 된다. 이와 같이, 분기별 제약을 반영한 프루닝과 합류 시의 최상한 조인을 통해, 간단한 구간 도메인만으로도 경계가 과도하게 팽창하지 않도록 억제하면서(예: 참 경로에서 bal
-- amount의 음수 영역 제거), 두 경로의 효과를 보수적으로 통합할 수 있다.
-
-컨테이너(배열·매핑·구조체)는 기본적으로 
-⊤
-⊤으로 유지하되, 접근 시점(on‑access) 또는 주석으로 특정 키/필드가 지정된 경우 해당 위치를 **구체화(concretize)**하여 해석한다. 본 예제의
-balances[msg.sender]는 주석으로 키가 지정되었기 때문에 곧바로 구간 값이 부여되고, 이후 분기 본문과 합류에서 그 효과가 전파된다. 초기 총발행량
-totalSupply와 같이 명시적 초기값이 주어진 상태변수는 고정 구간에서 출발하므로, 단일 대입만으로도 결과 경계가 직관적으로 해석된다.
-
-정리하면, 배치 주석은 디버깅에서 필수적인 초기 상태 지정 행위를 간단한 주석 문법으로 표준화하여, 개발자가 의도한 입력 범위를 한 번에 탐색할 수 있게 한다. SolQDebug는
-CFG를 재사용하고 단일 패스 재해석을 수행함으로써, 경량이면서도 의미론적으로 정합적인 결과를 제공한다. 자세한 형식적 정의와 알고리즘은 §3.3 및 §3.5에서 논의한다.
-\end{comment}
-
-Batch annotations allow developers to specify initial state and parameters as interval values and
-obtain line-level results by reinterpreting the pre-built CFG in a single pass. Variables without
-annotated ranges remain at \(\top\), making batch annotations essential for meaningful debugging
-feedback.
-
-We annotate \texttt{burn} from Listing~\ref{lst:grammar-min} with
-//@StateVar \texttt{balances[msg.sender]} = \([100,200]\) and
-//@LocalVar \texttt{amount} = \([50,150]\), and set \(\textit{totalSupply} = 1000\).
-This makes \(\textit{bal} \ge \textit{amount}\) partially true, allowing both branches to execute.
-
-Annotation blocks are delimited by \verb|//@Debugging BEGIN| and \verb|//@Debugging END|, with each
-line assigning an abstract value to a target L-value. Targets include global, state, and local
-variables, as well as nested accesses like \(\texttt{balances[addr]}\). Values are type-checked and
-normalized to their respective domains (intervals for integers, symbolic sets for addresses).
-
-When a batch block is encountered, \textsc{SolQDebug} (i) parses and type-checks each annotation,
-(ii) snapshots the current abstract memory and overlays the annotated values, (iii) reinterprets the
-function's CFG in a single pass with branch pruning and loop fixpoints, and (iv) restores the
-snapshot to isolate successive runs. The Snapshot Manager coordinates this process.
-
-Batch annotations do not alter the CFG structure—only the initial environment changes. The same
-branch pruning, join, and fixpoint rules from §3.2.1 apply. On the pre-built CFG
-(Figure~\ref{fig:solqdebug-cfg}), a batch run traverses from entry to exit in a single pass.
-
-The annotations yield \(\textit{bal} \in [100,200]\) and \(\textit{amount} \in [50,150]\). Since
-\(\textit{bal} \ge \textit{amount}\) is only partially true, both branches are reachable. After
-branch pruning, the true path produces \(\delta \in [50,150]\) and \(\texttt{balances[msg.sender]}
-\in [0,150]\), while the false path sets \(\delta := 0\) and leaves \(\texttt{balances[msg.sender]}
-\in [100,200]\). At the join:
-\[
-\delta \in [0,150],
-\qquad
-\texttt{balances[msg.sender]} \in [0,200].
-\]
-Finally, \(\textit{totalSupply} -\!= \delta\) yields \([1000,1000] - [0,150] = [850,1000]\). This
-demonstrates how branch pruning and joining prevent unnecessary interval blow-up while
-conservatively aggregating both paths.
-
-Containers (arrays, mappings, structs) remain at \(\top\) until accessed or annotated. Here,
-\(\texttt{balances[msg.sender]}\) is concretized by annotation and propagated through branches.
-State variables with explicit initial values start from fixed intervals.
-
-In summary, batch annotations enable developers to specify initial state declaratively and explore
-program behavior in a single pass over the pre-built CFG. Formal details appear in §3.3 and §3.5.
+Unlike incremental analysis, batch annotations leave the CFG structure unchanged---only
+        the initial environment differs. This makes batch runs lightweight, enabling rapid what-if
+        exploration. Variables without annotations remain at \(\top\), making explicit initialization
+        essential for meaningful results. Formal details of the interactive parser and CFG construction
+        appear in \S{}3.3 and \S{}3.4.
 
 \FloatBarrier
 \subsection{Interactive Parser}
-The standard Solidity parser accepts only whole files (\texttt{sourceUnit} $\rightarrow$ \texttt{EOF}
-) and thus rejects partial fragments produced during editing. \textsc{SolQDebug}'s interactive
-parser extends the official Solidity grammar (defined in \texttt{Solidity.g4}~\cite{antlr}) with
-additional entry rules that accept isolated code fragments based on the current editing context. Each
-fragment is parsed into a syntactically well-formed subtree suitable for incremental analysis without
-requiring a complete source file.
 
-The interactive parser is built upon ANTLR4~\cite{antlr} and introduces seven specialized entry
-rules for Solidity program fragments, plus one dedicated rule for batch-annotation blocks. The
-Context Analyzer determines the appropriate entry rule by inspecting the surrounding source context
-(e.g., whether the cursor is inside a function body, at top level, or within a struct definition) and
-selecting the most specific rule. This design allows developers to write and analyze code
-incrementally—statement by statement—while maintaining full syntactic consistency with the Solidity
-specification.
-
-Table~\ref{tab:interactive-rules} summarizes the entry rules. Each rule handles specific code
-fragments encountered during live editing. For instance, when a developer types a function header
-followed by an auto-inserted closing brace, \texttt{interactiveSourceUnit} accepts the skeleton
-definition. As statements are added inside the body, \texttt{interactiveBlockUnit} parses them
-individually. Two-phase constructs such as enums, structs, \texttt{if}/\texttt{else}, and
-\texttt{try}/\texttt{catch} are handled by dedicated rules that recognize when the first part (e.g.,
-\texttt{enum Status \{\}}) has been declared and the second part (e.g., member items
-\texttt{Pending, Shipped}) is being added incrementally.
+The Interactive Parser extends the Solidity language grammar~\citet{solgram} with specialized entry rules
+that accept partial code fragments during incremental editing.
+The parser defines eight specialized entry rules: seven for partial Solidity constructs
+during incremental editing (Table~\ref{tab:interactive-rules}),
+and one for batch-annotation blocks that enable symbolic input scenarios.
 
 \begin{table}[t]
 \centering
@@ -715,73 +631,62 @@ individually. Two-phase constructs such as enums, structs, \texttt{if}/\texttt{e
 \toprule
 \textbf{Entry Rule} & \textbf{Purpose} \\
 \midrule
-\texttt{interactiveSourceUnit} & Top-level declarations: functions, contracts, interfaces, libraries, state variables, pragmas, imports \\
-\texttt{interactiveEnumUnit} & Enum member items added after the enum shell is defined \\
-\texttt{interactiveStructUnit} & Struct member declarations added after the struct shell is defined \\
-\texttt{interactiveBlockUnit} & Statements and control-flow skeletons inside function bodies \\
-\texttt{interactiveDoWhileUnit} & The \texttt{while} tail of a \texttt{do\{...\}} loop \\
-\texttt{interactiveIfElseUnit} & \texttt{else} or \texttt{else if} branches following an \texttt{if} \\
-\texttt{interactiveCatchClauseUnit} & \texttt{catch} clauses following a \texttt{try} statement \\
-\texttt{debugUnit} & Batch-annotation lines (\texttt{@StateVar}, \texttt{@LocalVar}) \\
+interactiveSourceUnit & Top-level declarations: functions, contracts, interfaces, libraries, state variables, pragmas, imports \\
+interactiveEnumUnit & Enum member items added after the enum shell is defined \\
+interactiveStructUnit & Struct member declarations added after the struct shell is defined \\
+interactiveBlockUnit & Statements and control-flow skeletons inside function bodies \\
+interactiveDoWhileUnit & The while tail of a do-while loop \\
+interactiveIfElseUnit & else or else-if branches following an if statement \\
+interactiveCatchClauseUnit & catch clauses following a try statement \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\noindent\textbf{Representative example.}
-Consider the \texttt{burn} function from Listing~\ref{lst:grammar-min}. When the developer first
-types the function header, the parser invokes \texttt{interactiveSourceUnit} to accept:
-\begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
-function burn(uint256 amount) public onlyOwner {
-}
-\end{lstlisting}
-As statements are added line-by-line inside the body, \texttt{interactiveBlockUnit} parses each one:
-\begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
-uint256 bal = balances[msg.sender];
-uint256 delta;
-\end{lstlisting}
-When the developer types an \texttt{if} skeleton, \texttt{interactiveBlockUnit} matches it as
-\texttt{interactiveIfStatement}:
-\begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
-if (bal >= amount) {
-}
-\end{lstlisting}
-Later, if an \texttt{else} branch is added, \texttt{interactiveIfElseUnit} recognizes it and
-attaches it to the preceding \texttt{if} using the construct stack maintained by the Context
-Analyzer.
+Table~\ref{tab:interactive-rules} shows the seven rules, divided into two categories.
+\textit{Primary rules} (\texttt{interactiveSourceUnit}, \texttt{interactiveBlockUnit})
+handle independent constructs, while \textit{continuation rules} complete partially-written
+structures by filling enum or struct shells or by appending control-flow branches.
+This separation prevents syntactically invalid constructs (e.g., an else-branch without
+a preceding if-statement) from being parsed as independent statements.
 
-\noindent\textbf{Batch annotations.}
-The \texttt{debugUnit} rule parses annotation lines that specify initial abstract values for state
-and local variables. These annotations enable developers to configure symbolic input scenarios
-without deploying contracts. For example:
-\begin{lstlisting}[language=Solidity,basicstyle=\ttfamily\small]
-// @Debugging BEGIN
-// @StateVar balances[msg.sender] = [100,200]
-// @LocalVar amount = [50,150]
-// @Debugging END
-\end{lstlisting}
-Each directive assigns an interval or symbolic value to a variable. The parser supports nested access
-patterns (e.g., \texttt{balances[msg.sender]}, \texttt{user.balance}, \texttt{arr[i].field}) and
-various value types (integer intervals, symbolic addresses, boolean values). Type checking is
-performed at parse time, and out-of-bounds intervals are clamped to the declared type's valid range
-with a warning. The Snapshot Manager (§3.4.3) consumes these annotations to overlay the initial
-abstract environment before function reinterpretation.
+For concreteness, we refer to the burn function in Listing~\ref{lst:grammar-min}.
+The function header triggers \texttt{interactiveSourceUnit}, creating a function
+with an empty body.
+Each new statement invokes \texttt{interactiveBlockUnit}, which includes productions
+for both complete statements and control-flow skeletons (see Appendix~\ref{appendix:interactive-grammar}
+for the complete grammar hierarchy).
+For instance, typing \texttt{if (condition) \{\,\}} produces a skeletal if-statement.
+In the burn function, when the developer adds the \texttt{else} branch,
+\texttt{interactiveIfElseUnit} attaches it to the existing if-statement.
 
-The complete grammar specification, including production rules and formal syntax for all entry points,
-is provided in Appendix~\ref{appendix:interactive-grammar}. Implementation details such as
-context-stack management and entry-rule selection algorithms are also documented there.
+The debugUnit rule parses batch-annotation lines that specify initial abstract values for variables, enabling symbolic input scenarios without contract deployment. The grammar defines three annotation types:
+\begin{itemize}[leftmargin=1.5em, itemsep=2pt]
+  \item GlobalVar assigns values to global variables such as msg.sender or block.timestamp
+  \item StateVar assigns values to contract state variables, supporting nested access patterns like balances[msg.sender] or user.balance
+  \item LocalVar assigns values to function parameters and local variables
+\end{itemize}
+
+Each annotation accepts an L-value and a value specification.
+Supported value formats include integer intervals, symbolic addresses,
+boolean values, and symbolic placeholders for bytes and strings.
+The parser validates type compatibility and range bounds at parse time,
+warning developers if annotated values are incompatible with declared types.
+
+Complete grammar specifications, including all production rules and value formats for annotations,
+appear in Appendix~\ref{appendix:interactive-grammar}.
 
 \FloatBarrier
     \subsection{Dynamic CFG Construction}
 
-This section explains how we dynamically extend the control‑flow graph while a user edits code. We
+This section explains how we dynamically extend the control-flow graph while a user edits code. We
 proceed in three steps. First, we construct and splice a CFG fragment for each statement form and
 rewire only the neighborhood of the current node. Second, we locate the insertion site (the current
-block) using a successor‑first, line‑aware selection strategy. Third, we re‑interpret only the
+block) using a successor-first, line-aware selection strategy. Third, we re-interpret only the
 affected region after splicing to update abstract environments.
 
 \subsubsection{Statement-Local, Incremental Construction}
 
-We introduce the node kinds that make up the CFG, then show how each major statement is translated into a small CFG fragment and spliced locally. Every edit operates at an \textsc{insertion site}—the block immediately preceding the new fragment—without restructuring the rest of the graph.
+We introduce the node kinds that make up the CFG, then show how each major statement is translated into a small CFG fragment and spliced locally. Every edit operates at an \textsc{insertion site}---the block immediately preceding the new fragment---without restructuring the rest of the graph.
 
 \noindent\textbf{Node kinds.}
 \begin{itemize}
@@ -797,8 +702,8 @@ Figure~\ref{fig:new-simple-statement} shows a simple statement. The builder crea
 \textsc{basic node} and splices it between the current node and the original successors. Incoming
 environment is copied from the current node; all outgoing edges of the current node are reattached
 to the new basic node. We deliberately store \emph{exactly one} statement per basic node so that
-mid‑line insertions become \(O(1)\) splices via the editor‑to‑CFG line map, without scanning or
-splitting multi‑statement blocks.
+mid-line insertions become \(O(1)\) splices via the editor-to-CFG line map, without scanning or
+splitting multi-statement blocks.
 
 \begin{figure}[H]
 \centering
@@ -859,13 +764,10 @@ original successors. Environments on the two edges are refined by the truth valu
 \label{fig:new-if}
 \end{figure}
 
-
-
-
 Figure~\ref{fig:new-else-if} shows an \texttt{else if}. The builder removes the previously created
 false arm of the nearest preceding \texttt{if}/\texttt{else if} at the same nesting depth and
 splices a fragment consisting of a new \textsc{condition node}, two \textsc{basic nodes}, and an
-\textsc{else‑if join}. The else‑if join is connected to the existing \textsc{if join} so the overall
+\textsc{else-if join}. The else-if join is connected to the existing \textsc{if join} so the overall
 shape remains a single diamond toward the if join.
 
 \begin{figure}[H]
@@ -906,8 +808,6 @@ shape remains a single diamond toward the if join.
 \label{fig:new-else-if}
 \end{figure}
 
-
-
 Figure~\ref{fig:new-else} shows an \texttt{else}. No new condition is created; the builder attaches
 a \textsc{basic node} to the false branch of the corresponding \texttt{if}/\texttt{else if} and
 connects it to the same \textsc{if join} as the true branch. The figure assumes a canonical
@@ -946,10 +846,8 @@ matching.
 \label{fig:new-else}
 \end{figure}
 
-
-
 Figure~\ref{fig:new-while} shows a \texttt{while}. The builder creates a \textsc{fixpoint evaluation
-node} \(\phi\), a \textsc{condition node}, a true‑arm \textsc{basic node} as the loop‑body entry,
+node} \(\phi\), a \textsc{condition node}, a true-arm \textsc{basic node} as the loop-body entry,
 and a \textsc{loop exit node} (false arm). Rewiring: current \(\rightarrow \phi \rightarrow\)
 condition; condition(true) \(\rightarrow\) body; body \(\rightarrow \phi\) (back edge);
 condition(false) \(\rightarrow\) loop exit; the loop exit reconnects to the original successors.
@@ -978,7 +876,7 @@ condition(false) \(\rightarrow\) loop exit; the loop exit reconnects to the orig
 \label{fig:new-require}
 \end{figure}
  The
-\(\phi\) node stores both the pre‑loop baseline and the running snapshot for widening/narrowing.
+\(\phi\) node stores both the pre-loop baseline and the running snapshot for widening/narrowing.
 
 \begin{figure}[H]
 \centering
@@ -1007,8 +905,6 @@ condition(false) \(\rightarrow\) loop exit; the loop exit reconnects to the orig
 \caption{While loop insertion. The builder creates a \textsc{fixpoint evaluation node} $\phi$, a \textsc{condition node}, a loop body node, and a \textsc{loop exit node}}
 \label{fig:new-while}
 \end{figure}
-
-
 
 Figure~\ref{fig:new-break} shows a \texttt{break}. The statement becomes a \textsc{basic node} whose
 outgoing edge is redirected to the \textsc{loop exit node}. The loop exit's environment is
@@ -1048,7 +944,7 @@ conservatively joined with the environment at the break site.
 
 Figure~\ref{fig:new-continue} shows a \texttt{continue}. The statement becomes a \textsc{basic node}
 whose outgoing edge is redirected to the loop's \textsc{fixpoint evaluation node} \(\phi\).
-Operationally, this keeps the back‑edge shape and joins the current environment into the loop's join
+Operationally, this keeps the back-edge shape and joins the current environment into the loop's join
 state.
 
 \begin{figure}[H]
@@ -1112,7 +1008,7 @@ recorded there and the original successors of the current node are detached.
 Figure~\ref{fig:new-require} shows \texttt{require}/\texttt{assert}. The builder inserts a
 \textsc{condition node} for the predicate, makes the true edge point to a \textsc{basic node}, and
 connects the false edge directly to the function's \textsc{error exit}. The true basic then
-reconnects to the original successors, forming a one‑sided diamond.
+reconnects to the original successors, forming a one-sided diamond.
 
 \noindent\textbf{Other constructs.} Similar patterns apply to the remaining control-flow constructs:
 \begin{itemize}
@@ -1124,9 +1020,9 @@ reconnects to the original successors, forming a one‑sided diamond.
 
         \subsubsection{Line-Aware Successor-First Insertion-Site Selection}
 
-We keep a lightweight line–to–node index to make insertion local. Each newly created node is
-attached to one or two source lines depending on whether the construct is single‑line (terminated by
-";") or brace‑delimited. This index is used only to locate the insertion site; the algorithm below does not mutate the graph.
+We keep a lightweight line--to--node index to make insertion local. Each newly created node is
+attached to one or two source lines depending on whether the construct is single-line (terminated by
+";") or brace-delimited. This index is used only to locate the insertion site; the algorithm below does not mutate the graph.
 
 \noindent\textbf{Line-to-node index mapping.}
 We attach each CFG node to source lines based on the statement type:
@@ -1428,7 +1324,7 @@ Traditional fixpoint algorithms apply widening after a fixed number of visits (t
   \item \textbf{Clamping:} Clamp the result to $[2, 20]$ to balance precision and efficiency. Loops with $\tau \le 2$ widen immediately; loops with $\tau \in [3, 20]$ iterate precisely up to $\tau$ visits before widening; loops exceeding 20 are capped to prevent excessive fixpoint rounds.
 \end{itemize}
 
-This mechanism is \emph{annotation-aware} without requiring special logic: when debug annotations materialize array lengths, mapping sizes, or function parameters, the evaluator naturally computes tighter intervals for condition operands, raising $\tau$ and deferring widening. Conversely, unannotated state expressions remain $\bot$, forcing the conservative default and triggering early widening (§\ref{sec:eval}, RQ3).
+This mechanism is \emph{annotation-aware} without requiring special logic: when debug annotations materialize array lengths, mapping sizes, or function parameters, the evaluator naturally computes tighter intervals for condition operands, raising $\tau$ and deferring widening. Conversely, unannotated state expressions remain $\bot$, forcing the conservative default and triggering early widening (\S{}\ref{sec:eval}, RQ3).
 
 Additionally, line 8 checks \textsc{CondConverged}, an optional early-stopping heuristic that detects when both condition operands stabilize to singleton intervals across successive iterations, signaling natural convergence and allowing the widening phase to terminate before $\tau$ is exhausted.
 
@@ -1439,8 +1335,8 @@ to compute sound over-approximations of variable ranges. We employ interval doma
 for integer types ($\widehat{\mathbb{Z}}_N, \widehat{\mathbb{U}}_N$), set abstractions
 for addresses and booleans, and on-demand materialization for composite types
 (arrays, mappings, structs). Standard widening operators ensure termination in loops.
-The complete formal semantics—including program syntax, concrete semantics, abstract
-domains, and abstract transfer functions—are provided in Appendix~\ref{app:semantics}.
+The complete formal semantics---including program syntax, concrete semantics, abstract
+domains, and abstract transfer functions---are provided in Appendix~\ref{app:semantics}.
 
 \clearpage
 
@@ -1454,14 +1350,14 @@ To evaluate how \textsc{SolQDebug} performs in practical debugging scenarios, we
 around three research questions:
 
 \begin{itemize}
-  \item \textbf{RQ1 – Responsiveness}:\;%
-        How much edit–to–inspect latency does \textsc{SolQDebug} eliminate compared to Remix?
+  \item \textbf{RQ1 -- Responsiveness}:\;%
+        How much edit--to--inspect latency does \textsc{SolQDebug} eliminate compared to Remix?
 
-  \item \textbf{RQ2 – Precision Sensitivity to Annotation Structure}:\;%
+  \item \textbf{RQ2 -- Precision Sensitivity to Annotation Structure}:\;%
         In a common Solidity pattern where inputs are normalized by division, how does the structure
-        of operand intervals—overlapping vs. distinct—impact interval growth?
+        of operand intervals---overlapping vs. distinct---impact interval growth?
 
-  \item \textbf{RQ3 – Loops}:\;%
+  \item \textbf{RQ3 -- Loops}:\;%
         Which loop structures lead to loss of precision, and how do symbolic inputs influence the
         stability of analysis?
 \end{itemize}
@@ -1470,7 +1366,7 @@ We evaluate \textsc{SolQDebug} on a controlled local setup with the following ha
 configuration:
 
 \begin{itemize}
-    \item \textbf{CPU}: 11th Gen Intel® Core™ i7-11390H @ 3.40GHz  
+    \item \textbf{CPU}: 11th Gen Intel\textregistered{} Core\texttrademark{} i7-11390H @ 3.40GHz  
     \item \textbf{RAM}: 16.0 GB  
     \item \textbf{Operating System}: Windows 10 (64-bit)  
     \item \textbf{Implementation Language}: Python  
@@ -1485,14 +1381,14 @@ coverage of debugging scenarios encountered in real-world Solidity
 development.
 
 Our selection criteria focused on three dimensions that directly
-impact debugging complexity: (1) \textbf{computational complexity}—
+impact debugging complexity: (1) \textbf{computational complexity}---
 diverse arithmetic operations including percentage calculations
 (e.g., DapiServer, GreenHouse), time-based vesting logic
 (e.g., LockupContract, ThorusBond), and conditional capping;
-(2) \textbf{data structure complexity}—complex structs with 5+ fields
+(2) \textbf{data structure complexity}---complex structs with 5+ fields
 (10 contracts), nested mappings (e.g., BitBookStake, PercentageFeeModel),
 dynamic arrays requiring iteration (7 contracts), and mapping-to-struct
-patterns (12 contracts); and (3) \textbf{control flow complexity}—
+patterns (12 contracts); and (3) \textbf{control flow complexity}---
 multiple internal function calls (23 contracts), non-trivial loops
 (5 contracts), nested conditionals with early returns
 (e.g., PercentageFeeModel with 3-level override hierarchy),
@@ -1502,8 +1398,8 @@ The 30 contracts span multiple DeFi categories including token
 economics (40\%), staking/vesting (30\%), DeFi protocols (20\%),
 and utility contracts (10\%), with lines of code ranging from
 8 to 59 (average: 23 LOC). This sampling strategy ensures coverage
-of key Solidity idioms—structs, mappings, dynamic arrays, control
-flow, and arithmetic logic—representing the diverse debugging
+of key Solidity idioms---structs, mappings, dynamic arrays, control
+flow, and arithmetic logic---representing the diverse debugging
 challenges developers face in practice.
 
 Since Remix IDE lacks built-in automated benchmarking capabilities, we developed \texttt{
@@ -1524,8 +1420,8 @@ reproducible conditions.
 
 
 \subsection{RQ1 - Responsiveness}
-To evaluate responsiveness, we measure edit-to-inspect latency—defined as the time from a code
-change to the appearance of updated variable information—under a single contract, single transaction
+To evaluate responsiveness, we measure edit-to-inspect latency---defined as the time from a code
+change to the appearance of updated variable information---under a single contract, single transaction
 scenario.
 
 \begin{figure}[t]
@@ -1543,22 +1439,22 @@ including compilation, deployment, and state initialization).
 For Remix, the pure debug time ranged from 25.1 to 124.6 seconds (median: 53.0 s), reflecting the
 time required to step through bytecode operations in the debugger. The total time, however, ranged
 from 71.1 to 168.3 seconds (median: 98.1 s), as it includes approximately 35 seconds for
-compilation and deployment, plus 0–11.8 seconds for manual state variable initialization (median:
+compilation and deployment, plus 0--11.8 seconds for manual state variable initialization (median:
 2.9 s). Functions requiring more state slots incur proportionally higher setup overhead, with state
 initialization time growing linearly with the number of storage variables.
 
-In contrast, \textsc{SolQDebug} completed analysis in 0.03–5.09 seconds (median: 0.15 s) across all
+In contrast, \textsc{SolQDebug} completed analysis in 0.03--5.09 seconds (median: 0.15 s) across all
 120 measurements, requiring no compilation, deployment, or state setup. Fig.~\ref{fig:rq1-responsiveness} visualizes this performance gap: Remix pure debug time alone exceeds \textsc{
 SolQDebug}'s total latency by a median factor of \textasciitilde350$\times$, while total Remix
 latency (including setup) exceeds it by \textasciitilde650$\times$. This demonstrates that \textsc{
-SolQDebug} eliminates the compile–deploy–setup cycle entirely, enabling immediate feedback during
+SolQDebug} eliminates the compile--deploy--setup cycle entirely, enabling immediate feedback during
 code editing.
 
 \medskip
 \noindent\fbox{%
 \begin{minipage}{0.96\linewidth}
 \textbf{Answer to RQ1:}
-\textsc{SolQDebug} achieves sub-second edit-to-inspect latency (median: 0.15 s), eliminating 350$\times$–650$\times$ overhead from Remix's compile–deploy–debug cycle. This enables immediate, interactive feedback during code editing without transaction execution.
+\textsc{SolQDebug} achieves sub-second edit-to-inspect latency (median: 0.15 s), eliminating 350$\times$--650$\times$ overhead from Remix's compile--deploy--debug cycle. This enables immediate, interactive feedback during code editing without transaction execution.
 \end{minipage}%
 }
 
@@ -1576,8 +1472,8 @@ addition}
   \label{fig:rq2-precision}
 \end{figure*}
 
-Smart contracts often normalize raw inputs via division—e.g., converting timestamps to time
-units—before combining the results using addition or subtraction. To isolate the impact of the final
+Smart contracts often normalize raw inputs via division---e.g., converting timestamps to time
+units---before combining the results using addition or subtraction. To isolate the impact of the final
 arithmetic operator from the shared division step, we analyze two variants of the same control-flow
 structure: one using addition, the other using subtraction.
 
@@ -1594,8 +1490,8 @@ to the arithmetic operator. \textsc{Diff} inputs consistently trigger early wide
 increases, while \textsc{overlap} inputs maintain tighter bounds even under addition, which
 typically increases output range.
 
-This suggests that in division-normalized logic, the alignment of operand intervals—whether disjoint
-or overlapping—has a stronger influence on interval growth than the choice between addition and
+This suggests that in division-normalized logic, the alignment of operand intervals---whether disjoint
+or overlapping---has a stronger influence on interval growth than the choice between addition and
 subtraction. Overlapping inputs consistently result in smaller output ranges, reducing the degree of
 over-approximation as input width increases.
 
@@ -1623,7 +1519,7 @@ Debug annotations directly address this: by specifying \texttt{// @audit deposit
 
 \medskip
 \noindent\textbf{Pattern 3: Data-Dependent Divergence Despite Annotations.}
-Even when annotations provide accurate iteration counts, precision may degrade if the loop body contains data-dependent branches or updates decoupled from the loop index. \texttt{revokeStableMaster} in \textsc{Core} illustrates this: the loop \texttt{for (uint256 i = 0; i < stablecoinListLength - 1; i++)} searches for a specific address in \texttt{\_stablecoinList} and breaks early upon finding it. Although annotating \texttt{\_stablecoinList.length} raises $\tau$ appropriately, the variable \texttt{indexMet} depends on whether the target address exists in the array—a condition orthogonal to the loop index \texttt{i}. If the array is populated via annotations but the target is absent, the loop executes the full iteration count, and \texttt{indexMet} may widen or remain imprecise due to path merging at the conditional assignment. Conversely, if annotations leave the array empty, the loop terminates immediately with precise state but misses the intended exploration.
+Even when annotations provide accurate iteration counts, precision may degrade if the loop body contains data-dependent branches or updates decoupled from the loop index. \texttt{revokeStableMaster} in \textsc{Core} illustrates this: the loop \texttt{for (uint256 i = 0; i < stablecoinListLength - 1; i++)} searches for a specific address in \texttt{\_stablecoinList} and breaks early upon finding it. Although annotating \texttt{\_stablecoinList.length} raises $\tau$ appropriately, the variable \texttt{indexMet} depends on whether the target address exists in the array---a condition orthogonal to the loop index \texttt{i}. If the array is populated via annotations but the target is absent, the loop executes the full iteration count, and \texttt{indexMet} may widen or remain imprecise due to path merging at the conditional assignment. Conversely, if annotations leave the array empty, the loop terminates immediately with precise state but misses the intended exploration.
 
 This pattern reveals a fundamental tension: annotations that populate data structures enable deeper exploration (activating dormant branches, triggering realistic state transitions), but they also introduce variability that the interval domain cannot track precisely. Such loops require either (i) narrower annotations that materialize only the specific keys or indices the developer intends to inspect, or (ii) acceptance that widening will approximate the full range of behaviors.
 
@@ -1631,7 +1527,7 @@ This pattern reveals a fundamental tension: annotations that populate data struc
 \noindent\fbox{%
 \begin{minipage}{0.96\linewidth}
 \textbf{Answer to RQ3:}
-Loop precision in \textsc{SolQDebug} is governed by the adaptive widening threshold $\tau$, which is computed by evaluating the loop condition in the pre-loop symbolic environment. Constant-bounded loops converge precisely without annotations. State-dependent loops (e.g., iterating over \texttt{array.length}) benefit directly from debug annotations: specifying array sizes or mapping extents allows \textsc{EstimateIterations} to compute accurate thresholds, deferring widening and improving precision proportionally. However, data-dependent loops—where control flow or updates depend on array contents rather than indices—may still diverge under widening despite accurate iteration counts, as the interval domain cannot track element-specific correlations. Developers should annotate iteration bounds for state-dependent loops and use narrower, targeted annotations for data-dependent cases.
+Loop precision in \textsc{SolQDebug} is governed by the adaptive widening threshold $\tau$, which is computed by evaluating the loop condition in the pre-loop symbolic environment. Constant-bounded loops converge precisely without annotations. State-dependent loops (e.g., iterating over \texttt{array.length}) benefit directly from debug annotations: specifying array sizes or mapping extents allows \textsc{EstimateIterations} to compute accurate thresholds, deferring widening and improving precision proportionally. However, data-dependent loops---where control flow or updates depend on array contents rather than indices---may still diverge under widening despite accurate iteration counts, as the interval domain cannot track element-specific correlations. Developers should annotate iteration bounds for state-dependent loops and use narrower, targeted annotations for data-dependent cases.
 \end{minipage}%
 }
 
@@ -1655,7 +1551,7 @@ Loop precision in \textsc{SolQDebug} is governed by the adaptive widening thresh
     \end{itemize}
     Formal verification provides stronger guarantees, but requires fully specified properties and
     invariants, which are costly to author during early iterations. \textsc{SolQDebug} is designed
-    to bridge the gap between writing code and running tests or verification—offering immediate,
+    to bridge the gap between writing code and running tests or verification---offering immediate,
     sound, conservative feedback with low annotation overhead.
 
     For debugging, intervals strike a practical balance between precision and speed. They (i) align
@@ -1680,13 +1576,13 @@ Loop precision in \textsc{SolQDebug} is governed by the adaptive widening thresh
     \vspace{0.25em}
 
     \subsection{Evaluation Implication}
-    Traditional debuggers (e.g., Remix, Hardhat Debug) require compile–deploy–execute per iteration,
+    Traditional debuggers (e.g., Remix, Hardhat Debug) require compile--deploy--execute per iteration,
     typically taking tens of seconds. In contrast, our interpreter updates in milliseconds (median
-    \(\sim\)14\,ms on the first pass and 5–35\,ms on the second), yielding \emph{orders-of-magnitude}
+    \(\sim\)14\,ms on the first pass and 5--35\,ms on the second), yielding \emph{orders-of-magnitude}
     lower edit-to-inspect latency. This difference is qualitative: it enables near-keystroke
     feedback, which changes how developers explore code. Because results are symbolic, a single pass
     summarizes many concrete executions; developers can see when guards always hold/fail for an
-    interval, when a branch becomes unreachable, or when a value may cross a critical threshold—all
+    interval, when a branch becomes unreachable, or when a value may cross a critical threshold---all
     without leaving the editor. In short, \textsc{SolQDebug} complements runtime debuggers by moving
     fast, informative checks \emph{into} the authoring loop (RQ1).
 
@@ -1702,8 +1598,8 @@ Loop precision in \textsc{SolQDebug} is governed by the adaptive widening thresh
     without annotations because \textsc{EstimateIterations} computes exact thresholds.
     State-dependent loops (\texttt{for (i = 0; i < arr.length; ...)}) benefit directly from
     annotations: specifying \texttt{arr.length = 10} allows the analyzer to set $\tau = 10$,
-    deferring widening and enabling natural convergence. However, data-dependent loops—where the loop
-    body contains branches or updates decoupled from the index—may still widen despite accurate
+    deferring widening and enabling natural convergence. However, data-dependent loops---where the loop
+    body contains branches or updates decoupled from the index---may still widen despite accurate
     iteration counts, as the interval domain cannot track element-specific correlations.
 
     Practical implications: (i) always annotate array lengths, mapping sizes, and iteration bounds
@@ -1748,7 +1644,7 @@ Loop precision in \textsc{SolQDebug} is governed by the adaptive widening thresh
         debugging plug-ins. \citet{remix} is the most widely used web IDE; it supports syntax
         highlighting, one-click compilation, and a bytecode-level debugger that lets users step
         through EVM instructions and inspect stack, memory, and storage. \citet{hardhat} is a Node.
-        js–based framework that couples the Solidity compiler with an Ethereum runtime; its Hardhat
+        js--based framework that couples the Solidity compiler with an Ethereum runtime; its Hardhat
         Debug plug-in attaches a Remix-style debugger to locally broadcast transactions inside
         Visual Studio Code. \citet{forge} is a command-line toolchain oriented toward fast,
         reproducible unit testing; the command \texttt{forge test} spins up an ephemeral fork,
@@ -1769,9 +1665,9 @@ Loop precision in \textsc{SolQDebug} is governed by the adaptive widening thresh
         A rich body of work analyzes smart contracts for security issues using four main families of
         techniques.
         Static analysis tools reason over source or bytecode without running the contract. 
-        Representative systems include rule- or pattern–based analyzers such as Securify and Slither
-        \citep{securify,slither}, symbolic-execution–assisted detectors like Mythril \citep{mythril},
-        knowledge-graph–based reasoning such as Solidet \citep{solidet}, and bytecode CFG refinement
+        Representative systems include rule- or pattern--based analyzers such as Securify and Slither
+        \citep{securify,slither}, symbolic-execution--assisted detectors like Mythril \citep{mythril},
+        knowledge-graph--based reasoning such as Solidet \citep{solidet}, and bytecode CFG refinement
         as in Ethersolve \citep{ethersolve}.
         Dynamic testing and fuzzing exercise deployed or locally simulated contracts to uncover
         faults and security issues:
@@ -1783,7 +1679,7 @@ Loop precision in \textsc{SolQDebug} is governed by the adaptive widening thresh
         Formal verification aims to prove safety properties or refute counterexamples at compile
         time; examples include ZEUS, VeriSmart, and SmartPulse \citep{zeus,verismart,pulse}.
         Finally, AI-based approaches train models to predict vulnerabilities or triage candidates, e.
-        g., via data-flow–aware pretraining, IoT-oriented classifiers, or prompt-tuning for detector
+        g., via data-flow--aware pretraining, IoT-oriented classifiers, or prompt-tuning for detector
         adaptation \citep{peculiar,tmlvd,pscvfinder}.
 
         These approaches have substantially advanced vulnerability detection and property checking
@@ -1848,7 +1744,7 @@ Loop precision in \textsc{SolQDebug} is governed by the adaptive widening thresh
     abstract interpretation seeded by annotations, SolQDebug enables responsive, line-by-line
     inspection directly within the Solidity editor. Our evaluation shows that it reduces debugging
     latency compared to Remix, while enabling actionable feedback in response to symbolic inputs.
-    These results demonstrate that SolQDebug’s design effectively bridges the interactivity gap in
+    These results demonstrate that SolQDebug's design effectively bridges the interactivity gap in
     Solidity debugging and brings the development experience closer to that of modern debugging
     workflows.
     
@@ -1866,7 +1762,7 @@ International Symposium on Software Reliability Engineering Workshops (ISSREW) (
 
 \bibitem[ConsenSys Diligence(2025)]{psp}
 ConsenSys Diligence: Python Solidity Parser. \url{https://github.
-com/ConsenSysDiligence/python-solidity-parser} (2025). Accessed September 2025
+com/ConsenSysDiligence/python-solidity-parser} (2025). Accessed November 2025
 
 \bibitem[Cousot and Cousot(1977)]{cousot}
 Cousot, P., Cousot, R.: Abstract interpretation: a unified lattice model for static analysis of
@@ -1878,68 +1774,68 @@ Erhard, J., et al.: Interactive abstract interpretation: reanalyzing multithread
 cheap. International Journal on Software Tools for Technology Transfer (2024)
 
 \bibitem[Foundry Forge(2025)]{forge}
-Foundry Forge: \url{https://book.getfoundry.sh/reference/forge/forge/} (2025). Accessed September
+Foundry Forge: \url{https://book.getfoundry.sh/reference/forge/forge/} (2025). Accessed November
 2025
 
 \bibitem[Grieco et~al.(2020)]{echidna}
 Grieco, G., et al.: Echidna: effective, usable, and fast fuzzing for smart contracts. In:
 Proceedings of the 29th ACM SIGSOFT International Symposium on Software Testing and Analysis (ISSTA),
-pp. 557–560 (2020)
+pp. 557--560 (2020)
 
 \bibitem[Halder et~al.(2023)]{flow}
 Halder, R., et al.: Analyzing information flow in Solidity smart contracts. In: Distributed
-Computing to Blockchain, pp. 105–123. Academic Press (2023)
+Computing to Blockchain, pp. 105--123. Academic Press (2023)
 
 \bibitem[Halder(2024)]{DBM}
 Halder, R.: State-based invariant property generation of Solidity smart contracts using abstract
 interpretation. In: 2024 IEEE International Conference on Blockchain (2024)
 
 \bibitem[Hardhat(2025)]{hardhat}
-Hardhat: \url{https://hardhat.org/} (2025). Accessed September 2025
+Hardhat: \url{https://hardhat.org/} (2025). Accessed November 2025
 
 \bibitem[Hu et~al.(2023)]{solidet}
 Hu, T., et al.: Detect defects of Solidity smart contract based on the knowledge graph. IEEE
-Transactions on Reliability 73(1), 186–202 (2023)
+Transactions on Reliability 73(1), 186--202 (2023)
 
 \bibitem[JetBrains(2025)]{pycharm}
-JetBrains: PyCharm. \url{https://www.jetbrains.com/pycharm/} (2025). Accessed September 2025
+JetBrains: PyCharm. \url{https://www.jetbrains.com/pycharm/} (2025). Accessed November 2025
 
 \bibitem[Jiang et~al.(2018)]{confuzz}
 Jiang, B., Liu, Y., Chan, W.K.: ContractFuzzer: fuzzing smart contracts for vulnerability detection.
 In: Proceedings of the 33rd ACM/IEEE International Conference on Automated Software Engineering (ASE)
-, pp. 259–269 (2018)
+, pp. 259--269 (2018)
 
 \bibitem[Kalra et~al.(2018)]{zeus}
 Kalra, S., Goel, S., Dhawan, M., Sharma, S.: ZEUS: analyzing safety of smart contracts. In:
 Proceedings of the 2018 Network and Distributed System Security Symposium (NDSS) (2018)
 
 \bibitem[Llama(2025)]{llama}
-Llama: \url{https://www.llama.com/} (2025). Accessed September 2025
+Llama: \url{https://www.llama.com/} (2025). Accessed November 2025
 
 \bibitem[Ma et~al.(2023)]{transracer}
 Ma, C., Song, W., Huang, J.: TransRacer: function dependence-guided transaction race detection for
 smart contracts. In: Proceedings of the 31st ACM Joint European Software Engineering Conference and
-Symposium on the Foundations of Software Engineering (ESEC/FSE), pp. 947–959 (2023)
+Symposium on the Foundations of Software Engineering (ESEC/FSE), pp. 947--959 (2023)
 
 \bibitem[Mehar et~al.(2019)]{dao}
 Mehar, M.I., et al.: Understanding a revolutionary and flawed grand experiment in blockchain: the
 DAO attack. Journal of Cases on Information Technology (2019)
 
 \bibitem[Microsoft(2025)]{visual}
-Microsoft Visual Studio: \url{https://visualstudio.microsoft.com/ko/} (2025). Accessed September
+Microsoft Visual Studio: \url{https://visualstudio.microsoft.com/ko/} (2025). Accessed November
 2025
 
 \bibitem[Nguyen et~al.(2020)]{sfuzz}
 Nguyen, T.D., et al.: sFuzz: an efficient adaptive fuzzer for Solidity smart contracts. In:
 Proceedings of the 42nd ACM/IEEE International Conference on Software Engineering (ICSE), pp.
-778–788 (2020)
+778--788 (2020)
 
 \bibitem[Pasqua et~al.(2023)]{ethersolve}
 Pasqua, M., et al.: Enhancing Ethereum smart-contracts static analysis by computing a precise
 control-flow graph of Ethereum bytecode. Journal of Systems and Software 200, 111653 (2023)
 
 \bibitem[Remix IDE(2025)]{remix}
-Remix IDE: \url{https://remix.ethereum.org/} (2025). Accessed September 2025
+Remix IDE: \url{https://remix.ethereum.org/} (2025). Accessed November 2025
 
 \bibitem[Riouak et~al.(2024)]{iaj}
 Riouak, I., et al.: IntraJ: an on-demand framework for intraprocedural Java code analysis.
@@ -1950,27 +1846,30 @@ Rival, X., Yi, K.: Introduction to Static Analysis: an Abstract Interpretation P
 
 \bibitem[Shou et~al.(2023)]{ityfuzz}
 Shou, C., Tan, S., Sen, K.: Ityfuzz: snapshot-based fuzzer for smart contract. In: Proceedings of
-the 32nd ACM SIGSOFT International Symposium on Software Testing and Analysis (ISSTA), pp. 322–333
+the 32nd ACM SIGSOFT International Symposium on Software Testing and Analysis (ISSTA), pp. 322--333
 (2023)
 
 \bibitem[So et~al.(2020)]{verismart}
 So, S., et al.: Verismart: a highly precise safety verifier for Ethereum smart contracts. In: 2020
-IEEE Symposium on Security and Privacy (SP), pp. 1678–1694 (2020)
+IEEE Symposium on Security and Privacy (SP), pp. 1678--1694 (2020)
 
 \bibitem[solcx(2025)]{solcx}
 Solidity Compiler in Python (solcx): \url{https://solcx.readthedocs.io/en/latest/} (2025). Accessed
-September 2025
+November 2025
 
 \bibitem[Solidity(2025)]{solidity}
-Solidity documentation: \url{https://docs.soliditylang.org/en/v0.8.29/} (2025). Accessed September
+Solidity documentation: \url{https://docs.soliditylang.org/en/v0.8.30/} (2025). Accessed November
 2025
 
 \bibitem[Solidity Debugger Pro(2025)]{soldepro}
-Solidity Debugger Pro: \url{https://www.soliditydbg.org/} (2025). Accessed September 2025
+Solidity Debugger Pro: \url{https://www.soliditydbg.org/} (2025). Accessed November 2025
+
+\bibitem[Solidity Language Grammar]{solgram}
+Solidity Language Grammar: \url{https://docs.soliditylang.org/en/v0.8.30/grammar.html} (2025). Accessed November 2025
 
 \bibitem[SolQDebug Language Grammar Rule]{solqrule} 
 Solidity Language Grammar Rule of SolQDebug : \url{https://github.
-com/iwwyou/SolDebug/blob/main/Parser/Solidity.g4} . Accessed September 2025
+com/iwwyou/SolDebug/blob/main/Parser/Solidity.g4} . Accessed November 2025
 
 \bibitem[Stein et~al.(2021)]{daig}
 Stein, B., Chang, B.-Y.E., Sridharan, M.: Demanded abstract interpretation. In: Proceedings of the
@@ -1983,30 +1882,30 @@ summarization. ACM Transactions on Programming Languages and Systems (2024)
 
 \bibitem[Stephens et~al.(2021)]{pulse}
 Stephens, J., et al.: SmartPulse: automated checking of temporal properties in smart contracts. In:
-2021 IEEE Symposium on Security and Privacy (SP), pp. 555–571 (2021)
+2021 IEEE Symposium on Security and Privacy (SP), pp. 555--571 (2021)
 
 \bibitem[Tsankov et~al.(2018)]{securify}
 Tsankov, P., et al.: Securify: practical security analysis of smart contracts. In: Proceedings of
-the 2018 ACM SIGSAC Conference on Computer and Communications Security (CCS), pp. 67–82 (2018)
+the 2018 ACM SIGSAC Conference on Computer and Communications Security (CCS), pp. 67--82 (2018)
 
 \bibitem[Tsankov et~al.(2019)]{slither}
 Tsankov, P., et al.: Slither: a static analysis framework for smart contracts. In: 2019 IEEE/ACM 2nd
-International Workshop on Emerging Trends in Software Engineering for Blockchain (WETSEB), pp. 8–15
+International Workshop on Emerging Trends in Software Engineering for Blockchain (WETSEB), pp. 8--15
 (2019)
 
 \bibitem[Wu et~al.(2021)]{peculiar}
 Wu, H., et al.: Peculiar: smart contract vulnerability detection based on crucial data-flow graph
 and pre-training techniques. In: 2021 IEEE 32nd International Symposium on Software Reliability
-Engineering (ISSRE), pp. 378–389 (2021)
+Engineering (ISSRE), pp. 378--389 (2021)
 
 \bibitem[Yao et~al.(2022)]{mythril}
 Yao, Y., et al.: An improved vulnerability detection system of smart contracts based on symbolic
-execution. In: 2022 IEEE International Conference on Big Data (Big Data), pp. 3225–3234 (2022)
+execution. In: 2022 IEEE International Conference on Big Data (Big Data), pp. 3225--3234 (2022)
 
 \bibitem[Yu et~al.(2023)]{pscvfinder}
 Yu, L., et al.: PSCVFinder: a prompt-tuning based framework for smart contract vulnerability
 detection. In: 2023 IEEE 34th International Symposium on Software Reliability Engineering (ISSRE),
-pp. 556–567 (2023)
+pp. 556--567 (2023)
 
 \bibitem[Zheng et~al.(2024)]{dappscan}
 Zheng, Z., et al.: Dappscan: building large-scale datasets for smart contract weaknesses in dApp
@@ -2014,7 +1913,7 @@ projects. IEEE Transactions on Software Engineering (2024)
 
 \bibitem[Zhou et~al.(2022)]{tmlvd}
 Zhou, Q., et al.: Vulnerability analysis of smart contract for blockchain-based IoT applications: a
-machine learning approach. IEEE Internet of Things Journal 9(24), 24695–24707 (2022)
+machine learning approach. IEEE Internet of Things Journal 9(24), 24695--24707 (2022)
 
 \bibitem[Zou et~al.(2019)]{interview}
 Zou, W., et al.: Smart contract development: challenges and opportunities. IEEE Transactions on
@@ -2067,9 +1966,48 @@ structMember : typeName identifier ';' ;
 
 \noindent\textbf{Grammar:}
 \begin{verbatim}
-interactiveBlockUnit : (interactiveBlockItem)* EOF;
-interactiveBlockItem : interactiveStatement | uncheckedBlock;
+interactiveBlockUnit
+  : (interactiveBlockItem)* EOF;
+
+interactiveBlockItem
+  : interactiveStatement | uncheckedBlock;
+
+interactiveStatement
+  : interactiveSimpleStatement
+  | interactiveIfStatement
+  | interactiveForStatement
+  | interactiveWhileStatement
+  | interactiveDoWhileDoStatement
+  | interactiveTryStatement
+  | returnStatement
+  | emitStatement
+  | revertStatement
+  | requireStatement
+  | assertStatement
+  | continueStatement
+  | breakStatement
+  | assemblyStatement;
+
+interactiveIfStatement
+  : 'if' '(' expression ')' '{' '}' ;
+
+interactiveForStatement
+  : 'for' '(' (simpleStatement | ';') expression? ';' expression? ')' '{' '}' ;
+
+interactiveWhileStatement
+  : 'while' '(' expression ')' '{' '}' ;
+
+interactiveDoWhileDoStatement
+  : 'do' '{' '}' ;
+
+interactiveTryStatement
+  : 'try' expression ('returns' '(' parameterList ')')? '{' '}' ;
 \end{verbatim}
+
+\noindent The \texttt{interactiveStatement} production includes skeleton rules for
+control structures with empty bodies (e.g., \texttt{interactiveIfStatement}, \texttt{interactiveForStatement}),
+enabling incremental construction of control flow. As developers type statements inside these
+empty bodies, \texttt{interactiveBlockUnit} is recursively invoked to parse each new line.
 
 \subsubsection{Rule 5: \texttt{interactiveDoWhileUnit}}
 \noindent\textbf{Purpose.} Accepts the \texttt{while} tail of a \texttt{do\{...\}} loop.
