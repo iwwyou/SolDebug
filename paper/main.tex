@@ -705,7 +705,7 @@ Our CFG consists of the following node types:
 
 \subsubsection{Statement-Local, Incremental Construction}
 
-Every insertion operates at the \textsc{current node} without restructuring the rest of the graph. To enable direct insertion, each basic node holds exactly one statement, maintaining a line-to-node mapping.
+Every insertion operates at the \textsc{current node} without restructuring the rest of the graph. To enable direct insertion, each basic node holds exactly one statement.
 
 Assignments, function calls, and unary operations create a single \textsc{basic node} inserted between the current node and its successors (Figure~\ref{fig:new-simple-statement}). An \texttt{if} statement creates a \textsc{condition node}, true/false \textsc{basic nodes}, and an \textsc{if join} (Figure~\ref{fig:new-if}). An \texttt{else if} replaces the previous false branch with a new condition and its own join, connecting to the outer \textsc{if join} (Figure~\ref{fig:new-else-if}). An \texttt{else} attaches directly to the false branch without creating a new condition node (Figure~\ref{fig:new-else}).
 
@@ -745,14 +745,14 @@ A \texttt{break} redirects its outgoing edge to the \textsc{loop exit node} (Fig
   node distance=1.2cm and 1.5cm,
   block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
   cond/.style={diamond, draw, thick, aspect=2, minimum width=1.5cm, align=center, font=\footnotesize},
-  join/.style={rectangle, draw, thick, fill=yellow!20, minimum width=2cm, minimum height=0.6cm, align=center, font=\footnotesize},
+  join/.style={rectangle, draw=black, thick, fill=yellow!20, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
   dots/.style={circle, draw=none, minimum size=0.3cm}
 ]
   \node[block] (current) {Current Node};
   \node[cond, below=of current, fill=green!15] (cond) {guard};
   \node[block, below left=of cond, fill=green!15] (true) {True\\Node};
   \node[block, below right=of cond, fill=green!15] (false) {False\\Node};
-  \node[join, below=1.5cm of cond, fill=green!15] (join) {If Join};
+  \node[join, draw=black, below=2.5cm of cond, fill=green!15] (join) {If\\{} Join Node};
   \node[dots, below=of join] (succ) {...};
 
   \draw[->, thick] (current) -- (cond);
@@ -772,7 +772,7 @@ A \texttt{break} redirects its outgoing edge to the \textsc{loop exit node} (Fig
   node distance=1.2cm and 2cm,
   block/.style={rectangle, draw, thick, minimum width=1.8cm, minimum height=0.7cm, align=center, font=\footnotesize},
   cond/.style={diamond, draw, thick, aspect=2, minimum width=1.3cm, align=center, font=\footnotesize},
-  join/.style={rectangle, draw, thick, fill=yellow!20, minimum width=1.8cm, minimum height=0.6cm, align=center, font=\footnotesize},
+  join/.style={rectangle, draw=black, thick, fill=yellow!20, minimum width=1.8cm, minimum height=0.7cm, align=center, font=\footnotesize},
   dots/.style={circle, draw=none, minimum size=0.3cm}
 ]
   \node[block] (current) {Current Node};
@@ -785,13 +785,13 @@ A \texttt{break} redirects its outgoing edge to the \textsc{loop exit node} (Fig
   \node[block, below left=1cm and 1.5cm of elif_cond, fill=green!15] (elif_true) {Else-If\\True Node};
   \node[block, below right=1cm and 1.5cm of elif_cond, fill=green!15] (elif_false) {Else-If\\False Node};
 
-  \node[join, below=2.5cm of elif_cond, fill=green!15] (elif_join) {Else-If Join};
-  \node[join, below=4.5cm of if_cond] (if_join) {If Join};
+  \node[join, draw=black, below=2.5cm of elif_cond, fill=green!15] (elif_join) {Else-If\\{} Join Node};
+  \node[join, draw=black, below=5.5cm of if_cond] (if_join) {If\\{} Join Node};
   \node[dots, below=0.6cm of if_join] (succ) {...};
 
   \draw[->, thick] (current) -- (if_cond);
-  \draw[->, thick] (if_cond) -- ++(-2.2,-0.8) -- node[above left, pos=0.1] {T} (if_true);
-  \draw[->, thick] (if_cond) -- ++(2.2,-0.8) -- node[above right, pos=0.1] {F} (elif_cond);
+  \draw[->, thick] (if_cond) -| node[above left, pos=0.25] {T} (if_true);
+  \draw[->, thick] (if_cond) -| node[above right, pos=0.25] {F} (elif_cond);
   \draw[->, thick] (elif_cond) -| node[above left, pos=0.25] {T} (elif_true);
   \draw[->, thick] (elif_cond) -| node[above right, pos=0.25] {F} (elif_false);
   \draw[->, thick] (if_dots) -- ++(0,-1.5) -| (if_join);
@@ -810,7 +810,7 @@ A \texttt{break} redirects its outgoing edge to the \textsc{loop exit node} (Fig
   node distance=1.2cm and 2cm,
   block/.style={rectangle, draw, thick, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
   cond/.style={diamond, draw, thick, aspect=2, minimum width=1.5cm, align=center, font=\footnotesize},
-  join/.style={rectangle, draw, thick, fill=yellow!20, minimum width=2cm, minimum height=0.6cm, align=center, font=\footnotesize},
+  join/.style={rectangle, draw=black, thick, fill=yellow!20, minimum width=2cm, minimum height=0.7cm, align=center, font=\footnotesize},
   dots/.style={circle, draw=none, minimum size=0.3cm}
 ]
   \node[block] (current) {Current Node};
@@ -819,7 +819,7 @@ A \texttt{break} redirects its outgoing edge to the \textsc{loop exit node} (Fig
   \node[dots, below=0.6cm of true] (true_dots) {...};
   \node[block, below right=1.2cm and 2cm of cond, fill=green!15] (else) {Else\\Node};
   \node[dots, below=0.6cm of else] (else_dots) {...};
-  \node[join, below=3.5cm of cond] (join) {If Join};
+  \node[join, draw=black, below=3.5cm of cond] (join) {If\\{} Join Node};
   \node[dots, below=0.6cm of join] (succ) {...};
 
   \draw[->, thick] (current) -- (cond);
@@ -848,7 +848,6 @@ A \texttt{break} redirects its outgoing edge to the \textsc{loop exit node} (Fig
   \node[phi, below=1cm of current, fill=green!15] (phi) {$\phi$};
   \node[cond, below=1cm of phi, fill=green!15] (cond) {guard};
   \node[block, below left=1.2cm and 2.2cm of cond, fill=green!15] (body) {Body\\Entry Node};
-  \node[dots, below=0.6cm of body] (body_dots) {...};
   \node[block, below right=1.2cm and 2.2cm of cond, fill=green!15] (exit) {Loop\\Exit Node};
   \node[dots, below=0.6cm of exit] (succ) {...};
 
@@ -856,7 +855,7 @@ A \texttt{break} redirects its outgoing edge to the \textsc{loop exit node} (Fig
   \draw[->, thick] (phi) -- (cond);
   \draw[->, thick] (cond) -| node[above left, pos=0.3] {T} (body);
   \draw[->, thick] (cond) -| node[above right, pos=0.3] {F} (exit);
-  \draw[->, thick, dashed] (body_dots) -- ++(-1.5,0) |- node[left, pos=0.85] {back edge} (phi);
+  \draw[->, thick] (body) -- ++(-1.5,0) |- node[above left, pos=0.15] {back edge} (phi);
   \draw[->, thick] (exit) -- (succ);
 \end{tikzpicture}
 \caption{While loop insertion. The builder creates a \textsc{fixpoint evaluation node} $\phi$, a \textsc{condition node}, a loop body node, and a \textsc{loop exit node}}
@@ -878,16 +877,13 @@ A \texttt{break} redirects its outgoing edge to the \textsc{loop exit node} (Fig
   \node[dots, below=0.5cm of body] (body_dots) {...};
   \node[block, below=0.5cm of body_dots, fill=green!15] (break) {\texttt{break}};
   \node[block, below right=1cm and 2cm of cond] (exit) {Loop\\Exit Node};
-  \node[dots, below=0.5cm of exit] (succ) {...};
 
   \draw[->, thick] (phi) -- (cond);
   \draw[->, thick] (cond) -| node[above left, pos=0.2] {T} (body);
   \draw[->, thick] (cond) -| node[above right, pos=0.2] {F} (exit);
   \draw[->, thick] (body) -- (body_dots);
   \draw[->, thick] (body_dots) -- (break);
-  \draw[->, thick, dashed] (body_dots) -- ++(-1.2,0) |- node[left, pos=0.8] {back} (phi);
   \draw[->, thick] (break) -| node[above right, pos=0.6] {redirect} (exit);
-  \draw[->, thick] (exit) -- (succ);
 \end{tikzpicture}
 \caption{Break statement insertion. The \texttt{break} node's outgoing edge is redirected to the \textsc{loop exit node}}
 \label{fig:new-break}
@@ -907,7 +903,6 @@ A \texttt{break} redirects its outgoing edge to the \textsc{loop exit node} (Fig
   \node[block, below left=1cm and 2cm of cond] (body) {Body Node};
   \node[dots, below=0.5cm of body] (body_dots) {...};
   \node[block, below=0.5cm of body_dots, fill=green!15] (continue) {\texttt{continue}};
-  \node[dots, below=0.5cm of continue, gray] (unreachable) {...};
   \node[block, below right=1cm and 2cm of cond] (exit) {Loop\\Exit Node};
 
   \draw[->, thick] (phi) -- (cond);
@@ -915,8 +910,7 @@ A \texttt{break} redirects its outgoing edge to the \textsc{loop exit node} (Fig
   \draw[->, thick] (cond) -| node[above right, pos=0.2] {F} (exit);
   \draw[->, thick] (body) -- (body_dots);
   \draw[->, thick] (body_dots) -- (continue);
-  \draw[->, thick, dashed, gray] (continue) -- (unreachable);
-  \draw[->, thick, dashed] (continue) -| ++(2,0) |- node[right, pos=0.3] {redirect} (phi);
+  \draw[->, thick] (continue) -- ++(-1.5,0) |- node[left, pos=0.25] {redirect} (phi);
 \end{tikzpicture}
 \caption{Continue statement insertion. The \texttt{continue} node's outgoing edge is redirected to the loop's \textsc{fixpoint evaluation node} $\phi$}
 \label{fig:new-continue}
@@ -974,17 +968,37 @@ attached to one or two source lines depending on whether the construct is single
 ";") or brace-delimited. This index is used only to locate the insertion site; the algorithm below does not mutate the graph.
 
 \noindent\textbf{Line-to-node index mapping.}
-We attach each CFG node to source lines based on the statement type:
-\begin{itemize}
-  \item \textbf{Sequential statements} (variable declaration, assignment, function call, unary operations): Index the statement block at its source line.
-  \item \textbf{Conditional branches} (\texttt{if}/\texttt{else if}): Index the condition node at the guard line and the join node at the closing brace line.
-  \item \textbf{Else branches}: Index the else block at the \texttt{else} line and reuse the preceding guard's join node.
-  \item \textbf{Loops} (\texttt{while}/\texttt{for}): Index the condition node at the guard line and the loop-exit node at the closing brace line.
-  \item \textbf{Loop control} (\texttt{continue}/\texttt{break}): Index the statement block at its source line.
-  \item \textbf{Terminating statements} (\texttt{return}/\texttt{revert}): \texttt{return} creates a new block; \texttt{revert} uses the current block directly.
-  \item \textbf{Assertions} (\texttt{require}/\texttt{assert}): Index the condition node at the statement line.
-  \item \textbf{Exception handling} (\texttt{try}/\texttt{catch}): Index the try condition at the \texttt{try} line and catch entry at the \texttt{catch} line.
-\end{itemize}
+We maintain a line-to-node index that maps source lines to CFG nodes, enabling efficient insertion-site lookup. Each indexed node records a \emph{start line} where the construct begins; brace-delimited constructs additionally record an \emph{end line} at the closing brace. Table~\ref{tab:line-mapping} summarizes how different statement types are indexed. Notably, not all nodes are indexed---only those required for insertion-site selection appear in the index, while auxiliary nodes (e.g., branch blocks, fixpoint join nodes) are omitted to keep the index lightweight.
+
+\begin{table}[t]
+\centering
+\caption{Line-to-node index mapping by statement type}
+\label{tab:line-mapping}
+\small
+\begin{tabular}{@{}lll|lll@{}}
+\toprule
+\multicolumn{3}{c|}{\textbf{Semicolon-Terminated Statements}} & \multicolumn{3}{c}{\textbf{Brace-Delimited Constructs}} \\
+\textbf{Statement} & \textbf{Start Line} & \textbf{End Line} & \textbf{Statement} & \textbf{Start Line} & \textbf{End Line} \\
+\midrule
+Variable decl. & statement node & --- & Function def. & \textsc{entry} node & \textsc{exit} node \\
+Assignment & statement node & --- & \texttt{if} & condition node & join node \\
+Function call & statement node & --- & \texttt{else if} & condition node & local join node \\
+Unary ops & statement node & --- & \texttt{else} & else node & (reused join) \\
+\texttt{continue} & statement node & --- & \texttt{while} & condition node & exit node \\
+\texttt{break} & statement node & --- & \texttt{for} & condition node & exit node \\
+\texttt{return} & new statement node & --- & \texttt{do} & do-entry node & --- \\
+\texttt{revert} & current node & --- & \texttt{do-while} & condition node & --- \\
+\texttt{require} & condition node & --- & \texttt{try} & try condition & --- \\
+\texttt{assert} & condition node & --- & \texttt{catch} & catch entry & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Semicolon-terminated statements are indexed at a single start line with no end line, reflecting their single-line nature. Among these, \texttt{return} creates a new statement node, while \texttt{revert} directly registers the current node---this distinction reflects how \texttt{revert} does not introduce a new control-flow block but terminates the current one.
+
+Brace-delimited constructs span multiple lines: the start line corresponds to the opening keyword (e.g., \texttt{if}, \texttt{while}), and the end line marks the closing brace. Function definitions index the \textsc{entry} node at the opening brace and the \textsc{exit} node at the closing brace. The \texttt{else} branch is an exception---it indexes the else node at the \texttt{else} keyword but reuses the join node from the preceding \texttt{if} or \texttt{else if}, sharing the outer join point. For loops, internal nodes such as the join node (used for fixpoint evaluation) and increment nodes remain unindexed, as they are not required for insertion. The \texttt{do} statement indexes only the entry node, while \texttt{do-while} indexes the condition node; neither registers an exit node in the current implementation. Similarly, branch blocks (e.g., \texttt{if\_true}, \texttt{if\_false}) and auxiliary nodes are excluded from the index.
+
+This lightweight indexing scheme enables the algorithms described below to locate insertion sites efficiently by line number, without requiring full graph traversal.
 
 
 \begin{algorithm}[!t]
