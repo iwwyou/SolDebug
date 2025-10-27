@@ -332,7 +332,16 @@ class DebugInitializer:
                 try:
                     if callerObject.typeInfo.isDynamicArray:
                         # 동적 배열은 필요하면 확장
-                        return callerObject.get_or_create_element(idx)
+                        try:
+                            print(f"[DEBUG INIT] Getting/creating element {idx} in array {callerObject.identifier}, current length={len(callerObject.elements)}")
+                        except:
+                            pass
+                        elem = callerObject.get_or_create_element(idx)
+                        try:
+                            print(f"[DEBUG INIT] After get_or_create: array length={len(callerObject.elements)}, elem type={type(elem).__name__}")
+                        except:
+                            pass
+                        return elem
                     else:
                         # 정적 배열은 범위 내에서만
                         if idx < len(callerObject.elements):
@@ -474,6 +483,14 @@ class DebugInitializer:
         if target is None:
             raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
 
+        # DEBUG: Show what we're patching (safe repr)
+        try:
+            target_id = getattr(target, 'identifier', '?')
+            target_val = repr(getattr(target, 'value', '?'))
+            print(f"[APPLY DEBUG] Patching {target_id} with value {value}")
+        except:
+            pass
+
         # ① snapshot & restore
         self._snapshot_once_for_debug(target)
         if edit_event == "delete":
@@ -484,6 +501,10 @@ class DebugInitializer:
 
         # ② 값 패치
         self._patch_var_with_new_value_for_debug(target, value)
+        try:
+            print(f"[APPLY DEBUG] After patching: {target_id} value updated")
+        except:
+            pass
 
         # ③ 주소-ID 바인딩
         self._bind_if_address_for_debug(target)

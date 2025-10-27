@@ -63,159 +63,123 @@ def simulate_inputs(records):
 
 test_inputs = [
   {
-    "code": "contract DeltaNeutralPancakeWorker02 {\n}",
+    "code": "contract TimeLockPool {\n}",
     "startLine": 1,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "    address public wNative;",
+    "code": "\n",
     "startLine": 2,
     "endLine": 2,
     "event": "add"
   },
   {
-    "code": "    address public cake;",
+    "code": "    struct Deposit {\n}",
     "startLine": 3,
-    "endLine": 3,
+    "endLine": 4,
     "event": "add"
   },
   {
-    "code": "    address public override baseToken;",
+    "code": "        uint256 amount;",
     "startLine": 4,
     "endLine": 4,
     "event": "add"
   },
   {
-    "code": "    address[] public reinvestPath;",
+    "code": "        uint64 start;",
     "startLine": 5,
     "endLine": 5,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "        uint64 end;",
     "startLine": 6,
     "endLine": 6,
     "event": "add"
   },
   {
-    "code": "    function getReinvestPath() public view returns (address[] memory) {\n}",
-    "startLine": 7,
-    "endLine": 8,
-    "event": "add"
-  },
-  {
-    "code": "        if (reinvestPath.length != 0) {\n}",
-    "startLine": 8,
-    "endLine": 9,
-    "event": "add"
-  },
-  {
-    "code": "        return reinvestPath;",
-    "startLine": 9,
-    "endLine": 9,
-    "event": "add"
-  },
-  {
-    "code": "           address[] memory path;",
-    "startLine": 11,
-    "endLine": 11,
-    "event": "add"
-  },
-  {
-    "code": "           if (baseToken == wNative) {\n}",
-    "startLine": 12,
-    "endLine": 13,
-    "event": "add"
-  },
-  {
-    "code": "           path = new address[](2);",
-    "startLine": 13,
-    "endLine": 13,
-    "event": "add"
-  },
-  {
-    "code": "            path[0] = address(cake);",
-    "startLine": 14,
-    "endLine": 14,
-    "event": "add"
-  },
-  {
-    "code": "            path[1] = address(wNative);",
-    "startLine": 15,
-    "endLine": 15,
-    "event": "add"
-  },
-  {
-    "code": "else {\n}",
-    "startLine": 16,
-    "endLine": 17,
-    "event": "add"
-  },
-  {
-    "code": "            path = new address[](3);",
-    "startLine": 17,
-    "endLine": 17,
-    "event": "add"
-  },
-  {
-    "code": "            path[0] = address(cake);",
-    "startLine": 18,
-    "endLine": 18,
-    "event": "add"
-  },
-  {
-    "code": "            path[1] = address(wNative);",
-    "startLine": 19,
-    "endLine": 19,
-    "event": "add"
-  },
-  {
-    "code": "            path[2] = address(baseToken);",
-    "startLine": 20,
-    "endLine": 20,
-    "event": "add"
-  },
-  {
-    "code": "        return path;",
-    "startLine": 22,
-    "endLine": 22,
-    "event": "add"
-  },
-  {
-    "code": "// @Debugging BEGIN",
+    "code": "\n",
     "startLine": 8,
     "endLine": 8,
     "event": "add"
   },
   {
-    "code": "// @StateVar reinvestPath.length = [0,0];",
+    "code": "    mapping(address => Deposit[]) public depositsOf;",
     "startLine": 9,
     "endLine": 9,
     "event": "add"
   },
   {
-    "code": "// @StateVar wNative = symbolicAddress 1;",
+    "code": "\n",
     "startLine": 10,
     "endLine": 10,
     "event": "add"
   },
   {
-    "code": "// @StateVar cake = symbolicAddress 2;",
+    "code": "    function getTotalDeposit(address _account) public view returns(uint256) {\n}",
     "startLine": 11,
-    "endLine": 11,
+    "endLine": 12,
     "event": "add"
   },
   {
-    "code": "// @StateVar baseToken = symbolicAddress 1;",
+    "code": "        uint256 total;",
     "startLine": 12,
     "endLine": 12,
     "event": "add"
   },
   {
-    "code": "// @Debugging END",
+    "code": "        for(uint256 i = 0; i < depositsOf[_account].length; i++) {\n}",
+    "startLine": 13,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "            total += depositsOf[_account][i].amount;",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "        return total;",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar depositsOf[_account][0].amount = [100,200];",
     "startLine": 13,
     "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar depositsOf[_account][1].amount = [200,300];",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar depositsOf[_account][2].amount = [400,500];",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar _account = symbolicAddress 1;",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 17,
+    "endLine": 17,
     "event": "add"
   }
 ]

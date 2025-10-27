@@ -88,7 +88,7 @@
     "startLine": 12,
     "endLine": 12,
     "event": "add"
-  },  
+  },
   {
     "code": "// @StateVar depositsOf[_account][0].amount = [100,200];",
     "startLine": 13,
@@ -103,20 +103,20 @@
   },
   {
     "code": "// @StateVar depositsOf[_account][2].amount = [400,500];",
-    "startLine": 14,
-    "endLine": 14,
-    "event": "add"
-  },   
-  {
-    "code": "// @LocalVar _account = symbolicAddress 1;",
     "startLine": 15,
     "endLine": 15,
     "event": "add"
   },
   {
-    "code": "// @Debugging END",
+    "code": "// @LocalVar _account = symbolicAddress 1;",
     "startLine": 16,
     "endLine": 16,
     "event": "add"
-  }  
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 17,
+    "endLine": 17,
+    "event": "add"
+  }
 ]

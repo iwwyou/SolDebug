@@ -52,10 +52,10 @@
 \newlabel{lst:grammar-batch}{{2}{10}{Burn function with batch annotations}{lstlisting.2}{}}
 \@writefile{lol}{\contentsline {lstlisting}{\numberline {2}{\ignorespaces Burn function with batch annotations}}{10}{lstlisting.2}\protected@file@percent }
 \citation{solgram}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Interactive parser entry rules}}{11}{table.caption.8}\protected@file@percent }
+\newlabel{tab:interactive-rules}{{2}{11}{Interactive parser entry rules}{table.caption.8}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Interactive Parser}{11}{subsection.3.3}\protected@file@percent }
 \citation{solqrule}
-\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Interactive parser entry rules}}{12}{table.caption.8}\protected@file@percent }
-\newlabel{tab:interactive-rules}{{2}{12}{Interactive parser entry rules}{table.caption.8}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Dynamic CFG Construction}{12}{subsection.3.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.1}Statement-Local, Incremental Construction}{13}{subsubsection.3.4.1}\protected@file@percent }
 \@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Simple statement insertion. The builder creates one node and splices it between the current node and the original successors}}{13}{figure.caption.9}\protected@file@percent }
@@ -76,38 +76,42 @@
 \newlabel{fig:new-return}{{11}{16}{Return statement insertion. The \texttt {return} node is rewired to the function's unique \textsc {return exit}}{figure.caption.16}{}}
 \@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Line-to-node index mapping by statement type}}{17}{table.caption.19}\protected@file@percent }
 \newlabel{tab:line-mapping}{{3}{17}{Line-to-node index mapping by statement type}{table.caption.19}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces Require/assert statement insertion. The builder creates a \textsc  {condition node} with true edge to a node and false edge to the \textsc  {error exit}}}{17}{figure.caption.17}\protected@file@percent }
-\newlabel{fig:new-require}{{12}{17}{Require/assert statement insertion. The builder creates a \textsc {condition node} with true edge to a node and false edge to the \textsc {error exit}}{figure.caption.17}{}}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.2}Line-Aware Successor-First Insertion-Site Selection}{17}{subsubsection.3.4.2}\protected@file@percent }
-\@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Branch-Context Insertion-Site Selection (\textsc  {GetBranchContext})}}{19}{algorithm.1}\protected@file@percent }
-\newlabel{alg:get-branch-context}{{1}{19}{Branch-Context Insertion-Site Selection (\textsc {GetBranchContext})}{algorithm.1}{}}
-\@writefile{loa}{\contentsline {algorithm}{\numberline {2}{\ignorespaces Successor-First Insertion-Site Selection (\textsc  {GetInsertionSite})}}{20}{algorithm.2}\protected@file@percent }
-\newlabel{alg:get-insertion-site}{{2}{20}{Successor-First Insertion-Site Selection (\textsc {GetInsertionSite})}{algorithm.2}{}}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.3}Abstract Interpretation for Incremental Analysis}{21}{subsubsection.3.4.3}\protected@file@percent }
-\@writefile{loa}{\contentsline {algorithm}{\numberline {3}{\ignorespaces Initial Function Interpretation (\textsc  {InterpretFunctionCFG})}}{22}{algorithm.3}\protected@file@percent }
-\newlabel{alg:interpret-full}{{3}{22}{Initial Function Interpretation (\textsc {InterpretFunctionCFG})}{algorithm.3}{}}
-\@writefile{loa}{\contentsline {algorithm}{\numberline {4}{\ignorespaces Change-Driven Reinterpretation (\textsc  {ReinterpretFrom})}}{23}{algorithm.4}\protected@file@percent }
-\newlabel{alg:reinterpret}{{4}{23}{Change-Driven Reinterpretation (\textsc {ReinterpretFrom})}{algorithm.4}{}}
-\@writefile{loa}{\contentsline {algorithm}{\numberline {5}{\ignorespaces Loop Fixpoint at Header}}{24}{algorithm.5}\protected@file@percent }
-\newlabel{alg:fixpoint}{{5}{24}{Loop Fixpoint at Header}{algorithm.5}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces Require statement insertion. The builder creates a \textsc  {condition node} with true edge to a node and false edge to the \textsc  {error exit}}}{17}{figure.caption.17}\protected@file@percent }
+\newlabel{fig:new-require}{{12}{17}{Require statement insertion. The builder creates a \textsc {condition node} with true edge to a node and false edge to the \textsc {error exit}}{figure.caption.17}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.2}Line-Based Insertion-Site Selection}{17}{subsubsection.3.4.2}\protected@file@percent }
+\@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Dependent-Context Insertion}}{18}{algorithm.1}\protected@file@percent }
+\newlabel{alg:get-branch-context}{{1}{18}{Dependent-Context Insertion}{algorithm.1}{}}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {2}{\ignorespaces Independent-Context Insertion}}{19}{algorithm.2}\protected@file@percent }
+\newlabel{alg:get-insertion-site}{{2}{19}{Independent-Context Insertion}{algorithm.2}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.3}Abstract Interpretation for Incremental Analysis}{19}{subsubsection.3.4.3}\protected@file@percent }
+\@writefile{loa}{\contentsline {algorithm}{\numberline {3}{\ignorespaces Incremental Interpretation}}{20}{algorithm.3}\protected@file@percent }
+\newlabel{alg:reinterpret}{{3}{20}{Incremental Interpretation}{algorithm.3}{}}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {4}{\ignorespaces Loop Fixpoint with Adaptive Widening}}{21}{algorithm.4}\protected@file@percent }
+\newlabel{alg:fixpoint}{{4}{21}{Loop Fixpoint with Adaptive Widening}{algorithm.4}{}}
 \citation{dappscan}
-\@writefile{toc}{\contentsline {section}{\numberline {4}Evaluation}{26}{section.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Experimental Setup}{26}{subsection.4.1}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {13}{\ignorespaces Edit-to-inspect latency comparison between Remix and \textsc  {SolQDebug} across varying test-case widths and execution passes. The x-axis represents the cost estimate, y-axis shows TestCase width (\(\Delta \)), and z-axis displays latency in seconds. While Remix maintains constant high latency regardless of iteration, \textsc  {SolQDebug} demonstrates significantly lower latency that quickly reaches a floor after the initial pass.}}{27}{figure.caption.20}\protected@file@percent }
-\newlabel{fig:rq1-responsiveness}{{13}{27}{Edit-to-inspect latency comparison between Remix and \textsc {SolQDebug} across varying test-case widths and execution passes. The x-axis represents the cost estimate, y-axis shows TestCase width (\(\Delta \)), and z-axis displays latency in seconds. While Remix maintains constant high latency regardless of iteration, \textsc {SolQDebug} demonstrates significantly lower latency that quickly reaches a floor after the initial pass}{figure.caption.20}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}RQ1 - Responsiveness}{27}{subsection.4.2}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {14}{\ignorespaces  Interval growth after normalization in \texttt  {pending} function from \texttt  {Lock.sol}. Left: original version with subtraction; right: modified version where subtraction is replaced with addition}}{28}{figure.caption.21}\protected@file@percent }
-\newlabel{fig:rq2-precision}{{14}{28}{Interval growth after normalization in \texttt {pending} function from \texttt {Lock.sol}. Left: original version with subtraction; right: modified version where subtraction is replaced with addition}{figure.caption.21}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}RQ2 - Precision Sensitivity to Annotation Structure}{28}{subsection.4.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}RQ3 - Loops}{29}{subsection.4.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{30}{section.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Why use Abstract Interpretation for Debugging}{30}{subsection.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Evaluation Implication}{31}{subsection.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Limitation}{32}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Evaluation}{22}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Experimental Setup}{22}{subsection.4.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Benchmark dataset: 30 representative contracts from DAppSCAN with diverse debugging scenarios.}}{23}{table.caption.20}\protected@file@percent }
+\newlabel{tab:benchmark-dataset}{{4}{23}{Benchmark dataset: 30 representative contracts from DAppSCAN with diverse debugging scenarios}{table.caption.20}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {13}{\ignorespaces Edit-to-inspect latency comparison between Remix and \textsc  {SolQDebug} across varying test-case widths and execution passes. The x-axis represents the cost estimate, y-axis shows TestCase width (\(\Delta \)), and z-axis displays latency in seconds. While Remix maintains constant high latency regardless of iteration, \textsc  {SolQDebug} demonstrates significantly lower latency that quickly reaches a floor after the initial pass.}}{24}{figure.caption.21}\protected@file@percent }
+\newlabel{fig:rq1-responsiveness}{{13}{24}{Edit-to-inspect latency comparison between Remix and \textsc {SolQDebug} across varying test-case widths and execution passes. The x-axis represents the cost estimate, y-axis shows TestCase width (\(\Delta \)), and z-axis displays latency in seconds. While Remix maintains constant high latency regardless of iteration, \textsc {SolQDebug} demonstrates significantly lower latency that quickly reaches a floor after the initial pass}{figure.caption.21}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}RQ1 - Responsiveness}{24}{subsection.4.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {14}{\ignorespaces  Interval growth after normalization in \texttt  {pending} function from \texttt  {Lock.sol}. Left: original version with subtraction; right: modified version where subtraction is replaced with addition}}{25}{figure.caption.22}\protected@file@percent }
+\newlabel{fig:rq2-precision}{{14}{25}{Interval growth after normalization in \texttt {pending} function from \texttt {Lock.sol}. Left: original version with subtraction; right: modified version where subtraction is replaced with addition}{figure.caption.22}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}RQ2 - Precision Sensitivity to Annotation Structure}{25}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}RQ3 - Loops}{26}{subsection.4.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Loop-containing benchmark contracts and their categorization. Pattern 1: constant-bounded with simple updates; Pattern 2: annotation-enabled convergence; Pattern 3: uninitialized local variables (developer-fixable); Pattern 4: independent accumulation (inherent limitation).}}{26}{table.caption.24}\protected@file@percent }
+\newlabel{tab:loop-benchmarks}{{5}{26}{Loop-containing benchmark contracts and their categorization. Pattern 1: constant-bounded with simple updates; Pattern 2: annotation-enabled convergence; Pattern 3: uninitialized local variables (developer-fixable); Pattern 4: independent accumulation (inherent limitation)}{table.caption.24}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{28}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Why use Abstract Interpretation for Debugging}{28}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Evaluation Implication}{29}{subsection.5.2}\protected@file@percent }
 \citation{remix}
 \citation{hardhat}
 \citation{forge}
 \citation{soldepro}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Limitation}{30}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}Related Works}{30}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Solidity IDEs and Debuggers}{30}{subsection.6.1}\protected@file@percent }
 \citation{securify,slither}
 \citation{mythril}
 \citation{solidet}
@@ -119,26 +123,24 @@
 \citation{ityfuzz}
 \citation{zeus,verismart,pulse}
 \citation{peculiar,tmlvd,pscvfinder}
-\@writefile{toc}{\contentsline {section}{\numberline {6}Related Works}{33}{section.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Solidity IDEs and Debuggers}{33}{subsection.6.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Solidity Vulnerability Detection and Verification}{33}{subsection.6.2}\protected@file@percent }
 \citation{flow,DBM}
 \citation{flow}
 \citation{DBM,dao}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Solidity Vulnerability Detection and Verification}{31}{subsection.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Solidity-Specific Abstract Interpretation Frameworks}{31}{subsection.6.3}\protected@file@percent }
 \citation{daig,ds,iac,iaj,fap}
 \citation{daig}
 \citation{ds}
 \citation{iac}
 \citation{iaj}
 \citation{fap}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Solidity-Specific Abstract Interpretation Frameworks}{34}{subsection.6.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Interactive Abstract Interpretation for Traditional Languages}{34}{subsection.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Interactive Abstract Interpretation for Traditional Languages}{32}{subsection.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{32}{section.7}\protected@file@percent }
 \bibcite{fap}{{1}{2024}{{Chimdyalwar}}{{}}}
 \bibcite{psp}{{2}{2025}{{ConsenSys Diligence}}{{}}}
 \bibcite{cousot}{{3}{1977}{{Cousot and Cousot}}{{}}}
 \bibcite{iac}{{4}{2024}{{Erhard et~al.}}{{}}}
 \bibcite{forge}{{5}{2025}{{Foundry Forge}}{{}}}
-\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{35}{section.7}\protected@file@percent }
 \bibcite{echidna}{{6}{2020}{{Grieco et~al.}}{{}}}
 \bibcite{flow}{{7}{2023}{{Halder et~al.}}{{}}}
 \bibcite{DBM}{{8}{2024}{{Halder}}{{}}}
@@ -174,26 +176,26 @@
 \bibcite{dappscan}{{38}{2024}{{Zheng et~al.}}{{}}}
 \bibcite{tmlvd}{{39}{2022}{{Zhou et~al.}}{{}}}
 \bibcite{interview}{{40}{2019}{{Zou et~al.}}{{}}}
-\@writefile{toc}{\contentsline {section}{\numberline {A}Interactive Parser Grammar Specification}{39}{appendix.A}\protected@file@percent }
-\newlabel{appendix:interactive-grammar}{{A}{39}{Interactive Parser Grammar Specification}{appendix.A}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {A.1}Entry Rules for Solidity Program Fragments}{39}{subsection.A.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.1}Rule 1: \texttt  {interactiveSourceUnit}}{39}{subsubsection.A.1.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.2}Rule 2: \texttt  {interactiveEnumUnit}}{39}{subsubsection.A.1.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.3}Rule 3: \texttt  {interactiveStructUnit}}{39}{subsubsection.A.1.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.4}Rule 4: \texttt  {interactiveBlockUnit}}{39}{subsubsection.A.1.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.5}Rule 5: \texttt  {interactiveDoWhileUnit}}{40}{subsubsection.A.1.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.6}Rule 6: \texttt  {interactiveIfElseUnit}}{40}{subsubsection.A.1.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.7}Rule 7: \texttt  {interactiveCatchClauseUnit}}{41}{subsubsection.A.1.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {A.2}Entry Rule for Debugging Annotations}{41}{subsection.A.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.2.1}\texttt  {debugUnit}}{41}{subsubsection.A.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {B}Abstract Domain and Formal Semantics}{41}{appendix.B}\protected@file@percent }
-\newlabel{app:semantics}{{B}{41}{Abstract Domain and Formal Semantics}{appendix.B}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {B.1}Abstract Domain}{41}{subsection.B.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {B.2}Concrete Semantics (Denotational)}{42}{subsection.B.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {B.3}Abstract Semantics (Denotational)}{42}{subsection.B.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {A}Interactive Parser Grammar Specification}{36}{appendix.A}\protected@file@percent }
+\newlabel{appendix:interactive-grammar}{{A}{36}{Interactive Parser Grammar Specification}{appendix.A}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.1}Entry Rules for Solidity Program Fragments}{36}{subsection.A.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.1}Rule 1: \texttt  {interactiveSourceUnit}}{36}{subsubsection.A.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.2}Rule 2: \texttt  {interactiveEnumUnit}}{36}{subsubsection.A.1.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.3}Rule 3: \texttt  {interactiveStructUnit}}{36}{subsubsection.A.1.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.4}Rule 4: \texttt  {interactiveBlockUnit}}{36}{subsubsection.A.1.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.5}Rule 5: \texttt  {interactiveDoWhileUnit}}{37}{subsubsection.A.1.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.6}Rule 6: \texttt  {interactiveIfElseUnit}}{37}{subsubsection.A.1.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.7}Rule 7: \texttt  {interactiveCatchClauseUnit}}{38}{subsubsection.A.1.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.2}Entry Rule for Debugging Annotations}{38}{subsection.A.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.2.1}\texttt  {debugUnit}}{38}{subsubsection.A.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {B}Abstract Domain and Formal Semantics}{38}{appendix.B}\protected@file@percent }
+\newlabel{app:semantics}{{B}{38}{Abstract Domain and Formal Semantics}{appendix.B}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {B.1}Abstract Domain}{38}{subsection.B.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {B.2}Concrete Semantics (Denotational)}{39}{subsection.B.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {B.3}Abstract Semantics (Denotational)}{39}{subsection.B.3}\protected@file@percent }
 \providecommand\NAT@force@numbers{}\NAT@force@numbers
-\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Concrete denotational semantics (statements)}}{43}{table.caption.24}\protected@file@percent }
-\newlabel{tab:conc-denot}{{4}{43}{Concrete denotational semantics (statements)}{table.caption.24}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Abstract denotational semantics (statements)}}{44}{table.caption.26}\protected@file@percent }
-\newlabel{tab:abs-denot}{{5}{44}{Abstract denotational semantics (statements)}{table.caption.26}{}}
-\gdef \@abspage@last{44}
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Concrete denotational semantics (statements)}}{40}{table.caption.27}\protected@file@percent }
+\newlabel{tab:conc-denot}{{6}{40}{Concrete denotational semantics (statements)}{table.caption.27}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Abstract denotational semantics (statements)}}{41}{table.caption.29}\protected@file@percent }
+\newlabel{tab:abs-denot}{{7}{41}{Abstract denotational semantics (statements)}{table.caption.29}{}}
+\gdef \@abspage@last{41}

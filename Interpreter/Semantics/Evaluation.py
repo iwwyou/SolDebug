@@ -42,13 +42,22 @@ class Evaluation :
         if not struct_list:
             return None
 
+        # DEBUG: Struct joining
+        try:
+            if struct_list and hasattr(struct_list[0], 'identifier'):
+                print(f"[STRUCT DEBUG] Joining {len(struct_list)} structs")
+            else:
+                print(f"[STRUCT DEBUG] Joining {len(struct_list)} structs")
+        except:
+            pass
+
         # 첫 구조체를 복사하여 결과 구조체 생성
         result = copy.deepcopy(struct_list[0])
 
         # 각 필드별로 모든 구조체의 값을 join
         for field_name in result.members:
             values = []
-            for s in struct_list:
+            for i, s in enumerate(struct_list):
                 if field_name in s.members:
                     field_var = s.members[field_name]
                     if isinstance(field_var, (StructVariable, ArrayVariable, MappingVariable)):
@@ -56,7 +65,12 @@ class Evaluation :
                         values.append(field_var)
                         break
                     else:
-                        values.append(field_var.value)
+                        val = field_var.value
+                        try:
+                            print(f"[STRUCT DEBUG]   struct[{i}].{field_name} = {repr(val)[:80]}")
+                        except:
+                            pass
+                        values.append(val)
 
             # join 수행
             if values:
@@ -64,6 +78,10 @@ class Evaluation :
                 for v in values[1:]:
                     if hasattr(joined_val, 'join') and hasattr(v, 'join'):
                         joined_val = joined_val.join(v)
+                try:
+                    print(f"[STRUCT DEBUG]   {field_name} joined = {repr(joined_val)[:80]}")
+                except:
+                    pass
 
                 # 결과 저장
                 if isinstance(result.members[field_name], Variables):
@@ -381,6 +399,7 @@ class Evaluation :
 
                     if idx >= len(callerObject.elements):
                         # ❗ 요소가 아직 없음 → base-type 의 TOP 값 (알 수 없는 값)
+                        print(f"[ARRAY OOB] Array {callerObject.identifier} accessed at index {idx}, but length is {len(callerObject.elements)} - returning TOP")
                         base_t = callerObject.typeInfo.arrayBaseType
                         if base_t.elementaryTypeName and base_t.elementaryTypeName.startswith("uint"):
                             bits = base_t.intTypeLength or 256
@@ -411,10 +430,14 @@ class Evaluation :
 
                     # 기본 타입: 모든 값 join
                     elif not isinstance(first_elem, (ArrayVariable, MappingVariable)):
+                        # # DEBUG: Check array access with interval index
+                        # print(f"[ARRAY DEBUG] Accessing {callerObject.identifier} with interval index {ident_str}={iv}, elements count={len(callerObject.elements)}")
                         joined = None
-                        for elem in callerObject.elements:
+                        for i, elem in enumerate(callerObject.elements):
                             val = getattr(elem, "value", elem)
+                            # print(f"[ARRAY DEBUG]   element[{i}] = {val}")
                             joined = val if joined is None else joined.join(val)
+                        # print(f"[ARRAY DEBUG]   joined result = {joined}")
                         return joined
 
                     # 배열/매핑 중첩: 첫 요소 그대로 반환 (복잡도 제한)
@@ -643,6 +666,7 @@ class Evaluation :
             if member == "length":
                 # ★ widening으로 TOP으로 표시된 경우 (-1)
                 if baseVal.typeInfo.arrayLength == -1:
+                    print(f"[LENGTH DEBUG] Array {baseVal.identifier} has widened arrayLength=-1, returning TOP")
                     return UnsignedIntegerInterval(0, 2 ** 256 - 1, 256)
 
                 # 동적 배열의 경우: 실제 elements 길이를 우선 사용
@@ -651,6 +675,7 @@ class Evaluation :
                     if len(baseVal.elements) > 0:
                         # elements가 있으면 그 길이 반환
                         ln = len(baseVal.elements)
+                        print(f"[LENGTH DEBUG] Dynamic array {baseVal.identifier} has {ln} elements")
                         return UnsignedIntegerInterval(ln, ln, 256)
                     else:
                         # 빈 동적 배열: TOP 반환 (알 수 없는 길이)
