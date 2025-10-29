@@ -1216,65 +1216,58 @@ around three research questions:
         stability of analysis?
 \end{itemize}
 \subsection{Experimental Setup}
-We evaluate \textsc{SolQDebug} on a controlled local setup with the following hardware and software
-configuration:
+We evaluate \textsc{SolQDebug} on a controlled local setup to measure responsiveness,
+precision, and loop-handling capabilities under realistic debugging scenarios.
 
-\begin{itemize}
-    \item \textbf{CPU}: 11th Gen Intel\textregistered{} Core\texttrademark{} i7-11390H @ 3.40GHz  
-    \item \textbf{RAM}: 16.0 GB  
-    \item \textbf{Operating System}: Windows 10 (64-bit)  
-    \item \textbf{Implementation Language}: Python  
-\end{itemize}
+\medskip
+\noindent\textbf{Experimental Setting.}
+The evaluation environment consists of an 11th Gen Intel\textregistered{} Core\texttrademark{}
+i7-11390H CPU at 3.40GHz with 16.0 GB RAM, running Windows 10 (64-bit). The tool is
+implemented in Python and tested against both synthetic benchmarks and real-world contracts.
 
-The dataset is derived from DAppSCAN~\cite{dappscan}, a large-scale
-real-world benchmark for smart contract analysis. From 3,345 Solidity files
-using \texttt{>=0.8.0}, we randomly sample approximately 10\% from each of
-three size brackets (1--10 KB, 11--20 KB, and over 20 KB), yielding 128
-contracts. After filtering out logic-free
-functions (e.g., those containing only assignments or return statements),
-we select 30 representative contracts using \emph{complexity-driven
-stratified sampling} to ensure comprehensive coverage of debugging scenarios
-encountered in real-world Solidity development. The selected contracts
-range from 7 to 59 lines of code (average: 24 LOC), spanning fundamental
-DeFi patterns such as token transfers with custom logic, staking/vesting
-mechanisms, liquidity pool operations, oracle data processing, and
-marketplace transactions. Our selection criteria focused on three dimensions
-that directly impact debugging complexity: (1) \textbf{computational
-complexity}---including percentage/fee calculations with varying precision
-requirements, time-based vesting or locking mechanisms with multi-step
-calculations, and accumulation operations with overflow protection;
-(2) \textbf{data structure complexity}---including structs with multiple
-fields, nested mappings with multi-level override hierarchies, dynamic
-arrays requiring iteration, and mapping-to-struct patterns with conditional
-lookups; and (3) \textbf{control flow complexity}---including loops with
-varying termination conditions, nested conditionals with early returns,
-and modifier-based access control affecting variable scopes.
-Table~\ref{tab:benchmark-dataset} lists all 30 benchmark contracts with
-their source files, target functions, and line ranges.
+\medskip
+\noindent\textbf{Dataset Collection.}
+We derive our dataset from DAppSCAN~\cite{dappscan}, a large-scale benchmark containing
+3,345 Solidity contracts compiled with version \texttt{>=0.8.0}. To ensure representative
+coverage across contract sizes, we apply stratified random sampling, drawing approximately
+10\% from each of three size brackets (1--10 KB, 11--20 KB, and over 20 KB), yielding 141
+Solidity files. After filtering logic-free functions (e.g., those containing only assignments
+or return statements), we select 30 representative contracts through complexity-driven
+stratified sampling.
+
+The selected contracts range from 7 to 59 lines of code (average: 24 LOC) and span
+fundamental DeFi patterns including token transfers with custom logic, staking/vesting
+mechanisms, liquidity pool operations, oracle data processing, and marketplace transactions.
+Our selection prioritizes three dimensions of debugging complexity: (1) \textit{computational
+complexity}---percentage/fee calculations, time-based vesting mechanisms, and overflow-protected
+accumulation; (2) \textit{data structure complexity}---structs with multiple fields, nested
+mappings, dynamic arrays, and mapping-to-struct patterns; (3) \textit{control flow
+complexity}---loops with varying termination conditions, nested conditionals, and modifier-based
+access control. Table~\ref{tab:benchmark-dataset} lists all 30 benchmark contracts with their
+source files, target functions, and line counts.
 
 \input{benchmark_table}
-
-Since Remix IDE lacks built-in automated benchmarking capabilities, we developed \texttt{
-remix\_benchmark}, a Selenium-based automation framework that programmatically drives the Remix web
-interface to measure edit-to-inspect latency. For each test function, \texttt{remix\_benchmark}
-automates the full workflow: compilation, contract deployment, state variable initialization via
-manual storage slot assignment, parameter entry, transaction execution, and step-through debugging.
-We measure two latency metrics: \textit{pure debug time}, capturing only the debugger step-through
-duration, and \textit{total time}, which includes compilation, deployment, and state setup overhead.
-The difference between these metrics reflects the additional manual effort required in traditional
-debugging workflows.
-
-Although \textsc{SolQDebug} is designed for interactive use within a Solidity editor, all
-experiments simulate this behavior in a controlled scripting environment. For each function, we
-reconstruct a sequence of incremental edits and annotations that mimic realistic developer activity.
-These fragments are streamed into the interpreter to measure latency and interval growth under
-reproducible conditions.
 
 
 \subsection{RQ1 - Responsiveness}
 To evaluate responsiveness, we measure edit-to-inspect latency---defined as the time from a code
 change to the appearance of updated variable information---under a single contract, single transaction
 scenario.
+
+Since Remix IDE lacks built-in automated benchmarking capabilities, we developed
+\texttt{remix\_benchmark}~\cite{remix_bench}, a Selenium~\cite{selenium}-based automation framework
+that programmatically drives the Remix web interface to measure edit-to-inspect latency. For each
+test function, \texttt{remix\_benchmark} automates the full workflow: compilation, contract deployment,
+state variable initialization via manual storage slot assignment, parameter entry, transaction execution,
+and step-through debugging. We measure two latency metrics: \textit{pure debug time}, capturing only
+the debugger step-through duration, and \textit{total time}, which includes compilation, deployment,
+and state setup overhead. The difference between these metrics reflects the additional manual effort
+required in traditional debugging workflows.
+
+Although \textsc{SolQDebug} is designed for interactive use within a Solidity editor, all experiments
+simulate this behavior in a controlled scripting environment. For each function, we reconstruct a
+sequence of incremental edits and annotations that mimic realistic developer activity. These fragments
+are streamed into the interpreter to measure latency and interval growth under reproducible conditions.
 
 \begin{figure}[t]
   \centering
@@ -1710,12 +1703,18 @@ control-flow graph of Ethereum bytecode. Journal of Systems and Software 200, 11
 \bibitem[Remix IDE(2025)]{remix}
 Remix IDE: \url{https://remix.ethereum.org/} (2025). Accessed November 2025
 
+\bibitem[Remix Benchmark]{remix_bench}
+Remix Benchmark: \url{https://github.com/iwwyou/SolDebug/tree/main/Evaluation/Remix} (2025). Accessed November 2025
+
 \bibitem[Riouak et~al.(2024)]{iaj}
 Riouak, I., et al.: IntraJ: an on-demand framework for intraprocedural Java code analysis.
 International Journal on Software Tools for Technology Transfer (2024)
 
 \bibitem[Rival and Yi(2020)]{yi}
 Rival, X., Yi, K.: Introduction to Static Analysis: an Abstract Interpretation Perspective (2020)
+
+\bibitem[Selenium with Python]{selenium}
+Selenium with Python: \url{https://selenium-python.readthedocs.io/} (2025). Accessed November 2025
 
 \bibitem[Shou et~al.(2023)]{ityfuzz}
 Shou, C., Tan, S., Sen, K.: Ityfuzz: snapshot-based fuzzer for smart contract. In: Proceedings of

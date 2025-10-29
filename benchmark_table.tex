@@ -1,0 +1,44 @@
+\begin{table*}[t]
+\caption{Benchmark dataset: 30 contracts selected through complexity-driven stratified sampling}
+\label{tab:benchmark-dataset}
+\centering
+\small
+\setlength{\tabcolsep}{12pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{} r l X l r @{}}
+\toprule
+\textbf{ID} & \textbf{Contract} & \textbf{Source File} & \textbf{Function} & \textbf{LOC} \\
+\midrule
+1  & Lock & dataset/original/Lock.sol & \texttt{pending} & 15 \\
+2  & Token & dataset/original/Token.sol & \texttt{burn} & 12 \\
+3  & Staking & dataset/original/Staking.sol & \texttt{calculateReward} & 18 \\
+4  & Marketplace & dataset/original/Marketplace.sol & \texttt{processOrder} & 24 \\
+5  & Oracle & dataset/original/Oracle.sol & \texttt{updatePrice} & 16 \\
+6  & Vault & dataset/original/Vault.sol & \texttt{withdraw} & 21 \\
+7  & Pool & dataset/original/Pool.sol & \texttt{swap} & 28 \\
+8  & Governance & dataset/original/Governance.sol & \texttt{executeProposal} & 33 \\
+9  & NFTMarket & dataset/original/NFTMarket.sol & \texttt{buy} & 19 \\
+10 & Vesting & dataset/original/Vesting.sol & \texttt{release} & 22 \\
+11 & AOC\_BEP & dataset/original/AOC\_BEP.sol & \texttt{updateUserInfo} & 14 \\
+12 & Balancer & dataset/original/Balancer.sol & \texttt{\_addActionBuilderAt} & 17 \\
+13 & Core & dataset/original/Core.sol & \texttt{revokeStableMaster} & 20 \\
+14 & TimeLockPool & dataset/original/TimeLockPool.sol & \texttt{getTotalDeposit} & 13 \\
+15 & AvatarArt & dataset/original/AvatarArt.sol & \texttt{\_removeFromTokens} & 25 \\
+16 & DEX & dataset/original/DEX.sol & \texttt{addLiquidity} & 26 \\
+17 & Lending & dataset/original/Lending.sol & \texttt{calculateInterest} & 23 \\
+18 & Bridge & dataset/original/Bridge.sol & \texttt{processTransfer} & 29 \\
+19 & Farm & dataset/original/Farm.sol & \texttt{harvest} & 31 \\
+20 & Auction & dataset/original/Auction.sol & \texttt{placeBid} & 27 \\
+21 & Insurance & dataset/original/Insurance.sol & \texttt{claim} & 35 \\
+22 & DAO & dataset/original/DAO.sol & \texttt{vote} & 18 \\
+23 & Lottery & dataset/original/Lottery.sol & \texttt{selectWinner} & 22 \\
+24 & Escrow & dataset/original/Escrow.sol & \texttt{release} & 19 \\
+25 & MultiSig & dataset/original/MultiSig.sol & \texttt{confirmTransaction} & 24 \\
+26 & Proxy & dataset/original/Proxy.sol & \texttt{upgrade} & 16 \\
+27 & Factory & dataset/original/Factory.sol & \texttt{deploy} & 21 \\
+28 & Registry & dataset/original/Registry.sol & \texttt{register} & 15 \\
+29 & Controller & dataset/original/Controller.sol & \texttt{execute} & 38 \\
+30 & Treasury & dataset/original/Treasury.sol & \texttt{allocate} & 59 \\
+\bottomrule
+\end{tabularx}
+\end{table*}
