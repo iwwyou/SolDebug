@@ -1,0 +1,1000 @@
+{
+  "Balancer_c": {
+    "file": "dataset\\contraction\\Balancer_c.sol",
+    "functions": [
+      {
+        "function_name": "_addActionBuilderAt",
+        "line_number": 4,
+        "complex_expressions": 1,
+        "total_operators": 2,
+        "complex_lines": [
+          {
+            "line_offset": 4,
+            "code": "uint256 additionalCount = index - currentLength + 1;",
+            "operators": {
+              "add": 1,
+              "sub": 1,
+              "mul": 0,
+              "div": 0
+            },
+            "total_ops": 2
+          }
+        ],
+        "possible_mutations": [
+          {
+            "line": {
+              "line_offset": 4,
+              "code": "uint256 additionalCount = index - currentLength + 1;",
+              "operators": {
+                "add": 1,
+                "sub": 1,
+                "mul": 0,
+                "div": 0
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "swap_add_sub",
+                "description": "Swap + and - operators"
+              },
+              {
+                "type": "add_to_sub",
+                "description": "Change + to -"
+              },
+              {
+                "type": "sub_to_add",
+                "description": "Change - to +"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "total_functions": 1,
+    "total_complex_expr": 1
+  },
+  "Claim_c": {
+    "file": "dataset\\contraction\\Claim_c.sol",
+    "functions": [
+      {
+        "function_name": "getCurrentClaimAmount",
+        "line_number": 8,
+        "complex_expressions": 1,
+        "total_operators": 2,
+        "complex_lines": [
+          {
+            "line_offset": 2,
+            "code": "return (claimable[user] * 30) / 100;",
+            "operators": {
+              "add": 0,
+              "sub": 0,
+              "mul": 1,
+              "div": 1
+            },
+            "total_ops": 2
+          }
+        ],
+        "possible_mutations": [
+          {
+            "line": {
+              "line_offset": 2,
+              "code": "return (claimable[user] * 30) / 100;",
+              "operators": {
+                "add": 0,
+                "sub": 0,
+                "mul": 1,
+                "div": 1
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "swap_mul_div",
+                "description": "Swap * and /"
+              },
+              {
+                "type": "has_division",
+                "description": "Contains division (normalization pattern)"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "total_functions": 1,
+    "total_complex_expr": 1
+  },
+  "Core_c": {
+    "file": "dataset\\contraction\\Core_c.sol",
+    "functions": [
+      {
+        "function_name": "revokeStableMaster",
+        "line_number": 11,
+        "complex_expressions": 1,
+        "total_operators": 2,
+        "complex_lines": [
+          {
+            "line_offset": 5,
+            "code": "for (uint256 i = 0; i < stablecoinListLength - 1; i++) {",
+            "operators": {
+              "add": 1,
+              "sub": 1,
+              "mul": 0,
+              "div": 0
+            },
+            "total_ops": 2
+          }
+        ],
+        "possible_mutations": [
+          {
+            "line": {
+              "line_offset": 5,
+              "code": "for (uint256 i = 0; i < stablecoinListLength - 1; i++) {",
+              "operators": {
+                "add": 1,
+                "sub": 1,
+                "mul": 0,
+                "div": 0
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "swap_add_sub",
+                "description": "Swap + and - operators"
+              },
+              {
+                "type": "add_to_sub",
+                "description": "Change + to -"
+              },
+              {
+                "type": "sub_to_add",
+                "description": "Change - to +"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "total_functions": 1,
+    "total_complex_expr": 1
+  },
+  "Dai_c": {
+    "file": "dataset\\contraction\\Dai_c.sol",
+    "functions": [
+      {
+        "function_name": "transferFrom",
+        "line_number": 15,
+        "complex_expressions": 2,
+        "total_operators": 4,
+        "complex_lines": [
+          {
+            "line_offset": 1,
+            "code": "require(balanceOf[src] >= wad, \"Dai/insufficient-balance\");",
+            "operators": {
+              "add": 0,
+              "sub": 1,
+              "mul": 0,
+              "div": 1
+            },
+            "total_ops": 2
+          },
+          {
+            "line_offset": 3,
+            "code": "require(allowance[src][msg.sender] >= wad, \"Dai/insufficient-allowance\");",
+            "operators": {
+              "add": 0,
+              "sub": 1,
+              "mul": 0,
+              "div": 1
+            },
+            "total_ops": 2
+          }
+        ],
+        "possible_mutations": [
+          {
+            "line": {
+              "line_offset": 1,
+              "code": "require(balanceOf[src] >= wad, \"Dai/insufficient-balance\");",
+              "operators": {
+                "add": 0,
+                "sub": 1,
+                "mul": 0,
+                "div": 1
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "sub_to_add",
+                "description": "Change - to +"
+              },
+              {
+                "type": "has_division",
+                "description": "Contains division (normalization pattern)"
+              }
+            ]
+          },
+          {
+            "line": {
+              "line_offset": 3,
+              "code": "require(allowance[src][msg.sender] >= wad, \"Dai/insufficient-allowance\");",
+              "operators": {
+                "add": 0,
+                "sub": 1,
+                "mul": 0,
+                "div": 1
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "sub_to_add",
+                "description": "Change - to +"
+              },
+              {
+                "type": "has_division",
+                "description": "Contains division (normalization pattern)"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "total_functions": 1,
+    "total_complex_expr": 2
+  },
+  "GovStakingStorage_c": {
+    "file": "dataset\\contraction\\GovStakingStorage_c.sol",
+    "functions": [
+      {
+        "function_name": "updateRewardMultiplier",
+        "line_number": 24,
+        "complex_expressions": 5,
+        "total_operators": 13,
+        "complex_lines": [
+          {
+            "line_offset": 2,
+            "code": "uint256 toRemove = ((((oldLockPeriod - passedTime) / 1 weeks) *",
+            "operators": {
+              "add": 0,
+              "sub": 1,
+              "mul": 1,
+              "div": 1
+            },
+            "total_ops": 3
+          },
+          {
+            "line_offset": 3,
+            "code": "oldRate) * oldAmount) / 100000;",
+            "operators": {
+              "add": 0,
+              "sub": 0,
+              "mul": 1,
+              "div": 1
+            },
+            "total_ops": 2
+          },
+          {
+            "line_offset": 4,
+            "code": "uint256 toAdd = (((newLockPeriod / 1 weeks) * newRate) * newAmount) /",
+            "operators": {
+              "add": 0,
+              "sub": 0,
+              "mul": 2,
+              "div": 2
+            },
+            "total_ops": 4
+          },
+          {
+            "line_offset": 6,
+            "code": "info.rewardMultiplier = info.rewardMultiplier + toAdd - toRemove;",
+            "operators": {
+              "add": 1,
+              "sub": 1,
+              "mul": 0,
+              "div": 0
+            },
+            "total_ops": 2
+          },
+          {
+            "line_offset": 7,
+            "code": "totalRewardMultiplier = totalRewardMultiplier + toAdd - toRemove;",
+            "operators": {
+              "add": 1,
+              "sub": 1,
+              "mul": 0,
+              "div": 0
+            },
+            "total_ops": 2
+          }
+        ],
+        "possible_mutations": [
+          {
+            "line": {
+              "line_offset": 2,
+              "code": "uint256 toRemove = ((((oldLockPeriod - passedTime) / 1 weeks) *",
+              "operators": {
+                "add": 0,
+                "sub": 1,
+                "mul": 1,
+                "div": 1
+              },
+              "total_ops": 3
+            },
+            "mutations": [
+              {
+                "type": "sub_to_add",
+                "description": "Change - to +"
+              },
+              {
+                "type": "swap_mul_div",
+                "description": "Swap * and /"
+              },
+              {
+                "type": "has_division",
+                "description": "Contains division (normalization pattern)"
+              }
+            ]
+          },
+          {
+            "line": {
+              "line_offset": 3,
+              "code": "oldRate) * oldAmount) / 100000;",
+              "operators": {
+                "add": 0,
+                "sub": 0,
+                "mul": 1,
+                "div": 1
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "swap_mul_div",
+                "description": "Swap * and /"
+              },
+              {
+                "type": "has_division",
+                "description": "Contains division (normalization pattern)"
+              }
+            ]
+          },
+          {
+            "line": {
+              "line_offset": 4,
+              "code": "uint256 toAdd = (((newLockPeriod / 1 weeks) * newRate) * newAmount) /",
+              "operators": {
+                "add": 0,
+                "sub": 0,
+                "mul": 2,
+                "div": 2
+              },
+              "total_ops": 4
+            },
+            "mutations": [
+              {
+                "type": "swap_mul_div",
+                "description": "Swap * and /"
+              },
+              {
+                "type": "has_division",
+                "description": "Contains division (normalization pattern)"
+              }
+            ]
+          },
+          {
+            "line": {
+              "line_offset": 6,
+              "code": "info.rewardMultiplier = info.rewardMultiplier + toAdd - toRemove;",
+              "operators": {
+                "add": 1,
+                "sub": 1,
+                "mul": 0,
+                "div": 0
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "swap_add_sub",
+                "description": "Swap + and - operators"
+              },
+              {
+                "type": "add_to_sub",
+                "description": "Change + to -"
+              },
+              {
+                "type": "sub_to_add",
+                "description": "Change - to +"
+              }
+            ]
+          },
+          {
+            "line": {
+              "line_offset": 7,
+              "code": "totalRewardMultiplier = totalRewardMultiplier + toAdd - toRemove;",
+              "operators": {
+                "add": 1,
+                "sub": 1,
+                "mul": 0,
+                "div": 0
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "swap_add_sub",
+                "description": "Swap + and - operators"
+              },
+              {
+                "type": "add_to_sub",
+                "description": "Change + to -"
+              },
+              {
+                "type": "sub_to_add",
+                "description": "Change - to +"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "total_functions": 1,
+    "total_complex_expr": 5
+  },
+  "GreenHouse_c": {
+    "file": "dataset\\contraction\\GreenHouse_c.sol",
+    "functions": [
+      {
+        "function_name": "_calculateFees",
+        "line_number": 8,
+        "complex_expressions": 6,
+        "total_operators": 15,
+        "complex_lines": [
+          {
+            "line_offset": 1,
+            "code": "allUsers = (amount * FEE_ALL_USERS_STAKED_PERMILLE) / 10000;",
+            "operators": {
+              "add": 0,
+              "sub": 0,
+              "mul": 1,
+              "div": 1
+            },
+            "total_ops": 2
+          },
+          {
+            "line_offset": 2,
+            "code": "bonusPool = (amount * FEE_BONUS_POOL_PERMILLE) / 10000;",
+            "operators": {
+              "add": 0,
+              "sub": 0,
+              "mul": 1,
+              "div": 1
+            },
+            "total_ops": 2
+          },
+          {
+            "line_offset": 3,
+            "code": "partner = (amount * FEE_PARTNER_WALLET_PERMILLE) / 10000;",
+            "operators": {
+              "add": 0,
+              "sub": 0,
+              "mul": 1,
+              "div": 1
+            },
+            "total_ops": 2
+          },
+          {
+            "line_offset": 4,
+            "code": "referral = (amount * FEE_REFERRAL_PERMILLE) / 10000;",
+            "operators": {
+              "add": 0,
+              "sub": 0,
+              "mul": 1,
+              "div": 1
+            },
+            "total_ops": 2
+          },
+          {
+            "line_offset": 5,
+            "code": "platform = (amount * FEE_PLATFORM_WALLET_PERMILLE) / 10000;",
+            "operators": {
+              "add": 0,
+              "sub": 0,
+              "mul": 1,
+              "div": 1
+            },
+            "total_ops": 2
+          },
+          {
+            "line_offset": 6,
+            "code": "net = amount - allUsers - bonusPool - partner - referral - platform;",
+            "operators": {
+              "add": 0,
+              "sub": 5,
+              "mul": 0,
+              "div": 0
+            },
+            "total_ops": 5
+          }
+        ],
+        "possible_mutations": [
+          {
+            "line": {
+              "line_offset": 1,
+              "code": "allUsers = (amount * FEE_ALL_USERS_STAKED_PERMILLE) / 10000;",
+              "operators": {
+                "add": 0,
+                "sub": 0,
+                "mul": 1,
+                "div": 1
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "swap_mul_div",
+                "description": "Swap * and /"
+              },
+              {
+                "type": "has_division",
+                "description": "Contains division (normalization pattern)"
+              }
+            ]
+          },
+          {
+            "line": {
+              "line_offset": 2,
+              "code": "bonusPool = (amount * FEE_BONUS_POOL_PERMILLE) / 10000;",
+              "operators": {
+                "add": 0,
+                "sub": 0,
+                "mul": 1,
+                "div": 1
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "swap_mul_div",
+                "description": "Swap * and /"
+              },
+              {
+                "type": "has_division",
+                "description": "Contains division (normalization pattern)"
+              }
+            ]
+          },
+          {
+            "line": {
+              "line_offset": 3,
+              "code": "partner = (amount * FEE_PARTNER_WALLET_PERMILLE) / 10000;",
+              "operators": {
+                "add": 0,
+                "sub": 0,
+                "mul": 1,
+                "div": 1
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "swap_mul_div",
+                "description": "Swap * and /"
+              },
+              {
+                "type": "has_division",
+                "description": "Contains division (normalization pattern)"
+              }
+            ]
+          },
+          {
+            "line": {
+              "line_offset": 4,
+              "code": "referral = (amount * FEE_REFERRAL_PERMILLE) / 10000;",
+              "operators": {
+                "add": 0,
+                "sub": 0,
+                "mul": 1,
+                "div": 1
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "swap_mul_div",
+                "description": "Swap * and /"
+              },
+              {
+                "type": "has_division",
+                "description": "Contains division (normalization pattern)"
+              }
+            ]
+          },
+          {
+            "line": {
+              "line_offset": 5,
+              "code": "platform = (amount * FEE_PLATFORM_WALLET_PERMILLE) / 10000;",
+              "operators": {
+                "add": 0,
+                "sub": 0,
+                "mul": 1,
+                "div": 1
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "swap_mul_div",
+                "description": "Swap * and /"
+              },
+              {
+                "type": "has_division",
+                "description": "Contains division (normalization pattern)"
+              }
+            ]
+          },
+          {
+            "line": {
+              "line_offset": 6,
+              "code": "net = amount - allUsers - bonusPool - partner - referral - platform;",
+              "operators": {
+                "add": 0,
+                "sub": 5,
+                "mul": 0,
+                "div": 0
+              },
+              "total_ops": 5
+            },
+            "mutations": [
+              {
+                "type": "sub_to_add",
+                "description": "Change - to +"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "total_functions": 1,
+    "total_complex_expr": 6
+  },
+  "HubPool_c": {
+    "file": "dataset\\contraction\\HubPool_c.sol",
+    "functions": [
+      {
+        "function_name": "_allocateLpAndProtocolFees",
+        "line_number": 16,
+        "complex_expressions": 1,
+        "total_operators": 2,
+        "complex_lines": [
+          {
+            "line_offset": 1,
+            "code": "uint256 protocolFeesCaptured = (bundleLpFees * protocolFeeCapturePct) / 1e18;",
+            "operators": {
+              "add": 0,
+              "sub": 0,
+              "mul": 1,
+              "div": 1
+            },
+            "total_ops": 2
+          }
+        ],
+        "possible_mutations": [
+          {
+            "line": {
+              "line_offset": 1,
+              "code": "uint256 protocolFeesCaptured = (bundleLpFees * protocolFeeCapturePct) / 1e18;",
+              "operators": {
+                "add": 0,
+                "sub": 0,
+                "mul": 1,
+                "div": 1
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "swap_mul_div",
+                "description": "Swap * and /"
+              },
+              {
+                "type": "has_division",
+                "description": "Contains division (normalization pattern)"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "total_functions": 1,
+    "total_complex_expr": 1
+  },
+  "Lock_c": {
+    "file": "dataset\\contraction\\Lock_c.sol",
+    "functions": [
+      {
+        "function_name": "pending",
+        "line_number": 14,
+        "complex_expressions": 1,
+        "total_operators": 2,
+        "complex_lines": [
+          {
+            "line_offset": 2,
+            "code": "uint256 _totalLockRemain =  _data.total - _data.unlockedAmounts - _data.pending;",
+            "operators": {
+              "add": 0,
+              "sub": 2,
+              "mul": 0,
+              "div": 0
+            },
+            "total_ops": 2
+          }
+        ],
+        "possible_mutations": [
+          {
+            "line": {
+              "line_offset": 2,
+              "code": "uint256 _totalLockRemain =  _data.total - _data.unlockedAmounts - _data.pending;",
+              "operators": {
+                "add": 0,
+                "sub": 2,
+                "mul": 0,
+                "div": 0
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "sub_to_add",
+                "description": "Change - to +"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "total_functions": 1,
+    "total_complex_expr": 1
+  },
+  "LockupContract_c": {
+    "file": "dataset\\contraction\\LockupContract_c.sol",
+    "functions": [
+      {
+        "function_name": "_getReleasedAmount",
+        "line_number": 8,
+        "complex_expressions": 1,
+        "total_operators": 2,
+        "complex_lines": [
+          {
+            "line_offset": 1,
+            "code": "uint unlockTimestamp = deploymentStartTime + (monthsToWaitBeforeUnlock * SECONDS_IN_ONE_MONTH);",
+            "operators": {
+              "add": 1,
+              "sub": 0,
+              "mul": 1,
+              "div": 0
+            },
+            "total_ops": 2
+          }
+        ],
+        "possible_mutations": [
+          {
+            "line": {
+              "line_offset": 1,
+              "code": "uint unlockTimestamp = deploymentStartTime + (monthsToWaitBeforeUnlock * SECONDS_IN_ONE_MONTH);",
+              "operators": {
+                "add": 1,
+                "sub": 0,
+                "mul": 1,
+                "div": 0
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "add_to_sub",
+                "description": "Change + to -"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "total_functions": 1,
+    "total_complex_expr": 1
+  },
+  "OptimisticGrants_c": {
+    "file": "dataset\\contraction\\OptimisticGrants_c.sol",
+    "functions": [
+      {
+        "function_name": "configureGrant",
+        "line_number": 17,
+        "complex_expressions": 1,
+        "total_operators": 2,
+        "complex_lines": [
+          {
+            "line_offset": 4,
+            "code": "solvency -= (_amount - oldAmount);",
+            "operators": {
+              "add": 0,
+              "sub": 2,
+              "mul": 0,
+              "div": 0
+            },
+            "total_ops": 2
+          }
+        ],
+        "possible_mutations": [
+          {
+            "line": {
+              "line_offset": 4,
+              "code": "solvency -= (_amount - oldAmount);",
+              "operators": {
+                "add": 0,
+                "sub": 2,
+                "mul": 0,
+                "div": 0
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "sub_to_add",
+                "description": "Change - to +"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "total_functions": 1,
+    "total_complex_expr": 1
+  },
+  "PoolKeeper_c": {
+    "file": "dataset\\contraction\\PoolKeeper_c.sol",
+    "functions": [
+      {
+        "function_name": "keeperTip",
+        "line_number": 7,
+        "complex_expressions": 2,
+        "total_operators": 5,
+        "complex_lines": [
+          {
+            "line_offset": 1,
+            "code": "uint256 elapsedBlocksNumerator = (block.timestamp - (_savedPreviousUpdatedTimestamp + _poolInterval));",
+            "operators": {
+              "add": 1,
+              "sub": 1,
+              "mul": 0,
+              "div": 0
+            },
+            "total_ops": 2
+          },
+          {
+            "line_offset": 3,
+            "code": "uint256 keeperTip = BASE_TIP + (TIP_DELTA_PER_BLOCK * elapsedBlocksNumerator) / BLOCK_TIME;",
+            "operators": {
+              "add": 1,
+              "sub": 0,
+              "mul": 1,
+              "div": 1
+            },
+            "total_ops": 3
+          }
+        ],
+        "possible_mutations": [
+          {
+            "line": {
+              "line_offset": 1,
+              "code": "uint256 elapsedBlocksNumerator = (block.timestamp - (_savedPreviousUpdatedTimestamp + _poolInterval));",
+              "operators": {
+                "add": 1,
+                "sub": 1,
+                "mul": 0,
+                "div": 0
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "swap_add_sub",
+                "description": "Swap + and - operators"
+              },
+              {
+                "type": "add_to_sub",
+                "description": "Change + to -"
+              },
+              {
+                "type": "sub_to_add",
+                "description": "Change - to +"
+              }
+            ]
+          },
+          {
+            "line": {
+              "line_offset": 3,
+              "code": "uint256 keeperTip = BASE_TIP + (TIP_DELTA_PER_BLOCK * elapsedBlocksNumerator) / BLOCK_TIME;",
+              "operators": {
+                "add": 1,
+                "sub": 0,
+                "mul": 1,
+                "div": 1
+              },
+              "total_ops": 3
+            },
+            "mutations": [
+              {
+                "type": "add_to_sub",
+                "description": "Change + to -"
+              },
+              {
+                "type": "swap_mul_div",
+                "description": "Swap * and /"
+              },
+              {
+                "type": "has_division",
+                "description": "Contains division (normalization pattern)"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "total_functions": 1,
+    "total_complex_expr": 2
+  },
+  "ThorusBond_c": {
+    "file": "dataset\\contraction\\ThorusBond_c.sol",
+    "functions": [
+      {
+        "function_name": "claimablePayout",
+        "line_number": 10,
+        "complex_expressions": 1,
+        "total_operators": 2,
+        "complex_lines": [
+          {
+            "line_offset": 6,
+            "code": "return info.remainingPayout * secondsSinceLastInteraction / info.remainingVestingSeconds;",
+            "operators": {
+              "add": 0,
+              "sub": 0,
+              "mul": 1,
+              "div": 1
+            },
+            "total_ops": 2
+          }
+        ],
+        "possible_mutations": [
+          {
+            "line": {
+              "line_offset": 6,
+              "code": "return info.remainingPayout * secondsSinceLastInteraction / info.remainingVestingSeconds;",
+              "operators": {
+                "add": 0,
+                "sub": 0,
+                "mul": 1,
+                "div": 1
+              },
+              "total_ops": 2
+            },
+            "mutations": [
+              {
+                "type": "swap_mul_div",
+                "description": "Swap * and /"
+              },
+              {
+                "type": "has_division",
+                "description": "Contains division (normalization pattern)"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "total_functions": 1,
+    "total_complex_expr": 1
+  }
+}

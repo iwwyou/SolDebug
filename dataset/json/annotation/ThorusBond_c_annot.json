@@ -72,9 +72,21 @@
     "event": "add"
   },
   {
-    "code": "        if(secondsSinceLastInteraction > info.remainingVestingSeconds)\n            return info.remainingPayout;\n        return info.remainingPayout * secondsSinceLastInteraction / info.remainingVestingSeconds;\n    }\n}\n}",
+    "code": "        if(secondsSinceLastInteraction > info.remainingVestingSeconds) {\n}",
     "startLine": 14,
-    "endLine": 19,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "        return info.remainingPayout;",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "        return info.remainingPayout * secondsSinceLastInteraction / info.remainingVestingSeconds;",
+    "startLine": 17,
+    "endLine": 17,
     "event": "add"
   },
   {

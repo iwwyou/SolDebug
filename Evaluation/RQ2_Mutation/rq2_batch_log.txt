@@ -1,0 +1,11 @@
+======================================================================
+RQ2 BATCH EXPERIMENT RUNNER
+======================================================================
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Evaluation\run_rq2_batch.py", line 183, in <module>
+    main()
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Evaluation\run_rq2_batch.py", line 44, in main
+    RESULTS_DIR.mkdir(exist_ok=True)
+  File "C:\Users\isjeon\AppData\Local\Programs\Python\Python310\lib\pathlib.py", line 1175, in mkdir
+    self._accessor.mkdir(self, mode)
+FileNotFoundError: [WinError 3] 지정된 경로를 찾을 수 없습니다: 'Evaluation\\RQ2_Results'

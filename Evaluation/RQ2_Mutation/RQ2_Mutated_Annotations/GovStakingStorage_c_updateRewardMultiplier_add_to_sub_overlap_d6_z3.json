@@ -1,0 +1,68 @@
+[
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 34,
+    "endLine": 34,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar info.rewardMultiplier = [100,106];",
+    "startLine": 35,
+    "endLine": 35,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar totalRewardMultiplier = [100,106];",
+    "startLine": 36,
+    "endLine": 36,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar oldRate = [100,106];",
+    "startLine": 37,
+    "endLine": 37,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar newRate = [100,106];",
+    "startLine": 38,
+    "endLine": 38,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar passedTime = [100,106];",
+    "startLine": 39,
+    "endLine": 39,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar oldLockPeriod = [100,106];",
+    "startLine": 40,
+    "endLine": 40,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar newLockPeriod = [100,106];",
+    "startLine": 41,
+    "endLine": 41,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar oldAmount = [100,106];",
+    "startLine": 42,
+    "endLine": 42,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar newAmount = [100,106];",
+    "startLine": 43,
+    "endLine": 43,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 44,
+    "endLine": 44,
+    "event": "add"
+  }
+]

@@ -1,0 +1,62 @@
+[
+  {
+    "code": "// @TestCase BEGIN",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar _data.total = [200,215]",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar _data.unlockedAmounts = [0,15]",
+    "startLine": 17,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar _data.pending = [0,15]",
+    "startLine": 18,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar _data.estUnlock = [0,1]",
+    "startLine": 19,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "// @GlobalVar block.timestamp = [0,15]",
+    "startLine": 20,
+    "endLine": 20,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar startLock = [0,15]",
+    "startLine": 21,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar lockedTime = [15522015,15522015]",
+    "startLine": 22,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar unlockDuration = [2592015,2592015]",
+    "startLine": 23,
+    "endLine": 23,
+    "event": "add"
+  },
+  {
+    "code": "// @TestCase END",
+    "startLine": 24,
+    "endLine": 24,
+    "event": "add"
+  }
+]

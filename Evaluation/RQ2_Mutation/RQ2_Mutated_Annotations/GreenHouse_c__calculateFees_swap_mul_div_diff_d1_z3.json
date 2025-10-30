@@ -1,0 +1,20 @@
+[
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 18,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar amount = [0,1];",
+    "startLine": 19,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 20,
+    "endLine": 20,
+    "event": "add"
+  }
+]

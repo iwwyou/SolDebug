@@ -1,0 +1,32 @@
+[
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 1,
+    "endLine": 1,
+    "event": "add"
+  },
+  {
+    "code": "// @GlobalVar block.timestamp = [70,140];",
+    "startLine": 2,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar _savedPreviousUpdatedTimestamp = [70,140];",
+    "startLine": 3,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar _poolInterval = [70,140];",
+    "startLine": 4,
+    "endLine": 4,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  }
+]

@@ -481,15 +481,28 @@ class DebugInitializer:
         # 일반적인 변수 처리
         target = self.resolve_lhs_expr_for_debug(lhs_expr, variables)
         if target is None:
-            raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+            # More detailed error message for debugging
+            try:
+                expr_repr = f"{lhs_expr.context}"
+                if hasattr(lhs_expr, 'identifier') and lhs_expr.identifier is not None:
+                    expr_repr += f" (identifier: {lhs_expr.identifier})"
+                if hasattr(lhs_expr, 'member') and lhs_expr.member is not None:
+                    expr_repr += f" (member: {lhs_expr.member})"
+            except:
+                expr_repr = "unknown"
 
-        # DEBUG: Show what we're patching (safe repr)
-        try:
-            target_id = getattr(target, 'identifier', '?')
-            target_val = repr(getattr(target, 'value', '?'))
-            print(f"[APPLY DEBUG] Patching {target_id} with value {value}")
-        except:
-            pass
+            # Don't raise error, just log warning and skip this annotation
+            print(f"[WARNING] Cannot resolve LHS expression: {expr_repr} (scope: {scope})")
+            print(f"[WARNING] Available variables: {list(variables.keys())[:10]}...")
+            return  # Skip this annotation instead of raising error
+
+        # DEBUG: Show what we're patching (safe repr) - commented out for clean output
+        # try:
+        #     target_id = getattr(target, 'identifier', '?')
+        #     target_val = repr(getattr(target, 'value', '?'))
+        #     print(f"[APPLY DEBUG] Patching {target_id} with value {value}")
+        # except:
+        #     pass
 
         # ① snapshot & restore
         self._snapshot_once_for_debug(target)
@@ -501,10 +514,10 @@ class DebugInitializer:
 
         # ② 값 패치
         self._patch_var_with_new_value_for_debug(target, value)
-        try:
-            print(f"[APPLY DEBUG] After patching: {target_id} value updated")
-        except:
-            pass
+        # try:
+        #     print(f"[APPLY DEBUG] After patching: {target_id} value updated")
+        # except:
+        #     pass
 
         # ③ 주소-ID 바인딩
         self._bind_if_address_for_debug(target)

@@ -91,27 +91,24 @@
 \citation{dappscan}
 \@writefile{toc}{\contentsline {section}{\numberline {4}Evaluation}{22}{section.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Experimental Setup}{22}{subsection.4.1}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Benchmark dataset: 30 representative contracts from DAppSCAN with diverse debugging scenarios.}}{23}{table.caption.20}\protected@file@percent }
-\newlabel{tab:benchmark-dataset}{{4}{23}{Benchmark dataset: 30 representative contracts from DAppSCAN with diverse debugging scenarios}{table.caption.20}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {13}{\ignorespaces Edit-to-inspect latency comparison between Remix and \textsc  {SolQDebug} across varying test-case widths and execution passes. The x-axis represents the cost estimate, y-axis shows TestCase width (\(\Delta \)), and z-axis displays latency in seconds. While Remix maintains constant high latency regardless of iteration, \textsc  {SolQDebug} demonstrates significantly lower latency that quickly reaches a floor after the initial pass.}}{24}{figure.caption.21}\protected@file@percent }
-\newlabel{fig:rq1-responsiveness}{{13}{24}{Edit-to-inspect latency comparison between Remix and \textsc {SolQDebug} across varying test-case widths and execution passes. The x-axis represents the cost estimate, y-axis shows TestCase width (\(\Delta \)), and z-axis displays latency in seconds. While Remix maintains constant high latency regardless of iteration, \textsc {SolQDebug} demonstrates significantly lower latency that quickly reaches a floor after the initial pass}{figure.caption.21}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}RQ1 - Responsiveness}{24}{subsection.4.2}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {14}{\ignorespaces  Interval growth after normalization in \texttt  {pending} function from \texttt  {Lock.sol}. Left: original version with subtraction; right: modified version where subtraction is replaced with addition}}{25}{figure.caption.22}\protected@file@percent }
-\newlabel{fig:rq2-precision}{{14}{25}{Interval growth after normalization in \texttt {pending} function from \texttt {Lock.sol}. Left: original version with subtraction; right: modified version where subtraction is replaced with addition}{figure.caption.22}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}RQ2 - Precision Sensitivity to Annotation Structure}{25}{subsection.4.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}RQ3 - Loops}{26}{subsection.4.4}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Loop-containing benchmark contracts and their categorization. Pattern 1: constant-bounded with simple updates; Pattern 2: annotation-enabled convergence; Pattern 3: uninitialized local variables (developer-fixable); Pattern 4: independent accumulation (inherent limitation).}}{26}{table.caption.24}\protected@file@percent }
-\newlabel{tab:loop-benchmarks}{{5}{26}{Loop-containing benchmark contracts and their categorization. Pattern 1: constant-bounded with simple updates; Pattern 2: annotation-enabled convergence; Pattern 3: uninitialized local variables (developer-fixable); Pattern 4: independent accumulation (inherent limitation)}{table.caption.24}{}}
+\citation{remix_bench}
+\citation{selenium}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}RQ1 - Responsiveness}{23}{subsection.4.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Benchmark dataset: 30 representative contracts from DAppSCAN with diverse debugging scenarios.}}{24}{table.caption.20}\protected@file@percent }
+\newlabel{tab:benchmark-dataset}{{4}{24}{Benchmark dataset: 30 representative contracts from DAppSCAN with diverse debugging scenarios}{table.caption.20}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {13}{\ignorespaces Debugging latency comparison between Remix and \textsc  {SolQDebug} across varying ByteOp counts and test-case widths \(\Delta \). \textsc  {SolQDebug} maintains consistent sub-second latency regardless of function complexity or input interval size, while Remix's latency scales linearly with both dimensions.}}{25}{figure.caption.21}\protected@file@percent }
+\newlabel{fig:rq1-responsiveness}{{13}{25}{Debugging latency comparison between Remix and \textsc {SolQDebug} across varying ByteOp counts and test-case widths \(\Delta \). \textsc {SolQDebug} maintains consistent sub-second latency regardless of function complexity or input interval size, while Remix's latency scales linearly with both dimensions}{figure.caption.21}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {14}{\ignorespaces  F90 (90th percentile of interval inflation) for \texttt  {Lock::pending} under \textsc  {overlap} and \textsc  {diff} annotation patterns. As input width ($\Delta $) increases, \textsc  {overlap} achieves progressively tighter precision (F90: 12.0 $\rightarrow $ 4.8), while \textsc  {diff} maintains near-constant inflation (F90 $\approx $ 13--14).}}{26}{figure.caption.22}\protected@file@percent }
+\newlabel{fig:rq2-lock}{{14}{26}{F90 (90th percentile of interval inflation) for \texttt {Lock::pending} under \textsc {overlap} and \textsc {diff} annotation patterns. As input width ($\Delta $) increases, \textsc {overlap} achieves progressively tighter precision (F90: 12.0 $\rightarrow $ 4.8), while \textsc {diff} maintains near-constant inflation (F90 $\approx $ 13--14)}{figure.caption.22}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}RQ2 - Impact of Annotation Patterns on Precision in Complex Arithmetic Operations}{26}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}RQ3 - Loops}{27}{subsection.4.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{28}{section.5}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Why use Abstract Interpretation for Debugging}{28}{subsection.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Evaluation Implication}{29}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Limitation}{29}{subsection.5.2}\protected@file@percent }
 \citation{remix}
 \citation{hardhat}
 \citation{forge}
 \citation{soldepro}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Limitation}{30}{subsection.5.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6}Related Works}{30}{section.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Solidity IDEs and Debuggers}{30}{subsection.6.1}\protected@file@percent }
 \citation{securify,slither}
 \citation{mythril}
 \citation{solidet}
@@ -123,20 +120,22 @@
 \citation{ityfuzz}
 \citation{zeus,verismart,pulse}
 \citation{peculiar,tmlvd,pscvfinder}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Related Works}{30}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Solidity IDEs and Debuggers}{30}{subsection.6.1}\protected@file@percent }
 \citation{flow,DBM}
 \citation{flow}
 \citation{DBM,dao}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Solidity Vulnerability Detection and Verification}{31}{subsection.6.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Solidity-Specific Abstract Interpretation Frameworks}{31}{subsection.6.3}\protected@file@percent }
 \citation{daig,ds,iac,iaj,fap}
 \citation{daig}
 \citation{ds}
 \citation{iac}
 \citation{iaj}
 \citation{fap}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Solidity Vulnerability Detection and Verification}{31}{subsection.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Solidity-Specific Abstract Interpretation Frameworks}{31}{subsection.6.3}\protected@file@percent }
+\bibcite{fap}{{1}{2024}{{Chimdyalwar}}{{}}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Interactive Abstract Interpretation for Traditional Languages}{32}{subsection.6.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{32}{section.7}\protected@file@percent }
-\bibcite{fap}{{1}{2024}{{Chimdyalwar}}{{}}}
 \bibcite{psp}{{2}{2025}{{ConsenSys Diligence}}{{}}}
 \bibcite{cousot}{{3}{1977}{{Cousot and Cousot}}{{}}}
 \bibcite{iac}{{4}{2024}{{Erhard et~al.}}{{}}}
@@ -196,8 +195,8 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {B.2}Concrete Semantics (Denotational)}{39}{subsection.B.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {B.3}Abstract Semantics (Denotational)}{39}{subsection.B.3}\protected@file@percent }
 \providecommand\NAT@force@numbers{}\NAT@force@numbers
-\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Concrete denotational semantics (statements)}}{40}{table.caption.27}\protected@file@percent }
-\newlabel{tab:conc-denot}{{6}{40}{Concrete denotational semantics (statements)}{table.caption.27}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Abstract denotational semantics (statements)}}{41}{table.caption.29}\protected@file@percent }
-\newlabel{tab:abs-denot}{{7}{41}{Abstract denotational semantics (statements)}{table.caption.29}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Concrete denotational semantics (statements)}}{40}{table.caption.25}\protected@file@percent }
+\newlabel{tab:conc-denot}{{5}{40}{Concrete denotational semantics (statements)}{table.caption.25}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Abstract denotational semantics (statements)}}{41}{table.caption.27}\protected@file@percent }
+\newlabel{tab:abs-denot}{{6}{41}{Abstract denotational semantics (statements)}{table.caption.27}{}}
 \gdef \@abspage@last{41}

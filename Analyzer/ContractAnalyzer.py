@@ -346,7 +346,7 @@ class ContractAnalyzer:
                     if check_code.startswith('function'):
                         self.current_context_type = 'function'
                         self.current_target_contract = self.find_contract_context(start_line)
-                        print(f"[analyze_context] Line {start_line}: Found function, contract={self.current_target_contract}")
+                        # print(f"[analyze_context] Line {start_line}: Found function, contract={self.current_target_contract}")
                         self.current_target_function = None  # 아직 함수가 생성되지 않음
                         return
                     elif check_code.startswith('modifier'):

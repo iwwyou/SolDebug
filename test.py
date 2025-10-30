@@ -63,7 +63,7 @@ def simulate_inputs(records):
 
 test_inputs = [
   {
-    "code": "contract TimeLockPool {\n}",
+    "code": "contract ThorusBond {\n}",
     "startLine": 1,
     "endLine": 2,
     "event": "add"
@@ -75,111 +75,117 @@ test_inputs = [
     "event": "add"
   },
   {
-    "code": "    struct Deposit {\n}",
+    "code": "    struct UserInfo {\n}",
     "startLine": 3,
     "endLine": 4,
     "event": "add"
   },
   {
-    "code": "        uint256 amount;",
+    "code": "        uint256 remainingPayout;",
     "startLine": 4,
     "endLine": 4,
     "event": "add"
   },
   {
-    "code": "        uint64 start;",
+    "code": "        uint256 remainingVestingSeconds;",
     "startLine": 5,
     "endLine": 5,
     "event": "add"
   },
   {
-    "code": "        uint64 end;",
+    "code": "        uint256 lastInteractionSecond;",
     "startLine": 6,
     "endLine": 6,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "    mapping(address => UserInfo) public userInfo;",
     "startLine": 8,
     "endLine": 8,
     "event": "add"
   },
   {
-    "code": "    mapping(address => Deposit[]) public depositsOf;",
+    "code": "\n",
     "startLine": 9,
     "endLine": 9,
     "event": "add"
   },
   {
-    "code": "\n",
+    "code": "    function claimablePayout(address user) public view returns (uint256) {\n}",
     "startLine": 10,
-    "endLine": 10,
+    "endLine": 11,
     "event": "add"
   },
   {
-    "code": "    function getTotalDeposit(address _account) public view returns(uint256) {\n}",
+    "code": "        UserInfo memory info = userInfo[user];",
     "startLine": 11,
-    "endLine": 12,
+    "endLine": 11,
     "event": "add"
   },
   {
-    "code": "        uint256 total;",
+    "code": "        uint256 secondsSinceLastInteraction = block.timestamp - info.lastInteractionSecond;",
     "startLine": 12,
     "endLine": 12,
     "event": "add"
   },
   {
-    "code": "        for(uint256 i = 0; i < depositsOf[_account].length; i++) {\n}",
-    "startLine": 13,
-    "endLine": 14,
-    "event": "add"
-  },
-  {
-    "code": "            total += depositsOf[_account][i].amount;",
-    "startLine": 14,
-    "endLine": 14,
-    "event": "add"
-  },
-  {
-    "code": "        return total;",
-    "startLine": 16,
-    "endLine": 16,
-    "event": "add"
-  },
-  {
-    "code": "// @Debugging BEGIN",
-    "startLine": 12,
-    "endLine": 12,
-    "event": "add"
-  },
-  {
-    "code": "// @StateVar depositsOf[_account][0].amount = [100,200];",
+    "code": "\n",
     "startLine": 13,
     "endLine": 13,
     "event": "add"
   },
   {
-    "code": "// @StateVar depositsOf[_account][1].amount = [200,300];",
+    "code": "        if(secondsSinceLastInteraction > info.remainingVestingSeconds) {\n}",
     "startLine": 14,
-    "endLine": 14,
+    "endLine": 15,
     "event": "add"
   },
   {
-    "code": "// @StateVar depositsOf[_account][2].amount = [400,500];",
+    "code": "        return info.remainingPayout;",
     "startLine": 15,
     "endLine": 15,
     "event": "add"
   },
   {
-    "code": "// @LocalVar _account = symbolicAddress 1;",
-    "startLine": 16,
-    "endLine": 16,
+    "code": "        return info.remainingPayout * secondsSinceLastInteraction / info.remainingVestingSeconds;",
+    "startLine": 17,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "// @GlobalVar block.timestamp = [100,150];",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar info.lastInteractionSecond = [50,70];",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar info.remainingVestingSeconds = [40,60];",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar info.remainingPayout = [10,20];",
+    "startLine": 15,
+    "endLine": 15,
     "event": "add"
   },
   {
     "code": "// @Debugging END",
-    "startLine": 17,
-    "endLine": 17,
+    "startLine": 16,
+    "endLine": 16,
     "event": "add"
   }
 ]

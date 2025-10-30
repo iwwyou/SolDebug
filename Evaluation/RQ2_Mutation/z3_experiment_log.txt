@@ -1,0 +1,836 @@
+======================================================================
+RQ2 EXPERIMENTS WITH Z3 SAT INPUTS
+======================================================================
+
+Total experiments: 70
+Contracts: 7
+Using Z3-generated SAT inputs
+
+
+[CONTRACT] GovStakingStorage_c
+------------------------------------------------------------
+  [1/70] GovStakingStorage_c_d1_overlap... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+[analyze_context] Line 33: Found function, contract=GovStakingStorage
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [2/70] GovStakingStorage_c_d1_diff... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+[analyze_context] Line 33: Found function, contract=GovStakingStorage
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [3/70] GovStakingStorage_c_d3_overlap... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+[analyze_context] Line 33: Found function, contract=GovStakingStorage
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [4/70] GovStakingStorage_c_d3_diff... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+[analyze_context] Line 33: Found function, contract=GovStakingStorage
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [5/70] GovStakingStorage_c_d6_overlap... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+[analyze_context] Line 33: Found function, contract=GovStakingStorage
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [6/70] GovStakingStorage_c_d6_diff... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+[analyze_context] Line 33: Found function, contract=GovStakingStorage
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [7/70] GovStakingStorage_c_d10_overlap... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+[analyze_context] Line 33: Found function, contract=GovStakingStorage
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [8/70] GovStakingStorage_c_d10_diff... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+[analyze_context] Line 33: Found function, contract=GovStakingStorage
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [9/70] GovStakingStorage_c_d15_overlap... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+[analyze_context] Line 33: Found function, contract=GovStakingStorage
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [10/70] GovStakingStorage_c_d15_diff... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+[analyze_context] Line 33: Found function, contract=GovStakingStorage
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+
+[CONTRACT] GreenHouse_c
+------------------------------------------------------------
+  [11/70] GreenHouse_c_d1_overlap... FAIL: None
+  [12/70] GreenHouse_c_d1_diff... FAIL: None
+  [13/70] GreenHouse_c_d3_overlap... FAIL: None
+  [14/70] GreenHouse_c_d3_diff... FAIL: None
+  [15/70] GreenHouse_c_d6_overlap... FAIL: None
+  [16/70] GreenHouse_c_d6_diff... FAIL: None
+  [17/70] GreenHouse_c_d10_overlap... FAIL: None
+  [18/70] GreenHouse_c_d10_diff... FAIL: None
+  [19/70] GreenHouse_c_d15_overlap... FAIL: None
+  [20/70] GreenHouse_c_d15_diff... FAIL: None
+
+[CONTRACT] HubPool_c
+------------------------------------------------------------
+  [21/70] HubPool_c_d1_overlap... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [22/70] HubPool_c_d1_diff... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [23/70] HubPool_c_d3_overlap... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [24/70] HubPool_c_d3_diff... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [25/70] HubPool_c_d6_overlap... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [26/70] HubPool_c_d6_diff... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [27/70] HubPool_c_d10_overlap... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [28/70] HubPool_c_d10_diff... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [29/70] HubPool_c_d15_overlap... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [30/70] HubPool_c_d15_diff... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+
+[CONTRACT] Lock_c
+------------------------------------------------------------
+  [31/70] Lock_c_d1_overlap... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [32/70] Lock_c_d1_diff... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [33/70] Lock_c_d3_overlap... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [34/70] Lock_c_d3_diff... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [35/70] Lock_c_d6_overlap... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [36/70] Lock_c_d6_diff... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [37/70] Lock_c_d10_overlap... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [38/70] Lock_c_d10_diff... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [39/70] Lock_c_d15_overlap... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+  [40/70] Lock_c_d15_diff... Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2236, in process_state_var_for_debug
+    self.current_target_function_cfg = ccf.get_function_cfg(self.current_target_function)
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Utils\CFG.py", line 279, in get_function_cfg
+    return self.functions[function_name]
+KeyError: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+ERROR in process_state_var_for_debug: None
+FAIL: None
+
+[CONTRACT] LockupContract_c
+------------------------------------------------------------
+  [41/70] LockupContract_c_d1_overlap... FAIL: None
+  [42/70] LockupContract_c_d1_diff... line 1:33 extraneous input '-' expecting {DecimalNumber, HexNumber}
+FAIL: None
+  [43/70] LockupContract_c_d3_overlap... FAIL: None
+  [44/70] LockupContract_c_d3_diff... line 1:33 extraneous input '-' expecting {DecimalNumber, HexNumber}
+FAIL: None
+  [45/70] LockupContract_c_d6_overlap... FAIL: None
+  [46/70] LockupContract_c_d6_diff... line 1:33 extraneous input '-' expecting {DecimalNumber, HexNumber}
+FAIL: None
+  [47/70] LockupContract_c_d10_overlap... FAIL: None
+  [48/70] LockupContract_c_d10_diff... line 1:33 extraneous input '-' expecting {DecimalNumber, HexNumber}
+FAIL: None
+  [49/70] LockupContract_c_d15_overlap... FAIL: None
+  [50/70] LockupContract_c_d15_diff... line 1:33 extraneous input '-' expecting {DecimalNumber, HexNumber}
+FAIL: None
+
+[CONTRACT] PoolKeeper_c
+------------------------------------------------------------
+  [51/70] PoolKeeper_c_d1_overlap... FAIL: None
+  [52/70] PoolKeeper_c_d1_diff... line 1:33 extraneous input '-' expecting {DecimalNumber, HexNumber}
+FAIL: None
+  [53/70] PoolKeeper_c_d3_overlap... FAIL: None
+  [54/70] PoolKeeper_c_d3_diff... line 1:33 extraneous input '-' expecting {DecimalNumber, HexNumber}
+FAIL: None
+  [55/70] PoolKeeper_c_d6_overlap... FAIL: None
+  [56/70] PoolKeeper_c_d6_diff... line 1:33 extraneous input '-' expecting {DecimalNumber, HexNumber}
+FAIL: None
+  [57/70] PoolKeeper_c_d10_overlap... FAIL: None
+  [58/70] PoolKeeper_c_d10_diff... line 1:33 extraneous input '-' expecting {DecimalNumber, HexNumber}
+FAIL: None
+  [59/70] PoolKeeper_c_d15_overlap... FAIL: None
+  [60/70] PoolKeeper_c_d15_diff... line 1:33 extraneous input '-' expecting {DecimalNumber, HexNumber}
+FAIL: None
+
+[CONTRACT] ThorusBond_c
+------------------------------------------------------------
+  [61/70] ThorusBond_c_d1_overlap... FAIL: None
+  [62/70] ThorusBond_c_d1_diff... line 1:33 extraneous input '-' expecting {DecimalNumber, HexNumber}
+FAIL: None
+  [63/70] ThorusBond_c_d3_overlap... FAIL: None
+  [64/70] ThorusBond_c_d3_diff... line 1:33 extraneous input '-' expecting {DecimalNumber, HexNumber}
+FAIL: None
+  [65/70] ThorusBond_c_d6_overlap... FAIL: None
+  [66/70] ThorusBond_c_d6_diff... line 1:33 extraneous input '-' expecting {DecimalNumber, HexNumber}
+FAIL: None
+  [67/70] ThorusBond_c_d10_overlap... FAIL: None
+  [68/70] ThorusBond_c_d10_diff... line 1:33 extraneous input '-' expecting {DecimalNumber, HexNumber}
+FAIL: None
+  [69/70] ThorusBond_c_d15_overlap... FAIL: None
+  [70/70] ThorusBond_c_d15_diff... line 1:33 extraneous input '-' expecting {DecimalNumber, HexNumber}
+FAIL: None
+
+======================================================================
+Saving results to C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Evaluation\RQ2_Z3_Results\rq2_z3_results.csv...
+[DONE] Saved 70 results
+
+======================================================================
+SUMMARY
+======================================================================
+Successful: 0/70
+Failed: 70/70
+
+Total time: 3.07s

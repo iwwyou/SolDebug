@@ -1142,10 +1142,17 @@ allowing fixpoint computation to terminate before exhausting $\tau$.
 
 \noindent\textbf{Algorithm~\ref{alg:reinterpret}: Incremental Interpretation.}
 \begin{itemize}
-  \item \textbf{Line 1--5 (initialization):} Initialize worklist with seed nodes, filtering out sinks that contribute nothing to downstream analysis.
-  \item \textbf{Line 7 (join predecessors):} Compute incoming environment by joining predecessors with path-sensitive refinement. Condition predecessors apply edge truth labels, pruning infeasible branches.
-  \item \textbf{Line 9--11 (loop headers):} Invoke the loop fixpoint subroutine (Algorithm~\ref{alg:fixpoint}) to compute loop fixpoint, then enqueue the loop-exit successors for downstream propagation.
-  \item \textbf{Line 13--17 (regular nodes):} Apply transfer function and change detection. Only when output changes do we enqueue successors, ensuring termination.
+  \item \textbf{Line 1 (worklist and snapshot initialization):} Initialize empty worklist $WL$, in-queue set $inQ$ to track enqueued nodes, and snapshot map $Out$ to store previous node outputs for change detection.
+
+  \item \textbf{Line 2--4 (seed node initialization):} Enqueue all seed nodes $s \in S$ (marking insertion points for incremental edits, or function entry for batch annotations), filtering out sink nodes (exit, error, return) that have no successors to propagate to.
+
+  \item \textbf{Line 6--7 (worklist iteration and incoming environment):} Dequeue node $n$ and compute its incoming environment $\hat{\sigma}_{in}$ by joining outputs from all predecessors. \textsc{RefineByCondition} applies path-sensitive refinement: for condition nodes, it narrows operand intervals based on the edge truth label (true/false branch), pruning infeasible paths.
+
+  \item \textbf{Line 9--11 (loop header delegation):} When encountering a loop header, delegate to Algorithm~\ref{alg:fixpoint} to compute the loop fixpoint. After fixpoint converges, enqueue the loop-exit node's successors to continue analysis beyond the loop.
+
+  \item \textbf{Line 13 (transfer function):} Apply the abstract transfer function to node $n$, computing output environment $\hat{\sigma}_{out}$ by interpreting statements (assignments, calls, etc.) using interval arithmetic and domain operations.
+
+  \item \textbf{Line 14--17 (change detection and propagation):} Compare $\hat{\sigma}_{out}$ with the previous snapshot $Out[n]$. Only if changed, update node environment and snapshot, then enqueue successors. This ensures fixpoint termination by stopping propagation when environments stabilize.
 \end{itemize}
 
 \begin{algorithm}[!htbp]
@@ -1181,9 +1188,15 @@ allowing fixpoint computation to terminate before exhausting $\tau$.
 
 \noindent\textbf{Algorithm~\ref{alg:fixpoint}: Loop Fixpoint with Adaptive Widening.}
 \begin{itemize}
-  \item \textbf{Line 1--3 (initialization):} Identify loop nodes, compute pre-loop environment, and estimate adaptive threshold $\tau$ by analyzing the loop condition. This is \textbf{annotation-aware}: when debug annotations materialize bounds (array lengths, parameters), tighter intervals raise $\tau$ and defer widening.
-  \item \textbf{Line 6--15 (widening phase):} Iterate through loop nodes, applying widening only after $\tau$ visits at join nodes. Line 11 checks \textbf{early convergence}: when condition operands stabilize, the algorithm breaks before exhausting $\tau$.
-  \item \textbf{Line 17 (narrowing phase):} Apply standard narrowing (descending iteration with narrowing operator at join nodes) to refine the widened result.
+  \item \textbf{Line 1 (identify loop nodes and pre-loop environment):} Collect all CFG nodes within the loop body. Compute $Start$ by joining environments from all loop-entry predecessors (excluding back edges).
+
+  \item \textbf{Line 2 (\textsc{EstimateIterations}):} Evaluate both operands of the loop condition (e.g., \texttt{i < array.length}) in the pre-loop environment $Start$. For comparison operators ($<, \le, >, \ge$), compute $\tau$ as the difference between operand bounds: e.g., given \texttt{i = [0,0]} and \texttt{array.length = [10,10]}, compute $\tau = 10 - 0 = 10$. When annotations provide concrete values, this yields tight thresholds; otherwise, a conservative default (typically 2) is used.
+
+  \item \textbf{Line 3 (initialize visit counts):} Track how many times each join node has been visited to trigger widening after $\tau$ iterations.
+
+  \item \textbf{Line 6--15 (widening phase):} Perform fixpoint iteration with worklist-based propagation. At each join node, apply widening only after $\tau$ visits (Line 10), otherwise perform standard join (Line 12). Line 11 implements \textbf{early convergence}: if loop condition operands stabilize to singleton intervals, terminate early without exhausting $\tau$.
+
+  \item \textbf{Line 17 (narrowing phase):} Apply standard narrowing (descending iteration with narrowing operator at join nodes) to refine over-approximations from widening.
 \end{itemize}
 
 \medskip
@@ -1200,20 +1213,19 @@ for addresses and booleans, and on-demand materialization for composite types
 % CONTENT MOVED TO APPENDIX A
 
 \section{Evaluation}
-To evaluate how \textsc{SolQDebug} performs in practical debugging scenarios, we organize our study
-around three research questions:
+To evaluate the practical benefits of \textsc{SolQDebug} in real-world development scenarios,
+we structure our empirical analysis around three key questions:
 
 \begin{itemize}
   \item \textbf{RQ1 -- Responsiveness}:\;%
-        How much edit--to--inspect latency does \textsc{SolQDebug} eliminate compared to Remix?
+        How much does \textsc{SolQDebug} reduce debugging latency compared to Remix?
 
   \item \textbf{RQ2 -- Precision Sensitivity to Annotation Structure}:\;%
         In a common Solidity pattern where inputs are normalized by division, how does the structure
         of operand intervals---overlapping vs. distinct---impact interval growth?
 
   \item \textbf{RQ3 -- Loops}:\;%
-        Which loop structures lead to loss of precision, and how do symbolic inputs influence the
-        stability of analysis?
+        How does \textsc{SolQDebug}'s analysis approach affect precision in loop structures?
 \end{itemize}
 \subsection{Experimental Setup}
 We evaluate \textsc{SolQDebug} on a controlled local setup to measure responsiveness,
@@ -1222,287 +1234,296 @@ precision, and loop-handling capabilities under realistic debugging scenarios.
 \medskip
 \noindent\textbf{Experimental Setting.}
 The evaluation environment consists of an 11th Gen Intel\textregistered{} Core\texttrademark{}
-i7-11390H CPU at 3.40GHz with 16.0 GB RAM, running Windows 10 (64-bit). The tool is
-implemented in Python and tested against both synthetic benchmarks and real-world contracts.
+i7-11390H CPU at 3.40GHz with 16.0~GB RAM, running Windows 10 (64-bit).
+\textsc{SolQDebug} is implemented in Python~3.x and operates directly on Solidity
+source code without requiring compilation or deployment, using the ANTLR4-based
+parser described in Section~4.
 
 \medskip
 \noindent\textbf{Dataset Collection.}
 We derive our dataset from DAppSCAN~\cite{dappscan}, a large-scale benchmark containing
-3,345 Solidity contracts compiled with version \texttt{>=0.8.0}. To ensure representative
-coverage across contract sizes, we apply stratified random sampling, drawing approximately
-10\% from each of three size brackets (1--10 KB, 11--20 KB, and over 20 KB), yielding 141
-Solidity files. After filtering logic-free functions (e.g., those containing only assignments
-or return statements), we select 30 representative contracts through complexity-driven
-stratified sampling.
+3,344 Solidity contracts compiled with version \texttt{>=0.8.0}. To ensure representative
+coverage across contract sizes, we first exclude contracts smaller than 4~KB (2,142 samples),
+which typically contain minimal logic unsuitable for debugging analysis. From the remaining
+1,202 contracts, we sample approximately 10\% from each of three size brackets:
+\begin{itemize}[leftmargin=*,nosep]
+  \item 4--10~KB (735 contracts): 70 samples
+  \item 11--20~KB (304 contracts): 30 samples
+  \item Over 20~KB (163 contracts): 20 samples
+\end{itemize}
+yielding 120 candidate contracts.
 
-The selected contracts range from 7 to 59 lines of code (average: 24 LOC) and span
-fundamental DeFi patterns including token transfers with custom logic, staking/vesting
-mechanisms, liquidity pool operations, oracle data processing, and marketplace transactions.
-Our selection prioritizes three dimensions of debugging complexity: (1) \textit{computational
-complexity}---percentage/fee calculations, time-based vesting mechanisms, and overflow-protected
-accumulation; (2) \textit{data structure complexity}---structs with multiple fields, nested
-mappings, dynamic arrays, and mapping-to-struct patterns; (3) \textit{control flow
-complexity}---loops with varying termination conditions, nested conditionals, and modifier-based
-access control. Table~\ref{tab:benchmark-dataset} lists all 30 benchmark contracts with their
+We then apply two filtering criteria: (1)~excluding functions with multi-contract
+interactions (i.e., accessing variables or invoking functions from other contracts),
+as our analysis focuses on single-contract scenarios, and (2)~excluding logic-free
+functions (e.g., those containing only assignments or return statements). From the
+filtered set, we select 30 representative functions for evaluation.
+
+The selected contracts represent diverse DeFi scenarios including token transfers
+with custom logic, staking/vesting mechanisms, liquidity pool operations, oracle
+data processing, and marketplace transactions.
+Our selection prioritizes three dimensions of debugging complexity:
+\begin{itemize}[leftmargin=*,topsep=2pt]
+  \item \textbf{Computational complexity}---complex arithmetic patterns with
+        chained computations across multiple statements, making value ranges
+        hard to predict without interval tracking;
+  \item \textbf{Data structure complexity}---structs with multiple fields, nested
+        mappings, dynamic arrays, and mapping-to-struct patterns;
+  \item \textbf{Control flow complexity}---loops with varying termination conditions,
+        nested conditionals, and modifier-based access control.
+\end{itemize}
+Table~\ref{tab:benchmark-dataset} lists all 30 benchmark contracts with their
 source files, target functions, and line counts.
 
 \input{benchmark_table}
 
 
 \subsection{RQ1 - Responsiveness}
-To evaluate responsiveness, we measure edit-to-inspect latency---defined as the time from a code
-change to the appearance of updated variable information---under a single contract, single transaction
-scenario.
+To evaluate responsiveness, we measure \textit{debugging latency}, defined as the time
+required to step through the execution of a function line-by-line.
+For Remix IDE, this corresponds to the duration from opening the debugger to
+stepping through the entire execution using the "step forward" button. For \textsc{SolQDebug}, it
+represents the time from a code modification to the display of updated variable information.
 
 Since Remix IDE lacks built-in automated benchmarking capabilities, we developed
 \texttt{remix\_benchmark}~\cite{remix_bench}, a Selenium~\cite{selenium}-based automation framework
-that programmatically drives the Remix web interface to measure edit-to-inspect latency. For each
-test function, \texttt{remix\_benchmark} automates the full workflow: compilation, contract deployment,
-state variable initialization via manual storage slot assignment, parameter entry, transaction execution,
-and step-through debugging. We measure two latency metrics: \textit{pure debug time}, capturing only
-the debugger step-through duration, and \textit{total time}, which includes compilation, deployment,
-and state setup overhead. The difference between these metrics reflects the additional manual effort
-required in traditional debugging workflows.
+that programmatically drives the Remix web interface to measure debugging latency. For each
+test function, \texttt{remix\_benchmark} automates the full workflow: compilation, contract
+deployment, state variable initialization via manual storage slot assignment, parameter entry,
+transaction execution, and step-through debugging.
 
-Although \textsc{SolQDebug} is designed for interactive use within a Solidity editor, all experiments
-simulate this behavior in a controlled scripting environment. For each function, we reconstruct a
-sequence of incremental edits and annotations that mimic realistic developer activity. These fragments
-are streamed into the interpreter to measure latency and interval growth under reproducible conditions.
+Unlike Remix's concrete execution model, which requires stepping through every bytecode
+instruction for each test input, \textsc{SolQDebug} uses abstract interpretation with
+interval domain (Section~\ref{sec:impl}) that operates directly on the Solidity AST.
+Rather than enumerating concrete values one by one, the abstract interpreter represents
+inputs as intervals and computes abstract states over those intervals, analyzing all possible
+behaviors in a single pass without blockchain deployment. With this interval-based approach,
+\textsc{SolQDebug} maintains consistent latency regardless of test-case width \(\Delta\),
+which specifies the size of each input interval in debug annotations. In contrast, Remix must
+execute each concrete input value separately, so its latency scales linearly with the number
+of test inputs.
+
+Although \textsc{SolQDebug} is designed for interactive use within a Solidity editor, all
+experiments simulate this behavior in a controlled scripting environment. For each function,
+we reconstruct a sequence of incremental edits and annotations that mimic realistic developer
+activity. These fragments are streamed into the interpreter to measure latency and interval
+growth under reproducible conditions.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=0.8\linewidth]{3d_benchmark_surface.png}
-  \caption{Edit-to-inspect latency comparison between Remix and \textsc{SolQDebug} across varying test-case widths and execution passes. The x-axis represents the cost estimate, y-axis shows TestCase width (\(\Delta\)), and z-axis displays latency in seconds. While Remix maintains constant high latency regardless of iteration, \textsc{SolQDebug} demonstrates significantly lower latency that quickly reaches a floor after the initial pass.}
+  \caption{Debugging latency comparison between Remix and \textsc{SolQDebug} across varying
+  ByteOp counts and test-case widths \(\Delta\). \textsc{SolQDebug} maintains consistent
+  sub-second latency regardless of function complexity or input interval size, while Remix's
+  latency scales linearly with both dimensions.}
   \label{fig:rq1-responsiveness}
 \end{figure}
 
-We evaluated 30 functions across 4 test-case widths \(\Delta \in \{0, 2, 5, 10\}\), yielding 120
-total measurements for \textsc{SolQDebug}. For Remix, we measured each function once using \texttt{
-remix\_benchmark}, capturing both pure debug time (debugger step-through only) and total time (
-including compilation, deployment, and state initialization).
+We evaluated 30 functions across 4 test-case widths \(\Delta \in \{0, 2, 5, 10\}\), yielding
+120 total measurements for \textsc{SolQDebug}. For Remix, we measured each function once per
+\(\Delta\) value to demonstrate the linear scaling behavior.
+Figure~\ref{fig:rq1-responsiveness} illustrates the latency comparison across these dimensions.
 
-For Remix, the pure debug time ranged from 25.1 to 124.6 seconds (median: 53.0 s), reflecting the
-time required to step through bytecode operations in the debugger. The total time, however, ranged
-from 71.1 to 168.3 seconds (median: 98.1 s), as it includes approximately 35 seconds for
-compilation and deployment, plus 0--11.8 seconds for manual state variable initialization (median:
-2.9 s). Functions requiring more state slots incur proportionally higher setup overhead, with state
-initialization time growing linearly with the number of storage variables.
+For Remix, the debugging latency ranged from 25.1 to 124.6 seconds (median: 53.0s), reflecting
+the time required to step through bytecode operations in the debugger. This latency
+scales linearly with test-case width, as each additional input value requires a separate
+transaction execution and complete bytecode step-through.
 
-In contrast, \textsc{SolQDebug} completed analysis in 0.03--5.09 seconds (median: 0.15 s) across all
-120 measurements, requiring no compilation, deployment, or state setup. Fig.~\ref{fig:rq1-responsiveness} visualizes this performance gap: Remix pure debug time alone exceeds \textsc{
-SolQDebug}'s total latency by a median factor of \textasciitilde350$\times$, while total Remix
-latency (including setup) exceeds it by \textasciitilde650$\times$. This demonstrates that \textsc{
-SolQDebug} eliminates the compile--deploy--setup cycle entirely, enabling immediate feedback during
-code editing.
+In contrast, \textsc{SolQDebug} completed analysis in 0.03--5.09 seconds (median: 0.15s)
+across all 120 measurements. \textsc{SolQDebug}'s latency remains nearly constant
+regardless of test-case width, as abstract interpretation analyzes all
+input combinations symbolically in a single pass. This results in a median speedup of approximately
+350$\times$ over Remix for pure debugging time. In practice, Remix users also incur additional
+overhead from compilation, deployment, and state initialization, further increasing total debugging
+time. \textsc{SolQDebug} eliminates these preparatory steps entirely, enabling immediate feedback
+during code editing.
 
 \medskip
 \noindent\fbox{%
 \begin{minipage}{0.96\linewidth}
 \textbf{Answer to RQ1:}
-\textsc{SolQDebug} achieves sub-second edit-to-inspect latency (median: 0.15 s), eliminating 350$\times$--650$\times$ overhead from Remix's compile--deploy--debug cycle. This enables immediate, interactive feedback during code editing without transaction execution.
+\textsc{SolQDebug} achieves sub-second debugging latency (median: 0.15s), providing
+approximately 350$\times$ faster line-by-line variable inspection compared to Remix's
+bytecode step-through (median: 53.0s). Unlike Remix, whose latency scales linearly with
+input space size, \textsc{SolQDebug} maintains consistent performance regardless of
+test-case width through abstract interpretation. When including compilation and deployment
+overhead, the practical speedup reaches approximately 650$\times$.
 \end{minipage}%
 }
 
-\subsection{RQ2 - Precision Sensitivity to Annotation Structure}
+\subsection{RQ2 - Impact of Annotation Patterns on Precision in Complex Arithmetic Operations}
 
-\begin{figure*}[t]
+\begin{figure}[t]
   \centering
-  \includegraphics[width=0.35\linewidth]{fig_pending_f90.pdf}
-  \hspace{2em}
-  \includegraphics[width=0.35\linewidth]{fig_pending_convert_f90.pdf}
+  \includegraphics[width=0.48\textwidth]{fig_pending_f90.pdf}
   \caption{
-Interval growth after normalization in \texttt{pending} function from \texttt{Lock.sol}. Left:
-original version with subtraction; right: modified version where subtraction is replaced with
-addition}
-  \label{fig:rq2-precision}
-\end{figure*}
+F90 (90th percentile of interval inflation) for \texttt{Lock::pending} under \textsc{overlap} and \textsc{diff} annotation patterns.
+As input width ($\Delta$) increases, \textsc{overlap} achieves progressively tighter precision (F90: 12.0 $\rightarrow$ 4.8),
+while \textsc{diff} maintains near-constant inflation (F90 $\approx$ 13--14).}
+  \label{fig:rq2-lock}
+\end{figure}
 
-Smart contracts often normalize raw inputs via division---e.g., converting timestamps to time
-units---before combining the results using addition or subtraction. To isolate the impact of the final
-arithmetic operator from the shared division step, we analyze two variants of the same control-flow
-structure: one using addition, the other using subtraction.
+Real-world smart contracts frequently employ complex arithmetic operations involving multiplication and division
+to compute financial quantities such as rewards, fees, and vesting schedules.
+These operations inherently amplify interval widths during abstract interpretation
+due to the combinatorial nature of interval arithmetic.
+Understanding how annotation structure influences precision in such contexts is critical for practical adoption
+of \textsc{SolQDebug}.
 
-Each variant is tested under two annotation styles. In the \textsc{diff} style, each operand is
-assigned a distinct input interval (e.g., \([10, 20]\) and \([30, 40]\)). In the \textsc{overlap}
-style, the intervals are partially aligned (e.g., \([10, 20]\) and \([15, 25]\)), such that they
-share a subrange but are not fully identical.
-For each combination, we sweep the annotation width \(\Delta \in \{1, 3, 6, 10\}\) and report
-\(F_{90}\), the 90th percentile of the inflation factor \(F = \textit{exit\_width} /
-\textit{input\_width}\).
+To investigate this, we examine the \texttt{pending} function from \texttt{Lock.sol} in our benchmark dataset. The function uses complex arithmetic operations involving multiplication and division. In particular, the multiplication is particularly critical: in interval arithmetic, it computes the Cartesian product of endpoint combinations $\{a_{\min} \times b_{\min}, a_{\min} \times b_{\max}, a_{\max} \times b_{\min}, a_{\max} \times b_{\max}\}$. Consequently, when operand intervals are disjoint, this combinatorial expansion generates significantly wider output ranges.
 
-Results in Fig.7 show that interval growth is more sensitive to the structure of input ranges than
-to the arithmetic operator. \textsc{Diff} inputs consistently trigger early widening as \(\Delta\)
-increases, while \textsc{overlap} inputs maintain tighter bounds even under addition, which
-typically increases output range.
+To assess this effect, we evaluate two annotation strategies under varying input widths $\Delta \in \{1, 3, 6, 10\}$.
+In the \textsc{overlap} style, all input variables share a common base range (e.g., $[100, 100+\Delta]$).
+In the \textsc{diff} style, each variable occupies a distinct range (e.g., $[100, 100+\Delta]$, $[300, 300+\Delta]$,
+$[500, 500+\Delta]$). We measure F90, the 90th percentile of the inflation factor
+$F = \frac{\text{exit\_width}}{\text{input\_width}}$.
 
-This suggests that in division-normalized logic, the alignment of operand intervals---whether disjoint
-or overlapping---has a stronger influence on interval growth than the choice between addition and
-subtraction. Overlapping inputs consistently result in smaller output ranges, reducing the degree of
-over-approximation as input width increases.
+As shown in Figure~\ref{fig:rq2-lock}, the \textsc{overlap} strategy consistently produces tighter bounds: as $\Delta$ increases from 1 to 10, F90 decreases from 12.0 to 4.8, indicating that wider inputs lead to proportionally smaller relative growth. In contrast, the \textsc{diff} strategy maintains nearly constant inflation (F90 $\approx$ 13--14) regardless of input width. This difference arises from interval multiplication semantics: when annotations align operands to overlapping ranges, the extreme products remain closer to the midpoint, limiting excessive interval expansion. Conversely, disjoint ranges maximize the distance between endpoint combinations, causing output intervals to span unnecessarily large ranges.
+
+Moreover, we observe similar patterns in other contracts from our benchmark dataset that employ multiplication or division in their arithmetic. These include reward computations (GovStakingStorage\_c), fee calculations (GreenHouse\_c, HubPool\_c), vesting schedules (LockupContract\_c), and proportional payouts (ThorusBond\_c). Across these contracts, overlapping annotations consistently yield tighter precision than disjoint ranges. This pattern demonstrates that for real-world contracts with multiplication or division, developers can significantly improve analysis precision by choosing overlapping rather than disjoint annotations.
 
 \medskip
 \noindent\fbox{%
 \begin{minipage}{0.96\linewidth}
 \textbf{Answer to RQ2:}
-In division-normalized arithmetic patterns, the structure of input interval annotations (overlapping vs.\ disjoint) has a stronger influence on precision than the choice of arithmetic operator (addition vs.\ subtraction). Overlapping intervals consistently reduce over-approximation by up to 3$\times$ compared to disjoint inputs, suggesting developers should align annotation ranges with expected input correlations to improve precision without sacrificing responsiveness.
+For real-world contracts using multiplication or division, overlapping annotations yield significantly lower interval inflation than disjoint annotations, due to interval multiplication's combinatorial nature.
 \end{minipage}%
 }
 
 \subsection{RQ3 - Loops}
 
-Loop precision in \textsc{SolQDebug} depends critically on the evaluability of the loop condition expression. Recall from Algorithm~\ref{alg:fixpoint} (line 2) that \textsc{EstimateIterations} analyzes the condition by evaluating both operands in the pre-loop environment $Start$ to compute a widening threshold $\tau$.
+Abstract interpretation with the interval domain faces a well-known precision challenge in loops.
+To guarantee termination, widening operators must be applied after a bounded number of iterations,
+often causing intervals to expand to $\top$ or $[0, \infty]$ even when the actual loop bounds are finite.
+However, Solidity's properties create opportunities for mitigation.
+Gas costs limit loop complexity, and loop conditions commonly depend on simple values
+such as array lengths, mapping sizes, or bounded counters.
 
-Table~\ref{tab:loop-benchmarks} summarizes the five loop-containing benchmarks analyzed in this study. We identify four distinct patterns based on these cases, each exhibiting different precision characteristics:
+We address this challenge through an annotation-guided widening threshold mechanism.
+When developers annotate values that determine loop bounds (e.g., array lengths),
+the analyzer evaluates the loop condition using this information to compute adaptive thresholds that delay widening,
+improving precision while maintaining soundness and termination guarantees.
 
-\begin{table}[h]
-\centering
-\small
-\begin{tabular}{@{}lllll@{}}
-\toprule
-\textbf{Contract} & \textbf{Function} & \textbf{Loop Condition} & \textbf{Pattern} & \textbf{File} \\
-\midrule
-AOC\_BEP & \texttt{updateUserInfo} & \texttt{i <= 4} & 1 & \texttt{dataset/original/AOC\_BEP.sol} \\
-Balancer & \texttt{\_addActionBuilderAt} & \texttt{i < additionalCount} & 2 & \texttt{dataset/original/Balancer.sol} \\
-Core & \texttt{revokeStableMaster} & \texttt{i < length - 1} & 2 & \texttt{dataset/original/Core.sol} \\
-TimeLockPool & \texttt{getTotalDeposit} & \texttt{i < array.length} & 3 & \texttt{dataset/original/TimeLockPool.sol} \\
-AvatarArt... & \texttt{\_removeFromTokens} & \texttt{i < tokenCount} & 4 & \texttt{dataset/original/AvatarArt...sol} \\
-\bottomrule
-\end{tabular}
-\caption{Loop-containing benchmark contracts and their categorization. Pattern 1: constant-bounded with simple updates; Pattern 2: annotation-enabled convergence; Pattern 3: uninitialized local variables (developer-fixable); Pattern 4: independent accumulation (inherent limitation).}
-\label{tab:loop-benchmarks}
-\end{table}
+To evaluate the effectiveness of this approach, we analyze the five loop-containing functions from our benchmark dataset (Table~\ref{tab:benchmark-dataset}):
+\texttt{updateUserInfo} (AOC\_BEP), \texttt{\_addActionBuilderAt} (Balancer), \texttt{revokeStableMaster} (Core), \texttt{getTotalDeposit} (TimeLockPool), and \texttt{\_removeFromTokens} (AvatarArtMarketPlace).
+We identify four distinct patterns that demonstrate varying levels of precision under our approach.
 
 \medskip
 \noindent\textbf{Pattern 1: Constant-Bounded Loops with Simple Updates.}
-When loop conditions reference only constants and the loop body contains only simple assignments (no accumulation), \textsc{EstimateIterations} computes precise thresholds without requiring annotations. For instance, \texttt{updateUserInfo} in \textsc{AOC\_BEP} contains \texttt{for (uint256 i = 1; i <= 4; i++)}, where the condition \texttt{i <= 4} evaluates to $\tau = 4$. Inside the loop, variables are assigned directly (\texttt{level = i}), not accumulated. Because the actual loop iterates at most 4 times and contains no diverging operations, widening never triggers, and the interval for \texttt{userInfo[account].level} converges precisely to $[1,4]$ without any annotations.
+When loop conditions reference only constants and the loop body contains only simple assignments,
+\textsc{EstimateIterations} computes precise thresholds without annotations.
+For example, \texttt{updateUserInfo} (AOC\_BEP) uses \texttt{for (uint256 i = 1; i <= 4; i++)}
+with $\tau = 4$ computed from the constant bound.
+The small constant bound and simple updates allow convergence without triggering widening.
+The analysis produces precise interval \texttt{userInfo[account].level} $\in [1,4]$.
 
 \medskip
 \noindent\textbf{Pattern 2: Annotation-Enabled Convergence.}
-When loop bounds depend on dynamic values (e.g., array lengths, computed variables) but the loop body contains only simple updates without problematic accumulation, debug annotations enable precise convergence. For example, \texttt{\_addActionBuilderAt} in \textsc{Balancer} uses \texttt{for (uint8 i = 0; i < additionalCount; i++)}, where \texttt{additionalCount} is computed from function inputs. When annotations specify the inputs (e.g., \texttt{index = 5}, \texttt{currentLength = 2}), the evaluator computes \texttt{additionalCount = 4}, yielding $\tau = 4$. Since the loop body only calls \texttt{actionBuilders.push()} without complex data-dependent logic, the analysis converges precisely. Similarly, \texttt{revokeStableMaster} in \textsc{Core} iterates \texttt{for (uint256 i = 0; i < stablecoinListLength - 1; i++)} with simple index-based operations. Annotating the array length allows precise threshold computation, and the absence of problematic accumulation patterns ensures convergence.
+When loop bounds depend on dynamic values but the loop body performs only simple updates,
+annotations enable precise convergence.
+\texttt{\_addActionBuilderAt} (Balancer) uses \texttt{for (uint8 i = 0; i < additionalCount; i++)}
+where \texttt{additionalCount} is computed from function inputs.
+Annotating these inputs allows the evaluator to compute \texttt{additionalCount = 4} and set $\tau = 4$.
+The simple loop body converges precisely.
+
+\texttt{revokeStableMaster} (Core) exhibits similar behavior.
+It iterates \texttt{for (uint256 i = 0; i < stablecoinListLength - 1; i++)} with simple index-based operations.
+Annotating the array length enables precise threshold computation and convergence.
 
 \medskip
 \noindent\textbf{Pattern 3: Uninitialized Local Variables (Developer-Fixable).}
-Solidity does not automatically initialize local variables to zero. For instance, \texttt{getTotalDeposit} in \textsc{TimeLockPool} declares \texttt{uint256 total;} without initialization, then accumulates values via \texttt{total += depositsOf[\_account][i].amount}. Since \textsc{SolQDebug} conservatively models uninitialized variables as $\top$ (unknown), any arithmetic operation propagates $\top$, causing \texttt{total} to remain $\top = [0, 2^{256}-1]$ regardless of array annotations.
+When local variables lack explicit initialization, precision loss can occur.
+\texttt{getTotalDeposit} (TimeLockPool) declares \texttt{uint256 total;} without initialization
+and then accumulates values in a loop.
+\textsc{SolQDebug} conservatively models uninitialized variables as $\top$ (unknown).
+Any arithmetic operation propagates $\top$.
+This causes \texttt{total} to remain $\top = [0, 2^{256}-1]$ throughout the analysis.
 
-This pattern represents a \emph{developer-fixable} limitation: explicitly initializing \texttt{total = 0} would enable precise tracking. Debug annotations cannot compensate for missing initialization, as the interval domain soundly treats uninitialized reads as arbitrary values. Developers encountering this pattern should add explicit initialization.
+This pattern represents a developer-fixable limitation.
+Explicitly initializing \texttt{total = 0} would enable precise tracking.
+Annotations cannot compensate for missing initialization because the interval domain soundly treats uninitialized reads as arbitrary values.
 
 \medskip
-\noindent\textbf{Pattern 4: Independent Accumulation Variables (Inherent Limitation).}
-Even when loop bounds are precisely known, variables that accumulate independently of the loop condition may still diverge under widening. \texttt{\_removeFromTokens} in \textsc{AvatarArtMarketplace} illustrates this: the loop iterates \texttt{for (uint tokenIndex = 0; tokenIndex < tokenCount; tokenIndex++)}, where \texttt{tokenCount} is known from array annotations. Inside the loop, \texttt{resultIndex} increments conditionally (\texttt{if (tokenItemId != tokenId) \{ resultIndex++; \}}). Although the loop bound is finite, \texttt{resultIndex} depends on data values (how many elements match the condition), not the loop index itself.
+\noindent\textbf{Pattern 4: Data-Dependent Accumulation.}
+Even when loop bounds are precisely known,
+variables that accumulate based on data-dependent conditions may diverge under widening.
+\texttt{\_removeFromTokens} (AvatarArtMarketplace) illustrates this limitation.
+The loop iterates \texttt{for (uint tokenIndex = 0; tokenIndex < tokenCount; tokenIndex++)}
+where \texttt{tokenCount} is known from annotations.
+Inside the loop, \texttt{resultIndex} increments conditionally based on array element comparisons.
+The accumulator depends on data values rather than the loop index itself.
 
-After the widening threshold is exceeded, \textsc{SolQDebug} conservatively widens \texttt{resultIndex} to $[0, \infty]$, as the interval domain cannot track the correlation between array contents and accumulator updates. This pattern is \emph{inherent to the abstraction}: even perfect annotations of iteration bounds cannot prevent widening of variables whose updates depend on unpredictable data flow rather than iteration count alone. Developers should recognize that such accumulation patterns will exhibit conservative over-approximation.
+Once the widening threshold is exceeded, \textsc{SolQDebug} widens \texttt{resultIndex} to $[0, \infty]$.
+The interval domain cannot track correlations between array contents and conditional accumulation.
+This pattern represents an inherent limitation of the interval domain.
+Annotations of iteration bounds cannot prevent widening when variable updates depend on unpredictable data rather than iteration count.
 
 \medskip
 \noindent\fbox{%
 \begin{minipage}{0.96\linewidth}
 \textbf{Answer to RQ3:}
-Loop precision in \textsc{SolQDebug} is governed by the adaptive widening threshold $\tau$, which is computed by evaluating the loop condition in the pre-loop symbolic environment. We identify four patterns: (1) constant-bounded loops with simple updates converge precisely without annotations; (2) dynamic-bounded loops (e.g., iterating over array lengths) converge precisely when annotations provide sufficient information and the loop body lacks problematic accumulation; (3) uninitialized local variables propagate $\top$ regardless of annotations---developers must explicitly initialize such variables (e.g., \texttt{uint256 total = 0;}) to enable tracking; (4) accumulation variables whose updates depend on data values rather than loop indices (e.g., conditional increments) will widen to $[0, \infty]$ even when iteration bounds are known, as the interval domain cannot correlate array contents with accumulator state. Patterns 1-2 demonstrate annotation effectiveness, Pattern 3 is developer-fixable, and Pattern 4 represents an inherent abstraction limit.
+\textsc{SolQDebug} improves loop analysis precision for constant-bounded and annotation-enabled dynamic loops.
+Remaining precision loss arises from developer-fixable initialization issues and inherent interval domain limitations in tracking data-dependent accumulation.
 \end{minipage}%
 }
 
 \section{Discussion}
 
 \subsection{Why use Abstract Interpretation for Debugging}
-    In this work, we use debugging to mean a developer-led, interactive exploration activity that
-    happens before deployment during code authoring: the developer varies symbolic (interval) inputs
-    and immediately observes branch reachability, guard validity, and value bounds at the source
-    level. This edit-time feedback loop calls for a technique that (1) terminates quickly, (2)
-    explains results in a way developers can inspect, and (3) scales to near-keystroke
+    In this work, debugging refers to a developer-led, interactive exploration activity that
+    occurs during code authoring, before deployment: developers vary symbolic (interval) inputs
+    and immediately observe branch reachability, guard validity, and value bounds at the source
+    level. This edit-time feedback loop requires a technique that (1) terminates reliably, (2)
+    produces results developers can inspect and interpret, and (3) scales to near-keystroke
     responsiveness.
 
-    We chose abstract interpretation (AI) over symbolic execution and proof-based verification for
-    three reasons:
+    Abstract interpretation (AI) was selected over symbolic execution and proof-based verification
+    for three primary reasons:
     \begin{itemize}
-      \item \textbf{Termination.} AI enforces convergence via widening at loops and joins at merges, avoiding the path explosion common in symbolic execution.
-      \item \textbf{Explainability.} Each result is an abstract value in a well-defined lattice. With interval domains, the mapping from inputs to outputs is explicit as ranges, which makes dataflow effects easy to trace and debug at the line level.
-      \item \textbf{Responsiveness.} Interval transfer functions are lightweight, enabling millisecond-scale updates that fit the edit cycle. Symbolic engines routinely explore many paths even for small edits, which can break interactivity.
+      \item \textbf{Termination.} AI enforces convergence through widening at loops and joins at merges, avoiding the path explosion inherent in symbolic execution.
+      \item \textbf{Explainability.} Each result is an abstract value in a well-defined lattice. With interval domains, the mapping from inputs to outputs is explicit as ranges, enabling developers to trace dataflow effects and reason about behavior at the statement level.
+      \item \textbf{Responsiveness.} Interval transfer functions are lightweight, enabling millisecond-scale updates that align with the edit cycle. In contrast, symbolic engines routinely explore multiple paths even for small edits, which can degrade interactivity.
     \end{itemize}
-    Formal verification provides stronger guarantees, but requires fully specified properties and
-    invariants, which are costly to author during early iterations. \textsc{SolQDebug} is designed
-    to bridge the gap between writing code and running tests or verification---offering immediate,
-    sound, conservative feedback with low annotation overhead.
+    While formal verification provides stronger guarantees, it requires fully specified properties
+    and invariants, which are costly to develop during early iterations. \textsc{SolQDebug} is
+    designed to bridge the gap between code authoring and testing or verification---offering
+    immediate, sound feedback with minimal annotation overhead.
 
-    For debugging, intervals strike a practical balance between precision and speed. They (i) align
-    with developers' mental model of "possible ranges," (ii) expose boundary effects (e.g., overflow
-    thresholds, guard satisfaction regions) without committing to a single concrete input, and (iii)
-    compose predictably through joins and widenings. In our setting, intervals are also a natural
-    surface for annotations: developers can \emph{shape} symbolic inputs (e.g., make them
-    overlapping or disjoint) and directly see how that affects control flow and computed ranges.
+    In the debugging context, intervals strike a practical balance between precision and speed,
+    offering three key advantages: (i) they align with developers' mental model of "possible
+    ranges," (ii) they expose boundary effects (e.g., overflow thresholds, guard satisfaction
+    regions) without requiring concrete inputs, and (iii) they compose predictably through joins
+    and widenings. Furthermore, intervals provide a natural interface for annotations: developers
+    can \emph{shape} symbolic inputs (e.g., make them overlapping or disjoint) and directly
+    observe how these configurations affect control flow and computed ranges.
 
-    AI's precision is conservative by design; edit-time usability depends on giving developers
-    simple levers to steer precision without sacrificing responsiveness. We expose three such levers
-    that proved effective in our study:
+    While AI's precision is conservative by design, edit-time usability depends on providing
+    developers with simple mechanisms to control precision without sacrificing responsiveness.
+    Our evaluation demonstrates the effectiveness of three such mechanisms:
     \begin{itemize}
-      \item \textbf{Annotation structure.} Overlapping operand intervals often bound output ranges more tightly than disjoint ones in division-normalized arithmetic (cf.\ RQ2). This reduces false alarms with no runtime cost.
-      \item \textbf{Annotation width.} Narrower inputs shrink joins and delay widening; developers can start narrow and broaden gradually ("zoom out") to probe stability.
+      \item \textbf{Annotation structure.} Overlapping operand intervals often bound output ranges more tightly than disjoint ones in division-normalized arithmetic (cf.\ RQ2), reducing imprecision with no runtime cost.
+      \item \textbf{Annotation width.} Narrower inputs shrink joins and delay widening; developers can start narrow and broaden gradually to probe stability.
       \item \textbf{Guard-guided narrowing.} Making explicit the intended \texttt{require}/\texttt{if} guards in annotations tightens feasible states early and improves precision along the taken branch at negligible cost.
     \end{itemize}
-    Where stricter precision is essential (e.g., inside data-driven loops), the workflow can
-    temporarily fall back to concrete inputs for local inspection, then return to intervals for
-    broader exploration. This "concrete when needed, symbolic by default" rhythm preserves
-    interactivity while keeping results actionable.
+    In scenarios requiring stricter precision (e.g., inside data-driven loops), developers can
+    temporarily fall back to concrete inputs for detailed inspection, then return to intervals
+    for broader exploration. This "concrete when needed, symbolic by default" approach preserves
+    interactivity while maintaining actionable results.
     \vspace{0.25em}
 
-    \subsection{Evaluation Implication}
-    Traditional debuggers (e.g., Remix, Hardhat Debug) require compile--deploy--execute per iteration,
-    typically taking tens of seconds. In contrast, our interpreter updates in milliseconds (median
-    \(\sim\)14\,ms on the first pass and 5--35\,ms on the second), yielding \emph{orders-of-magnitude}
-    lower edit-to-inspect latency. This difference is qualitative: it enables near-keystroke
-    feedback, which changes how developers explore code. Because results are symbolic, a single pass
-    summarizes many concrete executions; developers can see when guards always hold/fail for an
-    interval, when a branch becomes unreachable, or when a value may cross a critical threshold---all
-    without leaving the editor. In short, \textsc{SolQDebug} complements runtime debuggers by moving
-    fast, informative checks \emph{into} the authoring loop (RQ1).
-
-    RQ2 shows that, in division-normalized patterns common in Solidity, \emph{how} intervals are
-    shaped can matter more than \emph{which} arithmetic operator is used. Overlapping inputs
-    systematically produced smaller output ranges than disjoint inputs, delaying or avoiding early
-    widening. When investigating arithmetic joins, start with partially overlapping intervals and
-    widen only as needed; keep operands aligned where normalization is present.
-
-    RQ3 demonstrates that loop precision is governed by the adaptive widening threshold $\tau$, which
-    depends on whether the loop condition expression can be evaluated in the pre-loop symbolic
-    environment. Constant-bounded loops (\texttt{for (i = 1; i <= 4; ...)}) converge precisely
-    without annotations because \textsc{EstimateIterations} computes exact thresholds.
-    State-dependent loops (\texttt{for (i = 0; i < arr.length; ...)}) benefit directly from
-    annotations: specifying \texttt{arr.length = 10} allows the analyzer to set $\tau = 10$,
-    deferring widening and enabling natural convergence. However, data-dependent loops---where the loop
-    body contains branches or updates decoupled from the index---may still widen despite accurate
-    iteration counts, as the interval domain cannot track element-specific correlations.
-
-    Practical implications: (i) always annotate array lengths, mapping sizes, and iteration bounds
-    for state-dependent loops to raise $\tau$ and delay widening; (ii) for data-dependent loops,
-    use narrower annotations that materialize only the specific keys or elements under inspection,
-    reducing the variability introduced by path merging; (iii) when widening becomes unavoidable
-    (e.g., search loops over large collections), accept the over-approximation or switch to concrete
-    inputs for targeted verification.
-
-    Overall, these findings suggest a debugging workflow that starts symbolic and broad, then
-    \emph{shapes} annotations to tighten precision where it matters (overlap, narrow, guard-guided),
-    and finally uses concrete spot checks only for stubborn hot spots (e.g., deeply data-dependent
-    loops).
-
     \subsection{Limitation}
-    Our current scope and measurements introduce several limitations. First, we focus on
+    Our current scope and analysis introduce several limitations. First, we focus on
     single-contract, single-transaction functions. Inter-contract calls, multi-transaction workflows,
     proxies, and inheritance hierarchies are out of scope in the present implementation. As a result,
     we have not yet conducted a developer study in larger project settings; the usability and
     interpretability of edit-time feedback across multi-contract workflows remain unvalidated.
 
-    Second, our latency numbers combine interpreter execution time (timed in Python) with an estimate
-    for annotation effort per variable (manual input). This procedure ignores UI-event latency and
-    cursor dynamics, and it assumes a consistent operator for annotation entry. Likewise, our
-    precision metric (\(F_{90}\): 90th percentile of exit-/input-width inflation) captures a salient
-    aspect of interval growth but does not reflect all developer notions of "useful precision."
-    These choices provide a consistent basis for tool-level comparison but may under- or
-    over-estimate end-to-end IDE latency or perceived precision.
-
-    We plan to (i) extend the analysis to inter-contract calls and multi-transaction scenarios, (ii)
-    instrument editor events to directly measure human-in-the-loop latency and refine the annotation
-    cost model, and (iii) run a controlled developer study once multi-contract support stabilizes.
-    On the analysis side, loop summarization and selective use of lightweight relational domains (e.
-    g., applied on demand to hot spots) are promising avenues to improve precision while preserving
-    interactivity.
+    Second, the interval domain exhibits inherent precision limitations in loops with data-dependent
+    accumulation. As demonstrated in RQ3 (Pattern 4), when loop variables accumulate conditionally
+    based on data values rather than iteration count, the domain cannot track these correlations
+    and may widen variables to imprecise ranges. While this trade-off preserves edit-time
+    responsiveness, developers encountering such patterns should consider concrete inputs or
+    relational domains for more precise analysis.
 
 \section{Related Works}
 

@@ -1,0 +1,38 @@
+[
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 1,
+    "endLine": 1,
+    "event": "add"
+  },
+  {
+    "code": "// @GlobalVar block.timestamp = [-10,13];",
+    "startLine": 2,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar info.lastInteractionSecond = [13,36];",
+    "startLine": 3,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar info.remainingVestingSeconds = [36,59];",
+    "startLine": 4,
+    "endLine": 4,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar info.remainingPayout = [59,82];",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  }
+]

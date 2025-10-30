@@ -1,0 +1,1780 @@
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+======================================================================
+RQ2 BATCH EXPERIMENT RUNNER
+======================================================================
+
+Total experiments: 90
+Contracts: 9
+Deltas: [1, 3, 6, 10, 15]
+Patterns: ['overlap', 'diff']
+
+
+[CONTRACT] Lock_c
+------------------------------------------------------------
+  [1/90] Lock_c_d1_overlap... [APPLY DEBUG] Patching _data.total with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: _data.total value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching _data.pending with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: _data.pending value updated
+[APPLY DEBUG] Patching startLock with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: startLock value updated
+[APPLY DEBUG] Patching unlockDuration with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: unlockDuration value updated
+[APPLY DEBUG] Patching lockedTime with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: lockedTime value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'_totalLockRemain': '[0,1]'}
+  31 │ varDeclaration │ {'_nUnlock': '[1,2]'}
+  32 │ assignment     │ {'_pending': '[0,0]'}
+  36 │ assignment     │ {'_pending': '[100,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+  36 │ return         │ {'_pending': '[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+==========================
+
+OK (0.60s, F90=inf)
+  [2/90] Lock_c_d1_diff... [APPLY DEBUG] Patching _data.total with value UnsignedIntegerInterval([121, 122])
+[APPLY DEBUG] After patching: _data.total value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching _data.pending with value UnsignedIntegerInterval([163, 164])
+[APPLY DEBUG] After patching: _data.pending value updated
+[APPLY DEBUG] Patching startLock with value UnsignedIntegerInterval([184, 185])
+[APPLY DEBUG] After patching: startLock value updated
+[APPLY DEBUG] Patching unlockDuration with value UnsignedIntegerInterval([205, 206])
+[APPLY DEBUG] After patching: unlockDuration value updated
+[APPLY DEBUG] Patching lockedTime with value UnsignedIntegerInterval([226, 227])
+[APPLY DEBUG] After patching: lockedTime value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'_totalLockRemain': '[None,None]'}
+  31 │ varDeclaration │ {'_nUnlock': '[None,None]'}
+  32 │ assignment     │ {'_pending': '[None,None]'}
+  36 │ assignment     │ {'_pending': '[163,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+  36 │ return         │ {'_pending': '[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+==========================
+
+OK (0.39s, F90=inf)
+  [3/90] Lock_c_d3_overlap... [APPLY DEBUG] Patching _data.total with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: _data.total value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching _data.pending with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: _data.pending value updated
+[APPLY DEBUG] Patching startLock with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: startLock value updated
+[APPLY DEBUG] Patching unlockDuration with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: unlockDuration value updated
+[APPLY DEBUG] Patching lockedTime with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: lockedTime value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'_totalLockRemain': '[0,3]'}
+  31 │ varDeclaration │ {'_nUnlock': '[1,2]'}
+  32 │ assignment     │ {'_pending': '[0,0]'}
+  36 │ assignment     │ {'_pending': '[100,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+  36 │ return         │ {'_pending': '[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+==========================
+
+OK (0.37s, F90=inf)
+  [4/90] Lock_c_d3_diff... [APPLY DEBUG] Patching _data.total with value UnsignedIntegerInterval([123, 126])
+[APPLY DEBUG] After patching: _data.total value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching _data.pending with value UnsignedIntegerInterval([169, 172])
+[APPLY DEBUG] After patching: _data.pending value updated
+[APPLY DEBUG] Patching startLock with value UnsignedIntegerInterval([192, 195])
+[APPLY DEBUG] After patching: startLock value updated
+[APPLY DEBUG] Patching unlockDuration with value UnsignedIntegerInterval([215, 218])
+[APPLY DEBUG] After patching: unlockDuration value updated
+[APPLY DEBUG] Patching lockedTime with value UnsignedIntegerInterval([238, 241])
+[APPLY DEBUG] After patching: lockedTime value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'_totalLockRemain': '[None,None]'}
+  31 │ varDeclaration │ {'_nUnlock': '[None,None]'}
+  32 │ assignment     │ {'_pending': '[None,None]'}
+  36 │ assignment     │ {'_pending': '[169,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+  36 │ return         │ {'_pending': '[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+==========================
+
+OK (0.36s, F90=inf)
+  [5/90] Lock_c_d6_overlap... [APPLY DEBUG] Patching _data.total with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: _data.total value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching _data.pending with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: _data.pending value updated
+[APPLY DEBUG] Patching startLock with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: startLock value updated
+[APPLY DEBUG] Patching unlockDuration with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: unlockDuration value updated
+[APPLY DEBUG] Patching lockedTime with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: lockedTime value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'_totalLockRemain': '[0,6]'}
+  31 │ varDeclaration │ {'_nUnlock': '[1,2]'}
+  32 │ assignment     │ {'_pending': '[0,0]'}
+  36 │ assignment     │ {'_pending': '[100,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+  36 │ return         │ {'_pending': '[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+==========================
+
+OK (0.31s, F90=inf)
+  [6/90] Lock_c_d6_diff... [APPLY DEBUG] Patching _data.total with value UnsignedIntegerInterval([126, 132])
+[APPLY DEBUG] After patching: _data.total value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching _data.pending with value UnsignedIntegerInterval([178, 184])
+[APPLY DEBUG] After patching: _data.pending value updated
+[APPLY DEBUG] Patching startLock with value UnsignedIntegerInterval([204, 210])
+[APPLY DEBUG] After patching: startLock value updated
+[APPLY DEBUG] Patching unlockDuration with value UnsignedIntegerInterval([230, 236])
+[APPLY DEBUG] After patching: unlockDuration value updated
+[APPLY DEBUG] Patching lockedTime with value UnsignedIntegerInterval([256, 262])
+[APPLY DEBUG] After patching: lockedTime value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'_totalLockRemain': '[None,None]'}
+  31 │ varDeclaration │ {'_nUnlock': '[None,None]'}
+  32 │ assignment     │ {'_pending': '[None,None]'}
+  36 │ assignment     │ {'_pending': '[178,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+  36 │ return         │ {'_pending': '[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+==========================
+
+OK (0.30s, F90=inf)
+  [7/90] Lock_c_d10_overlap... [APPLY DEBUG] Patching _data.total with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: _data.total value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching _data.pending with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: _data.pending value updated
+[APPLY DEBUG] Patching startLock with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: startLock value updated
+[APPLY DEBUG] Patching unlockDuration with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: unlockDuration value updated
+[APPLY DEBUG] Patching lockedTime with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: lockedTime value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'_totalLockRemain': '[0,10]'}
+  31 │ varDeclaration │ {'_nUnlock': '[1,2]'}
+  32 │ assignment     │ {'_pending': '[0,0]'}
+  36 │ assignment     │ {'_pending': '[100,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+  36 │ return         │ {'_pending': '[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+==========================
+
+OK (0.31s, F90=inf)
+  [8/90] Lock_c_d10_diff... [APPLY DEBUG] Patching _data.total with value UnsignedIntegerInterval([130, 140])
+[APPLY DEBUG] After patching: _data.total value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching _data.pending with value UnsignedIntegerInterval([190, 200])
+[APPLY DEBUG] After patching: _data.pending value updated
+[APPLY DEBUG] Patching startLock with value UnsignedIntegerInterval([220, 230])
+[APPLY DEBUG] After patching: startLock value updated
+[APPLY DEBUG] Patching unlockDuration with value UnsignedIntegerInterval([250, 260])
+[APPLY DEBUG] After patching: unlockDuration value updated
+[APPLY DEBUG] Patching lockedTime with value UnsignedIntegerInterval([280, 290])
+[APPLY DEBUG] After patching: lockedTime value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'_totalLockRemain': '[None,None]'}
+  31 │ varDeclaration │ {'_nUnlock': '[None,None]'}
+  32 │ assignment     │ {'_pending': '[None,None]'}
+  36 │ assignment     │ {'_pending': '[190,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+  36 │ return         │ {'_pending': '[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+==========================
+
+OK (0.35s, F90=inf)
+  [9/90] Lock_c_d15_overlap... [APPLY DEBUG] Patching _data.total with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: _data.total value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching _data.pending with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: _data.pending value updated
+[APPLY DEBUG] Patching startLock with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: startLock value updated
+[APPLY DEBUG] Patching unlockDuration with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: unlockDuration value updated
+[APPLY DEBUG] Patching lockedTime with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: lockedTime value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'_totalLockRemain': '[0,15]'}
+  31 │ varDeclaration │ {'_nUnlock': '[1,2]'}
+  32 │ assignment     │ {'_pending': '[0,0]'}
+  36 │ assignment     │ {'_pending': '[100,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+  36 │ return         │ {'_pending': '[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+==========================
+
+OK (0.32s, F90=inf)
+  [10/90] Lock_c_d15_diff... [APPLY DEBUG] Patching _data.total with value UnsignedIntegerInterval([135, 150])
+[APPLY DEBUG] After patching: _data.total value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching _data.pending with value UnsignedIntegerInterval([205, 220])
+[APPLY DEBUG] After patching: _data.pending value updated
+[APPLY DEBUG] Patching startLock with value UnsignedIntegerInterval([240, 255])
+[APPLY DEBUG] After patching: startLock value updated
+[APPLY DEBUG] Patching unlockDuration with value UnsignedIntegerInterval([275, 290])
+[APPLY DEBUG] After patching: unlockDuration value updated
+[APPLY DEBUG] Patching lockedTime with value UnsignedIntegerInterval([310, 325])
+[APPLY DEBUG] After patching: lockedTime value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'_totalLockRemain': '[None,None]'}
+  31 │ varDeclaration │ {'_nUnlock': '[None,None]'}
+  32 │ assignment     │ {'_pending': '[None,None]'}
+  36 │ assignment     │ {'_pending': '[205,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+  36 │ return         │ {'_pending': '[0,115792089237316195423570985008687907853269984665640564039457584007913129639935]'}
+==========================
+
+OK (0.33s, F90=inf)
+
+[CONTRACT] GovStakingStorage_c
+------------------------------------------------------------
+  [11/90] GovStakingStorage_c_d1_overlap... [analyze_context] Line 33: Found function, contract=GovStakingStorage
+[APPLY DEBUG] Patching info.rewardMultiplier with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: info.rewardMultiplier value updated
+[APPLY DEBUG] Patching totalRewardMultiplier with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: totalRewardMultiplier value updated
+[APPLY DEBUG] Patching oldRate with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: oldRate value updated
+[APPLY DEBUG] Patching newRate with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: newRate value updated
+[APPLY DEBUG] Patching passedTime with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: passedTime value updated
+[APPLY DEBUG] Patching oldLockPeriod with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: oldLockPeriod value updated
+[APPLY DEBUG] Patching newLockPeriod with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: newLockPeriod value updated
+[APPLY DEBUG] Patching oldAmount with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: oldAmount value updated
+[APPLY DEBUG] Patching newAmount with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: newAmount value updated
+
+=======  ANALYSIS  =======
+  46 │ varDeclaration │ {'toRemove': '[0,0]'}
+  48 │ varDeclaration │ {'toAdd': '[0,0]'}
+  50 │ assignment     │ {'info.rewardMultiplier': '[100,101]'}
+  51 │ assignment     │ {'totalRewardMultiplier': '[100,101]'}
+==========================
+
+OK (0.15s, F90=inf)
+  [12/90] GovStakingStorage_c_d1_diff... [analyze_context] Line 33: Found function, contract=GovStakingStorage
+[APPLY DEBUG] Patching info.rewardMultiplier with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: info.rewardMultiplier value updated
+[APPLY DEBUG] Patching totalRewardMultiplier with value UnsignedIntegerInterval([121, 122])
+[APPLY DEBUG] After patching: totalRewardMultiplier value updated
+[APPLY DEBUG] Patching oldRate with value UnsignedIntegerInterval([142, 143])
+[APPLY DEBUG] After patching: oldRate value updated
+[APPLY DEBUG] Patching newRate with value UnsignedIntegerInterval([163, 164])
+[APPLY DEBUG] After patching: newRate value updated
+[APPLY DEBUG] Patching passedTime with value UnsignedIntegerInterval([184, 185])
+[APPLY DEBUG] After patching: passedTime value updated
+[APPLY DEBUG] Patching oldLockPeriod with value UnsignedIntegerInterval([205, 206])
+[APPLY DEBUG] After patching: oldLockPeriod value updated
+[APPLY DEBUG] Patching newLockPeriod with value UnsignedIntegerInterval([226, 227])
+[APPLY DEBUG] After patching: newLockPeriod value updated
+[APPLY DEBUG] Patching oldAmount with value UnsignedIntegerInterval([247, 248])
+[APPLY DEBUG] After patching: oldAmount value updated
+[APPLY DEBUG] Patching newAmount with value UnsignedIntegerInterval([268, 269])
+[APPLY DEBUG] After patching: newAmount value updated
+
+=======  ANALYSIS  =======
+  46 │ varDeclaration │ {'toRemove': '[0,0]'}
+  48 │ varDeclaration │ {'toAdd': '[0,0]'}
+  50 │ assignment     │ {'info.rewardMultiplier': '[100,101]'}
+  51 │ assignment     │ {'totalRewardMultiplier': '[121,122]'}
+==========================
+
+OK (0.13s, F90=inf)
+  [13/90] GovStakingStorage_c_d3_overlap... [analyze_context] Line 33: Found function, contract=GovStakingStorage
+[APPLY DEBUG] Patching info.rewardMultiplier with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: info.rewardMultiplier value updated
+[APPLY DEBUG] Patching totalRewardMultiplier with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: totalRewardMultiplier value updated
+[APPLY DEBUG] Patching oldRate with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: oldRate value updated
+[APPLY DEBUG] Patching newRate with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: newRate value updated
+[APPLY DEBUG] Patching passedTime with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: passedTime value updated
+[APPLY DEBUG] Patching oldLockPeriod with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: oldLockPeriod value updated
+[APPLY DEBUG] Patching newLockPeriod with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: newLockPeriod value updated
+[APPLY DEBUG] Patching oldAmount with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: oldAmount value updated
+[APPLY DEBUG] Patching newAmount with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: newAmount value updated
+
+=======  ANALYSIS  =======
+  46 │ varDeclaration │ {'toRemove': '[0,0]'}
+  48 │ varDeclaration │ {'toAdd': '[0,0]'}
+  50 │ assignment     │ {'info.rewardMultiplier': '[100,103]'}
+  51 │ assignment     │ {'totalRewardMultiplier': '[100,103]'}
+==========================
+
+OK (0.13s, F90=inf)
+  [14/90] GovStakingStorage_c_d3_diff... [analyze_context] Line 33: Found function, contract=GovStakingStorage
+[APPLY DEBUG] Patching info.rewardMultiplier with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: info.rewardMultiplier value updated
+[APPLY DEBUG] Patching totalRewardMultiplier with value UnsignedIntegerInterval([123, 126])
+[APPLY DEBUG] After patching: totalRewardMultiplier value updated
+[APPLY DEBUG] Patching oldRate with value UnsignedIntegerInterval([146, 149])
+[APPLY DEBUG] After patching: oldRate value updated
+[APPLY DEBUG] Patching newRate with value UnsignedIntegerInterval([169, 172])
+[APPLY DEBUG] After patching: newRate value updated
+[APPLY DEBUG] Patching passedTime with value UnsignedIntegerInterval([192, 195])
+[APPLY DEBUG] After patching: passedTime value updated
+[APPLY DEBUG] Patching oldLockPeriod with value UnsignedIntegerInterval([215, 218])
+[APPLY DEBUG] After patching: oldLockPeriod value updated
+[APPLY DEBUG] Patching newLockPeriod with value UnsignedIntegerInterval([238, 241])
+[APPLY DEBUG] After patching: newLockPeriod value updated
+[APPLY DEBUG] Patching oldAmount with value UnsignedIntegerInterval([261, 264])
+[APPLY DEBUG] After patching: oldAmount value updated
+[APPLY DEBUG] Patching newAmount with value UnsignedIntegerInterval([284, 287])
+[APPLY DEBUG] After patching: newAmount value updated
+
+=======  ANALYSIS  =======
+  46 │ varDeclaration │ {'toRemove': '[0,0]'}
+  48 │ varDeclaration │ {'toAdd': '[0,0]'}
+  50 │ assignment     │ {'info.rewardMultiplier': '[100,103]'}
+  51 │ assignment     │ {'totalRewardMultiplier': '[123,126]'}
+==========================
+
+OK (0.16s, F90=inf)
+  [15/90] GovStakingStorage_c_d6_overlap... [analyze_context] Line 33: Found function, contract=GovStakingStorage
+[APPLY DEBUG] Patching info.rewardMultiplier with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: info.rewardMultiplier value updated
+[APPLY DEBUG] Patching totalRewardMultiplier with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: totalRewardMultiplier value updated
+[APPLY DEBUG] Patching oldRate with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: oldRate value updated
+[APPLY DEBUG] Patching newRate with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: newRate value updated
+[APPLY DEBUG] Patching passedTime with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: passedTime value updated
+[APPLY DEBUG] Patching oldLockPeriod with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: oldLockPeriod value updated
+[APPLY DEBUG] Patching newLockPeriod with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: newLockPeriod value updated
+[APPLY DEBUG] Patching oldAmount with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: oldAmount value updated
+[APPLY DEBUG] Patching newAmount with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: newAmount value updated
+
+=======  ANALYSIS  =======
+  46 │ varDeclaration │ {'toRemove': '[0,0]'}
+  48 │ varDeclaration │ {'toAdd': '[0,0]'}
+  50 │ assignment     │ {'info.rewardMultiplier': '[100,106]'}
+  51 │ assignment     │ {'totalRewardMultiplier': '[100,106]'}
+==========================
+
+OK (0.14s, F90=inf)
+  [16/90] GovStakingStorage_c_d6_diff... [analyze_context] Line 33: Found function, contract=GovStakingStorage
+[APPLY DEBUG] Patching info.rewardMultiplier with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: info.rewardMultiplier value updated
+[APPLY DEBUG] Patching totalRewardMultiplier with value UnsignedIntegerInterval([126, 132])
+[APPLY DEBUG] After patching: totalRewardMultiplier value updated
+[APPLY DEBUG] Patching oldRate with value UnsignedIntegerInterval([152, 158])
+[APPLY DEBUG] After patching: oldRate value updated
+[APPLY DEBUG] Patching newRate with value UnsignedIntegerInterval([178, 184])
+[APPLY DEBUG] After patching: newRate value updated
+[APPLY DEBUG] Patching passedTime with value UnsignedIntegerInterval([204, 210])
+[APPLY DEBUG] After patching: passedTime value updated
+[APPLY DEBUG] Patching oldLockPeriod with value UnsignedIntegerInterval([230, 236])
+[APPLY DEBUG] After patching: oldLockPeriod value updated
+[APPLY DEBUG] Patching newLockPeriod with value UnsignedIntegerInterval([256, 262])
+[APPLY DEBUG] After patching: newLockPeriod value updated
+[APPLY DEBUG] Patching oldAmount with value UnsignedIntegerInterval([282, 288])
+[APPLY DEBUG] After patching: oldAmount value updated
+[APPLY DEBUG] Patching newAmount with value UnsignedIntegerInterval([308, 314])
+[APPLY DEBUG] After patching: newAmount value updated
+
+=======  ANALYSIS  =======
+  46 │ varDeclaration │ {'toRemove': '[0,0]'}
+  48 │ varDeclaration │ {'toAdd': '[0,0]'}
+  50 │ assignment     │ {'info.rewardMultiplier': '[100,106]'}
+  51 │ assignment     │ {'totalRewardMultiplier': '[126,132]'}
+==========================
+
+OK (0.15s, F90=inf)
+  [17/90] GovStakingStorage_c_d10_overlap... [analyze_context] Line 33: Found function, contract=GovStakingStorage
+[APPLY DEBUG] Patching info.rewardMultiplier with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: info.rewardMultiplier value updated
+[APPLY DEBUG] Patching totalRewardMultiplier with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: totalRewardMultiplier value updated
+[APPLY DEBUG] Patching oldRate with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: oldRate value updated
+[APPLY DEBUG] Patching newRate with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: newRate value updated
+[APPLY DEBUG] Patching passedTime with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: passedTime value updated
+[APPLY DEBUG] Patching oldLockPeriod with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: oldLockPeriod value updated
+[APPLY DEBUG] Patching newLockPeriod with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: newLockPeriod value updated
+[APPLY DEBUG] Patching oldAmount with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: oldAmount value updated
+[APPLY DEBUG] Patching newAmount with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: newAmount value updated
+
+=======  ANALYSIS  =======
+  46 │ varDeclaration │ {'toRemove': '[0,0]'}
+  48 │ varDeclaration │ {'toAdd': '[0,0]'}
+  50 │ assignment     │ {'info.rewardMultiplier': '[100,110]'}
+  51 │ assignment     │ {'totalRewardMultiplier': '[100,110]'}
+==========================
+
+OK (0.13s, F90=inf)
+  [18/90] GovStakingStorage_c_d10_diff... [analyze_context] Line 33: Found function, contract=GovStakingStorage
+[APPLY DEBUG] Patching info.rewardMultiplier with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: info.rewardMultiplier value updated
+[APPLY DEBUG] Patching totalRewardMultiplier with value UnsignedIntegerInterval([130, 140])
+[APPLY DEBUG] After patching: totalRewardMultiplier value updated
+[APPLY DEBUG] Patching oldRate with value UnsignedIntegerInterval([160, 170])
+[APPLY DEBUG] After patching: oldRate value updated
+[APPLY DEBUG] Patching newRate with value UnsignedIntegerInterval([190, 200])
+[APPLY DEBUG] After patching: newRate value updated
+[APPLY DEBUG] Patching passedTime with value UnsignedIntegerInterval([220, 230])
+[APPLY DEBUG] After patching: passedTime value updated
+[APPLY DEBUG] Patching oldLockPeriod with value UnsignedIntegerInterval([250, 260])
+[APPLY DEBUG] After patching: oldLockPeriod value updated
+[APPLY DEBUG] Patching newLockPeriod with value UnsignedIntegerInterval([280, 290])
+[APPLY DEBUG] After patching: newLockPeriod value updated
+[APPLY DEBUG] Patching oldAmount with value UnsignedIntegerInterval([310, 320])
+[APPLY DEBUG] After patching: oldAmount value updated
+[APPLY DEBUG] Patching newAmount with value UnsignedIntegerInterval([340, 350])
+[APPLY DEBUG] After patching: newAmount value updated
+
+=======  ANALYSIS  =======
+  46 │ varDeclaration │ {'toRemove': '[0,0]'}
+  48 │ varDeclaration │ {'toAdd': '[0,0]'}
+  50 │ assignment     │ {'info.rewardMultiplier': '[100,110]'}
+  51 │ assignment     │ {'totalRewardMultiplier': '[130,140]'}
+==========================
+
+OK (0.14s, F90=inf)
+  [19/90] GovStakingStorage_c_d15_overlap... [analyze_context] Line 33: Found function, contract=GovStakingStorage
+[APPLY DEBUG] Patching info.rewardMultiplier with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: info.rewardMultiplier value updated
+[APPLY DEBUG] Patching totalRewardMultiplier with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: totalRewardMultiplier value updated
+[APPLY DEBUG] Patching oldRate with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: oldRate value updated
+[APPLY DEBUG] Patching newRate with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: newRate value updated
+[APPLY DEBUG] Patching passedTime with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: passedTime value updated
+[APPLY DEBUG] Patching oldLockPeriod with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: oldLockPeriod value updated
+[APPLY DEBUG] Patching newLockPeriod with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: newLockPeriod value updated
+[APPLY DEBUG] Patching oldAmount with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: oldAmount value updated
+[APPLY DEBUG] Patching newAmount with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: newAmount value updated
+
+=======  ANALYSIS  =======
+  46 │ varDeclaration │ {'toRemove': '[0,0]'}
+  48 │ varDeclaration │ {'toAdd': '[0,0]'}
+  50 │ assignment     │ {'info.rewardMultiplier': '[100,115]'}
+  51 │ assignment     │ {'totalRewardMultiplier': '[100,115]'}
+==========================
+
+OK (0.14s, F90=inf)
+  [20/90] GovStakingStorage_c_d15_diff... [analyze_context] Line 33: Found function, contract=GovStakingStorage
+[APPLY DEBUG] Patching info.rewardMultiplier with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: info.rewardMultiplier value updated
+[APPLY DEBUG] Patching totalRewardMultiplier with value UnsignedIntegerInterval([135, 150])
+[APPLY DEBUG] After patching: totalRewardMultiplier value updated
+[APPLY DEBUG] Patching oldRate with value UnsignedIntegerInterval([170, 185])
+[APPLY DEBUG] After patching: oldRate value updated
+[APPLY DEBUG] Patching newRate with value UnsignedIntegerInterval([205, 220])
+[APPLY DEBUG] After patching: newRate value updated
+[APPLY DEBUG] Patching passedTime with value UnsignedIntegerInterval([240, 255])
+[APPLY DEBUG] After patching: passedTime value updated
+[APPLY DEBUG] Patching oldLockPeriod with value UnsignedIntegerInterval([275, 290])
+[APPLY DEBUG] After patching: oldLockPeriod value updated
+[APPLY DEBUG] Patching newLockPeriod with value UnsignedIntegerInterval([310, 325])
+[APPLY DEBUG] After patching: newLockPeriod value updated
+[APPLY DEBUG] Patching oldAmount with value UnsignedIntegerInterval([345, 360])
+[APPLY DEBUG] After patching: oldAmount value updated
+[APPLY DEBUG] Patching newAmount with value UnsignedIntegerInterval([380, 395])
+[APPLY DEBUG] After patching: newAmount value updated
+
+=======  ANALYSIS  =======
+  46 │ varDeclaration │ {'toRemove': '[0,0]'}
+  48 │ varDeclaration │ {'toAdd': '[0,0]'}
+  50 │ assignment     │ {'info.rewardMultiplier': '[100,115]'}
+  51 │ assignment     │ {'totalRewardMultiplier': '[135,150]'}
+==========================
+
+OK (0.13s, F90=inf)
+
+[CONTRACT] GreenHouse_c
+------------------------------------------------------------
+  [21/90] GreenHouse_c_d1_overlap... [APPLY DEBUG] Patching amount with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: amount value updated
+
+=======  ANALYSIS  =======
+  21 │ assignment     │ {'allUsers': '[7,7]'}
+  22 │ assignment     │ {'bonusPool': '[1,1]'}
+  23 │ assignment     │ {'partner': '[0,0]'}
+  24 │ assignment     │ {'referral': '[0,0]'}
+  25 │ assignment     │ {'platform': '[1,1]'}
+  26 │ assignment     │ {'net': '[91,92]'}
+  26 │ implicitReturn │ {'allUsers': '[7,7]', 'bonusPool': '[1,1]', 'partner': '[0,0]', 'referral': '[0,0]', 'platform': '[1,1]', 'net': '[91,92]'}
+==========================
+
+OK (0.10s, F90=inf)
+  [22/90] GreenHouse_c_d1_diff... [APPLY DEBUG] Patching amount with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: amount value updated
+
+=======  ANALYSIS  =======
+  21 │ assignment     │ {'allUsers': '[7,7]'}
+  22 │ assignment     │ {'bonusPool': '[1,1]'}
+  23 │ assignment     │ {'partner': '[0,0]'}
+  24 │ assignment     │ {'referral': '[0,0]'}
+  25 │ assignment     │ {'platform': '[1,1]'}
+  26 │ assignment     │ {'net': '[91,92]'}
+  26 │ implicitReturn │ {'allUsers': '[7,7]', 'bonusPool': '[1,1]', 'partner': '[0,0]', 'referral': '[0,0]', 'platform': '[1,1]', 'net': '[91,92]'}
+==========================
+
+OK (0.14s, F90=inf)
+  [23/90] GreenHouse_c_d3_overlap... [APPLY DEBUG] Patching amount with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: amount value updated
+
+=======  ANALYSIS  =======
+  21 │ assignment     │ {'allUsers': '[7,7]'}
+  22 │ assignment     │ {'bonusPool': '[1,1]'}
+  23 │ assignment     │ {'partner': '[0,0]'}
+  24 │ assignment     │ {'referral': '[0,0]'}
+  25 │ assignment     │ {'platform': '[1,1]'}
+  26 │ assignment     │ {'net': '[91,94]'}
+  26 │ implicitReturn │ {'allUsers': '[7,7]', 'bonusPool': '[1,1]', 'partner': '[0,0]', 'referral': '[0,0]', 'platform': '[1,1]', 'net': '[91,94]'}
+==========================
+
+OK (0.11s, F90=inf)
+  [24/90] GreenHouse_c_d3_diff... [APPLY DEBUG] Patching amount with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: amount value updated
+
+=======  ANALYSIS  =======
+  21 │ assignment     │ {'allUsers': '[7,7]'}
+  22 │ assignment     │ {'bonusPool': '[1,1]'}
+  23 │ assignment     │ {'partner': '[0,0]'}
+  24 │ assignment     │ {'referral': '[0,0]'}
+  25 │ assignment     │ {'platform': '[1,1]'}
+  26 │ assignment     │ {'net': '[91,94]'}
+  26 │ implicitReturn │ {'allUsers': '[7,7]', 'bonusPool': '[1,1]', 'partner': '[0,0]', 'referral': '[0,0]', 'platform': '[1,1]', 'net': '[91,94]'}
+==========================
+
+OK (0.10s, F90=inf)
+  [25/90] GreenHouse_c_d6_overlap... [APPLY DEBUG] Patching amount with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: amount value updated
+
+=======  ANALYSIS  =======
+  21 │ assignment     │ {'allUsers': '[7,7]'}
+  22 │ assignment     │ {'bonusPool': '[1,1]'}
+  23 │ assignment     │ {'partner': '[0,0]'}
+  24 │ assignment     │ {'referral': '[0,0]'}
+  25 │ assignment     │ {'platform': '[1,1]'}
+  26 │ assignment     │ {'net': '[91,97]'}
+  26 │ implicitReturn │ {'allUsers': '[7,7]', 'bonusPool': '[1,1]', 'partner': '[0,0]', 'referral': '[0,0]', 'platform': '[1,1]', 'net': '[91,97]'}
+==========================
+
+OK (0.09s, F90=inf)
+  [26/90] GreenHouse_c_d6_diff... [APPLY DEBUG] Patching amount with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: amount value updated
+
+=======  ANALYSIS  =======
+  21 │ assignment     │ {'allUsers': '[7,7]'}
+  22 │ assignment     │ {'bonusPool': '[1,1]'}
+  23 │ assignment     │ {'partner': '[0,0]'}
+  24 │ assignment     │ {'referral': '[0,0]'}
+  25 │ assignment     │ {'platform': '[1,1]'}
+  26 │ assignment     │ {'net': '[91,97]'}
+  26 │ implicitReturn │ {'allUsers': '[7,7]', 'bonusPool': '[1,1]', 'partner': '[0,0]', 'referral': '[0,0]', 'platform': '[1,1]', 'net': '[91,97]'}
+==========================
+
+OK (0.10s, F90=inf)
+  [27/90] GreenHouse_c_d10_overlap... [APPLY DEBUG] Patching amount with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: amount value updated
+
+=======  ANALYSIS  =======
+  21 │ assignment     │ {'allUsers': '[7,7]'}
+  22 │ assignment     │ {'bonusPool': '[1,1]'}
+  23 │ assignment     │ {'partner': '[0,0]'}
+  24 │ assignment     │ {'referral': '[0,0]'}
+  25 │ assignment     │ {'platform': '[1,1]'}
+  26 │ assignment     │ {'net': '[91,101]'}
+  26 │ implicitReturn │ {'allUsers': '[7,7]', 'bonusPool': '[1,1]', 'partner': '[0,0]', 'referral': '[0,0]', 'platform': '[1,1]', 'net': '[91,101]'}
+==========================
+
+OK (0.10s, F90=inf)
+  [28/90] GreenHouse_c_d10_diff... [APPLY DEBUG] Patching amount with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: amount value updated
+
+=======  ANALYSIS  =======
+  21 │ assignment     │ {'allUsers': '[7,7]'}
+  22 │ assignment     │ {'bonusPool': '[1,1]'}
+  23 │ assignment     │ {'partner': '[0,0]'}
+  24 │ assignment     │ {'referral': '[0,0]'}
+  25 │ assignment     │ {'platform': '[1,1]'}
+  26 │ assignment     │ {'net': '[91,101]'}
+  26 │ implicitReturn │ {'allUsers': '[7,7]', 'bonusPool': '[1,1]', 'partner': '[0,0]', 'referral': '[0,0]', 'platform': '[1,1]', 'net': '[91,101]'}
+==========================
+
+OK (0.09s, F90=inf)
+  [29/90] GreenHouse_c_d15_overlap... [APPLY DEBUG] Patching amount with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: amount value updated
+
+=======  ANALYSIS  =======
+  21 │ assignment     │ {'allUsers': '[7,8]'}
+  22 │ assignment     │ {'bonusPool': '[1,1]'}
+  23 │ assignment     │ {'partner': '[0,0]'}
+  24 │ assignment     │ {'referral': '[0,0]'}
+  25 │ assignment     │ {'platform': '[1,1]'}
+  26 │ assignment     │ {'net': '[90,106]'}
+  26 │ implicitReturn │ {'allUsers': '[7,8]', 'bonusPool': '[1,1]', 'partner': '[0,0]', 'referral': '[0,0]', 'platform': '[1,1]', 'net': '[90,106]'}
+==========================
+
+OK (0.10s, F90=inf)
+  [30/90] GreenHouse_c_d15_diff... [APPLY DEBUG] Patching amount with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: amount value updated
+
+=======  ANALYSIS  =======
+  21 │ assignment     │ {'allUsers': '[7,8]'}
+  22 │ assignment     │ {'bonusPool': '[1,1]'}
+  23 │ assignment     │ {'partner': '[0,0]'}
+  24 │ assignment     │ {'referral': '[0,0]'}
+  25 │ assignment     │ {'platform': '[1,1]'}
+  26 │ assignment     │ {'net': '[90,106]'}
+  26 │ implicitReturn │ {'allUsers': '[7,8]', 'bonusPool': '[1,1]', 'partner': '[0,0]', 'referral': '[0,0]', 'platform': '[1,1]', 'net': '[90,106]'}
+==========================
+
+OK (0.09s, F90=inf)
+
+[CONTRACT] HubPool_c
+------------------------------------------------------------
+  [31/90] HubPool_c_d1_overlap... [APPLY DEBUG] Patching protocolFeeCapturePct with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: protocolFeeCapturePct value updated
+[APPLY DEBUG] Patching l1Token with value AddressSet({1})
+[APPLY DEBUG] After patching: l1Token value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].undistributedLpFees with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].undistributedLpFees value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].utilizedReserves with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].utilizedReserves value updated
+[APPLY DEBUG] Patching unclaimedAccumulatedProtocolFees[l1Token] with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: unclaimedAccumulatedProtocolFees[l1Token] value updated
+[APPLY DEBUG] Patching bundleLpFees with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: bundleLpFees value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'protocolFeesCaptured': '[0,0]'}
+  26 │ varDeclaration │ {'lpFeesCaptured': '[100,101]'}
+  29 │ assignment     │ {'pooledTokens[l1Token].undistributedLpFees': '[200,202]'}
+  30 │ assignment     │ {'pooledTokens[l1Token].utilizedReserves': '[200,202]'}
+  34 │ assignment     │ {'unclaimedAccumulatedProtocolFees[l1Token]': '[None,None]'}
+==========================
+
+OK (0.24s, F90=inf)
+  [32/90] HubPool_c_d1_diff... [APPLY DEBUG] Patching protocolFeeCapturePct with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: protocolFeeCapturePct value updated
+[APPLY DEBUG] Patching l1Token with value AddressSet({1})
+[APPLY DEBUG] After patching: l1Token value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].undistributedLpFees with value UnsignedIntegerInterval([121, 122])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].undistributedLpFees value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].utilizedReserves with value UnsignedIntegerInterval([142, 143])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].utilizedReserves value updated
+[APPLY DEBUG] Patching unclaimedAccumulatedProtocolFees[l1Token] with value UnsignedIntegerInterval([163, 164])
+[APPLY DEBUG] After patching: unclaimedAccumulatedProtocolFees[l1Token] value updated
+[APPLY DEBUG] Patching bundleLpFees with value UnsignedIntegerInterval([184, 185])
+[APPLY DEBUG] After patching: bundleLpFees value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'protocolFeesCaptured': '[0,0]'}
+  26 │ varDeclaration │ {'lpFeesCaptured': '[184,185]'}
+  29 │ assignment     │ {'pooledTokens[l1Token].undistributedLpFees': '[305,307]'}
+  30 │ assignment     │ {'pooledTokens[l1Token].utilizedReserves': '[326,328]'}
+  34 │ assignment     │ {'unclaimedAccumulatedProtocolFees[l1Token]': '[None,None]'}
+==========================
+
+OK (0.19s, F90=inf)
+  [33/90] HubPool_c_d3_overlap... [APPLY DEBUG] Patching protocolFeeCapturePct with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: protocolFeeCapturePct value updated
+[APPLY DEBUG] Patching l1Token with value AddressSet({1})
+[APPLY DEBUG] After patching: l1Token value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].undistributedLpFees with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].undistributedLpFees value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].utilizedReserves with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].utilizedReserves value updated
+[APPLY DEBUG] Patching unclaimedAccumulatedProtocolFees[l1Token] with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: unclaimedAccumulatedProtocolFees[l1Token] value updated
+[APPLY DEBUG] Patching bundleLpFees with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: bundleLpFees value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'protocolFeesCaptured': '[0,0]'}
+  26 │ varDeclaration │ {'lpFeesCaptured': '[100,103]'}
+  29 │ assignment     │ {'pooledTokens[l1Token].undistributedLpFees': '[200,206]'}
+  30 │ assignment     │ {'pooledTokens[l1Token].utilizedReserves': '[200,206]'}
+  34 │ assignment     │ {'unclaimedAccumulatedProtocolFees[l1Token]': '[None,None]'}
+==========================
+
+OK (0.22s, F90=inf)
+  [34/90] HubPool_c_d3_diff... [APPLY DEBUG] Patching protocolFeeCapturePct with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: protocolFeeCapturePct value updated
+[APPLY DEBUG] Patching l1Token with value AddressSet({1})
+[APPLY DEBUG] After patching: l1Token value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].undistributedLpFees with value UnsignedIntegerInterval([123, 126])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].undistributedLpFees value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].utilizedReserves with value UnsignedIntegerInterval([146, 149])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].utilizedReserves value updated
+[APPLY DEBUG] Patching unclaimedAccumulatedProtocolFees[l1Token] with value UnsignedIntegerInterval([169, 172])
+[APPLY DEBUG] After patching: unclaimedAccumulatedProtocolFees[l1Token] value updated
+[APPLY DEBUG] Patching bundleLpFees with value UnsignedIntegerInterval([192, 195])
+[APPLY DEBUG] After patching: bundleLpFees value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'protocolFeesCaptured': '[0,0]'}
+  26 │ varDeclaration │ {'lpFeesCaptured': '[192,195]'}
+  29 │ assignment     │ {'pooledTokens[l1Token].undistributedLpFees': '[315,321]'}
+  30 │ assignment     │ {'pooledTokens[l1Token].utilizedReserves': '[338,344]'}
+  34 │ assignment     │ {'unclaimedAccumulatedProtocolFees[l1Token]': '[None,None]'}
+==========================
+
+OK (0.19s, F90=inf)
+  [35/90] HubPool_c_d6_overlap... [APPLY DEBUG] Patching protocolFeeCapturePct with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: protocolFeeCapturePct value updated
+[APPLY DEBUG] Patching l1Token with value AddressSet({1})
+[APPLY DEBUG] After patching: l1Token value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].undistributedLpFees with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].undistributedLpFees value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].utilizedReserves with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].utilizedReserves value updated
+[APPLY DEBUG] Patching unclaimedAccumulatedProtocolFees[l1Token] with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: unclaimedAccumulatedProtocolFees[l1Token] value updated
+[APPLY DEBUG] Patching bundleLpFees with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: bundleLpFees value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'protocolFeesCaptured': '[0,0]'}
+  26 │ varDeclaration │ {'lpFeesCaptured': '[100,106]'}
+  29 │ assignment     │ {'pooledTokens[l1Token].undistributedLpFees': '[200,212]'}
+  30 │ assignment     │ {'pooledTokens[l1Token].utilizedReserves': '[200,212]'}
+  34 │ assignment     │ {'unclaimedAccumulatedProtocolFees[l1Token]': '[None,None]'}
+==========================
+
+OK (0.19s, F90=inf)
+  [36/90] HubPool_c_d6_diff... [APPLY DEBUG] Patching protocolFeeCapturePct with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: protocolFeeCapturePct value updated
+[APPLY DEBUG] Patching l1Token with value AddressSet({1})
+[APPLY DEBUG] After patching: l1Token value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].undistributedLpFees with value UnsignedIntegerInterval([126, 132])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].undistributedLpFees value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].utilizedReserves with value UnsignedIntegerInterval([152, 158])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].utilizedReserves value updated
+[APPLY DEBUG] Patching unclaimedAccumulatedProtocolFees[l1Token] with value UnsignedIntegerInterval([178, 184])
+[APPLY DEBUG] After patching: unclaimedAccumulatedProtocolFees[l1Token] value updated
+[APPLY DEBUG] Patching bundleLpFees with value UnsignedIntegerInterval([204, 210])
+[APPLY DEBUG] After patching: bundleLpFees value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'protocolFeesCaptured': '[0,0]'}
+  26 │ varDeclaration │ {'lpFeesCaptured': '[204,210]'}
+  29 │ assignment     │ {'pooledTokens[l1Token].undistributedLpFees': '[330,342]'}
+  30 │ assignment     │ {'pooledTokens[l1Token].utilizedReserves': '[356,368]'}
+  34 │ assignment     │ {'unclaimedAccumulatedProtocolFees[l1Token]': '[None,None]'}
+==========================
+
+OK (0.18s, F90=inf)
+  [37/90] HubPool_c_d10_overlap... [APPLY DEBUG] Patching protocolFeeCapturePct with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: protocolFeeCapturePct value updated
+[APPLY DEBUG] Patching l1Token with value AddressSet({1})
+[APPLY DEBUG] After patching: l1Token value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].undistributedLpFees with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].undistributedLpFees value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].utilizedReserves with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].utilizedReserves value updated
+[APPLY DEBUG] Patching unclaimedAccumulatedProtocolFees[l1Token] with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: unclaimedAccumulatedProtocolFees[l1Token] value updated
+[APPLY DEBUG] Patching bundleLpFees with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: bundleLpFees value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'protocolFeesCaptured': '[0,0]'}
+  26 │ varDeclaration │ {'lpFeesCaptured': '[100,110]'}
+  29 │ assignment     │ {'pooledTokens[l1Token].undistributedLpFees': '[200,220]'}
+  30 │ assignment     │ {'pooledTokens[l1Token].utilizedReserves': '[200,220]'}
+  34 │ assignment     │ {'unclaimedAccumulatedProtocolFees[l1Token]': '[None,None]'}
+==========================
+
+OK (0.18s, F90=inf)
+  [38/90] HubPool_c_d10_diff... [APPLY DEBUG] Patching protocolFeeCapturePct with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: protocolFeeCapturePct value updated
+[APPLY DEBUG] Patching l1Token with value AddressSet({1})
+[APPLY DEBUG] After patching: l1Token value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].undistributedLpFees with value UnsignedIntegerInterval([130, 140])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].undistributedLpFees value updated
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching pooledTokens[l1Token].utilizedReserves with value UnsignedIntegerInterval([160, 170])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].utilizedReserves value updated
+[APPLY DEBUG] Patching unclaimedAccumulatedProtocolFees[l1Token] with value UnsignedIntegerInterval([190, 200])
+[APPLY DEBUG] After patching: unclaimedAccumulatedProtocolFees[l1Token] value updated
+[APPLY DEBUG] Patching bundleLpFees with value UnsignedIntegerInterval([220, 230])
+[APPLY DEBUG] After patching: bundleLpFees value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'protocolFeesCaptured': '[0,0]'}
+  26 │ varDeclaration │ {'lpFeesCaptured': '[220,230]'}
+  29 │ assignment     │ {'pooledTokens[l1Token].undistributedLpFees': '[350,370]'}
+  30 │ assignment     │ {'pooledTokens[l1Token].utilizedReserves': '[380,400]'}
+  34 │ assignment     │ {'unclaimedAccumulatedProtocolFees[l1Token]': '[None,None]'}
+==========================
+
+OK (0.20s, F90=inf)
+  [39/90] HubPool_c_d15_overlap... [APPLY DEBUG] Patching protocolFeeCapturePct with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: protocolFeeCapturePct value updated
+[APPLY DEBUG] Patching l1Token with value AddressSet({1})
+[APPLY DEBUG] After patching: l1Token value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].undistributedLpFees with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].undistributedLpFees value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].utilizedReserves with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].utilizedReserves value updated
+[APPLY DEBUG] Patching unclaimedAccumulatedProtocolFees[l1Token] with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: unclaimedAccumulatedProtocolFees[l1Token] value updated
+[APPLY DEBUG] Patching bundleLpFees with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: bundleLpFees value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'protocolFeesCaptured': '[0,0]'}
+  26 │ varDeclaration │ {'lpFeesCaptured': '[100,115]'}
+  29 │ assignment     │ {'pooledTokens[l1Token].undistributedLpFees': '[200,230]'}
+  30 │ assignment     │ {'pooledTokens[l1Token].utilizedReserves': '[200,230]'}
+  34 │ assignment     │ {'unclaimedAccumulatedProtocolFees[l1Token]': '[None,None]'}
+==========================
+
+OK (0.19s, F90=inf)
+  [40/90] HubPool_c_d15_diff... [APPLY DEBUG] Patching protocolFeeCapturePct with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: protocolFeeCapturePct value updated
+[APPLY DEBUG] Patching l1Token with value AddressSet({1})
+[APPLY DEBUG] After patching: l1Token value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].undistributedLpFees with value UnsignedIntegerInterval([135, 150])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].undistributedLpFees value updated
+[APPLY DEBUG] Patching pooledTokens[l1Token].utilizedReserves with value UnsignedIntegerInterval([170, 185])
+[APPLY DEBUG] After patching: pooledTokens[l1Token].utilizedReserves value updated
+[APPLY DEBUG] Patching unclaimedAccumulatedProtocolFees[l1Token] with value UnsignedIntegerInterval([205, 220])
+[APPLY DEBUG] After patching: unclaimedAccumulatedProtocolFees[l1Token] value updated
+[APPLY DEBUG] Patching bundleLpFees with value UnsignedIntegerInterval([240, 255])
+[APPLY DEBUG] After patching: bundleLpFees value updated
+
+=======  ANALYSIS  =======
+  25 │ varDeclaration │ {'protocolFeesCaptured': '[0,0]'}
+  26 │ varDeclaration │ {'lpFeesCaptured': '[240,255]'}
+  29 │ assignment     │ {'pooledTokens[l1Token].undistributedLpFees': '[375,405]'}
+  30 │ assignment     │ {'pooledTokens[l1Token].utilizedReserves': '[410,440]'}
+  34 │ assignment     │ {'unclaimedAccumulatedProtocolFees[l1Token]': '[None,None]'}
+==========================
+
+OK (0.22s, F90=inf)
+
+[CONTRACT] Claim_c
+------------------------------------------------------------
+  [41/90] Claim_c_d1_overlap... [APPLY DEBUG] Patching user with value AddressSet({1})
+[APPLY DEBUG] After patching: user value updated
+[APPLY DEBUG] Patching claimedOnce[user] with value BoolInterval([0, 1])
+[APPLY DEBUG] After patching: claimedOnce[user] value updated
+[APPLY DEBUG] Patching startTime with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: startTime value updated
+[APPLY DEBUG] Patching locktime with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: locktime value updated
+[APPLY DEBUG] Patching claimable[user] with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: claimable[user] value updated
+
+=======  ANALYSIS  =======
+  18 │ return         │ {'None': '[30,30]'}
+  23 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.13s, F90=inf)
+  [42/90] Claim_c_d1_diff... [APPLY DEBUG] Patching user with value AddressSet({1})
+[APPLY DEBUG] After patching: user value updated
+[APPLY DEBUG] Patching claimedOnce[user] with value BoolInterval([0, 1])
+[APPLY DEBUG] After patching: claimedOnce[user] value updated
+[APPLY DEBUG] Patching startTime with value UnsignedIntegerInterval([121, 122])
+[APPLY DEBUG] After patching: startTime value updated
+[APPLY DEBUG] Patching locktime with value UnsignedIntegerInterval([142, 143])
+[APPLY DEBUG] After patching: locktime value updated
+[APPLY DEBUG] Patching claimable[user] with value UnsignedIntegerInterval([163, 164])
+[APPLY DEBUG] After patching: claimable[user] value updated
+
+=======  ANALYSIS  =======
+  18 │ return         │ {'None': '[48,49]'}
+  23 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.11s, F90=inf)
+  [43/90] Claim_c_d3_overlap... [APPLY DEBUG] Patching user with value AddressSet({1})
+[APPLY DEBUG] After patching: user value updated
+[APPLY DEBUG] Patching claimedOnce[user] with value BoolInterval([0, 1])
+[APPLY DEBUG] After patching: claimedOnce[user] value updated
+[APPLY DEBUG] Patching startTime with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: startTime value updated
+[APPLY DEBUG] Patching locktime with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: locktime value updated
+[APPLY DEBUG] Patching claimable[user] with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: claimable[user] value updated
+
+=======  ANALYSIS  =======
+  18 │ return         │ {'None': '[30,30]'}
+  23 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.11s, F90=inf)
+  [44/90] Claim_c_d3_diff... [APPLY DEBUG] Patching user with value AddressSet({1})
+[APPLY DEBUG] After patching: user value updated
+[APPLY DEBUG] Patching claimedOnce[user] with value BoolInterval([0, 1])
+[APPLY DEBUG] After patching: claimedOnce[user] value updated
+[APPLY DEBUG] Patching startTime with value UnsignedIntegerInterval([123, 126])
+[APPLY DEBUG] After patching: startTime value updated
+[APPLY DEBUG] Patching locktime with value UnsignedIntegerInterval([146, 149])
+[APPLY DEBUG] After patching: locktime value updated
+[APPLY DEBUG] Patching claimable[user] with value UnsignedIntegerInterval([169, 172])
+[APPLY DEBUG] After patching: claimable[user] value updated
+
+=======  ANALYSIS  =======
+  18 │ return         │ {'None': '[50,51]'}
+  23 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.11s, F90=inf)
+  [45/90] Claim_c_d6_overlap... [APPLY DEBUG] Patching user with value AddressSet({1})
+[APPLY DEBUG] After patching: user value updated
+[APPLY DEBUG] Patching claimedOnce[user] with value BoolInterval([0, 1])
+[APPLY DEBUG] After patching: claimedOnce[user] value updated
+[APPLY DEBUG] Patching startTime with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: startTime value updated
+[APPLY DEBUG] Patching locktime with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: locktime value updated
+[APPLY DEBUG] Patching claimable[user] with value UnsignedIntegerInterval([100, 106])
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+Traceback (most recent call last):
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Analyzer\ContractAnalyzer.py", line 2240, in process_state_var_for_debug
+    self.debug_initializer.apply_debug_directive_enhanced(
+  File "C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Interpreter\Semantics\DebugInitializer.py", line 484, in apply_debug_directive_enhanced
+    raise ValueError(f"LHS cannot be resolved to a {scope} variable even with debug mode.")
+ValueError: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] After patching: claimable[user] value updated
+
+=======  ANALYSIS  =======
+  18 │ return         │ {'None': '[30,31]'}
+  23 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.11s, F90=inf)
+  [46/90] Claim_c_d6_diff... [APPLY DEBUG] Patching user with value AddressSet({1})
+[APPLY DEBUG] After patching: user value updated
+[APPLY DEBUG] Patching claimedOnce[user] with value BoolInterval([0, 1])
+[APPLY DEBUG] After patching: claimedOnce[user] value updated
+[APPLY DEBUG] Patching startTime with value UnsignedIntegerInterval([126, 132])
+[APPLY DEBUG] After patching: startTime value updated
+[APPLY DEBUG] Patching locktime with value UnsignedIntegerInterval([152, 158])
+[APPLY DEBUG] After patching: locktime value updated
+[APPLY DEBUG] Patching claimable[user] with value UnsignedIntegerInterval([178, 184])
+[APPLY DEBUG] After patching: claimable[user] value updated
+
+=======  ANALYSIS  =======
+  18 │ return         │ {'None': '[53,55]'}
+  23 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.11s, F90=inf)
+  [47/90] Claim_c_d10_overlap... [APPLY DEBUG] Patching user with value AddressSet({1})
+[APPLY DEBUG] After patching: user value updated
+[APPLY DEBUG] Patching claimedOnce[user] with value BoolInterval([0, 1])
+[APPLY DEBUG] After patching: claimedOnce[user] value updated
+[APPLY DEBUG] Patching startTime with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: startTime value updated
+[APPLY DEBUG] Patching locktime with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: locktime value updated
+[APPLY DEBUG] Patching claimable[user] with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: claimable[user] value updated
+
+=======  ANALYSIS  =======
+  18 │ return         │ {'None': '[30,33]'}
+  23 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.12s, F90=inf)
+  [48/90] Claim_c_d10_diff... [APPLY DEBUG] Patching user with value AddressSet({1})
+[APPLY DEBUG] After patching: user value updated
+[APPLY DEBUG] Patching claimedOnce[user] with value BoolInterval([0, 1])
+[APPLY DEBUG] After patching: claimedOnce[user] value updated
+[APPLY DEBUG] Patching startTime with value UnsignedIntegerInterval([130, 140])
+[APPLY DEBUG] After patching: startTime value updated
+[APPLY DEBUG] Patching locktime with value UnsignedIntegerInterval([160, 170])
+[APPLY DEBUG] After patching: locktime value updated
+[APPLY DEBUG] Patching claimable[user] with value UnsignedIntegerInterval([190, 200])
+[APPLY DEBUG] After patching: claimable[user] value updated
+
+=======  ANALYSIS  =======
+  18 │ return         │ {'None': '[57,60]'}
+  23 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.11s, F90=inf)
+  [49/90] Claim_c_d15_overlap... [APPLY DEBUG] Patching user with value AddressSet({1})
+[APPLY DEBUG] After patching: user value updated
+[APPLY DEBUG] Patching claimedOnce[user] with value BoolInterval([0, 1])
+[APPLY DEBUG] After patching: claimedOnce[user] value updated
+[APPLY DEBUG] Patching startTime with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: startTime value updated
+[APPLY DEBUG] Patching locktime with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: locktime value updated
+[APPLY DEBUG] Patching claimable[user] with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: claimable[user] value updated
+
+=======  ANALYSIS  =======
+  18 │ return         │ {'None': '[30,34]'}
+  23 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.11s, F90=inf)
+  [50/90] Claim_c_d15_diff... [APPLY DEBUG] Patching user with value AddressSet({1})
+[APPLY DEBUG] After patching: user value updated
+[APPLY DEBUG] Patching claimedOnce[user] with value BoolInterval([0, 1])
+[APPLY DEBUG] After patching: claimedOnce[user] value updated
+[APPLY DEBUG] Patching startTime with value UnsignedIntegerInterval([135, 150])
+[APPLY DEBUG] After patching: startTime value updated
+[APPLY DEBUG] Patching locktime with value UnsignedIntegerInterval([170, 185])
+[APPLY DEBUG] After patching: locktime value updated
+[APPLY DEBUG] Patching claimable[user] with value UnsignedIntegerInterval([205, 220])
+[APPLY DEBUG] After patching: claimable[user] value updated
+
+=======  ANALYSIS  =======
+  18 │ return         │ {'None': '[61,66]'}
+  23 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.12s, F90=inf)
+
+[CONTRACT] Dai_c
+------------------------------------------------------------
+  [51/90] Dai_c_d1_overlap... [APPLY DEBUG] Patching src with value AddressSet({1})
+[APPLY DEBUG] After patching: src value updated
+[APPLY DEBUG] Patching dst with value AddressSet({2})
+[APPLY DEBUG] After patching: dst value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching allowance[src][msg.sender] with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: allowance[src][msg.sender] value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching wad with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: wad value updated
+※ 분석 결과가 없습니다.
+OK (0.31s, F90=inf)
+  [52/90] Dai_c_d1_diff... [APPLY DEBUG] Patching src with value AddressSet({1})
+[APPLY DEBUG] After patching: src value updated
+[APPLY DEBUG] Patching dst with value AddressSet({2})
+[APPLY DEBUG] After patching: dst value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching allowance[src][msg.sender] with value UnsignedIntegerInterval([121, 122])
+[APPLY DEBUG] After patching: allowance[src][msg.sender] value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching wad with value UnsignedIntegerInterval([163, 164])
+[APPLY DEBUG] After patching: wad value updated
+※ 분석 결과가 없습니다.
+OK (0.24s, F90=inf)
+  [53/90] Dai_c_d3_overlap... [APPLY DEBUG] Patching src with value AddressSet({1})
+[APPLY DEBUG] After patching: src value updated
+[APPLY DEBUG] Patching dst with value AddressSet({2})
+[APPLY DEBUG] After patching: dst value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching allowance[src][msg.sender] with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: allowance[src][msg.sender] value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching wad with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: wad value updated
+※ 분석 결과가 없습니다.
+OK (0.23s, F90=inf)
+  [54/90] Dai_c_d3_diff... [APPLY DEBUG] Patching src with value AddressSet({1})
+[APPLY DEBUG] After patching: src value updated
+[APPLY DEBUG] Patching dst with value AddressSet({2})
+[APPLY DEBUG] After patching: dst value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching allowance[src][msg.sender] with value UnsignedIntegerInterval([123, 126])
+[APPLY DEBUG] After patching: allowance[src][msg.sender] value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching wad with value UnsignedIntegerInterval([169, 172])
+[APPLY DEBUG] After patching: wad value updated
+※ 분석 결과가 없습니다.
+OK (0.22s, F90=inf)
+  [55/90] Dai_c_d6_overlap... [APPLY DEBUG] Patching src with value AddressSet({1})
+[APPLY DEBUG] After patching: src value updated
+[APPLY DEBUG] Patching dst with value AddressSet({2})
+[APPLY DEBUG] After patching: dst value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching allowance[src][msg.sender] with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: allowance[src][msg.sender] value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching wad with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: wad value updated
+※ 분석 결과가 없습니다.
+OK (0.23s, F90=inf)
+  [56/90] Dai_c_d6_diff... [APPLY DEBUG] Patching src with value AddressSet({1})
+[APPLY DEBUG] After patching: src value updated
+[APPLY DEBUG] Patching dst with value AddressSet({2})
+[APPLY DEBUG] After patching: dst value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching allowance[src][msg.sender] with value UnsignedIntegerInterval([126, 132])
+[APPLY DEBUG] After patching: allowance[src][msg.sender] value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching wad with value UnsignedIntegerInterval([178, 184])
+[APPLY DEBUG] After patching: wad value updated
+※ 분석 결과가 없습니다.
+OK (0.29s, F90=inf)
+  [57/90] Dai_c_d10_overlap... [APPLY DEBUG] Patching src with value AddressSet({1})
+[APPLY DEBUG] After patching: src value updated
+[APPLY DEBUG] Patching dst with value AddressSet({2})
+[APPLY DEBUG] After patching: dst value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching allowance[src][msg.sender] with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: allowance[src][msg.sender] value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching wad with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: wad value updated
+※ 분석 결과가 없습니다.
+OK (0.27s, F90=inf)
+  [58/90] Dai_c_d10_diff... [APPLY DEBUG] Patching src with value AddressSet({1})
+[APPLY DEBUG] After patching: src value updated
+[APPLY DEBUG] Patching dst with value AddressSet({2})
+[APPLY DEBUG] After patching: dst value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching allowance[src][msg.sender] with value UnsignedIntegerInterval([130, 140])
+[APPLY DEBUG] After patching: allowance[src][msg.sender] value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching wad with value UnsignedIntegerInterval([190, 200])
+[APPLY DEBUG] After patching: wad value updated
+※ 분석 결과가 없습니다.
+OK (0.25s, F90=inf)
+  [59/90] Dai_c_d15_overlap... [APPLY DEBUG] Patching src with value AddressSet({1})
+[APPLY DEBUG] After patching: src value updated
+[APPLY DEBUG] Patching dst with value AddressSet({2})
+[APPLY DEBUG] After patching: dst value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching allowance[src][msg.sender] with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: allowance[src][msg.sender] value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching wad with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: wad value updated
+※ 분석 결과가 없습니다.
+OK (0.26s, F90=inf)
+  [60/90] Dai_c_d15_diff... [APPLY DEBUG] Patching src with value AddressSet({1})
+[APPLY DEBUG] After patching: src value updated
+[APPLY DEBUG] Patching dst with value AddressSet({2})
+[APPLY DEBUG] After patching: dst value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching allowance[src][msg.sender] with value UnsignedIntegerInterval([135, 150])
+[APPLY DEBUG] After patching: allowance[src][msg.sender] value updated
+ERROR in process_state_var_for_debug: LHS cannot be resolved to a state variable even with debug mode.
+[APPLY DEBUG] Patching wad with value UnsignedIntegerInterval([205, 220])
+[APPLY DEBUG] After patching: wad value updated
+※ 분석 결과가 없습니다.
+OK (0.25s, F90=inf)
+
+[CONTRACT] LockupContract_c
+------------------------------------------------------------
+  [61/90] LockupContract_c_d1_overlap... [APPLY DEBUG] Patching initialAmount with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: initialAmount value updated
+[APPLY DEBUG] Patching deploymentStartTime with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: deploymentStartTime value updated
+[APPLY DEBUG] Patching monthsToWaitBeforeUnlock with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: monthsToWaitBeforeUnlock value updated
+[APPLY DEBUG] Patching releaseSchedule with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: releaseSchedule value updated
+
+=======  ANALYSIS  =======
+  16 │ varDeclaration │ {'unlockTimestamp': '[262800100,265428101]'}
+  18 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.12s, F90=inf)
+  [62/90] LockupContract_c_d1_diff... [APPLY DEBUG] Patching initialAmount with value UnsignedIntegerInterval([121, 122])
+[APPLY DEBUG] After patching: initialAmount value updated
+[APPLY DEBUG] Patching deploymentStartTime with value UnsignedIntegerInterval([142, 143])
+[APPLY DEBUG] After patching: deploymentStartTime value updated
+[APPLY DEBUG] Patching monthsToWaitBeforeUnlock with value UnsignedIntegerInterval([163, 164])
+[APPLY DEBUG] After patching: monthsToWaitBeforeUnlock value updated
+[APPLY DEBUG] Patching releaseSchedule with value UnsignedIntegerInterval([184, 185])
+[APPLY DEBUG] After patching: releaseSchedule value updated
+
+=======  ANALYSIS  =======
+  16 │ varDeclaration │ {'unlockTimestamp': '[428364142,430992143]'}
+  18 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.12s, F90=inf)
+  [63/90] LockupContract_c_d3_overlap... [APPLY DEBUG] Patching initialAmount with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: initialAmount value updated
+[APPLY DEBUG] Patching deploymentStartTime with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: deploymentStartTime value updated
+[APPLY DEBUG] Patching monthsToWaitBeforeUnlock with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: monthsToWaitBeforeUnlock value updated
+[APPLY DEBUG] Patching releaseSchedule with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: releaseSchedule value updated
+
+=======  ANALYSIS  =======
+  16 │ varDeclaration │ {'unlockTimestamp': '[262800100,270684103]'}
+  18 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.11s, F90=inf)
+  [64/90] LockupContract_c_d3_diff... [APPLY DEBUG] Patching initialAmount with value UnsignedIntegerInterval([123, 126])
+[APPLY DEBUG] After patching: initialAmount value updated
+[APPLY DEBUG] Patching deploymentStartTime with value UnsignedIntegerInterval([146, 149])
+[APPLY DEBUG] After patching: deploymentStartTime value updated
+[APPLY DEBUG] Patching monthsToWaitBeforeUnlock with value UnsignedIntegerInterval([169, 172])
+[APPLY DEBUG] After patching: monthsToWaitBeforeUnlock value updated
+[APPLY DEBUG] Patching releaseSchedule with value UnsignedIntegerInterval([192, 195])
+[APPLY DEBUG] After patching: releaseSchedule value updated
+
+=======  ANALYSIS  =======
+  16 │ varDeclaration │ {'unlockTimestamp': '[444132146,452016149]'}
+  18 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.15s, F90=inf)
+  [65/90] LockupContract_c_d6_overlap... [APPLY DEBUG] Patching initialAmount with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: initialAmount value updated
+[APPLY DEBUG] Patching deploymentStartTime with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: deploymentStartTime value updated
+[APPLY DEBUG] Patching monthsToWaitBeforeUnlock with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: monthsToWaitBeforeUnlock value updated
+[APPLY DEBUG] Patching releaseSchedule with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: releaseSchedule value updated
+
+=======  ANALYSIS  =======
+  16 │ varDeclaration │ {'unlockTimestamp': '[262800100,278568106]'}
+  18 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.12s, F90=inf)
+  [66/90] LockupContract_c_d6_diff... [APPLY DEBUG] Patching initialAmount with value UnsignedIntegerInterval([126, 132])
+[APPLY DEBUG] After patching: initialAmount value updated
+[APPLY DEBUG] Patching deploymentStartTime with value UnsignedIntegerInterval([152, 158])
+[APPLY DEBUG] After patching: deploymentStartTime value updated
+[APPLY DEBUG] Patching monthsToWaitBeforeUnlock with value UnsignedIntegerInterval([178, 184])
+[APPLY DEBUG] After patching: monthsToWaitBeforeUnlock value updated
+[APPLY DEBUG] Patching releaseSchedule with value UnsignedIntegerInterval([204, 210])
+[APPLY DEBUG] After patching: releaseSchedule value updated
+
+=======  ANALYSIS  =======
+  16 │ varDeclaration │ {'unlockTimestamp': '[467784152,483552158]'}
+  18 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.11s, F90=inf)
+  [67/90] LockupContract_c_d10_overlap... [APPLY DEBUG] Patching initialAmount with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: initialAmount value updated
+[APPLY DEBUG] Patching deploymentStartTime with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: deploymentStartTime value updated
+[APPLY DEBUG] Patching monthsToWaitBeforeUnlock with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: monthsToWaitBeforeUnlock value updated
+[APPLY DEBUG] Patching releaseSchedule with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: releaseSchedule value updated
+
+=======  ANALYSIS  =======
+  16 │ varDeclaration │ {'unlockTimestamp': '[262800100,289080110]'}
+  18 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.13s, F90=inf)
+  [68/90] LockupContract_c_d10_diff... [APPLY DEBUG] Patching initialAmount with value UnsignedIntegerInterval([130, 140])
+[APPLY DEBUG] After patching: initialAmount value updated
+[APPLY DEBUG] Patching deploymentStartTime with value UnsignedIntegerInterval([160, 170])
+[APPLY DEBUG] After patching: deploymentStartTime value updated
+[APPLY DEBUG] Patching monthsToWaitBeforeUnlock with value UnsignedIntegerInterval([190, 200])
+[APPLY DEBUG] After patching: monthsToWaitBeforeUnlock value updated
+[APPLY DEBUG] Patching releaseSchedule with value UnsignedIntegerInterval([220, 230])
+[APPLY DEBUG] After patching: releaseSchedule value updated
+
+=======  ANALYSIS  =======
+  16 │ varDeclaration │ {'unlockTimestamp': '[499320160,525600170]'}
+  18 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.12s, F90=inf)
+  [69/90] LockupContract_c_d15_overlap... [APPLY DEBUG] Patching initialAmount with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: initialAmount value updated
+[APPLY DEBUG] Patching deploymentStartTime with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: deploymentStartTime value updated
+[APPLY DEBUG] Patching monthsToWaitBeforeUnlock with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: monthsToWaitBeforeUnlock value updated
+[APPLY DEBUG] Patching releaseSchedule with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: releaseSchedule value updated
+
+=======  ANALYSIS  =======
+  16 │ varDeclaration │ {'unlockTimestamp': '[262800100,302220115]'}
+  18 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.11s, F90=inf)
+  [70/90] LockupContract_c_d15_diff... [APPLY DEBUG] Patching initialAmount with value UnsignedIntegerInterval([135, 150])
+[APPLY DEBUG] After patching: initialAmount value updated
+[APPLY DEBUG] Patching deploymentStartTime with value UnsignedIntegerInterval([170, 185])
+[APPLY DEBUG] After patching: deploymentStartTime value updated
+[APPLY DEBUG] Patching monthsToWaitBeforeUnlock with value UnsignedIntegerInterval([205, 220])
+[APPLY DEBUG] After patching: monthsToWaitBeforeUnlock value updated
+[APPLY DEBUG] Patching releaseSchedule with value UnsignedIntegerInterval([240, 255])
+[APPLY DEBUG] After patching: releaseSchedule value updated
+
+=======  ANALYSIS  =======
+  16 │ varDeclaration │ {'unlockTimestamp': '[538740170,578160185]'}
+  18 │ return         │ {'0': '[0,0]'}
+==========================
+
+OK (0.11s, F90=inf)
+
+[CONTRACT] PoolKeeper_c
+------------------------------------------------------------
+  [71/90] PoolKeeper_c_d1_overlap... [APPLY DEBUG] Patching _savedPreviousUpdatedTimestamp with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: _savedPreviousUpdatedTimestamp value updated
+[APPLY DEBUG] Patching _poolInterval with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: _poolInterval value updated
+
+=======  ANALYSIS  =======
+  13 │ varDeclaration │ {'elapsedBlocksNumerator': '[None,None]'}
+  15 │ varDeclaration │ {'keeperTip': '[None,None]'}
+  18 │ return         │ {'MAX_TIP': '[100,100]'}
+  20 │ return         │ {'keeperTip': '[None,None]'}
+==========================
+
+OK (0.09s, F90=inf)
+  [72/90] PoolKeeper_c_d1_diff... [APPLY DEBUG] Patching _savedPreviousUpdatedTimestamp with value UnsignedIntegerInterval([121, 122])
+[APPLY DEBUG] After patching: _savedPreviousUpdatedTimestamp value updated
+[APPLY DEBUG] Patching _poolInterval with value UnsignedIntegerInterval([142, 143])
+[APPLY DEBUG] After patching: _poolInterval value updated
+
+=======  ANALYSIS  =======
+  13 │ varDeclaration │ {'elapsedBlocksNumerator': '[None,None]'}
+  15 │ varDeclaration │ {'keeperTip': '[None,None]'}
+  18 │ return         │ {'MAX_TIP': '[100,100]'}
+  20 │ return         │ {'keeperTip': '[None,None]'}
+==========================
+
+OK (0.09s, F90=inf)
+  [73/90] PoolKeeper_c_d3_overlap... [APPLY DEBUG] Patching _savedPreviousUpdatedTimestamp with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: _savedPreviousUpdatedTimestamp value updated
+[APPLY DEBUG] Patching _poolInterval with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: _poolInterval value updated
+
+=======  ANALYSIS  =======
+  13 │ varDeclaration │ {'elapsedBlocksNumerator': '[None,None]'}
+  15 │ varDeclaration │ {'keeperTip': '[None,None]'}
+  18 │ return         │ {'MAX_TIP': '[100,100]'}
+  20 │ return         │ {'keeperTip': '[None,None]'}
+==========================
+
+OK (0.09s, F90=inf)
+  [74/90] PoolKeeper_c_d3_diff... [APPLY DEBUG] Patching _savedPreviousUpdatedTimestamp with value UnsignedIntegerInterval([123, 126])
+[APPLY DEBUG] After patching: _savedPreviousUpdatedTimestamp value updated
+[APPLY DEBUG] Patching _poolInterval with value UnsignedIntegerInterval([146, 149])
+[APPLY DEBUG] After patching: _poolInterval value updated
+
+=======  ANALYSIS  =======
+  13 │ varDeclaration │ {'elapsedBlocksNumerator': '[None,None]'}
+  15 │ varDeclaration │ {'keeperTip': '[None,None]'}
+  18 │ return         │ {'MAX_TIP': '[100,100]'}
+  20 │ return         │ {'keeperTip': '[None,None]'}
+==========================
+
+OK (0.09s, F90=inf)
+  [75/90] PoolKeeper_c_d6_overlap... [APPLY DEBUG] Patching _savedPreviousUpdatedTimestamp with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: _savedPreviousUpdatedTimestamp value updated
+[APPLY DEBUG] Patching _poolInterval with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: _poolInterval value updated
+
+=======  ANALYSIS  =======
+  13 │ varDeclaration │ {'elapsedBlocksNumerator': '[None,None]'}
+  15 │ varDeclaration │ {'keeperTip': '[None,None]'}
+  18 │ return         │ {'MAX_TIP': '[100,100]'}
+  20 │ return         │ {'keeperTip': '[None,None]'}
+==========================
+
+OK (0.10s, F90=inf)
+  [76/90] PoolKeeper_c_d6_diff... [APPLY DEBUG] Patching _savedPreviousUpdatedTimestamp with value UnsignedIntegerInterval([126, 132])
+[APPLY DEBUG] After patching: _savedPreviousUpdatedTimestamp value updated
+[APPLY DEBUG] Patching _poolInterval with value UnsignedIntegerInterval([152, 158])
+[APPLY DEBUG] After patching: _poolInterval value updated
+
+=======  ANALYSIS  =======
+  13 │ varDeclaration │ {'elapsedBlocksNumerator': '[None,None]'}
+  15 │ varDeclaration │ {'keeperTip': '[None,None]'}
+  18 │ return         │ {'MAX_TIP': '[100,100]'}
+  20 │ return         │ {'keeperTip': '[None,None]'}
+==========================
+
+OK (0.10s, F90=inf)
+  [77/90] PoolKeeper_c_d10_overlap... [APPLY DEBUG] Patching _savedPreviousUpdatedTimestamp with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: _savedPreviousUpdatedTimestamp value updated
+[APPLY DEBUG] Patching _poolInterval with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: _poolInterval value updated
+
+=======  ANALYSIS  =======
+  13 │ varDeclaration │ {'elapsedBlocksNumerator': '[None,None]'}
+  15 │ varDeclaration │ {'keeperTip': '[None,None]'}
+  18 │ return         │ {'MAX_TIP': '[100,100]'}
+  20 │ return         │ {'keeperTip': '[None,None]'}
+==========================
+
+OK (0.10s, F90=inf)
+  [78/90] PoolKeeper_c_d10_diff... [APPLY DEBUG] Patching _savedPreviousUpdatedTimestamp with value UnsignedIntegerInterval([130, 140])
+[APPLY DEBUG] After patching: _savedPreviousUpdatedTimestamp value updated
+[APPLY DEBUG] Patching _poolInterval with value UnsignedIntegerInterval([160, 170])
+[APPLY DEBUG] After patching: _poolInterval value updated
+
+=======  ANALYSIS  =======
+  13 │ varDeclaration │ {'elapsedBlocksNumerator': '[None,None]'}
+  15 │ varDeclaration │ {'keeperTip': '[None,None]'}
+  18 │ return         │ {'MAX_TIP': '[100,100]'}
+  20 │ return         │ {'keeperTip': '[None,None]'}
+==========================
+
+OK (0.13s, F90=inf)
+  [79/90] PoolKeeper_c_d15_overlap... [APPLY DEBUG] Patching _savedPreviousUpdatedTimestamp with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: _savedPreviousUpdatedTimestamp value updated
+[APPLY DEBUG] Patching _poolInterval with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: _poolInterval value updated
+
+=======  ANALYSIS  =======
+  13 │ varDeclaration │ {'elapsedBlocksNumerator': '[None,None]'}
+  15 │ varDeclaration │ {'keeperTip': '[None,None]'}
+  18 │ return         │ {'MAX_TIP': '[100,100]'}
+  20 │ return         │ {'keeperTip': '[None,None]'}
+==========================
+
+OK (0.10s, F90=inf)
+  [80/90] PoolKeeper_c_d15_diff... [APPLY DEBUG] Patching _savedPreviousUpdatedTimestamp with value UnsignedIntegerInterval([135, 150])
+[APPLY DEBUG] After patching: _savedPreviousUpdatedTimestamp value updated
+[APPLY DEBUG] Patching _poolInterval with value UnsignedIntegerInterval([170, 185])
+[APPLY DEBUG] After patching: _poolInterval value updated
+
+=======  ANALYSIS  =======
+  13 │ varDeclaration │ {'elapsedBlocksNumerator': '[None,None]'}
+  15 │ varDeclaration │ {'keeperTip': '[None,None]'}
+  18 │ return         │ {'MAX_TIP': '[100,100]'}
+  20 │ return         │ {'keeperTip': '[None,None]'}
+==========================
+
+OK (0.09s, F90=inf)
+
+[CONTRACT] ThorusBond_c
+------------------------------------------------------------
+  [81/90] ThorusBond_c_d1_overlap... [ANTLR] 1:8 mismatched input 'if' expecting {<EOF>, 'pragma', 'import', 'abstract', 'contract', 'interface', 'library', 'error', 'using', 'struct', 'modifier', 'function', 'event', 'enum', 'mapping', 'address', 'address payable', 'bool', 'string', 'var', 'bytes', Int, Uint, Byte, Fixed, Ufixed, 'payable', 'type', 'global', 'from', 'to', 'override', 'constructor', 'fallback', 'receive', Identifier}
+[APPLY DEBUG] Patching info.lastInteractionSecond with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: info.lastInteractionSecond value updated
+[APPLY DEBUG] Patching info.remainingVestingSeconds with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: info.remainingVestingSeconds value updated
+[APPLY DEBUG] Patching info.remainingPayout with value UnsignedIntegerInterval([100, 101])
+[APPLY DEBUG] After patching: info.remainingPayout value updated
+
+=======  ANALYSIS  =======
+  18 │ varDeclaration │ {'secondsSinceLastInteraction': '[0,1]'}
+==========================
+
+OK (0.04s, F90=inf)
+  [82/90] ThorusBond_c_d1_diff... [ANTLR] 1:8 mismatched input 'if' expecting {<EOF>, 'pragma', 'import', 'abstract', 'contract', 'interface', 'library', 'error', 'using', 'struct', 'modifier', 'function', 'event', 'enum', 'mapping', 'address', 'address payable', 'bool', 'string', 'var', 'bytes', Int, Uint, Byte, Fixed, Ufixed, 'payable', 'type', 'global', 'from', 'to', 'override', 'constructor', 'fallback', 'receive', Identifier}
+[APPLY DEBUG] Patching info.lastInteractionSecond with value UnsignedIntegerInterval([121, 122])
+[APPLY DEBUG] After patching: info.lastInteractionSecond value updated
+[APPLY DEBUG] Patching info.remainingVestingSeconds with value UnsignedIntegerInterval([142, 143])
+[APPLY DEBUG] After patching: info.remainingVestingSeconds value updated
+[APPLY DEBUG] Patching info.remainingPayout with value UnsignedIntegerInterval([163, 164])
+[APPLY DEBUG] After patching: info.remainingPayout value updated
+
+=======  ANALYSIS  =======
+  18 │ varDeclaration │ {'secondsSinceLastInteraction': '[None,None]'}
+==========================
+
+OK (0.04s, F90=inf)
+  [83/90] ThorusBond_c_d3_overlap... [ANTLR] 1:8 mismatched input 'if' expecting {<EOF>, 'pragma', 'import', 'abstract', 'contract', 'interface', 'library', 'error', 'using', 'struct', 'modifier', 'function', 'event', 'enum', 'mapping', 'address', 'address payable', 'bool', 'string', 'var', 'bytes', Int, Uint, Byte, Fixed, Ufixed, 'payable', 'type', 'global', 'from', 'to', 'override', 'constructor', 'fallback', 'receive', Identifier}
+[APPLY DEBUG] Patching info.lastInteractionSecond with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: info.lastInteractionSecond value updated
+[APPLY DEBUG] Patching info.remainingVestingSeconds with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: info.remainingVestingSeconds value updated
+[APPLY DEBUG] Patching info.remainingPayout with value UnsignedIntegerInterval([100, 103])
+[APPLY DEBUG] After patching: info.remainingPayout value updated
+
+=======  ANALYSIS  =======
+  18 │ varDeclaration │ {'secondsSinceLastInteraction': '[0,3]'}
+==========================
+
+OK (0.04s, F90=inf)
+  [84/90] ThorusBond_c_d3_diff... [ANTLR] 1:8 mismatched input 'if' expecting {<EOF>, 'pragma', 'import', 'abstract', 'contract', 'interface', 'library', 'error', 'using', 'struct', 'modifier', 'function', 'event', 'enum', 'mapping', 'address', 'address payable', 'bool', 'string', 'var', 'bytes', Int, Uint, Byte, Fixed, Ufixed, 'payable', 'type', 'global', 'from', 'to', 'override', 'constructor', 'fallback', 'receive', Identifier}
+[APPLY DEBUG] Patching info.lastInteractionSecond with value UnsignedIntegerInterval([123, 126])
+[APPLY DEBUG] After patching: info.lastInteractionSecond value updated
+[APPLY DEBUG] Patching info.remainingVestingSeconds with value UnsignedIntegerInterval([146, 149])
+[APPLY DEBUG] After patching: info.remainingVestingSeconds value updated
+[APPLY DEBUG] Patching info.remainingPayout with value UnsignedIntegerInterval([169, 172])
+[APPLY DEBUG] After patching: info.remainingPayout value updated
+
+=======  ANALYSIS  =======
+  18 │ varDeclaration │ {'secondsSinceLastInteraction': '[None,None]'}
+==========================
+
+OK (0.04s, F90=inf)
+  [85/90] ThorusBond_c_d6_overlap... [ANTLR] 1:8 mismatched input 'if' expecting {<EOF>, 'pragma', 'import', 'abstract', 'contract', 'interface', 'library', 'error', 'using', 'struct', 'modifier', 'function', 'event', 'enum', 'mapping', 'address', 'address payable', 'bool', 'string', 'var', 'bytes', Int, Uint, Byte, Fixed, Ufixed, 'payable', 'type', 'global', 'from', 'to', 'override', 'constructor', 'fallback', 'receive', Identifier}
+[APPLY DEBUG] Patching info.lastInteractionSecond with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: info.lastInteractionSecond value updated
+[APPLY DEBUG] Patching info.remainingVestingSeconds with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: info.remainingVestingSeconds value updated
+[APPLY DEBUG] Patching info.remainingPayout with value UnsignedIntegerInterval([100, 106])
+[APPLY DEBUG] After patching: info.remainingPayout value updated
+
+=======  ANALYSIS  =======
+  18 │ varDeclaration │ {'secondsSinceLastInteraction': '[0,6]'}
+==========================
+
+OK (0.04s, F90=inf)
+  [86/90] ThorusBond_c_d6_diff... [ANTLR] 1:8 mismatched input 'if' expecting {<EOF>, 'pragma', 'import', 'abstract', 'contract', 'interface', 'library', 'error', 'using', 'struct', 'modifier', 'function', 'event', 'enum', 'mapping', 'address', 'address payable', 'bool', 'string', 'var', 'bytes', Int, Uint, Byte, Fixed, Ufixed, 'payable', 'type', 'global', 'from', 'to', 'override', 'constructor', 'fallback', 'receive', Identifier}
+[APPLY DEBUG] Patching info.lastInteractionSecond with value UnsignedIntegerInterval([126, 132])
+[APPLY DEBUG] After patching: info.lastInteractionSecond value updated
+[APPLY DEBUG] Patching info.remainingVestingSeconds with value UnsignedIntegerInterval([152, 158])
+[APPLY DEBUG] After patching: info.remainingVestingSeconds value updated
+[APPLY DEBUG] Patching info.remainingPayout with value UnsignedIntegerInterval([178, 184])
+[APPLY DEBUG] After patching: info.remainingPayout value updated
+
+=======  ANALYSIS  =======
+  18 │ varDeclaration │ {'secondsSinceLastInteraction': '[None,None]'}
+==========================
+
+OK (0.04s, F90=inf)
+  [87/90] ThorusBond_c_d10_overlap... [ANTLR] 1:8 mismatched input 'if' expecting {<EOF>, 'pragma', 'import', 'abstract', 'contract', 'interface', 'library', 'error', 'using', 'struct', 'modifier', 'function', 'event', 'enum', 'mapping', 'address', 'address payable', 'bool', 'string', 'var', 'bytes', Int, Uint, Byte, Fixed, Ufixed, 'payable', 'type', 'global', 'from', 'to', 'override', 'constructor', 'fallback', 'receive', Identifier}
+[APPLY DEBUG] Patching info.lastInteractionSecond with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: info.lastInteractionSecond value updated
+[APPLY DEBUG] Patching info.remainingVestingSeconds with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: info.remainingVestingSeconds value updated
+[APPLY DEBUG] Patching info.remainingPayout with value UnsignedIntegerInterval([100, 110])
+[APPLY DEBUG] After patching: info.remainingPayout value updated
+
+=======  ANALYSIS  =======
+  18 │ varDeclaration │ {'secondsSinceLastInteraction': '[0,10]'}
+==========================
+
+OK (0.04s, F90=inf)
+  [88/90] ThorusBond_c_d10_diff... [ANTLR] 1:8 mismatched input 'if' expecting {<EOF>, 'pragma', 'import', 'abstract', 'contract', 'interface', 'library', 'error', 'using', 'struct', 'modifier', 'function', 'event', 'enum', 'mapping', 'address', 'address payable', 'bool', 'string', 'var', 'bytes', Int, Uint, Byte, Fixed, Ufixed, 'payable', 'type', 'global', 'from', 'to', 'override', 'constructor', 'fallback', 'receive', Identifier}
+[APPLY DEBUG] Patching info.lastInteractionSecond with value UnsignedIntegerInterval([130, 140])
+[APPLY DEBUG] After patching: info.lastInteractionSecond value updated
+[APPLY DEBUG] Patching info.remainingVestingSeconds with value UnsignedIntegerInterval([160, 170])
+[APPLY DEBUG] After patching: info.remainingVestingSeconds value updated
+[APPLY DEBUG] Patching info.remainingPayout with value UnsignedIntegerInterval([190, 200])
+[APPLY DEBUG] After patching: info.remainingPayout value updated
+
+=======  ANALYSIS  =======
+  18 │ varDeclaration │ {'secondsSinceLastInteraction': '[None,None]'}
+==========================
+
+OK (0.04s, F90=inf)
+  [89/90] ThorusBond_c_d15_overlap... [ANTLR] 1:8 mismatched input 'if' expecting {<EOF>, 'pragma', 'import', 'abstract', 'contract', 'interface', 'library', 'error', 'using', 'struct', 'modifier', 'function', 'event', 'enum', 'mapping', 'address', 'address payable', 'bool', 'string', 'var', 'bytes', Int, Uint, Byte, Fixed, Ufixed, 'payable', 'type', 'global', 'from', 'to', 'override', 'constructor', 'fallback', 'receive', Identifier}
+[APPLY DEBUG] Patching info.lastInteractionSecond with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: info.lastInteractionSecond value updated
+[APPLY DEBUG] Patching info.remainingVestingSeconds with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: info.remainingVestingSeconds value updated
+[APPLY DEBUG] Patching info.remainingPayout with value UnsignedIntegerInterval([100, 115])
+[APPLY DEBUG] After patching: info.remainingPayout value updated
+
+=======  ANALYSIS  =======
+  18 │ varDeclaration │ {'secondsSinceLastInteraction': '[0,15]'}
+==========================
+
+OK (0.04s, F90=inf)
+  [90/90] ThorusBond_c_d15_diff... [ANTLR] 1:8 mismatched input 'if' expecting {<EOF>, 'pragma', 'import', 'abstract', 'contract', 'interface', 'library', 'error', 'using', 'struct', 'modifier', 'function', 'event', 'enum', 'mapping', 'address', 'address payable', 'bool', 'string', 'var', 'bytes', Int, Uint, Byte, Fixed, Ufixed, 'payable', 'type', 'global', 'from', 'to', 'override', 'constructor', 'fallback', 'receive', Identifier}
+[APPLY DEBUG] Patching info.lastInteractionSecond with value UnsignedIntegerInterval([135, 150])
+[APPLY DEBUG] After patching: info.lastInteractionSecond value updated
+[APPLY DEBUG] Patching info.remainingVestingSeconds with value UnsignedIntegerInterval([170, 185])
+[APPLY DEBUG] After patching: info.remainingVestingSeconds value updated
+[APPLY DEBUG] Patching info.remainingPayout with value UnsignedIntegerInterval([205, 220])
+[APPLY DEBUG] After patching: info.remainingPayout value updated
+
+=======  ANALYSIS  =======
+  18 │ varDeclaration │ {'secondsSinceLastInteraction': '[None,None]'}
+==========================
+
+OK (0.04s, F90=inf)
+
+======================================================================
+Saving results to C:\Users\isjeon\PycharmProjects\pythonProject\SolDebug\Evaluation\RQ2_Results\rq2_batch_results.csv...
+[DONE] Saved 90 results
+
+======================================================================
+SUMMARY
+======================================================================
+Successful: 90/90
+Failed: 0/90
+Total execution time: 14.32s
+Average time per experiment: 0.16s
+
+Total time: 14.38s

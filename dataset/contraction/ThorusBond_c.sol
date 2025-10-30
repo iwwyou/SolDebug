@@ -11,8 +11,9 @@ contract ThorusBond {
         UserInfo memory info = userInfo[user];
         uint256 secondsSinceLastInteraction = block.timestamp - info.lastInteractionSecond;
         
-        if(secondsSinceLastInteraction > info.remainingVestingSeconds)
+        if(secondsSinceLastInteraction > info.remainingVestingSeconds) {
             return info.remainingPayout;
+        }
         return info.remainingPayout * secondsSinceLastInteraction / info.remainingVestingSeconds;
     }
 }
