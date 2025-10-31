@@ -4,7 +4,9 @@
       "Bash(python:*)",
       "Bash(tee:*)",
       "Bash(mv:*)",
-      "Bash(git ls-tree:*)"
+      "Bash(git ls-tree:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)"
     ],
     "deny": [],
     "ask": []
