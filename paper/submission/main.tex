@@ -1625,25 +1625,21 @@ Remaining precision loss arises from developer-fixable initialization issues and
         development and the interactive tooling common in traditional programming environments.
 
 \section{Conclusion}
-    We introduced SolQDebug, a source-level interactive debugger for Solidity that provides
-    millisecond feedback without requiring compilation, deployment, or transaction replay. By
-    combining an interactive parser with seven specialized entry rules, dynamic control-flow graph
-    updates, and annotation-guided interval-based abstract interpretation with adaptive widening,
-    SolQDebug enables responsive, line-by-line inspection directly within the Solidity editor.
-    Our evaluation on 30 real-world functions from DAppSCAN demonstrates a median speedup of
-    350$\times$ over Remix IDE (0.15s vs. 53.0s), achieving sub-second debugging latency regardless
-    of symbolic input width. We show that overlapping annotation patterns yield significantly
-    tighter precision than disjoint patterns in multiplication-heavy arithmetic, and that adaptive
-    widening thresholds enable precise convergence for constant-bounded and annotation-enabled
-    dynamic loops while soundly handling data-dependent accumulation patterns. These results
-    demonstrate that SolQDebug's design effectively bridges the interactivity gap in Solidity
-    debugging and brings the development experience closer to that of modern debugging workflows.
-    
-    Future work includes extending SolQDebug to inter-contract and multi-transaction contexts,
-    incorporating loop summarization for higher precision, and conducting user studies to assess its
-    practical adoption and usability. We also plan to apply analysis based on the EVM Object Format
-    (EOF) to support inter-contract debugging when source code is unavailable, as Ethereum moves
-    toward structured bytecode formats in upcoming hard forks.
+    This paper presents SolQDebug, the first interactive source-level debugger for Solidity
+    that eliminates the traditional compile-deploy-debug cycle. Through interactive parsing,
+    dynamic control-flow analysis, and annotation-guided abstract interpretation, SolQDebug
+    provides millisecond-scale feedback directly within the editor.
+
+    Evaluation on 30 real-world DAppSCAN functions demonstrates a 350$\times$ median speedup
+    over Remix IDE (0.15s vs. 53.0s). Our analysis shows that annotation-guided interpretation
+    enables precise analysis across diverse execution paths while maintaining soundness guarantees.
+    These results demonstrate that SolQDebug effectively bridges the interactivity gap in
+    Solidity debugging, bringing the development experience closer to modern IDEs and
+    enhancing software quality in the blockchain ecosystem.
+
+    Future work includes extending support to inter-contract and multi-transaction contexts,
+    conducting user studies to assess practical adoption, and applying EOF-based analysis
+    to support inter-contract debugging when source code is unavailable.
 
 \section*{Acknowledgements}
 This work was supported by the Institute of Information \& communications Technology Planning \& Evaluation (IITP) grant funded by the Korean government (MSIT) (RS-2021-II210177, High Assurance of Smart Contract for Secure Software Development Life Cycle).
