@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (MiKTeX 25.4) (preloaded format=pdflatex 2025.10.22)  1 NOV 2025 02:23
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (MiKTeX 25.4) (preloaded format=pdflatex 2025.10.22)  2 NOV 2025 07:20
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -1311,8 +1311,7 @@ Try typing  <return>  to proceed.
 ftex.def
 File: l3backend-pdftex.def 2025-06-09 L3 backend support: PDF output (pdfTeX)
 \l__color_backend_stack_int=\count378
-)
-No file main.aux.
+) (C:/Users\isjeon\PycharmProjects\pythonProject\SolDebug\out\main.aux)
 \openout1 = `main.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 75.
@@ -1401,6 +1400,8 @@ LaTeX Font Info:    Overwriting symbol font `AMSa' in version `normal'
 LaTeX Font Info:    Overwriting symbol font `AMSa' in version `bold'
 (Font)                  U/msa/m/n --> U/msa/m/n on input line 75.
 Package hyperref Info: Link coloring ON on input line 75.
+ (C:/Users\isjeon\PycharmProjects\pythonProject\SolDebug\out\main.out)
+(C:/Users\isjeon\PycharmProjects\pythonProject\SolDebug\out\main.out)
 \@outlinefile=\write5
 \openout5 = `main.out'.
 
@@ -1409,76 +1410,63 @@ Package caption Info: float package is loaded.
 Package caption Info: listings package is loaded.
 Package caption Info: End \AtBeginDocument code.
 \c@lstlisting=\count385
-LaTeX Font Info:    Calculating math sizes for size <12.045> on input line 110.
+LaTeX Font Info:    Calculating math sizes for size <12.045> on input line 112.
 
-LaTeX Font Info:    Trying to load font information for U+msa on input line 110
+LaTeX Font Info:    Trying to load font information for U+msa on input line 112
 .
- (C:\Users\isjeon\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\umsa.fd
+
+(C:\Users\isjeon\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 110
+LaTeX Font Info:    Trying to load font information for U+msb on input line 112
 .
- (C:\Users\isjeon\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\umsb.fd
+
+(C:\Users\isjeon\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
 LaTeX Font Info:    Trying to load font information for U+rsfs on input line 11
-0.
+2.
 
 (C:\Users\isjeon\AppData\Local\Programs\MiKTeX\tex/latex/jknappen\ursfs.fd
 File: ursfs.fd 1998/03/24 rsfs font definition file (jk)
 )
 
 LaTeX Font Warning: Font shape `U/rsfs/m/n' in size <8.43146> not available
-(Font)              size <8> substituted on input line 110.
+(Font)              size <8> substituted on input line 112.
 
 LaTeX Font Info:    Trying to load font information for U+stmry on input line 1
-10.
+12.
 (C:\Users\isjeon\AppData\Local\Programs\MiKTeX\tex/latex/stmaryrd\ustmry.fd)
 
 LaTeX Font Warning: Font shape `U/stmry/b/n' undefined
-(Font)              using `U/stmry/m/n' instead on input line 110.
+(Font)              using `U/stmry/m/n' instead on input line 112.
 
 
 LaTeX Font Warning: Font shape `U/stmry/b/n' in size <8.43146> not available
-(Font)              size <8> substituted on input line 110.
+(Font)              size <8> substituted on input line 112.
 
 LaTeX Font Info:    Calculating math sizes for size <11.04124> on input line 11
-0.
+2.
 
 LaTeX Font Warning: Font shape `U/rsfs/m/n' in size <5.52061> not available
-(Font)              size <6> substituted on input line 110.
+(Font)              size <6> substituted on input line 112.
 
 
 LaTeX Font Warning: Font shape `U/stmry/b/n' in size <5.52061> not available
-(Font)              size <6> substituted on input line 110.
+(Font)              size <6> substituted on input line 112.
 
-LaTeX Font Info:    Calculating math sizes for size <9.03374> on input line 110
+LaTeX Font Info:    Calculating math sizes for size <9.03374> on input line 112
 .
 
 LaTeX Font Warning: Font shape `U/rsfs/m/n' in size <4.51686> not available
-(Font)              size <5> substituted on input line 110.
+(Font)              size <5> substituted on input line 112.
 
 
 LaTeX Font Warning: Font shape `U/stmry/b/n' in size <4.51686> not available
-(Font)              size <5> substituted on input line 110.
+(Font)              size <5> substituted on input line 112.
 
 LaTeX Font Info:    Calculating math sizes for size <10.03749> on input line 11
-0.
-
-Package natbib Warning: Citation `smart contract evolution' on page 1 undefined
- on input line 114.
-
-
-Package natbib Warning: Citation `solidity' on page 1 undefined on input line 1
-14.
-
-
-Package natbib Warning: Citation `gpt' on page 1 undefined on input line 116.
-
-
-Package natbib Warning: Citation `llama' on page 1 undefined on input line 117.
-
-
+2.
 
 
 
@@ -1487,25 +1475,10 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
  [1
 
 {C:/Users/isjeon/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}]
-
-Package natbib Warning: Citation `remix' on page 2 undefined on input line 123.
-
-
-
-Package natbib Warning: Citation `hardhat' on page 2 undefined on input line 12
-3.
-
-
-Package natbib Warning: Citation `forge' on page 2 undefined on input line 124.
-
-
-
-Package natbib Warning: Citation `interview' on page 2 undefined on input line 
-126.
-
-
-Package natbib Warning: Citation `dappscan' on page 2 undefined on input line 1
-52.
+Underfull \hbox (badness 1275) in paragraph at lines 123--131
+\OT1/cmr/m/n/10 like Remix IDE ([][]Remix IDE[][], [][]2025[][]), Hard-hat ([][
+]Hard-hat[][], [][]2025[][]), and Foundry
+ []
 
 
 
@@ -1523,70 +1496,58 @@ File: lstlang2.sty 2024/09/23 1.10c listings language file
 File: lstlang3.sty 2024/09/23 1.10c listings language file
 )
 
-main.tex:181: Package Listings Error: Couldn't load requested language.
+main.tex:183: Package Listings Error: Couldn't load requested language.
 
 See the Listings package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.181 ...o our analysis}, label={lst:grammar-min}]
+l.183 ...o our analysis}, label={lst:grammar-min}]
                                                   
 The following languages weren't loadable:
     ,solidity$
 This may cause errors in the sequel.
 
 
-main.tex:181: Package Listings Error: language solidity undefined.
+main.tex:183: Package Listings Error: language solidity undefined.
 
 See the Listings package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.181 ...o our analysis}, label={lst:grammar-min}]
+l.183 ...o our analysis}, label={lst:grammar-min}]
                                                   
 The language is not loadable. Try typing  <return>  to proceed.
 If that doesn't work, type  X <return>  to quit.
 
 Package hyperref Info: bookmark level for unknown lstlisting defaults to 0 on i
-nput line 181.
+nput line 183.
 
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [3]
-
-Package natbib Warning: Citation `solidity' on page 4 undefined on input line 2
-30.
-
-<Fig1a.pdf, id=61, 3060.63445pt x 1520.5608pt>
+<Fig1a.pdf, id=270, 3060.63445pt x 1520.5608pt>
 File: Fig1a.pdf Graphic file (type pdf)
 <use Fig1a.pdf>
-Package pdftex.def Info: Fig1a.pdf  used on input line 253.
+Package pdftex.def Info: Fig1a.pdf  used on input line 255.
 (pdftex.def)             Requested size: 178.55841pt x 88.7007pt.
-<Fig1b.pdf, id=62, 3061.35712pt x 1520.5608pt>
+<Fig1b.pdf, id=271, 3061.35712pt x 1520.5608pt>
 File: Fig1b.pdf Graphic file (type pdf)
 <use Fig1b.pdf>
-Package pdftex.def Info: Fig1b.pdf  used on input line 260.
+Package pdftex.def Info: Fig1b.pdf  used on input line 262.
 (pdftex.def)             Requested size: 178.55841pt x 88.6775pt.
-<Fig1c.pdf, id=63, 3060.63445pt x 1519.83813pt>
+<Fig1c.pdf, id=272, 3060.63445pt x 1519.83813pt>
 File: Fig1c.pdf Graphic file (type pdf)
 <use Fig1c.pdf>
-Package pdftex.def Info: Fig1c.pdf  used on input line 269.
+Package pdftex.def Info: Fig1c.pdf  used on input line 271.
 (pdftex.def)             Requested size: 178.55841pt x 88.65855pt.
-<Fig1d.pdf, id=64, 3060.63445pt x 1520.5608pt>
+<Fig1d.pdf, id=273, 3060.63445pt x 1520.5608pt>
 File: Fig1d.pdf Graphic file (type pdf)
 <use Fig1d.pdf>
-Package pdftex.def Info: Fig1d.pdf  used on input line 276.
+Package pdftex.def Info: Fig1d.pdf  used on input line 278.
 (pdftex.def)             Requested size: 178.55841pt x 88.7007pt.
-
-Package natbib Warning: Citation `pycharm' on page 4 undefined on input line 29
-2.
-
-
-Package natbib Warning: Citation `visual' on page 4 undefined on input line 292
-.
-
 
 
 
@@ -1599,72 +1560,42 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [5 <./Fig1a.pdf> <./Fig1b.pdf> <./Fig1c.pdf> <./Fig1d.pdf>]
 
-Package natbib Warning: Citation `interview' on page 6 undefined on input line 
-330.
-
-
-
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [6]
-<Fig2.pdf, id=92, 3445.83356pt x 1385.4159pt>
+<Fig2.pdf, id=312, 3445.83356pt x 1385.4159pt>
 File: Fig2.pdf Graphic file (type pdf)
 <use Fig2.pdf>
-Package pdftex.def Info: Fig2.pdf  used on input line 378.
+Package pdftex.def Info: Fig2.pdf  used on input line 380.
 (pdftex.def)             Requested size: 353.38426pt x 142.08003pt.
-
-
-Package natbib Warning: Citation `antlr' on page 7 undefined on input line 400.
-
-
 
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [7 <./Fig2.pdf>]
-
-LaTeX Warning: Reference `lst:grammar-min' on page 8 undefined on input line 42
-7.
-
-
-LaTeX Warning: Reference `tab:input_code' on page 8 undefined on input line 470
-.
-
 LaTeX Font Info:    Trying to load font information for OMS+cmr on input line 4
-76.
-(C:\Users\isjeon\AppData\Local\Programs\MiKTeX\tex/latex/base\omscmr.fd
+78.
+ (C:\Users\isjeon\AppData\Local\Programs\MiKTeX\tex/latex/base\omscmr.fd
 File: omscmr.fd 2024/11/19 v2.5n Standard LaTeX font definitions
 )
 LaTeX Font Info:    Font shape `OMS/cmr/m/n' in size <10.03749> not available
-(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 476.
-
-
-LaTeX Warning: Reference `lst:grammar-min' on page 8 undefined on input line 47
-8.
-
-LaTeX Font Info:    Font shape `OMS/cmr/m/n' in size <7> not available
-(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 496.
-
-LaTeX Warning: Reference `fig:solqdebug-cfg' on page 8 undefined on input line 
-537.
-
+(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 478.
 
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [8]
+LaTeX Font Info:    Font shape `OMS/cmr/m/n' in size <7> not available
+(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 498.
+
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [9]
-
-LaTeX Warning: Reference `lst:grammar-batch' on page 10 undefined on input line
- 568.
-
 (C:\Users\isjeon\AppData\Local\Programs\MiKTeX\tex/latex/listings\lstlang1.sty
 File: lstlang1.sty 2024/09/23 1.10c listings language file
 ) (C:\Users\isjeon\AppData\Local\Programs\MiKTeX\tex/latex/listings\lstlang2.st
@@ -1675,26 +1606,26 @@ File: lstlang2.sty 2024/09/23 1.10c listings language file
 File: lstlang3.sty 2024/09/23 1.10c listings language file
 )
 
-main.tex:574: Package Listings Error: Couldn't load requested language.
+main.tex:576: Package Listings Error: Couldn't load requested language.
 
 See the Listings package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.574 ... annotations}, label={lst:grammar-batch}]
+l.576 ... annotations}, label={lst:grammar-batch}]
                                                   
 The following languages weren't loadable:
     ,solidity$
 This may cause errors in the sequel.
 
 
-main.tex:574: Package Listings Error: language solidity undefined.
+main.tex:576: Package Listings Error: language solidity undefined.
 
 See the Listings package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.574 ... annotations}, label={lst:grammar-batch}]
+l.576 ... annotations}, label={lst:grammar-batch}]
                                                   
 The language is not loadable. Try typing  <return>  to proceed.
 If that doesn't work, type  X <return>  to quit.
@@ -1705,31 +1636,15 @@ If that doesn't work, type  X <return>  to quit.
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [10]
-Underfull \hbox (badness 3323) in paragraph at lines 611--616
+Underfull \hbox (badness 3323) in paragraph at lines 613--618
 []\OT1/cmr/m/n/10 Unlike incre-men-tal anal-y-sis, batch anno-ta-tions leave th
 e CFG struc-ture
  []
 
 
-Package natbib Warning: Citation `solgram' on page 11 undefined on input line 6
-19.
-
-
-Overfull \hbox (7.41223pt too wide) in paragraph at lines 624--642
+Overfull \hbox (7.41223pt too wide) in paragraph at lines 626--644
  [] 
  []
-
-
-LaTeX Warning: Reference `tab:interactive-rules' on page 11 undefined on input 
-line 644.
-
-
-LaTeX Warning: Reference `lst:grammar-min' on page 11 undefined on input line 6
-51.
-
-
-LaTeX Warning: Reference `appendix:interactive-grammar' on page 11 undefined on
- input line 655.
 
 
 
@@ -1738,63 +1653,19 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [11]
 
-LaTeX Warning: Reference `appendix:interactive-grammar' on page 12 undefined on
- input line 681.
-
-
-Package natbib Warning: Citation `solqrule' on page 12 undefined on input line 
-682.
-
-
-
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [12]
 
-LaTeX Warning: Reference `fig:new-simple-statement' on page 13 undefined on inp
-ut line 712.
-
-
-LaTeX Warning: Reference `fig:new-if' on page 13 undefined on input line 714.
-
-
-LaTeX Warning: Reference `fig:new-else-if' on page 13 undefined on input line 7
-15.
-
-
-LaTeX Warning: Reference `fig:new-else' on page 13 undefined on input line 716.
-
-
-
-LaTeX Warning: Reference `fig:new-while' on page 13 undefined on input line 720
-.
-
-
-LaTeX Warning: Reference `fig:new-break' on page 13 undefined on input line 722
-.
-
-
-LaTeX Warning: Reference `fig:new-continue' on page 13 undefined on input line 
-723.
-
-
-LaTeX Warning: Reference `fig:new-return' on page 13 undefined on input line 72
-5.
-
-
-LaTeX Warning: Reference `fig:new-require' on page 13 undefined on input line 7
-27.
-
-
-main.tex:768: Package pgfkeys Error: The key '/tikz/join' requires a value. I a
+main.tex:770: Package pgfkeys Error: The key '/tikz/join' requires a value. I a
 m going to ignore this key.
 
 See the pgfkeys package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.768 ...lack, below=2.5cm of cond, fill=green!15]
+l.770 ...lack, below=2.5cm of cond, fill=green!15]
                                                    (join) {If\\{} Join Node};
 This error message was generated by an \errmessage
 command, so I can't give any explicit help.
@@ -1802,13 +1673,13 @@ Pretend that you're Hercule Poirot: Examine all clues,
 and deduce the truth by order and method.
 
 
-main.tex:768: LaTeX Error: Not allowed in LR mode.
+main.tex:770: LaTeX Error: Not allowed in LR mode.
 
 See the LaTeX manual or LaTeX Companion for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.768 ...5cm of cond, fill=green!15] (join) {If\\{
+l.770 ...5cm of cond, fill=green!15] (join) {If\\{
                                                   } Join Node};
 You've lost some text.  Try typing  <return>  to proceed.
 If that doesn't work, type  X <return>  to quit.
@@ -1820,73 +1691,73 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [13]
 
-main.tex:801: Package pgfkeys Error: The key '/tikz/join' requires a value. I a
+main.tex:803: Package pgfkeys Error: The key '/tikz/join' requires a value. I a
 m going to ignore this key.
 
 See the pgfkeys package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.801 ... below=2.5cm of elif_cond, fill=green!15]
+l.803 ... below=2.5cm of elif_cond, fill=green!15]
                                                    (elif_join) {Else-If\\{} ...
 (That was another \errmessage.)
 
 
-main.tex:801: LaTeX Error: Not allowed in LR mode.
+main.tex:803: LaTeX Error: Not allowed in LR mode.
 
 See the LaTeX manual or LaTeX Companion for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.801 ...d, fill=green!15] (elif_join) {Else-If\\{
+l.803 ...d, fill=green!15] (elif_join) {Else-If\\{
                                                   } Join Node};
 You've lost some text.  Try typing  <return>  to proceed.
 If that doesn't work, type  X <return>  to quit.
 
 
-main.tex:802: Package pgfkeys Error: The key '/tikz/join' requires a value. I a
+main.tex:804: Package pgfkeys Error: The key '/tikz/join' requires a value. I a
 m going to ignore this key.
 
 See the pgfkeys package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.802 ...join, draw=black, below=5.5cm of if_cond]
+l.804 ...join, draw=black, below=5.5cm of if_cond]
                                                    (if_join) {If\\{} Join No...
 (That was another \errmessage.)
 
 
-main.tex:802: LaTeX Error: Not allowed in LR mode.
+main.tex:804: LaTeX Error: Not allowed in LR mode.
 
 See the LaTeX manual or LaTeX Companion for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.802 ... below=5.5cm of if_cond] (if_join) {If\\{
+l.804 ... below=5.5cm of if_cond] (if_join) {If\\{
                                                   } Join Node};
 You've lost some text.  Try typing  <return>  to proceed.
 If that doesn't work, type  X <return>  to quit.
 
 
-main.tex:835: Package pgfkeys Error: The key '/tikz/join' requires a value. I a
+main.tex:837: Package pgfkeys Error: The key '/tikz/join' requires a value. I a
 m going to ignore this key.
 
 See the pgfkeys package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.835 ...de[join, draw=black, below=3.5cm of cond]
+l.837 ...de[join, draw=black, below=3.5cm of cond]
                                                    (join) {If\\{} Join Node};
 (That was another \errmessage.)
 
 
-main.tex:835: LaTeX Error: Not allowed in LR mode.
+main.tex:837: LaTeX Error: Not allowed in LR mode.
 
 See the LaTeX manual or LaTeX Companion for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.835 ...black, below=3.5cm of cond] (join) {If\\{
+l.837 ...black, below=3.5cm of cond] (join) {If\\{
                                                   } Join Node};
 You've lost some text.  Try typing  <return>  to proceed.
 If that doesn't work, type  X <return>  to quit.
@@ -1907,54 +1778,21 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [16]
-
-LaTeX Warning: Reference `tab:line-mapping' on page 17 undefined on input line 
-989.
-
-
-Overfull \hbox (4.78627pt too wide) in paragraph at lines 991--1009
+Overfull \hbox (4.78627pt too wide) in paragraph at lines 993--1011
  [] 
  []
 
-
-LaTeX Warning: Reference `fig:new-else-if' on page 17 undefined on input line 1
-012.
-
-
-LaTeX Warning: Reference `fig:new-else' on page 17 undefined on input line 1012
-.
-
 Package hyperref Info: bookmark level for unknown algorithm defaults to 0 on in
-put line 1015.
+put line 1017.
 
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [17]
-
-LaTeX Warning: Reference `alg:get-branch-context' on page 18 undefined on input
- line 1042.
-
-
-LaTeX Warning: Reference `alg:get-insertion-site' on page 18 undefined on input
- line 1042.
-
 LaTeX Font Info:    Font shape `OT1/cmtt/bx/n' in size <10.03749> not available
 
-(Font)              Font shape `OT1/cmtt/m/n' tried instead on input line 1045.
-
-
-LaTeX Warning: Reference `alg:get-branch-context' on page 18 undefined on input
- line 1045.
-
-
-LaTeX Warning: Reference `alg:get-insertion-site' on page 18 undefined on input
- line 1046.
-
-
-LaTeX Warning: Reference `alg:get-branch-context' on page 18 undefined on input
- line 1051.
+(Font)              Font shape `OT1/cmtt/m/n' tried instead on input line 1047.
 
 
 
@@ -1963,39 +1801,14 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [18]
 
-LaTeX Warning: Reference `alg:get-insertion-site' on page 19 undefined on input
- line 1086.
-
-
-LaTeX Warning: Reference `alg:get-branch-context' on page 19 undefined on input
- line 1100.
-
-
-LaTeX Warning: Reference `alg:get-insertion-site' on page 19 undefined on input
- line 1101.
-
-
-LaTeX Warning: Reference `alg:reinterpret' on page 19 undefined on input line 1
-105.
-
-
-LaTeX Warning: Reference `alg:fixpoint' on page 19 undefined on input line 1107
-.
-
-
-
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [19]
-
-LaTeX Warning: Reference `alg:fixpoint' on page 20 undefined on input line 1131
-.
-
-main.tex:1137: Undefined control sequence.
+main.tex:1139: Undefined control sequence.
 <recently read> \Env 
                      
-l.1137      \State $\Env
+l.1139      \State $\Env
                         (n)\gets \hat{\sigma}_{\mathrm{out}}$; \quad $Out[n]...
 The control sequence at the end of the top line
 of your error message was never \def'ed. If you have
@@ -2004,21 +1817,13 @@ spelling (e.g., `I\hbox'). Otherwise just continue,
 and I'll forget about whatever was undefined.
 
 
-LaTeX Warning: Reference `alg:reinterpret' on page 20 undefined on input line 1
-144.
-
-
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [20]
-
-LaTeX Warning: Reference `alg:fixpoint' on page 21 undefined on input line 1152
-.
-
-main.tex:1165: Undefined control sequence.
-l.1165 ...(h)$; \quad $Start \gets \bigsqcup\{\Env
+main.tex:1167: Undefined control sequence.
+l.1167 ...(h)$; \quad $Start \gets \bigsqcup\{\Env
                                                   (p)\mid p\in\Pred(h)\setmi...
 The control sequence at the end of the top line
 of your error message was never \def'ed. If you have
@@ -2026,8 +1831,8 @@ misspelled it (e.g., `\hobx'), type `I' and the correct
 spelling (e.g., `I\hbox'). Otherwise just continue,
 and I'll forget about whatever was undefined.
 
-main.tex:1165: Undefined control sequence.
-l.1165 ...t \gets \bigsqcup\{\Env(p)\mid p\in\Pred
+main.tex:1167: Undefined control sequence.
+l.1167 ...t \gets \bigsqcup\{\Env(p)\mid p\in\Pred
                                                   (h)\setminus L\}$
 The control sequence at the end of the top line
 of your error message was never \def'ed. If you have
@@ -2036,8 +1841,8 @@ spelling (e.g., `I\hbox'). Otherwise just continue,
 and I'll forget about whatever was undefined.
 
 
-LaTeX Warning: Reference `alg:fixpoint' on page 21 undefined on input line 1190
-.
+LaTeX Font Warning: Font shape `OT1/cmr/bx/sc' undefined
+(Font)              using `OT1/cmr/bx/n' instead on input line 1196.
 
 
 
@@ -2046,64 +1851,23 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [21]
 
-LaTeX Font Warning: Font shape `OT1/cmr/bx/sc' undefined
-(Font)              using `OT1/cmr/bx/n' instead on input line 1194.
-
-
-LaTeX Warning: Reference `tab:conc-denot' on page 22 undefined on input line 12
-08.
-
-
-LaTeX Warning: Reference `tab:abs-denot' on page 22 undefined on input line 120
-8.
-
-
-LaTeX Warning: Reference `app:semantics' on page 22 undefined on input line 120
-8.
-
-
-Underfull \hbox (badness 2158) in paragraph at lines 1204--1209
-\OT1/cmr/bx/n/10.03749 Abstract Inter-pre-ta-tion Frame-work. \OT1/cmr/m/sc/10.
-03749 SolQDe-bug \OT1/cmr/m/n/10 com-putes sound over-
- []
-
-
-
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [22]
-
-Package natbib Warning: Citation `dappscan' on page 23 undefined on input line 
-1245.
-
-
-Underfull \hbox (badness 2443) in paragraph at lines 1271--1273
+Underfull \hbox (badness 2443) in paragraph at lines 1276--1278
 []\OT1/cmr/bx/n/10.03749 Data struc-ture com-plex-ity\OT1/cmr/m/n/10 ---structs
  with mul-ti-ple
  []
 
-
-LaTeX Warning: Reference `tab:benchmark-dataset' on page 23 undefined on input 
-line 1276.
-
 (benchmark_table.tex)
-
-Package natbib Warning: Citation `remix_bench' on page 23 undefined on input li
-ne 1290.
-
-
-Package natbib Warning: Citation `selenium' on page 23 undefined on input line 
-1290.
-
-
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [23]
 
-LaTeX Warning: Reference `sec:impl' on page 24 undefined on input line 1298.
+LaTeX Warning: Reference `sec:impl' on page 24 undefined on input line 1303.
 
 
 
@@ -2111,46 +1875,32 @@ LaTeX Warning: Reference `sec:impl' on page 24 undefined on input line 1298.
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [24]
-<Fig13.pdf, id=239, 3836.81429pt x 1603.67136pt>
+<Fig13.pdf, id=515, 3836.81429pt x 1603.67136pt>
 File: Fig13.pdf Graphic file (type pdf)
 <use Fig13.pdf>
-Package pdftex.def Info: Fig13.pdf  used on input line 1315.
+Package pdftex.def Info: Fig13.pdf  used on input line 1320.
 (pdftex.def)             Requested size: 297.60114pt x 124.38112pt.
-
-
-LaTeX Warning: Reference `fig:rq1-responsiveness' on page 25 undefined on input
- line 1326.
-
 
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [25 <./Fig13.pdf>]
-<Fig14.pdf, id=248, 462.52798pt x 346.89601pt>
+<Fig14.pdf, id=525, 462.52798pt x 346.89601pt>
 File: Fig14.pdf Graphic file (type pdf)
 <use Fig14.pdf>
-Package pdftex.def Info: Fig14.pdf  used on input line 1359.
+Package pdftex.def Info: Fig14.pdf  used on input line 1364.
 (pdftex.def)             Requested size: 178.55841pt x 133.91795pt.
-
-
-LaTeX Warning: Reference `fig:rq2-lock' on page 26 undefined on input line 1382
-.
-
 
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [26 <./Fig14.pdf>]
-Underfull \hbox (badness 1024) in paragraph at lines 1384--1385
+Underfull \hbox (badness 1024) in paragraph at lines 1389--1390
 []\OT1/cmr/m/n/10 Moreover, we observe sim-i-lar pat-terns in other con-tracts 
 from our bench-
  []
-
-
-LaTeX Warning: Reference `tab:benchmark-dataset' on page 27 undefined on input 
-line 1408.
 
 
 
@@ -2169,150 +1919,10 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [29]
 
-Package natbib Warning: Citation `remix' on page 30 undefined on input line 153
-3.
-
-
-Package natbib Warning: Citation `hardhat' on page 30 undefined on input line 1
-535.
-
-
-Package natbib Warning: Citation `forge' on page 30 undefined on input line 153
-7.
-
-
-Package natbib Warning: Citation `soldepro' on page 30 undefined on input line 
-1540.
-
-
-Package natbib Warning: Citation `securify' on page 30 undefined on input line 
-1557.
-
-
-Package natbib Warning: Citation `slither' on page 30 undefined on input line 1
-557.
-
-
-Package natbib Warning: Citation `mythril' on page 30 undefined on input line 1
-557.
-
-
-Package natbib Warning: Citation `solidet' on page 30 undefined on input line 1
-558.
-
-
-Package natbib Warning: Citation `ethersolve' on page 30 undefined on input lin
-e 1559.
-
-
-Package natbib Warning: Citation `confuzz' on page 30 undefined on input line 1
-562.
-
-
-Package natbib Warning: Citation `echidna' on page 30 undefined on input line 1
-563.
-
-
-Package natbib Warning: Citation `sfuzz' on page 30 undefined on input line 156
-4.
-
-
-Package natbib Warning: Citation `transracer' on page 30 undefined on input lin
-e 1564.
-
-
-Package natbib Warning: Citation `ityfuzz' on page 30 undefined on input line 1
-566.
-
-
-Package natbib Warning: Citation `zeus' on page 30 undefined on input line 1568
-.
-
-
-Package natbib Warning: Citation `verismart' on page 30 undefined on input line
- 1568.
-
-
-Package natbib Warning: Citation `pulse' on page 30 undefined on input line 156
-8.
-
-
-Package natbib Warning: Citation `peculiar' on page 30 undefined on input line 
-1571.
-
-
-Package natbib Warning: Citation `tmlvd' on page 30 undefined on input line 157
-1.
-
-
-Package natbib Warning: Citation `pscvfinder' on page 30 undefined on input lin
-e 1571.
-
-
-
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [30]
-
-Package natbib Warning: Citation `flow' on page 31 undefined on input line 1584
-.
-
-
-Package natbib Warning: Citation `DBM' on page 31 undefined on input line 1584.
-
-
-
-Package natbib Warning: Citation `flow' on page 31 undefined on input line 1585
-.
-
-
-Package natbib Warning: Citation `DBM' on page 31 undefined on input line 1587.
-
-
-
-Package natbib Warning: Citation `dao' on page 31 undefined on input line 1587.
-
-
-
-Package natbib Warning: Citation `daig' on page 31 undefined on input line 1605
-.
-
-
-Package natbib Warning: Citation `ds' on page 31 undefined on input line 1605.
-
-
-Package natbib Warning: Citation `iac' on page 31 undefined on input line 1605.
-
-
-
-Package natbib Warning: Citation `iaj' on page 31 undefined on input line 1605.
-
-
-
-Package natbib Warning: Citation `fap' on page 31 undefined on input line 1605.
-
-
-
-Package natbib Warning: Citation `daig' on page 31 undefined on input line 1606
-.
-
-
-Package natbib Warning: Citation `ds' on page 31 undefined on input line 1608.
-
-
-Package natbib Warning: Citation `iac' on page 31 undefined on input line 1610.
-
-
-
-Package natbib Warning: Citation `iaj' on page 31 undefined on input line 1612.
-
-
-
-Package natbib Warning: Citation `fap' on page 31 undefined on input line 1614.
-
-
-
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
@@ -2323,12 +1933,13 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [32]
+Underfull \hbox (badness 1033) in paragraph at lines 1660--1661
+\OT1/cmr/m/n/10 The curated bench-mark dataset of 30 Solid-ity con-tracts deriv
+ed from DApp-
+ []
 
-Package natbib Warning: Citation `dappscan' on page 33 undefined on input line 
-1655.
 
-
-Underfull \hbox (badness 10000) in paragraph at lines 1679--1681
+Underfull \hbox (badness 10000) in paragraph at lines 1684--1686
 []\OT1/cmr/m/n/10 ConsenSys Dili-gence: Python Solid-ity Parser. [][]$https : /
  / github . com /
  []
@@ -2356,7 +1967,7 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
  [36]
 LaTeX Font Info:    Font shape `OT1/cmtt/bx/n' in size <11.04124> not available
 
-(Font)              Font shape `OT1/cmtt/m/n' tried instead on input line 1856.
+(Font)              Font shape `OT1/cmtt/m/n' tried instead on input line 1861.
 
 
 
@@ -2364,7 +1975,7 @@ LaTeX Font Info:    Font shape `OT1/cmtt/bx/n' in size <11.04124> not available
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [37]
-Overfull \hbox (44.3014pt too wide) in paragraph at lines 1926--1926
+Overfull \hbox (44.3014pt too wide) in paragraph at lines 1931--1931
 []  \OT1/cmtt/m/n/10.03749 : 'for' '(' (simpleStatement | ';') expression? ';' 
 expression? ')' '{' '}' ;[] 
  []
@@ -2375,19 +1986,19 @@ expression? ')' '{' '}' ;[]
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [38]
-Overfull \hbox (44.3014pt too wide) in paragraph at lines 1958--1958
+Overfull \hbox (44.3014pt too wide) in paragraph at lines 1963--1963
 []\OT1/cmtt/m/n/10.03749 interactiveCatchClause : 'catch' (identifier? '(' para
 meterList ')')? '{' '}' ;[] 
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 1967--1968
+Underfull \hbox (badness 10000) in paragraph at lines 1972--1973
 []\OT1/cmtt/m/n/10.03749 @GlobalVar\OT1/cmr/m/n/10 : Assigns val-ues to global 
 vari-ables (e.g., \OT1/cmtt/m/n/10.03749 msg.sender\OT1/cmr/m/n/10 ,
  []
 
 
-Overfull \hbox (75.91924pt too wide) in paragraph at lines 1978--1978
+Overfull \hbox (75.91924pt too wide) in paragraph at lines 1983--1983
 []\OT1/cmtt/m/n/10.03749 debugGlobalVar : '//' '@GlobalVar' identifier ('.' ide
 ntifier)? '=' globalValue ';' ;[] 
  []
@@ -2398,11 +2009,25 @@ ntifier)? '=' globalValue ';' ;[]
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [39]
-Underfull \hbox (badness 1496) in paragraph at lines 2008--2012
-\OT1/cmr/bx/n/10.03749 Order, join, and meet: \OT1/cmr/m/n/10 For inter-vals: $
-[\OML/cmm/m/it/10.03749 `[]; u[]\OT1/cmr/m/n/10 ] \OMS/cmtt/m/n/10.03749 v \OT1
-/cmr/m/n/10 [\OML/cmm/m/it/10.03749 `[]; u[]\OT1/cmr/m/n/10 ]  \OMS/cmtt/m/n/10
-.03749 ([])  \OML/cmm/m/it/10.03749 `[] \OMS/cmtt/m/n/10.03749 ^^T
+
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [40]
+Underfull \hbox (badness 10000) in paragraph at lines 2128--2128
+[]|$\OML/cmm/m/it/9 F\OT1/cmr/m/n/9 (\OML/cmm/m/it/9 H\OT1/cmr/m/n/9 )(\OML/cmm
+/m/it/9 ^^[\OT1/cmr/m/n/9 ) = []$;
+ []
+
+
+Overfull \hbox (18.38658pt too wide) in paragraph at lines 2128--2128
+[]|$\OML/cmm/m/it/9 F\OT1/cmr/m/n/9 (\OML/cmm/m/it/9 H\OT1/cmr/m/n/9 )(\OML/cmm
+/m/it/9 ^^[\OT1/cmr/m/n/9 ) = []$;
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 2136--2137
+[]\OT1/cmr/m/n/10 Signed inte-gers: $\U/msb/m/n/10.03749 Z[] \OT1/cmr/m/n/10 =
  []
 
 
@@ -2410,19 +2035,45 @@ Underfull \hbox (badness 1496) in paragraph at lines 2008--2012
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [40]
-Underfull \hbox (badness 6032) in paragraph at lines 2178--2178
-[]|$[] \OT1/cmr/m/n/9 = []([]\OML/cmm/m/it/9 ; p; []\OT1/cmr/m/n/9 )$, $[] = []
-([]\OML/cmm/m/it/9 ; p; []\OT1/cmr/m/n/9 )$; $\U/stmry/m/n/9 J\OMS/cmsy/m/n/9 ^
-^A\U/stmry/m/n/9 K[]\OT1/cmr/m/n/9 ([]) =
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 2178--2178
+ [41]
+Underfull \hbox (badness 10000) in paragraph at lines 2237--2237
 []|$\OML/cmm/m/it/9 G[]\OT1/cmr/m/n/9 (\OML/cmm/m/it/9 H\OT1/cmr/m/n/9 )([]) = 
 [][]\U/stmry/m/n/9 J\OML/cmm/m/it/9 s\U/stmry/m/n/9 K[]\OT1/cmr/m/n/9 ([]([]\OM
 L/cmm/m/it/9 ; p; []\OT1/cmr/m/n/9 ))  \OML/cmm/m/it/9 .[]
  []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 2237--2237
+[]|$\OML/cmm/m/it/9 G[]\OT1/cmr/m/n/9 (\OML/cmm/m/it/9 H\OT1/cmr/m/n/9 )([]) = 
+[][]\U/stmry/m/n/9 J\OML/cmm/m/it/9 s\U/stmry/m/n/9 K[]\OT1/cmr/m/n/9 ([]([]\OM
+L/cmm/m/it/9 ; p; []\OT1/cmr/m/n/9 ))  \OML/cmm/m/it/9 .[]
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 2237--2237
+\OT1/cmr/m/n/9 (\OML/cmm/m/it/9 ^^U[]: \U/stmry/m/n/9 J\OML/cmm/m/it/9 incr\U/s
+tmry/m/n/9 K[]\OT1/cmr/m/n/9 ([])  \OML/cmm/m/it/9 .[]  H\OT1/cmr/m/n/9 )\OML/c
+mm/m/it/9 ;  []\OT1/cmr/m/n/9 ([]([]\OML/cmm/m/it/9 ; p; []\OT1/cmr/m/n/9 ))[]$
+;
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 2237--2237
+[]|$\OML/cmm/m/it/9 G[]\OT1/cmr/m/n/9 (\OML/cmm/m/it/9 H\OT1/cmr/m/n/9 )([]) = 
+\U/stmry/m/n/9 J\OML/cmm/m/it/9 s\U/stmry/m/n/9 K[]\OT1/cmr/m/n/9 ([])  \OML/cm
+m/m/it/9 .[]
+ []
+
+
+Overfull \hbox (7.67401pt too wide) in paragraph at lines 2237--2237
+\OT1/cmr/m/n/9 (\OML/cmm/m/it/9 ^^U[]: [][]H\OT1/cmr/m/n/9 ([]([]\OML/cmm/m/it/
+9 ; p; []\OT1/cmr/m/n/9 ))\OML/cmm/m/it/9 ;  []\OT1/cmr/m/n/9 ([]([]\OML/cmm/m/
+it/9 ; p; []\OT1/cmr/m/n/9 ))[])$;
+ []
+
+
+Package natbib Warning: Citation `CousotCousot77' on page 42 undefined on input
+ line 2240.
 
 
 Package natbib Warning: There were undefined citations.
@@ -2432,18 +2083,13 @@ Package natbib Warning: There were undefined citations.
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [41]
+ [42]
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [42]
-(C:/Users\isjeon\PycharmProjects\pythonProject\SolDebug\out\main.aux
-
-Package natbib Warning: Citation(s) may have changed.
-(natbib)                Rerun to get citations correct.
-
-)
+ [43]
+(C:/Users\isjeon\PycharmProjects\pythonProject\SolDebug\out\main.aux)
  ***********
 LaTeX2e <2025-06-01> patch level 1
 L3 programming layer <2025-09-02>
@@ -2462,23 +2108,17 @@ LaTeX Warning: There were undefined references.
 
 LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
 
-
-Package rerunfilecheck Warning: File `main.out' has changed.
-(rerunfilecheck)                Rerun to get outlines right
-(rerunfilecheck)                or use package `bookmark'.
-
-Package rerunfilecheck Info: Checksums for `main.out':
-(rerunfilecheck)             Before: <no file>
-(rerunfilecheck)             After:  BDD5D36E45ABE6C4C773B5C698AD905C;9513.
+Package rerunfilecheck Info: File `main.out' has not changed.
+(rerunfilecheck)             Checksum: 1962EAABDED7B8CB1FA8B70DE9BA109D;9726.
  ) 
 Here is how much of TeX's memory you used:
- 29625 strings out of 468081
- 561010 string characters out of 5425304
- 1140683 words of memory out of 5000000
- 57538 multiletter control sequences out of 15000+600000
+ 29684 strings out of 468081
+ 562263 string characters out of 5425304
+ 1144697 words of memory out of 5000000
+ 57588 multiletter control sequences out of 15000+600000
  662133 words of font info for 175 fonts, out of 8000000 for 9000
  1151 hyphenation exceptions out of 8191
- 90i,24n,93p,769b,1120s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 90i,24n,93p,763b,1966s stack positions out of 10000i,1000n,20000p,200000b,200000s
  <C:\Users\isjeon\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi602\tcr
 m1000.pk><C:/Users/isjeon/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsf
 onts/cm/cmbsy10.pfb><C:/Users/isjeon/AppData/Local/Programs/MiKTeX/fonts/type1/
@@ -2505,23 +2145,24 @@ e1/public/amsfonts/cm/cmss10.pfb><C:/Users/isjeon/AppData/Local/Programs/MiKTeX
 /fonts/type1/public/amsfonts/cm/cmss8.pfb><C:/Users/isjeon/AppData/Local/Progra
 ms/MiKTeX/fonts/type1/public/amsfonts/cm/cmss9.pfb><C:/Users/isjeon/AppData/Loc
 al/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy10.pfb><C:/Users/isjeon/A
-ppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy7.pfb><C:/Users
-/isjeon/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy9.pfb>
+ppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy5.pfb><C:/Users
+/isjeon/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy7.pfb>
 <C:/Users/isjeon/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/c
-mti10.pfb><C:/Users/isjeon/AppData/Local/Programs/MiKTeX/fonts/type1/public/ams
-fonts/cm/cmti7.pfb><C:/Users/isjeon/AppData/Local/Programs/MiKTeX/fonts/type1/p
-ublic/amsfonts/cm/cmti9.pfb><C:/Users/isjeon/AppData/Local/Programs/MiKTeX/font
-s/type1/public/amsfonts/cm/cmtt10.pfb><C:/Users/isjeon/AppData/Local/Programs/M
-iKTeX/fonts/type1/public/amsfonts/cm/cmtt8.pfb><C:/Users/isjeon/AppData/Local/P
-rograms/MiKTeX/fonts/type1/public/amsfonts/cm/cmtt9.pfb><C:/Users/isjeon/AppDat
-a/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/symbols/msbm10.pfb><C:/User
-s/isjeon/AppData/Local/Programs/MiKTeX/fonts/type1/public/hoekwater/stmary10.pf
-b><C:/Users/isjeon/AppData/Local/Programs/MiKTeX/fonts/type1/public/hoekwater/s
-tmary9.pfb>
+msy9.pfb><C:/Users/isjeon/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsf
+onts/cm/cmti10.pfb><C:/Users/isjeon/AppData/Local/Programs/MiKTeX/fonts/type1/p
+ublic/amsfonts/cm/cmti7.pfb><C:/Users/isjeon/AppData/Local/Programs/MiKTeX/font
+s/type1/public/amsfonts/cm/cmti9.pfb><C:/Users/isjeon/AppData/Local/Programs/Mi
+KTeX/fonts/type1/public/amsfonts/cm/cmtt10.pfb><C:/Users/isjeon/AppData/Local/P
+rograms/MiKTeX/fonts/type1/public/amsfonts/cm/cmtt8.pfb><C:/Users/isjeon/AppDat
+a/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmtt9.pfb><C:/Users/isje
+on/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/symbols/msbm10.pfb
+><C:/Users/isjeon/AppData/Local/Programs/MiKTeX/fonts/type1/public/hoekwater/st
+mary10.pfb><C:/Users/isjeon/AppData/Local/Programs/MiKTeX/fonts/type1/public/ho
+ekwater/stmary9.pfb>
 Output written on C:/Users\isjeon\PycharmProjects\pythonProject\SolDebug\out\ma
-in.pdf (42 pages, 12704138 bytes).
+in.pdf (43 pages, 12767807 bytes).
 PDF statistics:
- 665 PDF objects out of 1000 (max. 8388607)
- 218 named destinations out of 1000 (max. 500000)
- 48 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 981 PDF objects out of 1000 (max. 8388607)
+ 221 named destinations out of 1000 (max. 500000)
+ 424 words of extra memory for PDF output out of 10000 (max. 10000000)
 

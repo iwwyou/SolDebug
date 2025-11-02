@@ -1,0 +1,42 @@
+Dear Editor-in-Chief,
+
+I am writing to submit our manuscript entitled "SolQDebug: Debug Solidity Quickly for Interactive Immediacy in Smart Contract Development" for consideration for publication in Automated Software Engineering.
+
+Context and Importance:
+
+As blockchain technology continues to mature, Solidity has emerged as the dominant language for smart contract development, powering the Ethereum ecosystem valued at over $460 billion. However, the debugging experience for Solidity remains significantly inferior to traditional programming environments. Current tools require developers to go through time-consuming cycles of compilation, deployment, transaction-based state setup, and bytecode-level tracing for every debugging iteration. According to recent developer surveys, 88.8% of Solidity practitioners report debugging as painful, with 69% specifically citing the absence of interactive source-level tooling as the primary cause.
+
+This research addresses a critical gap in smart contract development tooling by introducing SolQDebug, the first interactive source-level debugger for Solidity that provides millisecond-scale feedback directly on source code without requiring compilation, deployment, or blockchain interaction. Our approach combines three key technical innovations: (1) an interactive parser with seven specialized grammar rules that enables incremental parsing of partial code fragments, (2) a dynamic control-flow graph builder that supports live structural updates during editing, and (3) an annotation-guided abstract interpreter with adaptive widening thresholds that allows developers to explore multiple execution paths through symbolic input ranges.
+
+Our evaluation on 30 real-world functions from DAppSCAN demonstrates a median speedup of 350x over Remix IDE (0.15s vs. 53.0s per function), achieving sub-second debugging latency regardless of input complexity. Beyond performance improvements, we provide practical insights into how annotation structure affects precision in common smart contract patterns and demonstrate effective loop convergence strategies while preserving soundness guarantees.
+
+Appropriateness for the Journal:
+
+This work is highly appropriate for Automated Software Engineering for several reasons:
+
+1. Automated Development Tools: SolQDebug directly advances the state-of-the-art in automated software development tools by enabling interactive, feedback-driven debugging for an increasingly important application domain.
+
+2. Novel Application of Static Analysis: We demonstrate how abstract interpretation can be adapted to provide real-time feedback during code authoring, extending beyond traditional batch analysis to support interactive development workflows.
+
+3. Practical Impact: Our evaluation demonstrates substantial performance improvements over existing industrial tools, showing real potential for adoption in smart contract development practice.
+
+4. Technical Depth: The paper presents rigorous formal semantics, comprehensive evaluation on real-world benchmarks, and detailed analysis of precision trade-offs in different annotation patterns.
+
+5. Emerging Domain: Smart contract development represents a growing area where automated software engineering techniques can have significant impact, given the immutability of deployed contracts and the high cost of bugs.
+
+All authors have approved this manuscript for submission, and this work has not been published elsewhere nor is it under consideration by another journal. We have no conflicts of interest to declare.
+
+Thank you for considering our manuscript. We look forward to your response.
+
+Sincerely,
+
+Inseong Jeon
+Sundeuk Kim
+Hyunwoo Kim
+Hoh Peter In
+
+Department of Computer Science
+Korea University
+Seoul, Republic of Korea
+
+Corresponding Author: Hoh Peter In (hoh_in@korea.ac.kr)

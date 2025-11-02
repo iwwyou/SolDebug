@@ -112,57 +112,52 @@ demonstrate that \textsc{SolQDebug} makes interactive debugging practical for So
 
 \section{Introduction}\label{sec1}
 
-    Smart contracts are the backbone of decentralized applications, and Solidity has become the
-    dominant language for writing them~\citep{smart contract evolution, solidity}. As contracts grow
-    more complex and control more assets, developers must reason about correctness throughout the
-    development cycle---not just at deployment. Large language models (LLMs) such as ChatGPT~\citep{gpt} or
-    Llama~\citep{llama} can assist with code generation but offer no guarantees of correctness.
-    Ultimately, developers remain responsible for understanding variable interactions, control flow,
-    and numeric boundaries during authoring.
+    Blockchain technology has evolved from a simple cryptocurrency platform into a comprehensive ecosystem for decentralized applications.
+    At the center of this evolution, Ethereum ranks second in market capitalization at over \$460 billion~\citep{coinmarketcap}.
+    Including derivative projects such as Tether built on its infrastructure (valued at approximately \$180 billion), the Ethereum ecosystem demonstrates the vast potential of decentralized applications.
+    These applications are powered by smart contracts written primarily in Solidity~\citep{solidity}, the dominant language for contract development.
+    As contracts grow more complex and handle increasing value, ensuring their correctness becomes critical.
+    Once deployed to the blockchain, contracts are immutable and cannot be easily fixed.
+    While large language models (LLMs) such as ChatGPT~\citep{gpt} or Llama~\citep{llama} can assist with code generation, they offer no guarantees of correctness.
+    Ultimately, developers remain responsible for understanding variable interactions, control flow, and numeric boundaries during authoring.
 
-    Unfortunately, the debugging workflow for Solidity lags far behind traditional programming
-    environments. Even a single inspection requires full compilation, deployment, transaction-based
+    Unfortunately, the debugging workflow for Solidity remains significantly less mature than
+    traditional programming environments. Even a single inspection requires full compilation, deployment, transaction-based
     state setup, and manual bytecode-level tracing. Tools like Remix IDE~\citep{remix}, Hardhat~\citep{hardhat}, and
-    Foundry Forge~\citep{forge} replicate this costly pipeline, providing no live feedback during edits. A prior
-    study found that 88.8\% of Solidity developers described debugging as painful, and 69\%
-    attributed this to the absence of interactive, source-level tooling~\citep{interview}. Despite
-    this widely acknowledged pain point, we find no existing research or tooling that provides
-    interactive feedback during Solidity code authoring---a gap that this paper aims to fill.
+    Foundry Forge~\citep{forge} replicate this costly pipeline. A prior
+    study found that 88.8\% of Solidity developers described debugging as painful. Moreover, 69\%
+    attributed this to the absence of interactive source-level tooling~\citep{interview}. To the
+    best of our knowledge, no existing research or tooling provides interactive feedback during
+    Solidity code authoring, a gap that this paper aims to fill.
     
     This paper presents \textsc{SolQDebug}, a source-level interactive Solidity debugger powered by
-    abstract interpretation (AI). Rather than replacing runtime debuggers, it complements them by
-    enabling symbolic, per-statement inspection during code authoring---before compilation or
-    deployment. It targets the Solidity pattern of single-contract, single-transaction execution,
-    where each function is isolated and stateless---ideal for static reasoning but difficult to
-    simulate manually. To support this, \textsc{SolQDebug} applies interval-based AI, which
-    generalizes over symbolic inputs, exposes edge-case behaviors, and
-    provides sound results with low overhead. This approach gives developers immediate feedback and
-    enables them to reason efficiently about how symbolic inputs influence variable behavior.
-    Although these inputs enable generalization across multiple cases, certain input configurations
-    or control structures may lead to wider output ranges. We evaluate these behaviors empirically
-    and propose annotation strategies that help maintain interpretability across typical Solidity
-    patterns.
+    abstract interpretation (AI). To provide live feedback, \textsc{SolQDebug} combines AI with interval domain and debug annotations.
+    The AI generalizes over symbolic inputs, exposes edge-case behaviors, and provides sound results
+    with millisecond-scale overhead. Debug annotations allow developers to specify symbolic input ranges
+    directly in source code, enabling exploration of different execution scenarios without recompilation or redeployment.
+    This combination gives developers immediate feedback and enables them to reason efficiently about
+    how symbolic inputs influence variable behavior.
+
+    To achieve this goal, \textsc{SolQDebug} builds on two core ideas.
+    First, it provides incremental analysis through interactive parsing and dynamic control-flow graph (CFG) construction.
+    As developers type each statement, the system extends the CFG and recomputes abstract states
+    only for affected program points.
+    Second, it enables annotation-guided exploration. Developers specify symbolic input ranges
+    directly in source code, and the interpreter uses these ranges to analyze multiple execution
+    paths in a single pass.
     
-    To achieve this goal, \textsc{SolQDebug} builds on two core ideas. First, it extends the
-    Solidity grammar with interactive parsing rules and dynamically updates the control-flow graph
-    to reflect incremental edits, enabling keystroke-level structural changes during code authoring.
-    Second, it performs AI seeded by inline annotations. These annotations,
-    written directly in the source code, allow developers to specify symbolic values for both
-    parameters and storage variables, similar to how traditional debuggers let users configure
-    initial states and explore control flow.
-    
-    We evaluate \textsc{SolQDebug} on real-world functions from DAppSCAN~\citep{dappscan}, demonstrating
-    millisecond-scale responsiveness under symbolic input. Beyond latency, we analyze how input
-    interval structure affects interpretability in common Solidity patterns, such as
-    division-normalized arithmetic.
+    To validate these design choices, we evaluate \textsc{SolQDebug} on 30 real-world functions from DAppSCAN~\citep{dappscan}.
+    Our evaluation demonstrates millisecond-scale responsiveness and examines how annotation structure
+    affects precision across common smart contract patterns. We also show how annotation-guided analysis
+    addresses the precision challenges typically encountered in loop.
     
     This paper makes the following contributions:
     
     \begin{itemize}
-      \item We identify the main barriers to interactive Solidity debugging: latency from compilation, deployment, and transaction setup, and EVM constraints that prevent lightweight re-execution.
-      \item We design an interactive parser with seven specialized entry rules and a dynamic control-flow graph (CFG) engine that supports live structural updates and syntactic recovery during incremental editing.
+      \item We identify the main barriers to interactive Solidity debugging: latency from compilation, deployment, and transaction setup, and Ethereum Virtual Machine (EVM) constraints that prevent lightweight re-execution.
+      \item We design an interactive parser with seven specialized entry rules and a dynamic CFG engine that supports live structural updates and syntactic recovery during incremental editing.
       \item We introduce an annotation-guided abstract interpreter with adaptive widening thresholds that uses developer-specified symbolic inputs to achieve precise loop analysis while maintaining termination guarantees.
-      \item We evaluate \textsc{SolQDebug} on 30 real-world functions from DAppSCAN, demonstrating 350$\times$ median speedup over Remix IDE, and analyze how annotation structure impacts precision in multiplication-heavy arithmetic and loop convergence patterns.
+      \item We evaluate \textsc{SolQDebug} on 30 real-world functions from DAppSCAN and demonstrate a 350$\times$ median speedup over Remix IDE. We analyze how annotation structure impacts precision in common smart contract patterns and loop convergence.
     \end{itemize}
 
 \section{Background}\label{sect2}
@@ -227,7 +222,7 @@ contract Example {
         occurs through a one-time transaction that stores the compiled bytecode on-chain and invokes
         the constructor exactly once. After deployment, all subsequent interactions are message-call
         transactions. In these, the caller specifies a public function along with encoded calldata.
-        Once the transaction is mined into a block, the Ethereum Virtual Machine (EVM) jumps to the
+        Once the transaction is mined into a block, the EVM jumps to the
         designated entry point and executes the corresponding function sequentially. At runtime,
         Solidity variables fall into three distinct storage classes~\citep{solidity}:
     
@@ -313,7 +308,7 @@ contract Example {
     
         \smallskip
         \noindent\textbf{(2) Architectural limitations of the EVM.}
-        The Ethereum Virtual Machine (EVM) is a state-based execution engine in which each
+        The EVM is a state-based execution engine in which each
         transaction mutates a globally persistent storage. Once a function executes, its side
         effects are irreversible unless external intervention is performed. Re-executing the same
         function along the same control path is nontrivial: developers must either redeploy the
@@ -348,7 +343,7 @@ contract Example {
     tailored for isolated statements, expressions, and control-flow blocks. When the developer types
     or edits code, only the affected region is reparsed using a reduced grammar.
 
-    Each parsed statement is inserted into a dynamic control-flow graph (CFG), and AI
+    Each parsed statement is inserted into a dynamic CFG, and AI
     resumes from the edit point. The interpreter uses an interval lattice, assigning
     each variable a conservative range $[l, h]$ to expose edge conditions (e.g., overflows or
     failing guards) and to approximate groups of concrete executions that follow the same path. This
@@ -1054,7 +1049,7 @@ Both algorithms never mutate the graph and rely solely on the line-to-node index
 Dependent contexts (\texttt{else}/\texttt{else if}) cannot exist independently and must attach to a preceding
 \texttt{if}/\texttt{else if} condition node. The algorithm proceeds as follows:
 \begin{itemize}
-  \item \textbf{Line 1--3 (initialization):} Retrieves CFG nodes at or before line \(L\) to initialize the BFS queue. These nodes include the join node of the preceding conditional, which serves as the starting point for backward traversal. If no nodes are found, the dependent context is invalid.
+  \item \textbf{Line 1--3 (initialization):} Retrieves CFG nodes at or before line \(L\) to initialize the Breadth-First Search (BFS) queue. These nodes include the join node of the preceding conditional, which serves as the starting point for backward traversal. If no nodes are found, the dependent context is invalid.
   \item \textbf{Line 5--13 (BFS traversal):} Performs BFS through CFG predecessors to find the matching condition node of type \texttt{if} or \texttt{else\_if}. The BFS ensures we find the \emph{nearest} enclosing condition.
   \item \textbf{Line 15:} Reports an error if no matching condition is found.
 \end{itemize}
@@ -1204,10 +1199,13 @@ allowing fixpoint computation to terminate before exhausting $\tau$.
 
 \medskip
 \noindent\textbf{Abstract Interpretation Framework.}
+Our approach builds upon abstract interpretation frameworks for Solidity smart contracts~\citep{flow,DBM}.
 \textsc{SolQDebug} computes sound over-approximations of variable ranges using interval domains
 for integer types ($\widehat{\mathbb{Z}}_N, \widehat{\mathbb{U}}_N$), set abstractions
 for addresses and booleans, and on-demand materialization for composite types
-(arrays, mappings, structs). The complete formal semantics (Tables~\ref{tab:conc-denot} and~\ref{tab:abs-denot}) are in Appendix~\ref{app:semantics}.
+(arrays, mappings, structs).
+Unlike prior work focusing on invariant generation~\citep{DBM} or information flow analysis~\citep{flow}, we target interactive debugging with incremental refinement.
+The complete formal semantics (Tables~\ref{tab:conc-denot} and~\ref{tab:abs-denot}) are in Appendix~\ref{app:semantics}.
 
 \FloatBarrier
 
@@ -1561,7 +1559,7 @@ Remaining precision loss arises from developer-fixable initialization issues and
         as in Ethersolve \citep{ethersolve}.
         Dynamic testing and fuzzing exercise deployed or locally simulated contracts to uncover
         faults and security issues:
-        ContractFuzzer mutates ABI-level inputs \citep{confuzz}, Echidna brings property-based
+        ContractFuzzer mutates Application Binary Interface (ABI)-level inputs \citep{confuzz}, Echidna brings property-based
         fuzzing into developer workflows \citep{echidna}, sFuzz adapts scheduling for higher
         coverage \citep{sfuzz}, TransRacer finds transaction-ordering races \citep{transracer}, and
         Ityfuzz leverages snapshotting to decouple executions from chain nondeterminism
@@ -1611,8 +1609,8 @@ Remaining precision loss arises from developer-fixable initialization issues and
         reuse.
         \citet{iac} extended Goblint with incremental support for multithreaded C, selectively
         recomputing only genuinely affected facts and maintaining IDE-level responsiveness.
-        \citet{iaj} introduced IntraJ, an LSP-integrated analyzer for Java 11 that computes only the
-        AST and data-flow facts needed for the current view, keeping feedback under 100 ms.
+        \citet{iaj} introduced IntraJ, a Language Server Protocol (LSP)-integrated analyzer for Java 11 that computes only the
+        Abstract Syntax Tree (AST) and data-flow facts needed for the current view, keeping feedback under 100 ms.
         \citet{fap} achieved fast yet precise interval analysis on call graphs via one top-down and
         multiple bottom-up passes, and later introduced an incremental variant that revisits only
         the impacted functions.
@@ -1670,12 +1668,15 @@ ANTLR: \url{https://www.antlr.org/} (2025). Accessed November 2025
 \bibitem[ChatGPT(2025)]{gpt}
 ChatGPT: \url{https://chatgpt.com/} (2025). Accessed November 2025
 
+\bibitem[CoinMarketCap(2025)]{coinmarketcap}
+CoinMarketCap: \url{https://coinmarketcap.com/} (2025). Accessed November 2025
+
 \bibitem[Chen et~al.(2025)]{smart contract evolution}
-Chen, X., et al.: Characterizing smart contract evolution. ACM Transactions on Software Engineering and Methodology (2025)
+Chen, X., et al.: Characterizing smart contract evolution. ACM Transactions on Software Engineering and Methodology (2025). https://doi.org/10.1145/3719004
 
 \bibitem[Chimdyalwar(2024)]{fap}
 Chimdyalwar, B.: Fast and precise interval analysis on industry code. In: 2024 IEEE 35th
-International Symposium on Software Reliability Engineering Workshops (ISSREW) (2024)
+International Symposium on Software Reliability Engineering Workshops (ISSREW) (2024). https://doi.org/10.1109/ISSREW63542.2024.00049
 
 \bibitem[ConsenSys Diligence(2025)]{psp}
 ConsenSys Diligence: Python Solidity Parser. \url{https://github.
@@ -1684,11 +1685,11 @@ com/ConsenSysDiligence/python-solidity-parser} (2025). Accessed November 2025
 \bibitem[Cousot and Cousot(1977)]{cousot}
 Cousot, P., Cousot, R.: Abstract interpretation: a unified lattice model for static analysis of
 programs by construction or approximation of fixpoints. In: Proceedings of the 4th ACM
-SIGACT-SIGPLAN Symposium on Principles of Programming Languages (POPL) (1977)
+SIGACT-SIGPLAN Symposium on Principles of Programming Languages (POPL) (1977). https://doi.org/10.1145/512950.512973
 
 \bibitem[Erhard et~al.(2024)]{iac}
 Erhard, J., et al.: Interactive abstract interpretation: reanalyzing multithreaded C programs for
-cheap. International Journal on Software Tools for Technology Transfer (2024)
+cheap. International Journal on Software Tools for Technology Transfer (2024). https://doi.org/10.1007/s10009-024-00768-9
 
 \bibitem[Foundry Forge(2025)]{forge}
 Foundry Forge: \url{https://book.getfoundry.sh/reference/forge/forge/} (2025). Accessed November
@@ -1697,7 +1698,7 @@ Foundry Forge: \url{https://book.getfoundry.sh/reference/forge/forge/} (2025). A
 \bibitem[Grieco et~al.(2020)]{echidna}
 Grieco, G., et al.: Echidna: effective, usable, and fast fuzzing for smart contracts. In:
 Proceedings of the 29th ACM SIGSOFT International Symposium on Software Testing and Analysis (ISSTA),
-pp. 557--560 (2020)
+pp. 557--560 (2020). https://doi.org/10.1145/3395363.3404366
 
 \bibitem[Halder et~al.(2023)]{flow}
 Halder, R., et al.: Analyzing information flow in Solidity smart contracts. In: Distributed
@@ -1705,14 +1706,14 @@ Computing to Blockchain, pp. 105--123. Academic Press (2023)
 
 \bibitem[Halder(2024)]{DBM}
 Halder, R.: State-based invariant property generation of Solidity smart contracts using abstract
-interpretation. In: 2024 IEEE International Conference on Blockchain (2024)
+interpretation. In: 2024 IEEE International Conference on Blockchain (2024). https://doi.org/10.1109/Blockchain62396.2024.00038
 
 \bibitem[Hardhat(2025)]{hardhat}
 Hardhat: \url{https://hardhat.org/} (2025). Accessed November 2025
 
 \bibitem[Hu et~al.(2023)]{solidet}
 Hu, T., et al.: Detect defects of Solidity smart contract based on the knowledge graph. IEEE
-Transactions on Reliability 73(1), 186--202 (2023)
+Transactions on Reliability 73(1), 186--202 (2023). https://doi.org/10.1109/TR.2023.3233999
 
 \bibitem[JetBrains(2025)]{pycharm}
 JetBrains: PyCharm. \url{https://www.jetbrains.com/pycharm/} (2025). Accessed November 2025
@@ -1720,11 +1721,11 @@ JetBrains: PyCharm. \url{https://www.jetbrains.com/pycharm/} (2025). Accessed No
 \bibitem[Jiang et~al.(2018)]{confuzz}
 Jiang, B., Liu, Y., Chan, W.K.: ContractFuzzer: fuzzing smart contracts for vulnerability detection.
 In: Proceedings of the 33rd ACM/IEEE International Conference on Automated Software Engineering (ASE)
-, pp. 259--269 (2018)
+, pp. 259--269 (2018). https://doi.org/10.1145/3238147.3238177
 
 \bibitem[Kalra et~al.(2018)]{zeus}
 Kalra, S., Goel, S., Dhawan, M., Sharma, S.: ZEUS: analyzing safety of smart contracts. In:
-Proceedings of the 2018 Network and Distributed System Security Symposium (NDSS) (2018)
+Proceedings of the 2018 Network and Distributed System Security Symposium (NDSS) (2018). https://doi.org/10.14722/ndss.2018.23082
 
 \bibitem[Llama(2025)]{llama}
 Llama: \url{https://www.llama.com/} (2025). Accessed November 2025
@@ -1732,11 +1733,11 @@ Llama: \url{https://www.llama.com/} (2025). Accessed November 2025
 \bibitem[Ma et~al.(2023)]{transracer}
 Ma, C., Song, W., Huang, J.: TransRacer: function dependence-guided transaction race detection for
 smart contracts. In: Proceedings of the 31st ACM Joint European Software Engineering Conference and
-Symposium on the Foundations of Software Engineering (ESEC/FSE), pp. 947--959 (2023)
+Symposium on the Foundations of Software Engineering (ESEC/FSE), pp. 947--959 (2023). https://doi.org/10.1145/3611643.3616281
 
 \bibitem[Mehar et~al.(2019)]{dao}
 Mehar, M.I., et al.: Understanding a revolutionary and flawed grand experiment in blockchain: the
-DAO attack. Journal of Cases on Information Technology (2019)
+DAO attack. Journal of Cases on Information Technology (2019). https://doi.org/10.4018/JCIT.2019010102
 
 \bibitem[Microsoft(2025)]{visual}
 Microsoft Visual Studio: \url{https://visualstudio.microsoft.com/ko/} (2025). Accessed November
@@ -1745,11 +1746,11 @@ Microsoft Visual Studio: \url{https://visualstudio.microsoft.com/ko/} (2025). Ac
 \bibitem[Nguyen et~al.(2020)]{sfuzz}
 Nguyen, T.D., et al.: sFuzz: an efficient adaptive fuzzer for Solidity smart contracts. In:
 Proceedings of the 42nd ACM/IEEE International Conference on Software Engineering (ICSE), pp.
-778--788 (2020)
+778--788 (2020). https://doi.org/10.1145/3377811.3380334
 
 \bibitem[Pasqua et~al.(2023)]{ethersolve}
 Pasqua, M., et al.: Enhancing Ethereum smart-contracts static analysis by computing a precise
-control-flow graph of Ethereum bytecode. Journal of Systems and Software 200, 111653 (2023)
+control-flow graph of Ethereum bytecode. Journal of Systems and Software 200, 111653 (2023). https://doi.org/10.1016/j.jss.2023.111653
 
 \bibitem[Remix IDE(2025)]{remix}
 Remix IDE: \url{https://remix.ethereum.org/} (2025). Accessed November 2025
@@ -1759,7 +1760,7 @@ Remix Benchmark: \url{https://github.com/iwwyou/SolDebug/tree/main/Evaluation/RQ
 
 \bibitem[Riouak et~al.(2024)]{iaj}
 Riouak, I., et al.: IntraJ: an on-demand framework for intraprocedural Java code analysis.
-International Journal on Software Tools for Technology Transfer (2024)
+International Journal on Software Tools for Technology Transfer (2024). https://doi.org/10.1007/s10009-024-00771-0
 
 \bibitem[Rival and Yi(2020)]{yi}
 Rival, X., Yi, K.: Introduction to Static Analysis: an Abstract Interpretation Perspective (2020)
@@ -1770,11 +1771,11 @@ Selenium with Python: \url{https://selenium-python.readthedocs.io/} (2025). Acce
 \bibitem[Shou et~al.(2023)]{ityfuzz}
 Shou, C., Tan, S., Sen, K.: Ityfuzz: snapshot-based fuzzer for smart contract. In: Proceedings of
 the 32nd ACM SIGSOFT International Symposium on Software Testing and Analysis (ISSTA), pp. 322--333
-(2023)
+(2023). https://doi.org/10.1145/3597926.3598059
 
 \bibitem[So et~al.(2020)]{verismart}
 So, S., et al.: Verismart: a highly precise safety verifier for Ethereum smart contracts. In: 2020
-IEEE Symposium on Security and Privacy (SP), pp. 1678--1694 (2020)
+IEEE Symposium on Security and Privacy (SP), pp. 1678--1694 (2020). https://doi.org/10.1109/SP40000.2020.00032
 
 \bibitem[solcx(2025)]{solcx}
 Solidity Compiler in Python (solcx): \url{https://solcx.readthedocs.io/en/latest/} (2025). Accessed
@@ -1797,50 +1798,50 @@ com/iwwyou/SolDebug/blob/main/Parser/Solidity.g4} . Accessed November 2025
 \bibitem[Stein et~al.(2021)]{daig}
 Stein, B., Chang, B.-Y.E., Sridharan, M.: Demanded abstract interpretation. In: Proceedings of the
 42nd ACM SIGPLAN International Conference on Programming Language Design and Implementation (PLDI)
-(2021)
+(2021). https://doi.org/10.1145/3453483.3454044
 
 \bibitem[Stein et~al.(2024)]{ds}
 Stein, B., Chang, B.-Y.E., Sridharan, M.: Interactive abstract interpretation with demanded
-summarization. ACM Transactions on Programming Languages and Systems (2024)
+summarization. ACM Transactions on Programming Languages and Systems (2024). https://doi.org/10.1145/3648484
 
 \bibitem[Stephens et~al.(2021)]{pulse}
 Stephens, J., et al.: SmartPulse: automated checking of temporal properties in smart contracts. In:
-2021 IEEE Symposium on Security and Privacy (SP), pp. 555--571 (2021)
+2021 IEEE Symposium on Security and Privacy (SP), pp. 555--571 (2021). https://doi.org/10.1109/SP40001.2021.00085
 
 \bibitem[Tsankov et~al.(2018)]{securify}
 Tsankov, P., et al.: Securify: practical security analysis of smart contracts. In: Proceedings of
-the 2018 ACM SIGSAC Conference on Computer and Communications Security (CCS), pp. 67--82 (2018)
+the 2018 ACM SIGSAC Conference on Computer and Communications Security (CCS), pp. 67--82 (2018). https://doi.org/10.1145/3243734.3243780
 
-\bibitem[Tsankov et~al.(2019)]{slither}
-Tsankov, P., et al.: Slither: a static analysis framework for smart contracts. In: 2019 IEEE/ACM 2nd
+\bibitem[Feist et~al.(2019)]{slither}
+Feist, J., Grieco, G., Groce, A.: Slither: a static analysis framework for smart contracts. In: 2019 IEEE/ACM 2nd
 International Workshop on Emerging Trends in Software Engineering for Blockchain (WETSEB), pp. 8--15
-(2019)
+(2019). https://doi.org/10.1109/WETSEB.2019.00008
 
 \bibitem[Wu et~al.(2021)]{peculiar}
 Wu, H., et al.: Peculiar: smart contract vulnerability detection based on crucial data-flow graph
 and pre-training techniques. In: 2021 IEEE 32nd International Symposium on Software Reliability
-Engineering (ISSRE), pp. 378--389 (2021)
+Engineering (ISSRE), pp. 378--389 (2021). https://doi.org/10.1109/ISSRE52982.2021.00047
 
 \bibitem[Yao et~al.(2022)]{mythril}
 Yao, Y., et al.: An improved vulnerability detection system of smart contracts based on symbolic
-execution. In: 2022 IEEE International Conference on Big Data (Big Data), pp. 3225--3234 (2022)
+execution. In: 2022 IEEE International Conference on Big Data (Big Data), pp. 3225--3234 (2022). https://doi.org/10.1109/BigData55660.2022.10020730
 
 \bibitem[Yu et~al.(2023)]{pscvfinder}
 Yu, L., et al.: PSCVFinder: a prompt-tuning based framework for smart contract vulnerability
 detection. In: 2023 IEEE 34th International Symposium on Software Reliability Engineering (ISSRE),
-pp. 556--567 (2023)
+pp. 556--567 (2023). https://doi.org/10.1109/ISSRE59848.2023.00030
 
 \bibitem[Zheng et~al.(2024)]{dappscan}
 Zheng, Z., et al.: Dappscan: building large-scale datasets for smart contract weaknesses in dApp
-projects. IEEE Transactions on Software Engineering (2024)
+projects. IEEE Transactions on Software Engineering (2024). https://doi.org/10.1109/TSE.2024.3383422
 
 \bibitem[Zhou et~al.(2022)]{tmlvd}
 Zhou, Q., et al.: Vulnerability analysis of smart contract for blockchain-based IoT applications: a
-machine learning approach. IEEE Internet of Things Journal 9(24), 24695--24707 (2022)
+machine learning approach. IEEE Internet of Things Journal 9(24), 24695--24707 (2022). https://doi.org/10.1109/JIOT.2022.3196269
 
 \bibitem[Zou et~al.(2019)]{interview}
 Zou, W., et al.: Smart contract development: challenges and opportunities. IEEE Transactions on
-Software Engineering (2019)
+Software Engineering (2019). https://doi.org/10.1109/TSE.2019.2942301
 
 \end{thebibliography}
 
@@ -1988,6 +1989,32 @@ debugLocalVar : '//' '@LocalVar' lvalue '=' value ';' ;
 
 This appendix presents the abstract domain definitions and formal semantics used by \textsc{SolQDebug}'s abstract interpreter. The framework is based on interval analysis for numeric types, set domains for addresses, and lazy materialization for composite data structures.
 
+\subsection{Language Syntax}
+
+We consider a subset of Solidity focusing on core control structures, expressions, and state manipulation relevant to our analysis.
+
+\noindent\textbf{Expressions:}
+\begin{align*}
+e \in \mathsf{Expr}\ ::=\ & n \mid x \mid \mathsf{true} \mid \mathsf{false} \mid \mathsf{address\_literal}\\
+& \mid e_1 \oplus e_2 \mid e_1\ \odot\ e_2 \mid e_1\ ?\ e_2 : e_3\\
+& \mid e.f \mid e_1[e_2] \mid f(\overline{e}) \mid \neg e \mid \mathsf{delete}\ e
+\end{align*}
+where $\oplus \in \{+,-,*,/,\%,**,\&\&,||,\&,|,\wedge,<<,>>\}$ and $\odot \in \{<,\le,>,\ge,==,\ne\}$.
+
+\noindent\textbf{Statements:}
+\begin{align*}
+s \in \mathsf{Stmt}\ ::=\ & \mathsf{skip} \mid s_1; s_2 \mid \tau\ x; \mid \tau\ x = e;\\
+& \mid lv := e \mid \mathsf{delete}\ lv\\
+& \mid \mathsf{if}\ p\ \mathsf{then}\ s_t\ \mathsf{else}\ s_f\\
+& \mid \mathsf{while}\ p\ \mathsf{do}\ s\\
+& \mid \mathsf{for}\ init; p; incr\ \mathsf{do}\ s\\
+& \mid \mathsf{do}\ s\ \mathsf{while}\ p\\
+& \mid \mathsf{return}\ e \mid \mathsf{assert}(p) \mid \mathsf{require}(p)\\
+& \mid \mathsf{revert}(\cdots) \mid \mathsf{try}\ e\ (\mathsf{returns}\ (x))\ s_t\ \mathsf{catch}\ s_c\\
+& \mid f(\overline{e})
+\end{align*}
+where $\tau$ ranges over types (\texttt{uint}, \texttt{int}, \texttt{bool}, \texttt{address}, structs, arrays, mappings), $lv$ denotes l-values (variables, fields, array/mapping elements), and $p$ denotes boolean expressions.
+
 \subsection{Abstract Domain}
 
 \noindent\textbf{Atomic abstract values:}
@@ -1995,7 +2022,7 @@ This appendix presents the abstract domain definitions and formal semantics used
 \item \textbf{Unsigned integers:} $\widehat{\mathbb{U}}_N = \{[\ell,u] \mid 0 \le \ell \le u \le 2^N{-}1\} \cup \{\bot,\top_N\}$
 \item \textbf{Signed integers:} $\widehat{\mathbb{Z}}_N = \{[\ell,u] \mid -2^{N-1} \le \ell \le u \le 2^{N-1}{-}1\} \cup \{\bot,\top_N^{\pm}\}$
 \item \textbf{Booleans:} $\widehat{\mathbb{B}} = \{\bot,\widehat{\mathsf{false}},\widehat{\mathsf{true}},\top\}$
-\item \textbf{Addresses:} $\widehat{\mathbb{A}} = \wp_{\le K}(\mathsf{AddrID}) \cup \{\top\}$ (set domain with cap $K=8$)
+\item \textbf{Addresses:} $\widehat{\mathbb{A}} = \wp_{\text{fin}}(\mathsf{AddrID}) \cup \{\top\}$ (finite set of symbolic address identifiers)
 \item \textbf{Bytes:} $\widehat{\mathbb{BY}}_K = \{\bot,\top_K\}$ (symbolic/opaque)
 \item \textbf{Enums:} $\widehat{\mathsf{Enum}}(E) = \{[\ell,u]\mid 0\le \ell \le u \le |E|-1\}\cup\{\bot,\top_E\}$
 \end{itemize}
@@ -2007,34 +2034,14 @@ This appendix presents the abstract domain definitions and formal semantics used
 \item \textbf{Mappings:} $\widehat{\mathsf{Map}}(\kappa\Rightarrow\tau) = (\hat{d},M)$ with default $\hat{d}$ and finite map $M$ for observed keys
 \end{itemize}
 
-\noindent\textbf{Order, join, and meet:}
-For intervals: $[\ell_1,u_1] \sqsubseteq [\ell_2,u_2] \iff \ell_2 \le \ell_1 \land u_1 \le u_2$,
-$[\ell_1,u_1] \sqcup [\ell_2,u_2] = [\min(\ell_1,\ell_2),\max(u_1,u_2)]$,
-$[\ell_1,u_1] \sqcap [\ell_2,u_2] = [\max(\ell_1,\ell_2),\min(u_1,u_2)]$ if non-empty, else $\bot$.
+\medskip
+\noindent
+Standard interval domain operations (order, join, meet, widening, narrowing) apply to integer and enum domains.
 
-Widening $\nabla$ and narrowing $\Delta$ follow standard interval analysis patterns. For address sets: $S_1 \sqcup S_2 = S_1 \cup S_2$ if $|S_1 \cup S_2| \le K$, else $\top$.
-
-\subsection{Concrete Semantics (Denotational)}
-
-Let stores be $\sigma:\mathsf{Var}\rightharpoonup \mathsf{CVal}$.
-L-value resolution $\mathrm{loc}_\sigma(\mathit{lv})=\ell$ and write $\mathrm{write}(\sigma,\ell,v)$
-update the store. Expressions are pure: $\llbracket e\rrbracket_\sigma\in\mathsf{Val}$.
-
-\noindent\textbf{Outcome domain:}
-\[
-\mathsf{Res} \;::=\; \Norm(\sigma) \;\mid\; \Ret(v,\sigma) \;\mid\; \Abort
-\]
-with sequencing
-\[
-\begin{aligned}
-\Norm(\sigma)\ \triangleright\ K &:= K(\sigma),\\
-\Ret(v,\sigma)\ \triangleright\ K &:= \Ret(v,\sigma),\\
-\Abort\ \triangleright\ K &:= \Abort.
-\end{aligned}
-\]
+\subsection{Concrete Semantics}
 
 \begin{table}[t]
-  \caption{Concrete denotational semantics (statements)}
+  \caption{Concrete semantics (denotational)}
   \label{tab:conc-denot}
   \centering
   \small
@@ -2077,6 +2084,22 @@ with sequencing
       \end{cases}$;
     $\llbracket \textsf{while}\ p\ \textsf{do}\ s\rrbracket=\mathrm{lfp}(F)$\\
 
+    \textsf{for}\ $init$; $p$; $incr$ \textsf{do}\ $s$ &
+    $F(H)(\sigma)=
+      \begin{cases}
+        \big(\llbracket s\rrbracket(\sigma)\big)\ \triangleright\ (\lambda \sigma'.\,\llbracket incr\rrbracket(\sigma')\ \triangleright\ H) & \text{if }\llbracket p\rrbracket_\sigma=\mathsf{true},\\
+        \Norm(\sigma) & \text{if }\llbracket p\rrbracket_\sigma=\mathsf{false}
+      \end{cases}$;
+    $\llbracket \textsf{for}\ init; p; incr\ \textsf{do}\ s\rrbracket(\sigma)=\llbracket init\rrbracket(\sigma)\ \triangleright\ (\lambda \sigma'.\,\mathrm{lfp}(F)(\sigma'))$\\
+
+    \textsf{do}\ $s$ \textsf{while}\ $p$ &
+    $F(H)(\sigma)=\llbracket s\rrbracket(\sigma)\ \triangleright\ (\lambda \sigma'.\,
+      \begin{cases}
+        H(\sigma') & \text{if }\llbracket p\rrbracket_{\sigma'}=\mathsf{true},\\
+        \Norm(\sigma') & \text{if }\llbracket p\rrbracket_{\sigma'}=\mathsf{false}
+      \end{cases})$;
+    $\llbracket \textsf{do}\ s\ \textsf{while}\ p\rrbracket=\mathrm{lfp}(F)$\\
+
     \textsf{return}\ $e$ &
     $\llbracket \textsf{return}\ e\rrbracket(\sigma)=\Ret(\llbracket e\rrbracket_\sigma,\,\sigma)$\\
 
@@ -2090,42 +2113,54 @@ with sequencing
     \textsf{revert}$(\cdots)$ &
     $\llbracket \textsf{revert}(\cdots)\rrbracket(\sigma)=\Abort$\\
 
+    \textsf{try}\ $e$ (\textsf{returns}\ $(x)$)\ $s_t$ \textsf{catch}\ $s_c$ &
+    $\llbracket \cdot\rrbracket(\sigma)=
+      \begin{cases}
+        \llbracket s_t\rrbracket(\sigma[x\mapsto v]) & \text{if call succeeds with }v,\\
+        \llbracket s_c\rrbracket(\sigma) & \text{if call reverts}
+      \end{cases}$\\
+
     \textsf{call}$(\overline{e})$ &
     Internal: parameter binding; external: unspecified\\
     \bottomrule
   \end{tabularx}
 \end{table}
 
+\begin{itemize}[leftmargin=1.25em]
+\item \textbf{Variables:} $\mathsf{Var}$ = set of variable identifiers
+\item \textbf{Values:} $\mathsf{Val}$ includes:
+  \begin{itemize}[leftmargin=1.25em]
+  \item Unsigned integers: $\mathbb{U}_N = \{0,1,\ldots,2^N{-}1\}$
+  \item Signed integers: $\mathbb{Z}_N = \{-2^{N-1},\ldots,2^{N-1}{-}1\}$
+  \item Booleans: $\mathbb{B} = \{\mathsf{true},\mathsf{false}\}$
+  \item Addresses: $\mathbb{A} = \mathsf{AddrID}$ (symbolic identifiers, e.g., msg.sender, symbolicAddress 1)
+  \item Composite values: structs, arrays, mappings with concrete elements
+  \end{itemize}
+\item \textbf{Stores:} $\sigma \in \Sigma = \mathsf{Var} \rightharpoonup \mathsf{Val}$
+\end{itemize}
+
+\medskip
+\noindent
+L-value resolution $\mathrm{loc}_\sigma(\mathit{lv})$ and write $\mathrm{write}(\sigma,\ell,v)$ update the store. Expressions are pure: $\llbracket e\rrbracket_\sigma\in\mathsf{Val}$.
+
 \noindent\textbf{Array/mapping materialization:}
 $\mathrm{loc}_\sigma(a[i])$ extends $a$ up to $i$ with defaults if needed; $\mathrm{loc}_\sigma(m[k])$ creates $m[k]$ lazily if absent.
 
+\subsection{Collecting Semantics}
+
+For abstraction, we lift concrete semantics to sets of states.
+
+\noindent\textbf{Collecting function semantics:} Given a function $f$ and a set of states $S \subseteq \Sigma$, the collecting semantics is:
+\[
+\mathcal{S}[[f]](S) = \{\sigma' \mid \sigma \in S, \, (\sigma', v_{\text{out}}) \in \mathcal{S}[[f]](\sigma, v_{\text{in}}), \, v_{\text{in}} \in \mathsf{Val}\}
+\]
+
+\noindent\textbf{Reachable states:} The set of all reachable states during contract execution forms the collecting semantics, serving as the basis for abstract interpretation.
+
 \subsection{Abstract Semantics (Denotational)}
 
-Let $\hat{\sigma}:\mathsf{Var}\rightharpoonup \widehat{\mathsf{CVal}}$ be the abstract store. Expressions evaluate to
-$\llbracket e\rrbracket^\sharp_{\hat{\sigma}}\in \widehat{\mathsf{Val}}$.
-
-\noindent\textbf{Abstract outcomes:}
-\[
-\widehat{\mathsf{Res}} \;::=\; \widehat{\Norm}(\hat{\sigma}) \;\mid\; \widehat{\Ret}(\hat{v},\hat{\sigma}) \;\mid\; \widehat{\Abort},
-\]
-with sequencing
-\[
-\begin{aligned}
-\widehat{\Norm}(\hat{\sigma})\ \triangleright^\sharp\ K &:= K(\hat{\sigma}),\\
-\widehat{\Ret}(\hat{v},\hat{\sigma})\ \triangleright^\sharp\ K &:= \widehat{\Ret}(\hat{v},\hat{\sigma}),\\
-\widehat{\Abort}\ \triangleright^\sharp\ K &:= \widehat{\Abort}.
-\end{aligned}
-\]
-
-\noindent\textbf{Auxiliary functions:}
-\begin{itemize}[leftmargin=1.25em]
-\item $\mathrm{refine}(\hat{\sigma},p,b)$: narrows operands of $p$ by interval meets
-\item $\widehat{\mathrm{write}}(\hat{\sigma},\mathit{lv},\hat{v})$: strong update if singleton index/key, weak update otherwise
-\item $\mathrm{joinRes}(r_1,r_2)$: componentwise join of abstract outcomes
-\end{itemize}
-
 \begin{table}[t]
-  \caption{Abstract denotational semantics (statements)}
+  \caption{Abstract semantics (denotational)}
   \label{tab:abs-denot}
   \centering
   \small
@@ -2162,8 +2197,22 @@ with sequencing
       \llbracket s\rrbracket^\sharp(\mathrm{refine}(\hat{\sigma},p,\mathsf{true}))\ \triangleright^\sharp\ H,\;
       \widehat{\Norm}(\mathrm{refine}(\hat{\sigma},p,\mathsf{false}))
     \big)$;
-    $\llbracket \textsf{while}\ p\ \textsf{do}\ s\rrbracket^\sharp
-      = \mathrm{lfp}^{\nabla}(G^\sharp) \;\triangle\; \mathrm{narrow}^{k}$\\
+    $\llbracket \textsf{while}\ p\ \textsf{do}\ s\rrbracket^\sharp = \mathrm{lfp}^{\nabla}(G^\sharp)$\\
+
+    \textsf{for}\ $init$; $p$; $incr$ \textsf{do}\ $s$ &
+    $G^\sharp(H)(\hat{\sigma})=\mathrm{joinRes}\big(
+      \llbracket s\rrbracket^\sharp(\mathrm{refine}(\hat{\sigma},p,\mathsf{true}))\ \triangleright^\sharp\ (\lambda \hat{\sigma}'.\,\llbracket incr\rrbracket^\sharp(\hat{\sigma}')\ \triangleright^\sharp\ H),\;
+      \widehat{\Norm}(\mathrm{refine}(\hat{\sigma},p,\mathsf{false}))
+    \big)$;
+    $\llbracket \textsf{for}\ init; p; incr\ \textsf{do}\ s\rrbracket^\sharp(\hat{\sigma})=
+      \llbracket init\rrbracket^\sharp(\hat{\sigma})\ \triangleright^\sharp\ (\lambda \hat{\sigma}'.\,\mathrm{lfp}^{\nabla}(G^\sharp)(\hat{\sigma}'))$\\
+
+    \textsf{do}\ $s$ \textsf{while}\ $p$ &
+    $G^\sharp(H)(\hat{\sigma})=\llbracket s\rrbracket^\sharp(\hat{\sigma})\ \triangleright^\sharp\ (\lambda \hat{\sigma}'.\,\mathrm{joinRes}\big(
+      H(\mathrm{refine}(\hat{\sigma}',p,\mathsf{true})),\;
+      \widehat{\Norm}(\mathrm{refine}(\hat{\sigma}',p,\mathsf{false}))
+    \big))$;
+    $\llbracket \textsf{do}\ s\ \textsf{while}\ p\rrbracket^\sharp = \mathrm{lfp}^{\nabla}(G^\sharp)$\\
 
     \textsf{return}\ $e$ &
     $\llbracket \textsf{return}\ e\rrbracket^\sharp(\hat{\sigma})=\widehat{\Ret}(\llbracket e\rrbracket^\sharp_{\hat{\sigma}},\,\hat{\sigma})$\\
@@ -2174,18 +2223,37 @@ with sequencing
     \textsf{revert}$(\cdots)$ &
     $\llbracket \textsf{revert}(\cdots)\rrbracket^\sharp(\hat{\sigma})=\widehat{\Abort}$\\
 
+    \textsf{try}\ $e$ (\textsf{returns}\ $(x)$)\ $s_t$ \textsf{catch}\ $s_c$ &
+    $\llbracket \cdot\rrbracket^\sharp(\hat{\sigma})=\mathrm{joinRes}\!\big(
+      \llbracket s_t\rrbracket^\sharp(\hat{\sigma}[x\mapsto \top]),\
+      \llbracket s_c\rrbracket^\sharp(\hat{\sigma})
+    \big)$\\
+
     \textsf{call}$(\overline{e})$ &
     Internal: parameter binding; external: havoc footprint or $\widehat{\Abort}$\\
     \bottomrule
   \end{tabularx}
 \end{table}
 
-\noindent\textbf{Expression semantics:}
-Arithmetic ($+,-,*,/,\%$): interval arithmetic with wrapping;
-comparisons ($<,\le,=,\neq,\ge,>$): abstract booleans;
-logical ($\land,\lor,\neg$): three-valued logic.
+Our abstract semantics forms a Galois connection with the concrete semantics, ensuring soundness. The abstraction function $\alpha$ and concretization function $\gamma$ connect concrete and abstract domains, guaranteeing that abstract computations safely over-approximate concrete behaviors.
 
-\noindent\textbf{Array/mapping access:}
-Singleton index/key: strong update; range/non-singleton: join of materialized cells.
+\medskip
+\noindent\textbf{Abstract semantic domains:}
+\begin{itemize}[leftmargin=1.25em]
+\item \textbf{Abstract values:} $\widehat{\mathsf{Val}}$ = union of atomic abstract values ($\widehat{\mathbb{U}}_N$, $\widehat{\mathbb{Z}}_N$, $\widehat{\mathbb{B}}$, $\widehat{\mathbb{A}}$, etc.) and composite abstract values ($\widehat{\mathsf{Struct}}$, $\widehat{\mathsf{Arr}}$, $\widehat{\mathsf{Map}}$) from \S\ref{app:semantics}.2
+\item \textbf{Abstract stores:} $\hat{\sigma} \in \widehat{\Sigma} = \mathsf{Var} \rightharpoonup \widehat{\mathsf{Val}}$
+\end{itemize}
+
+\medskip
+\noindent
+Expressions evaluate to $\llbracket e\rrbracket^\sharp_{\hat{\sigma}}\in \widehat{\mathsf{Val}}$.
+
+\medskip
+\noindent\textbf{Auxiliary functions:}
+\begin{itemize}[leftmargin=1.25em]
+\item $\mathrm{refine}(\hat{\sigma},p,b)$: narrows operands of $p$ by interval meets
+\item $\widehat{\mathrm{write}}(\hat{\sigma},\mathit{lv},\hat{v})$: strong update if singleton index/key, weak update otherwise
+\item $\mathrm{joinRes}(r_1,r_2)$: componentwise join of abstract results
+\end{itemize}
 
 \end{document}
