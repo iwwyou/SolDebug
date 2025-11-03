@@ -3,10 +3,16 @@
 \providecommand\hyper@newdestlabel[2]{}
 \providecommand\HyField@AuxAddToFields[1]{}
 \providecommand\HyField@AuxAddToCoFields[2]{}
-\citation{smart contract evolution,solidity}
+\citation{coinmarketcap}
+\citation{solidity}
+\citation{gpt}
+\citation{llama}
 \Newlabel{1}{1}
 \@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
 \newlabel{sec1}{{1}{1}{Introduction}{section.1}{}}
+\citation{remix}
+\citation{hardhat}
+\citation{forge}
 \citation{interview}
 \citation{dappscan}
 \@writefile{toc}{\contentsline {section}{\numberline {2}Background}{3}{section.2}\protected@file@percent }
@@ -14,9 +20,9 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Structure of Solidity Smart Contract}{3}{subsection.2.1}\protected@file@percent }
 \newlabel{lst:grammar-min}{{1}{3}{Minimal example used to illustrate grammar elements relevant to our analysis}{lstlisting.1}{}}
 \@writefile{lol}{\contentsline {lstlisting}{\numberline {1}{\ignorespaces Minimal example used to illustrate grammar elements relevant to our analysis}}{3}{lstlisting.1}\protected@file@percent }
-\citation{solidity}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Solidity Execution Model}{4}{subsection.2.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Root Causes of the Solidity-Debugging Bottleneck}{4}{subsection.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Solidity Execution and Debugging Workflow}{4}{subsection.2.2}\protected@file@percent }
+\citation{pycharm}
+\citation{visual}
 \newlabel{fig:step-compile}{{1a}{5}{Compile}{figure.caption.2}{}}
 \newlabel{sub@fig:step-compile}{{a}{5}{Compile}{figure.caption.2}{}}
 \newlabel{fig:step-deploy}{{1b}{5}{Deploy related contracts}{figure.caption.2}{}}
@@ -28,8 +34,10 @@
 \@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Traditional Solidity debugging workflow}}{5}{figure.caption.2}\protected@file@percent }
 \providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
 \newlabel{fig:legacy-debug-grid}{{1}{5}{Traditional Solidity debugging workflow}{figure.caption.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Root Causes of the Solidity-Debugging Bottleneck}{5}{subsection.2.3}\protected@file@percent }
 \citation{interview}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}Proposed Methodology and Technical Challenges}{6}{subsection.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}Proposed Approach Overview}{6}{subsection.2.4}\protected@file@percent }
+\citation{antlr}
 \@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces \textsc  {SolQDebug} architecture}}{7}{figure.caption.3}\protected@file@percent }
 \newlabel{fig:solqdebug-arch}{{2}{7}{\textsc {SolQDebug} architecture}{figure.caption.3}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {3}The design of SolQDebug}{7}{section.3}\protected@file@percent }
@@ -43,56 +51,54 @@
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.2}Batch Annotation Analysis}{10}{subsubsection.3.2.2}\protected@file@percent }
 \newlabel{lst:grammar-batch}{{2}{10}{Burn function with batch annotations}{lstlisting.2}{}}
 \@writefile{lol}{\contentsline {lstlisting}{\numberline {2}{\ignorespaces Burn function with batch annotations}}{10}{lstlisting.2}\protected@file@percent }
+\citation{solgram}
 \@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Interactive parser entry rules}}{11}{table.caption.8}\protected@file@percent }
 \newlabel{tab:interactive-rules}{{2}{11}{Interactive parser entry rules}{table.caption.8}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Interactive Parser}{11}{subsection.3.3}\protected@file@percent }
+\citation{solqrule}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Dynamic CFG Construction}{12}{subsection.3.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.1}Statement-Local, Incremental Construction}{13}{subsubsection.3.4.1}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Simple statement insertion. The builder creates one node and splices it between the current node and the original successors}}{13}{figure.caption.9}\protected@file@percent }
-\newlabel{fig:new-simple-statement}{{4}{13}{Simple statement insertion. The builder creates one node and splices it between the current node and the original successors}{figure.caption.9}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces If statement insertion. The builder creates a \textsc  {condition node}, two nodes for true/false arms, and an \textsc  {if join}}}{14}{figure.caption.10}\protected@file@percent }
-\newlabel{fig:new-if}{{5}{14}{If statement insertion. The builder creates a \textsc {condition node}, two nodes for true/false arms, and an \textsc {if join}}{figure.caption.10}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Else-if statement insertion. The builder replaces the false arm with a new \textsc  {condition node}, two nodes, and an \textsc  {else-if join}}}{14}{figure.caption.11}\protected@file@percent }
-\newlabel{fig:new-else-if}{{6}{14}{Else-if statement insertion. The builder replaces the false arm with a new \textsc {condition node}, two nodes, and an \textsc {else-if join}}{figure.caption.11}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Else statement insertion. The builder attaches a node to the false branch of the corresponding \texttt  {if}/\texttt  {else if}, connecting to the \textsc  {if join}}}{15}{figure.caption.12}\protected@file@percent }
-\newlabel{fig:new-else}{{7}{15}{Else statement insertion. The builder attaches a node to the false branch of the corresponding \texttt {if}/\texttt {else if}, connecting to the \textsc {if join}}{figure.caption.12}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces While loop insertion. The builder creates a \textsc  {fixpoint evaluation node} $\phi $, a \textsc  {condition node}, a loop body node, and a \textsc  {loop exit node}}}{15}{figure.caption.13}\protected@file@percent }
-\newlabel{fig:new-while}{{8}{15}{While loop insertion. The builder creates a \textsc {fixpoint evaluation node} $\phi $, a \textsc {condition node}, a loop body node, and a \textsc {loop exit node}}{figure.caption.13}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Break statement insertion. The \texttt  {break} node's outgoing edge is redirected to the \textsc  {loop exit node}}}{16}{figure.caption.14}\protected@file@percent }
-\newlabel{fig:new-break}{{9}{16}{Break statement insertion. The \texttt {break} node's outgoing edge is redirected to the \textsc {loop exit node}}{figure.caption.14}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Continue statement insertion. The \texttt  {continue} node's outgoing edge is redirected to the loop's \textsc  {fixpoint evaluation node} $\phi $}}{16}{figure.caption.15}\protected@file@percent }
-\newlabel{fig:new-continue}{{10}{16}{Continue statement insertion. The \texttt {continue} node's outgoing edge is redirected to the loop's \textsc {fixpoint evaluation node} $\phi $}{figure.caption.15}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Return statement insertion. The \texttt  {return} node is rewired to the function's unique \textsc  {return exit}}}{16}{figure.caption.16}\protected@file@percent }
-\newlabel{fig:new-return}{{11}{16}{Return statement insertion. The \texttt {return} node is rewired to the function's unique \textsc {return exit}}{figure.caption.16}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Line-to-node index mapping by statement type}}{17}{table.caption.19}\protected@file@percent }
-\newlabel{tab:line-mapping}{{3}{17}{Line-to-node index mapping by statement type}{table.caption.19}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces Require statement insertion. The builder creates a \textsc  {condition node} with true edge to a node and false edge to the \textsc  {error exit}}}{17}{figure.caption.17}\protected@file@percent }
-\newlabel{fig:new-require}{{12}{17}{Require statement insertion. The builder creates a \textsc {condition node} with true edge to a node and false edge to the \textsc {error exit}}{figure.caption.17}{}}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.2}Line-Based Insertion-Site Selection}{17}{subsubsection.3.4.2}\protected@file@percent }
-\@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Dependent-Context Insertion}}{18}{algorithm.1}\protected@file@percent }
-\newlabel{alg:get-branch-context}{{1}{18}{Dependent-Context Insertion}{algorithm.1}{}}
-\@writefile{loa}{\contentsline {algorithm}{\numberline {2}{\ignorespaces Independent-Context Insertion}}{19}{algorithm.2}\protected@file@percent }
-\newlabel{alg:get-insertion-site}{{2}{19}{Independent-Context Insertion}{algorithm.2}{}}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.3}Abstract Interpretation for Incremental Analysis}{19}{subsubsection.3.4.3}\protected@file@percent }
-\@writefile{loa}{\contentsline {algorithm}{\numberline {3}{\ignorespaces Incremental Interpretation}}{20}{algorithm.3}\protected@file@percent }
-\newlabel{alg:reinterpret}{{3}{20}{Incremental Interpretation}{algorithm.3}{}}
-\@writefile{loa}{\contentsline {algorithm}{\numberline {4}{\ignorespaces Loop Fixpoint with Adaptive Widening}}{21}{algorithm.4}\protected@file@percent }
-\newlabel{alg:fixpoint}{{4}{21}{Loop Fixpoint with Adaptive Widening}{algorithm.4}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.1}CFG Hierarchy}{13}{subsubsection.3.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.2}Statement-Local, Incremental Construction}{13}{subsubsection.3.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.3}Line-Based Insertion-Site Selection}{13}{subsubsection.3.4.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Line-to-node index mapping by statement type}}{14}{table.caption.10}\protected@file@percent }
+\newlabel{tab:line-mapping}{{3}{14}{Line-to-node index mapping by statement type}{table.caption.10}{}}
+\citation{solqimpl}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Dependent-Context Insertion}}{15}{algorithm.1}\protected@file@percent }
+\newlabel{alg:get-branch-context}{{1}{15}{Dependent-Context Insertion}{algorithm.1}{}}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {2}{\ignorespaces Independent-Context Insertion}}{16}{algorithm.2}\protected@file@percent }
+\newlabel{alg:get-insertion-site}{{2}{16}{Independent-Context Insertion}{algorithm.2}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.4}Abstract Interpretation for Incremental Analysis}{17}{subsubsection.3.4.4}\protected@file@percent }
+\newlabel{sec:impl}{{3.4.4}{17}{Abstract Interpretation for Incremental Analysis}{subsubsection.3.4.4}{}}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {3}{\ignorespaces Incremental Interpretation}}{17}{algorithm.3}\protected@file@percent }
+\newlabel{alg:reinterpret}{{3}{17}{Incremental Interpretation}{algorithm.3}{}}
+\citation{flow,DBM}
+\citation{DBM}
+\citation{flow}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {4}{\ignorespaces Loop Fixpoint with Adaptive Widening}}{19}{algorithm.4}\protected@file@percent }
+\newlabel{alg:fixpoint}{{4}{19}{Loop Fixpoint with Adaptive Widening}{algorithm.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Evaluation}{19}{section.4}\protected@file@percent }
 \citation{dappscan}
-\@writefile{toc}{\contentsline {section}{\numberline {4}Evaluation}{22}{section.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Experimental Setup}{22}{subsection.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}RQ1 - Responsiveness}{23}{subsection.4.2}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Benchmark dataset: 30 representative contracts from DAppSCAN with diverse debugging scenarios.}}{24}{table.caption.20}\protected@file@percent }
-\newlabel{tab:benchmark-dataset}{{4}{24}{Benchmark dataset: 30 representative contracts from DAppSCAN with diverse debugging scenarios}{table.caption.20}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {13}{\ignorespaces Debugging latency comparison between Remix and \textsc  {SolQDebug} across varying ByteOp counts and test-case widths \(\Delta \). \textsc  {SolQDebug} maintains consistent sub-second latency regardless of function complexity or input interval size, while Remix's latency scales linearly with both dimensions.}}{25}{figure.caption.21}\protected@file@percent }
-\newlabel{fig:rq1-responsiveness}{{13}{25}{Debugging latency comparison between Remix and \textsc {SolQDebug} across varying ByteOp counts and test-case widths \(\Delta \). \textsc {SolQDebug} maintains consistent sub-second latency regardless of function complexity or input interval size, while Remix's latency scales linearly with both dimensions}{figure.caption.21}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {14}{\ignorespaces  F90 (90th percentile of interval inflation) for \texttt  {Lock::pending} under \textsc  {overlap} and \textsc  {diff} annotation patterns. As input width ($\Delta $) increases, \textsc  {overlap} achieves progressively tighter precision (F90: 12.0 $\rightarrow $ 4.8), while \textsc  {diff} maintains near-constant inflation (F90 $\approx $ 13--14).}}{26}{figure.caption.22}\protected@file@percent }
-\newlabel{fig:rq2-lock}{{14}{26}{F90 (90th percentile of interval inflation) for \texttt {Lock::pending} under \textsc {overlap} and \textsc {diff} annotation patterns. As input width ($\Delta $) increases, \textsc {overlap} achieves progressively tighter precision (F90: 12.0 $\rightarrow $ 4.8), while \textsc {diff} maintains near-constant inflation (F90 $\approx $ 13--14)}{figure.caption.22}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}RQ2 - Impact of Annotation Patterns on Precision in Complex Arithmetic Operations}{26}{subsection.4.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}RQ3 - Loops}{27}{subsection.4.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{28}{section.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Why use Abstract Interpretation for Debugging}{28}{subsection.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Limitation}{29}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Experimental Setup}{20}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}RQ1 - Responsiveness}{20}{subsection.4.2}\protected@file@percent }
+\citation{remix_bench}
+\citation{selenium}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Benchmark dataset: 30 representative contracts from DAppSCAN with diverse debugging scenarios.}}{21}{table.caption.11}\protected@file@percent }
+\newlabel{tab:benchmark-dataset}{{4}{21}{Benchmark dataset: 30 representative contracts from DAppSCAN with diverse debugging scenarios}{table.caption.11}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Debugging latency comparison between Remix and \textsc  {SolQDebug} across varying ByteOp counts and test-case widths \(\Delta \). \textsc  {SolQDebug} maintains consistent sub-second latency regardless of function complexity or symbolic interval input width, while Remix's latency scales linearly with both dimensions.}}{22}{figure.caption.12}\protected@file@percent }
+\newlabel{fig:rq1-responsiveness}{{4}{22}{Debugging latency comparison between Remix and \textsc {SolQDebug} across varying ByteOp counts and test-case widths \(\Delta \). \textsc {SolQDebug} maintains consistent sub-second latency regardless of function complexity or symbolic interval input width, while Remix's latency scales linearly with both dimensions}{figure.caption.12}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces  F90 (90th percentile of interval inflation) for \texttt  {Lock::pending} under \textsc  {overlap} and \textsc  {diff} annotation patterns. As input width ($\Delta $) increases, \textsc  {overlap} achieves progressively tighter precision (F90: 12.0 $\rightarrow $ 4.8), while \textsc  {diff} maintains near-constant inflation (F90 $\approx $ 13--14).}}{23}{figure.caption.13}\protected@file@percent }
+\newlabel{fig:rq2-lock}{{5}{23}{F90 (90th percentile of interval inflation) for \texttt {Lock::pending} under \textsc {overlap} and \textsc {diff} annotation patterns. As input width ($\Delta $) increases, \textsc {overlap} achieves progressively tighter precision (F90: 12.0 $\rightarrow $ 4.8), while \textsc {diff} maintains near-constant inflation (F90 $\approx $ 13--14)}{figure.caption.13}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}RQ2 - Impact of Annotation Patterns on Precision in Complex Arithmetic Operations}{23}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}RQ3 - Loops}{24}{subsection.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{25}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Why use Abstract Interpretation with Interval Domain for Debugging}{25}{subsection.5.1}\protected@file@percent }
+\citation{remix}
+\citation{hardhat}
+\citation{forge}
+\citation{soldepro}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Current Limitations}{26}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}Related Works}{26}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Solidity IDEs and Debuggers}{26}{subsection.6.1}\protected@file@percent }
 \citation{securify,slither}
 \citation{mythril}
 \citation{solidet}
@@ -104,85 +110,114 @@
 \citation{ityfuzz}
 \citation{zeus,verismart,pulse}
 \citation{peculiar,tmlvd,pscvfinder}
-\@writefile{toc}{\contentsline {section}{\numberline {6}Related Works}{30}{section.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Solidity IDEs and Debuggers}{30}{subsection.6.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Solidity Vulnerability Detection and Verification}{30}{subsection.6.2}\protected@file@percent }
 \citation{flow,DBM}
 \citation{flow}
 \citation{DBM,dao}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Solidity Vulnerability Detection and Verification}{27}{subsection.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Solidity-Specific Abstract Interpretation Frameworks}{27}{subsection.6.3}\protected@file@percent }
 \citation{daig,ds,iac,iaj,fap}
 \citation{daig}
 \citation{ds}
 \citation{iac}
 \citation{iaj}
 \citation{fap}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Solidity-Specific Abstract Interpretation Frameworks}{31}{subsection.6.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Interactive Abstract Interpretation for Traditional Languages}{31}{subsection.6.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{32}{section.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Interactive Abstract Interpretation for Traditional Languages}{28}{subsection.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{28}{section.7}\protected@file@percent }
+\citation{dappscan}
 \bibcite{antlr}{{1}{2025}{{ANTLR}}{{}}}
 \bibcite{gpt}{{2}{2025}{{ChatGPT}}{{}}}
-\bibcite{smart contract evolution}{{3}{2025}{{Chen et~al.}}{{}}}
-\bibcite{fap}{{4}{2024}{{Chimdyalwar}}{{}}}
-\bibcite{psp}{{5}{2025}{{ConsenSys Diligence}}{{}}}
-\bibcite{cousot}{{6}{1977}{{Cousot and Cousot}}{{}}}
-\bibcite{iac}{{7}{2024}{{Erhard et~al.}}{{}}}
-\bibcite{forge}{{8}{2025}{{Foundry Forge}}{{}}}
-\bibcite{echidna}{{9}{2020}{{Grieco et~al.}}{{}}}
-\bibcite{flow}{{10}{2023}{{Halder et~al.}}{{}}}
-\bibcite{DBM}{{11}{2024}{{Halder}}{{}}}
-\bibcite{hardhat}{{12}{2025}{{Hardhat}}{{}}}
-\bibcite{solidet}{{13}{2023}{{Hu et~al.}}{{}}}
-\bibcite{pycharm}{{14}{2025}{{JetBrains}}{{}}}
-\bibcite{confuzz}{{15}{2018}{{Jiang et~al.}}{{}}}
-\bibcite{zeus}{{16}{2018}{{Kalra et~al.}}{{}}}
-\bibcite{llama}{{17}{2025}{{Llama}}{{}}}
-\bibcite{transracer}{{18}{2023}{{Ma et~al.}}{{}}}
-\bibcite{dao}{{19}{2019}{{Mehar et~al.}}{{}}}
-\bibcite{visual}{{20}{2025}{{Microsoft}}{{}}}
-\bibcite{sfuzz}{{21}{2020}{{Nguyen et~al.}}{{}}}
-\bibcite{ethersolve}{{22}{2023}{{Pasqua et~al.}}{{}}}
-\bibcite{remix}{{23}{2025}{{Remix IDE}}{{}}}
-\bibcite{remix_bench}{{24}{2025}{{Remix Benchmark}}{{}}}
-\bibcite{iaj}{{25}{2024}{{Riouak et~al.}}{{}}}
-\bibcite{yi}{{26}{2020}{{Rival and Yi}}{{}}}
-\bibcite{selenium}{{27}{2025}{{Selenium with Python}}{{}}}
-\bibcite{ityfuzz}{{28}{2023}{{Shou et~al.}}{{}}}
-\bibcite{verismart}{{29}{2020}{{So et~al.}}{{}}}
-\bibcite{solcx}{{30}{2025}{{solcx}}{{}}}
-\bibcite{solidity}{{31}{2025}{{Solidity}}{{}}}
-\bibcite{soldepro}{{32}{2025}{{Solidity Debugger Pro}}{{}}}
-\bibcite{solgram}{{33}{2025}{{Solidity Language Grammar}}{{}}}
-\bibcite{solqrule}{{34}{2025}{{SolQDebug Language Grammar Rule}}{{}}}
-\bibcite{daig}{{35}{2021}{{Stein et~al.}}{{}}}
-\bibcite{ds}{{36}{2024}{{Stein et~al.}}{{}}}
-\bibcite{pulse}{{37}{2021}{{Stephens et~al.}}{{}}}
-\bibcite{securify}{{38}{2018}{{Tsankov et~al.}}{{}}}
-\bibcite{slither}{{39}{2019}{{Tsankov et~al.}}{{}}}
-\bibcite{peculiar}{{40}{2021}{{Wu et~al.}}{{}}}
-\bibcite{mythril}{{41}{2022}{{Yao et~al.}}{{}}}
-\bibcite{pscvfinder}{{42}{2023}{{Yu et~al.}}{{}}}
-\bibcite{dappscan}{{43}{2024}{{Zheng et~al.}}{{}}}
-\bibcite{tmlvd}{{44}{2022}{{Zhou et~al.}}{{}}}
-\bibcite{interview}{{45}{2019}{{Zou et~al.}}{{}}}
-\@writefile{toc}{\contentsline {section}{\numberline {A}Interactive Parser Grammar Specification}{36}{appendix.A}\protected@file@percent }
-\newlabel{appendix:interactive-grammar}{{A}{36}{Interactive Parser Grammar Specification}{appendix.A}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {A.1}Entry Rules for Solidity Program Fragments}{36}{subsection.A.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.1}Rule 1: \texttt  {interactiveSourceUnit}}{36}{subsubsection.A.1.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.2}Rule 2: \texttt  {interactiveEnumUnit}}{36}{subsubsection.A.1.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.3}Rule 3: \texttt  {interactiveStructUnit}}{36}{subsubsection.A.1.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.4}Rule 4: \texttt  {interactiveBlockUnit}}{36}{subsubsection.A.1.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.5}Rule 5: \texttt  {interactiveDoWhileUnit}}{37}{subsubsection.A.1.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.6}Rule 6: \texttt  {interactiveIfElseUnit}}{37}{subsubsection.A.1.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.7}Rule 7: \texttt  {interactiveCatchClauseUnit}}{38}{subsubsection.A.1.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {A.2}Entry Rule for Debugging Annotations}{38}{subsection.A.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.2.1}\texttt  {debugUnit}}{38}{subsubsection.A.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {B}Abstract Domain and Formal Semantics}{38}{appendix.B}\protected@file@percent }
-\newlabel{app:semantics}{{B}{38}{Abstract Domain and Formal Semantics}{appendix.B}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {B.1}Abstract Domain}{38}{subsection.B.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {B.2}Concrete Semantics (Denotational)}{39}{subsection.B.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {B.3}Abstract Semantics (Denotational)}{39}{subsection.B.3}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Concrete denotational semantics (statements)}}{40}{table.caption.28}\protected@file@percent }
-\newlabel{tab:conc-denot}{{5}{40}{Concrete denotational semantics (statements)}{table.caption.28}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Abstract denotational semantics (statements)}}{41}{table.caption.30}\protected@file@percent }
-\newlabel{tab:abs-denot}{{6}{41}{Abstract denotational semantics (statements)}{table.caption.30}{}}
-\gdef \@abspage@last{41}
+\bibcite{coinmarketcap}{{3}{2025}{{CoinMarketCap}}{{}}}
+\bibcite{smart contract evolution}{{4}{2025}{{Chen et~al.}}{{}}}
+\bibcite{fap}{{5}{2024}{{Chimdyalwar}}{{}}}
+\bibcite{psp}{{6}{2025}{{ConsenSys Diligence}}{{}}}
+\bibcite{cousot}{{7}{1977}{{Cousot and Cousot}}{{}}}
+\bibcite{iac}{{8}{2024}{{Erhard et~al.}}{{}}}
+\bibcite{forge}{{9}{2025}{{Foundry Forge}}{{}}}
+\bibcite{echidna}{{10}{2020}{{Grieco et~al.}}{{}}}
+\bibcite{flow}{{11}{2023}{{Halder et~al.}}{{}}}
+\bibcite{DBM}{{12}{2024}{{Halder}}{{}}}
+\bibcite{hardhat}{{13}{2025}{{Hardhat}}{{}}}
+\bibcite{solidet}{{14}{2023}{{Hu et~al.}}{{}}}
+\bibcite{pycharm}{{15}{2025}{{JetBrains}}{{}}}
+\bibcite{confuzz}{{16}{2018}{{Jiang et~al.}}{{}}}
+\bibcite{zeus}{{17}{2018}{{Kalra et~al.}}{{}}}
+\bibcite{llama}{{18}{2025}{{Llama}}{{}}}
+\bibcite{transracer}{{19}{2023}{{Ma et~al.}}{{}}}
+\bibcite{dao}{{20}{2019}{{Mehar et~al.}}{{}}}
+\bibcite{visual}{{21}{2025}{{Microsoft}}{{}}}
+\bibcite{sfuzz}{{22}{2020}{{Nguyen et~al.}}{{}}}
+\bibcite{ethersolve}{{23}{2023}{{Pasqua et~al.}}{{}}}
+\bibcite{remix}{{24}{2025}{{Remix IDE}}{{}}}
+\bibcite{remix_bench}{{25}{2025}{{Remix Benchmark}}{{}}}
+\bibcite{iaj}{{26}{2024}{{Riouak et~al.}}{{}}}
+\bibcite{yi}{{27}{2020}{{Rival and Yi}}{{}}}
+\bibcite{selenium}{{28}{2025}{{Selenium with Python}}{{}}}
+\bibcite{ityfuzz}{{29}{2023}{{Shou et~al.}}{{}}}
+\bibcite{verismart}{{30}{2020}{{So et~al.}}{{}}}
+\bibcite{solcx}{{31}{2025}{{solcx}}{{}}}
+\bibcite{solidity}{{32}{2025}{{Solidity}}{{}}}
+\bibcite{soldepro}{{33}{2025}{{Solidity Debugger Pro}}{{}}}
+\bibcite{solgram}{{34}{2025}{{Solidity Language Grammar}}{{}}}
+\bibcite{solqimpl}{{35}{2025}{{SolQDebug Implementation}}{{}}}
+\bibcite{solqrule}{{36}{2025}{{SolQDebug Language Grammar Rule}}{{}}}
+\bibcite{daig}{{37}{2021}{{Stein et~al.}}{{}}}
+\bibcite{ds}{{38}{2024}{{Stein et~al.}}{{}}}
+\bibcite{pulse}{{39}{2021}{{Stephens et~al.}}{{}}}
+\bibcite{securify}{{40}{2018}{{Tsankov et~al.}}{{}}}
+\bibcite{slither}{{41}{2019}{{Feist et~al.}}{{}}}
+\bibcite{peculiar}{{42}{2021}{{Wu et~al.}}{{}}}
+\bibcite{mythril}{{43}{2022}{{Yao et~al.}}{{}}}
+\bibcite{pscvfinder}{{44}{2023}{{Yu et~al.}}{{}}}
+\bibcite{dappscan}{{45}{2024}{{Zheng et~al.}}{{}}}
+\bibcite{tmlvd}{{46}{2022}{{Zhou et~al.}}{{}}}
+\bibcite{interview}{{47}{2019}{{Zou et~al.}}{{}}}
+\@writefile{toc}{\contentsline {section}{\numberline {A}Interactive Parser Grammar Specification}{33}{appendix.A}\protected@file@percent }
+\newlabel{appendix:interactive-grammar}{{A}{33}{Interactive Parser Grammar Specification}{appendix.A}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.1}Entry Rules for Solidity Program Fragments}{33}{subsection.A.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.1}Rule 1: \texttt  {interactiveSourceUnit}}{33}{subsubsection.A.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.2}Rule 2: \texttt  {interactiveEnumUnit}}{33}{subsubsection.A.1.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.3}Rule 3: \texttt  {interactiveStructUnit}}{33}{subsubsection.A.1.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.4}Rule 4: \texttt  {interactiveBlockUnit}}{33}{subsubsection.A.1.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.5}Rule 5: \texttt  {interactiveDoWhileUnit}}{34}{subsubsection.A.1.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.6}Rule 6: \texttt  {interactiveIfElseUnit}}{34}{subsubsection.A.1.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.7}Rule 7: \texttt  {interactiveCatchClauseUnit}}{35}{subsubsection.A.1.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.2}Entry Rule for Debugging Annotations}{35}{subsection.A.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.2.1}\texttt  {debugUnit}}{35}{subsubsection.A.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {B}Dynamic CFG Construction Patterns}{35}{appendix.B}\protected@file@percent }
+\newlabel{appendix:cfg-patterns}{{B}{35}{Dynamic CFG Construction Patterns}{appendix.B}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {B.1}CFG Hierarchy}{36}{subsection.B.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Structure of ContractCFG. The contract-level CFG sequences state variable initialization, constructor execution, and all function definitions.}}{36}{figure.caption.19}\protected@file@percent }
+\newlabel{fig:contract-cfg}{{6}{36}{Structure of ContractCFG. The contract-level CFG sequences state variable initialization, constructor execution, and all function definitions}{figure.caption.19}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Structure of FunctionCFG. Each function maintains its own control-flow graph. When modifiers are present, control flows from the function entry to the modifier, and returns from the modifier's placeholder (\texttt  {\_}) back to the function body, eventually reaching the function exit.}}{36}{figure.caption.20}\protected@file@percent }
+\newlabel{fig:function-cfg}{{7}{36}{Structure of FunctionCFG. Each function maintains its own control-flow graph. When modifiers are present, control flows from the function entry to the modifier, and returns from the modifier's placeholder (\texttt {\_}) back to the function body, eventually reaching the function exit}{figure.caption.20}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {B.2}Statement-Level Construction Patterns}{37}{subsection.B.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Simple statement insertion: single node spliced between current node and successors}}{37}{figure.caption.21}\protected@file@percent }
+\newlabel{fig:new-simple-statement}{{8}{37}{Simple statement insertion: single node spliced between current node and successors}{figure.caption.21}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces If statement insertion. The builder creates a \textsc  {condition node}, two nodes for true/false arms, and an \textsc  {if join}}}{37}{figure.caption.22}\protected@file@percent }
+\newlabel{fig:new-if}{{9}{37}{If statement insertion. The builder creates a \textsc {condition node}, two nodes for true/false arms, and an \textsc {if join}}{figure.caption.22}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Else-if statement insertion. The builder replaces the false arm with a new \textsc  {condition node}, two nodes, and an \textsc  {else-if join}}}{38}{figure.caption.23}\protected@file@percent }
+\newlabel{fig:new-else-if}{{10}{38}{Else-if statement insertion. The builder replaces the false arm with a new \textsc {condition node}, two nodes, and an \textsc {else-if join}}{figure.caption.23}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Else statement insertion. The builder attaches a node to the false branch of the corresponding \texttt  {if}/\texttt  {else if}, connecting to the \textsc  {if join}}}{38}{figure.caption.24}\protected@file@percent }
+\newlabel{fig:new-else}{{11}{38}{Else statement insertion. The builder attaches a node to the false branch of the corresponding \texttt {if}/\texttt {else if}, connecting to the \textsc {if join}}{figure.caption.24}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces While loop insertion. The builder creates a \textsc  {fixpoint evaluation node} $\phi $, a \textsc  {condition node}, a loop body node, and a \textsc  {loop exit node}}}{39}{figure.caption.25}\protected@file@percent }
+\newlabel{fig:new-while}{{12}{39}{While loop insertion. The builder creates a \textsc {fixpoint evaluation node} $\phi $, a \textsc {condition node}, a loop body node, and a \textsc {loop exit node}}{figure.caption.25}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {13}{\ignorespaces Break statement insertion. The \texttt  {break} node's outgoing edge is redirected to the \textsc  {loop exit node}}}{39}{figure.caption.26}\protected@file@percent }
+\newlabel{fig:new-break}{{13}{39}{Break statement insertion. The \texttt {break} node's outgoing edge is redirected to the \textsc {loop exit node}}{figure.caption.26}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {14}{\ignorespaces Continue statement insertion. The \texttt  {continue} node's outgoing edge is redirected to the loop's \textsc  {fixpoint evaluation node} $\phi $}}{40}{figure.caption.27}\protected@file@percent }
+\newlabel{fig:new-continue}{{14}{40}{Continue statement insertion. The \texttt {continue} node's outgoing edge is redirected to the loop's \textsc {fixpoint evaluation node} $\phi $}{figure.caption.27}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {15}{\ignorespaces Return statement insertion. The \texttt  {return} node is rewired to the function's unique \textsc  {return exit}}}{40}{figure.caption.28}\protected@file@percent }
+\newlabel{fig:new-return}{{15}{40}{Return statement insertion. The \texttt {return} node is rewired to the function's unique \textsc {return exit}}{figure.caption.28}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {16}{\ignorespaces Require statement insertion. The builder creates a \textsc  {condition node} with true edge to a node and false edge to the \textsc  {error exit}}}{40}{figure.caption.29}\protected@file@percent }
+\newlabel{fig:new-require}{{16}{40}{Require statement insertion. The builder creates a \textsc {condition node} with true edge to a node and false edge to the \textsc {error exit}}{figure.caption.29}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {C}Abstract Domain and Formal Semantics}{41}{appendix.C}\protected@file@percent }
+\newlabel{app:semantics}{{C}{41}{Abstract Domain and Formal Semantics}{appendix.C}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.1}Language Syntax}{41}{subsection.C.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.2}Abstract Domain}{41}{subsection.C.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Concrete semantics (denotational)}}{42}{table.caption.31}\protected@file@percent }
+\newlabel{tab:conc-denot}{{5}{42}{Concrete semantics (denotational)}{table.caption.31}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.3}Concrete Semantics}{42}{subsection.C.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.4}Collecting Semantics}{43}{subsection.C.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.5}Abstract Semantics (Denotational)}{43}{subsection.C.5}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Abstract semantics (denotational)}}{44}{table.caption.33}\protected@file@percent }
+\newlabel{tab:abs-denot}{{6}{44}{Abstract semantics (denotational)}{table.caption.33}{}}
+\gdef \@abspage@last{44}

@@ -1,12 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python:*)",
-      "Bash(tee:*)",
-      "Bash(mv:*)",
-      "Bash(git ls-tree:*)",
-      "Bash(mkdir:*)",
-      "Bash(cp:*)"
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []
