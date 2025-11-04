@@ -300,21 +300,21 @@ class Engine:
             start_env: Loop 진입 시점의 변수 환경
 
         Returns:
-            추정 반복 횟수 (기본값: 2, 최대값: 20)
+            추정 반복 횟수 (기본값: 1, 최대값: 20)
         """
         # Loop head가 condition node가 아니면 기본값
         if not getattr(head, 'condition_node', False):
-            return 2
+            return 1
 
         cond_expr = getattr(head, 'condition_expr', None)
         if cond_expr is None:
-            return 2
+            return 1
 
         # 조건식 평가
         try:
             # Binary expression인지 확인
             if not hasattr(cond_expr, 'operator') or cond_expr.operator not in ['<', '<=', '>', '>=', '!=']:
-                return 2
+                return 1
 
             # 좌변/우변 평가 (Evaluation.py 활용)
             left_val = self.eval.evaluate_expression(cond_expr.left, start_env, None, None)
@@ -322,11 +322,11 @@ class Engine:
 
             # Interval인지 확인
             if not (VariableEnv.is_interval(left_val) and VariableEnv.is_interval(right_val)):
-                return 2
+                return 1
 
             # bottom 체크
             if left_val.is_bottom() or right_val.is_bottom():
-                return 2
+                return 1
 
             # 반복 횟수 계산
             if cond_expr.operator in ['<', '<=']:
@@ -343,11 +343,11 @@ class Engine:
                 # != 조건은 예측 어려움, 보수적으로 처리
                 return 10
             else:
-                return 2
+                return 1
 
-            # 합리적인 범위로 제한: [2, 20]
+            # 합리적인 범위로 제한: [1, 20]
             if iterations <= 0:
-                return 2
+                return 1
             elif iterations > 20:
                 return 20
             else:
@@ -355,7 +355,7 @@ class Engine:
 
         except Exception as e:
             # 평가 실패 시 기본값
-            return 2
+            return 1
 
     # =================================================================
     #  Fixpoint (루프 중 문장기록 억제)
@@ -427,10 +427,6 @@ class Engine:
         WL = deque([head])
         iteration = 0
 
-        # 조건식 수렴 체크를 위한 변수
-        cond_expr = getattr(head, 'condition_expr', None)
-        prev_join_env = None  # 이전 iteration의 join 노드 환경
-
         while WL and max(visit_cnt.values(), default=0) < W_MAX:
             node = WL.popleft()
             visit_cnt[node] += 1
@@ -474,18 +470,6 @@ class Engine:
                 node.fixpoint_evaluation_node_vars = VariableEnv.copy_variables(out_joined)
 
             equal = VariableEnv.variables_equal(out_old, out_joined)
-
-            # ★ 조건식 수렴 체크: join 노드에서 조건이 수렴했는지 확인
-            if getattr(node, "fixpoint_evaluation_node", False) and cond_expr is not None:
-                if prev_join_env is not None:
-                    # 조건식이 수렴했는지 체크
-                    if self._check_loop_condition_converged(cond_expr, prev_join_env, out_joined):
-                        out_vars[node] = out_joined
-                        # WL을 비워서 루프 조기 종료
-                        WL.clear()
-                        break
-                # 다음 iteration을 위해 현재 환경 저장
-                prev_join_env = VariableEnv.copy_variables(out_joined)
 
             if equal:
                 out_vars[node] = out_joined; continue

@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(dir \"C:\\Users\\isjeon\\PycharmProjects\\pythonProject\\SolDebug\\dataset\")",
+      "Bash(dir /s /b \"C:\\Users\\isjeon\\PycharmProjects\\pythonProject\\SolDebug\\Evaluation\")",
+      "Bash(dir:*)",
+      "Bash(mv:*)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []
