@@ -15,53 +15,53 @@
 \citation{dappscan}
 \@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{2}{section.1}\protected@file@percent }
 \newlabel{sec1}{{1}{2}{Introduction}{section.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Minimal example used to illustrate grammar elements relevant to our analysis}}{3}{figure.caption.2}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig:grammar-min}{{1}{3}{Minimal example used to illustrate grammar elements relevant to our analysis}{figure.caption.2}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {2}Background}{3}{section.2}\protected@file@percent }
 \newlabel{sect2}{{2}{3}{Background}{section.2}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Structure of Solidity Smart Contract}{3}{subsection.2.1}\protected@file@percent }
-\newlabel{lst:grammar-min}{{1}{3}{Minimal example used to illustrate grammar elements relevant to our analysis}{lstlisting.1}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {1}{\ignorespaces Minimal example used to illustrate grammar elements relevant to our analysis}}{3}{lstlisting.1}\protected@file@percent }
+\newlabel{fig:step-compile}{{2a}{4}{Compile}{figure.caption.3}{}}
+\newlabel{sub@fig:step-compile}{{a}{4}{Compile}{figure.caption.3}{}}
+\newlabel{fig:step-deploy}{{2b}{4}{Deploy related contracts}{figure.caption.3}{}}
+\newlabel{sub@fig:step-deploy}{{b}{4}{Deploy related contracts}{figure.caption.3}{}}
+\newlabel{fig:step-init}{{2c}{4}{Send preparatory transactions}{figure.caption.3}{}}
+\newlabel{sub@fig:step-init}{{c}{4}{Send preparatory transactions}{figure.caption.3}{}}
+\newlabel{fig:step-debug}{{2d}{4}{Bytecode-level debugging}{figure.caption.3}{}}
+\newlabel{sub@fig:step-debug}{{d}{4}{Bytecode-level debugging}{figure.caption.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Traditional Solidity debugging workflow}}{4}{figure.caption.3}\protected@file@percent }
+\newlabel{fig:legacy-debug-grid}{{2}{4}{Traditional Solidity debugging workflow}{figure.caption.3}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Solidity Execution and Debugging Workflow}{4}{subsection.2.2}\protected@file@percent }
 \citation{pycharm}
 \citation{visual}
-\newlabel{fig:step-compile}{{1a}{5}{Compile}{figure.caption.2}{}}
-\newlabel{sub@fig:step-compile}{{a}{5}{Compile}{figure.caption.2}{}}
-\newlabel{fig:step-deploy}{{1b}{5}{Deploy related contracts}{figure.caption.2}{}}
-\newlabel{sub@fig:step-deploy}{{b}{5}{Deploy related contracts}{figure.caption.2}{}}
-\newlabel{fig:step-init}{{1c}{5}{Send preparatory transactions}{figure.caption.2}{}}
-\newlabel{sub@fig:step-init}{{c}{5}{Send preparatory transactions}{figure.caption.2}{}}
-\newlabel{fig:step-debug}{{1d}{5}{Bytecode-level debugging}{figure.caption.2}{}}
-\newlabel{sub@fig:step-debug}{{d}{5}{Bytecode-level debugging}{figure.caption.2}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Traditional Solidity debugging workflow}}{5}{figure.caption.2}\protected@file@percent }
-\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
-\newlabel{fig:legacy-debug-grid}{{1}{5}{Traditional Solidity debugging workflow}{figure.caption.2}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Root Causes of the Solidity-Debugging Bottleneck}{5}{subsection.2.3}\protected@file@percent }
 \citation{interview}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Two Sources of Inefficiency in Solidity Debugging}{5}{subsection.2.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.4}Proposed Approach Overview}{6}{subsection.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}The design of SolQDebug}{6}{section.3}\protected@file@percent }
 \citation{antlr}
-\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces \textsc  {SolQDebug} architecture}}{7}{figure.caption.3}\protected@file@percent }
-\newlabel{fig:solqdebug-arch}{{2}{7}{\textsc {SolQDebug} architecture}{figure.caption.3}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {3}The design of SolQDebug}{7}{section.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces \textsc  {SolQDebug} architecture}}{7}{figure.caption.4}\protected@file@percent }
+\newlabel{fig:solqdebug-arch}{{3}{7}{\textsc {SolQDebug} architecture}{figure.caption.4}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.1}System Architecture}{7}{subsection.3.1}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Incremental inputs for the running example}}{8}{table.caption.5}\protected@file@percent }
-\newlabel{tab:input_code}{{1}{8}{Incremental inputs for the running example}{table.caption.5}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Incremental inputs for the running example}}{8}{table.caption.6}\protected@file@percent }
+\newlabel{tab:input_code}{{1}{8}{Incremental inputs for the running example}{table.caption.6}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Running Example}{8}{subsection.3.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.1}Incremental Source Code Analysis}{8}{subsubsection.3.2.1}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces CFG structure showing Step 9 insertion. Each statement occupies a separate basic node; intermediate nodes along each branch are omitted, showing only the leaf nodes before the join point. The join point node computes the least upper bound of environments from both branches}}{9}{figure.caption.6}\protected@file@percent }
-\newlabel{fig:solqdebug-cfg}{{3}{9}{CFG structure showing Step 9 insertion. Each statement occupies a separate basic node; intermediate nodes along each branch are omitted, showing only the leaf nodes before the join point. The join point node computes the least upper bound of environments from both branches}{figure.caption.6}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces CFG structure showing Step 9 insertion. Each statement occupies a separate basic node; intermediate nodes along each branch are omitted, showing only the leaf nodes before the join point. The join point node computes the least upper bound of environments from both branches}}{9}{figure.caption.7}\protected@file@percent }
+\newlabel{fig:solqdebug-cfg}{{4}{9}{CFG structure showing Step 9 insertion. Each statement occupies a separate basic node; intermediate nodes along each branch are omitted, showing only the leaf nodes before the join point. The join point node computes the least upper bound of environments from both branches}{figure.caption.7}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Burn function with batch annotations}}{10}{figure.caption.8}\protected@file@percent }
+\newlabel{lst:grammar-batch}{{5}{10}{Burn function with batch annotations}{figure.caption.8}{}}
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.2}Batch Annotation Analysis}{10}{subsubsection.3.2.2}\protected@file@percent }
-\newlabel{lst:grammar-batch}{{2}{10}{Burn function with batch annotations}{lstlisting.2}{}}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {2}{\ignorespaces Burn function with batch annotations}}{10}{lstlisting.2}\protected@file@percent }
 \citation{solgram}
-\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Interactive parser entry rules}}{11}{table.caption.8}\protected@file@percent }
-\newlabel{tab:interactive-rules}{{2}{11}{Interactive parser entry rules}{table.caption.8}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Interactive parser entry rules}}{11}{table.caption.10}\protected@file@percent }
+\newlabel{tab:interactive-rules}{{2}{11}{Interactive parser entry rules}{table.caption.10}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Interactive Parser}{11}{subsection.3.3}\protected@file@percent }
 \citation{solqrule}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Incremental CFG Construction and Abstract Interpretation}{12}{subsection.3.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.1}CFG Hierarchy}{13}{subsubsection.3.4.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.2}Statement-Local, Incremental Construction}{13}{subsubsection.3.4.2}\protected@file@percent }
 \citation{solqimpl}
-\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Line-to-node index mapping by statement type}}{14}{table.caption.10}\protected@file@percent }
-\newlabel{tab:line-mapping}{{3}{14}{Line-to-node index mapping by statement type}{table.caption.10}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Line-to-node index mapping by statement type}}{14}{table.caption.12}\protected@file@percent }
+\newlabel{tab:line-mapping}{{3}{14}{Line-to-node index mapping by statement type}{table.caption.12}{}}
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.3}Line-to-Node Indexing for Incremental Insertion}{14}{subsubsection.3.4.3}\protected@file@percent }
 \@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Dependent-Context Insertion}}{15}{algorithm.1}\protected@file@percent }
 \newlabel{alg:get-branch-context}{{1}{15}{Dependent-Context Insertion}{algorithm.1}{}}
@@ -76,22 +76,23 @@
 \citation{flow,DBM}
 \citation{DBM}
 \citation{flow}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Evaluation}{20}{section.4}\protected@file@percent }
 \citation{dappscan}
-\@writefile{toc}{\contentsline {section}{\numberline {4}Evaluation}{21}{section.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Experimental Setup}{21}{subsection.4.1}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Benchmark dataset: 30 representative contracts from DAppSCAN with diverse debugging scenarios.}}{22}{table.caption.11}\protected@file@percent }
-\newlabel{tab:benchmark-dataset}{{4}{22}{Benchmark dataset: 30 representative contracts from DAppSCAN with diverse debugging scenarios}{table.caption.11}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}RQ1 - Responsiveness}{22}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}RQ1 - Responsiveness}{21}{subsection.4.2}\protected@file@percent }
 \citation{remix_bench}
 \citation{selenium}
-\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Debugging latency comparison between Remix and \textsc  {SolQDebug} across varying ByteOp counts and test-case widths \(\Delta \). \textsc  {SolQDebug} maintains consistent sub-second latency regardless of function complexity or symbolic interval input width, while Remix's latency scales linearly with both dimensions.}}{23}{figure.caption.12}\protected@file@percent }
-\newlabel{fig:rq1-responsiveness}{{4}{23}{Debugging latency comparison between Remix and \textsc {SolQDebug} across varying ByteOp counts and test-case widths \(\Delta \). \textsc {SolQDebug} maintains consistent sub-second latency regardless of function complexity or symbolic interval input width, while Remix's latency scales linearly with both dimensions}{figure.caption.12}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces  F90 (90th percentile of interval inflation) for \texttt  {Lock::pending} under \textsc  {overlap} and \textsc  {diff} annotation patterns. As input width ($\Delta $) increases, \textsc  {overlap} achieves progressively tighter precision (F90: 12.0 $\rightarrow $ 4.8), while \textsc  {diff} maintains near-constant inflation (F90 $\approx $ 13--14).}}{24}{figure.caption.13}\protected@file@percent }
-\newlabel{fig:rq2-lock}{{5}{24}{F90 (90th percentile of interval inflation) for \texttt {Lock::pending} under \textsc {overlap} and \textsc {diff} annotation patterns. As input width ($\Delta $) increases, \textsc {overlap} achieves progressively tighter precision (F90: 12.0 $\rightarrow $ 4.8), while \textsc {diff} maintains near-constant inflation (F90 $\approx $ 13--14)}{figure.caption.13}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Benchmark dataset: 30 representative contracts from DAppSCAN with diverse debugging scenarios.}}{22}{table.caption.13}\protected@file@percent }
+\newlabel{tab:benchmark-dataset}{{4}{22}{Benchmark dataset: 30 representative contracts from DAppSCAN with diverse debugging scenarios}{table.caption.13}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Debugging latency comparison between Remix and \textsc  {SolQDebug} across varying ByteOp counts and test-case widths \(\Delta \). \textsc  {SolQDebug} maintains consistent sub-second latency regardless of function complexity or symbolic interval input width, while Remix's latency scales linearly with both dimensions.}}{23}{figure.caption.14}\protected@file@percent }
+\newlabel{fig:rq1-responsiveness}{{6}{23}{Debugging latency comparison between Remix and \textsc {SolQDebug} across varying ByteOp counts and test-case widths \(\Delta \). \textsc {SolQDebug} maintains consistent sub-second latency regardless of function complexity or symbolic interval input width, while Remix's latency scales linearly with both dimensions}{figure.caption.14}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces  F90 (90th percentile of interval inflation) for \texttt  {Lock::pending} under \textsc  {overlap} and \textsc  {diff} annotation patterns. As input width ($\Delta $) increases, \textsc  {overlap} achieves progressively tighter precision (F90: 12.0 $\rightarrow $ 4.8), while \textsc  {diff} maintains near-constant inflation (F90 $\approx $ 13--14).}}{24}{figure.caption.15}\protected@file@percent }
+\newlabel{fig:rq2-lock}{{7}{24}{F90 (90th percentile of interval inflation) for \texttt {Lock::pending} under \textsc {overlap} and \textsc {diff} annotation patterns. As input width ($\Delta $) increases, \textsc {overlap} achieves progressively tighter precision (F90: 12.0 $\rightarrow $ 4.8), while \textsc {diff} maintains near-constant inflation (F90 $\approx $ 13--14)}{figure.caption.15}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.3}RQ2 - Impact of Annotation Patterns on Precision in Complex Arithmetic Operations}{24}{subsection.4.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.4}RQ3 - Loops}{25}{subsection.4.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{27}{section.5}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Why use Abstract Interpretation with Interval Domain for Debugging}{27}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Current Limitations}{27}{subsection.5.2}\protected@file@percent }
 \citation{remix}
 \citation{hardhat}
 \citation{forge}
@@ -107,7 +108,6 @@
 \citation{ityfuzz}
 \citation{zeus,verismart,pulse}
 \citation{peculiar,tmlvd,pscvfinder}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Current Limitations}{28}{subsection.5.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {6}Related Works}{28}{section.6}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Solidity IDEs and Debuggers}{28}{subsection.6.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Solidity Vulnerability Detection and Verification}{28}{subsection.6.2}\protected@file@percent }
@@ -122,9 +122,9 @@
 \citation{fap}
 \@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Solidity-Specific Abstract Interpretation Frameworks}{29}{subsection.6.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Interactive Abstract Interpretation for Traditional Languages}{29}{subsection.6.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{30}{section.7}\protected@file@percent }
 \citation{dappscan}
 \bibcite{antlr}{{1}{2025}{{ANTLR}}{{}}}
+\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{30}{section.7}\protected@file@percent }
 \bibcite{gpt}{{2}{2025}{{ChatGPT}}{{}}}
 \bibcite{coinmarketcap}{{3}{2025}{{CoinMarketCap}}{{}}}
 \bibcite{smart contract evolution}{{4}{2025}{{Chen et~al.}}{{}}}
@@ -171,53 +171,53 @@
 \bibcite{dappscan}{{45}{2024}{{Zheng et~al.}}{{}}}
 \bibcite{tmlvd}{{46}{2022}{{Zhou et~al.}}{{}}}
 \bibcite{interview}{{47}{2019}{{Zou et~al.}}{{}}}
-\@writefile{toc}{\contentsline {section}{\numberline {A}Interactive Parser Grammar Specification}{35}{appendix.A}\protected@file@percent }
-\newlabel{appendix:interactive-grammar}{{A}{35}{Interactive Parser Grammar Specification}{appendix.A}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {A.1}Entry Rules for Solidity Program Fragments}{35}{subsection.A.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.1}Rule 1: \texttt  {interactiveSourceUnit}}{35}{subsubsection.A.1.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.2}Rule 2: \texttt  {interactiveEnumUnit}}{35}{subsubsection.A.1.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.3}Rule 3: \texttt  {interactiveStructUnit}}{35}{subsubsection.A.1.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.4}Rule 4: \texttt  {interactiveBlockUnit}}{35}{subsubsection.A.1.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.5}Rule 5: \texttt  {interactiveDoWhileUnit}}{36}{subsubsection.A.1.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.6}Rule 6: \texttt  {interactiveIfElseUnit}}{36}{subsubsection.A.1.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.7}Rule 7: \texttt  {interactiveCatchClauseUnit}}{37}{subsubsection.A.1.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {A.2}Entry Rule for Debugging Annotations}{37}{subsection.A.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.2.1}\texttt  {debugUnit}}{37}{subsubsection.A.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {B}Incremental CFG Construction Patterns}{37}{appendix.B}\protected@file@percent }
-\newlabel{appendix:cfg-patterns}{{B}{37}{Incremental CFG Construction Patterns}{appendix.B}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {B.1}CFG Hierarchy}{38}{subsection.B.1}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Structure of ContractCFG. The contract-level CFG sequences state variable initialization, constructor execution, and all function definitions.}}{38}{figure.caption.19}\protected@file@percent }
-\newlabel{fig:contract-cfg}{{6}{38}{Structure of ContractCFG. The contract-level CFG sequences state variable initialization, constructor execution, and all function definitions}{figure.caption.19}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Structure of FunctionCFG. Each function maintains its own control-flow graph. When modifiers are present, control flows from the function entry to the modifier, and returns from the modifier's placeholder (\texttt  {\_}) back to the function body, eventually reaching the function exit.}}{38}{figure.caption.20}\protected@file@percent }
-\newlabel{fig:function-cfg}{{7}{38}{Structure of FunctionCFG. Each function maintains its own control-flow graph. When modifiers are present, control flows from the function entry to the modifier, and returns from the modifier's placeholder (\texttt {\_}) back to the function body, eventually reaching the function exit}{figure.caption.20}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {B.2}Statement-Level Construction Patterns}{39}{subsection.B.2}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Simple statement insertion: single node spliced between current node and successors}}{39}{figure.caption.21}\protected@file@percent }
-\newlabel{fig:new-simple-statement}{{8}{39}{Simple statement insertion: single node spliced between current node and successors}{figure.caption.21}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces If statement insertion. The builder creates a \textsc  {condition node}, two nodes for true/false arms, and an \textsc  {if join}}}{39}{figure.caption.22}\protected@file@percent }
-\newlabel{fig:new-if}{{9}{39}{If statement insertion. The builder creates a \textsc {condition node}, two nodes for true/false arms, and an \textsc {if join}}{figure.caption.22}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Else-if statement insertion. The builder replaces the false arm with a new \textsc  {condition node}, two nodes, and an \textsc  {else-if join}}}{40}{figure.caption.23}\protected@file@percent }
-\newlabel{fig:new-else-if}{{10}{40}{Else-if statement insertion. The builder replaces the false arm with a new \textsc {condition node}, two nodes, and an \textsc {else-if join}}{figure.caption.23}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Else statement insertion. The builder replaces the false branch node with a new else node, connecting to the \textsc  {if join}}}{40}{figure.caption.24}\protected@file@percent }
-\newlabel{fig:new-else}{{11}{40}{Else statement insertion. The builder replaces the false branch node with a new else node, connecting to the \textsc {if join}}{figure.caption.24}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces While loop insertion. The builder creates a \textsc  {fixpoint evaluation node} $\phi $, a \textsc  {condition node}, a loop body node, and a \textsc  {loop exit node}}}{41}{figure.caption.25}\protected@file@percent }
-\newlabel{fig:new-while}{{12}{41}{While loop insertion. The builder creates a \textsc {fixpoint evaluation node} $\phi $, a \textsc {condition node}, a loop body node, and a \textsc {loop exit node}}{figure.caption.25}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {13}{\ignorespaces Break statement insertion. The \texttt  {break} node's outgoing edge is redirected to the \textsc  {loop exit node}}}{41}{figure.caption.26}\protected@file@percent }
-\newlabel{fig:new-break}{{13}{41}{Break statement insertion. The \texttt {break} node's outgoing edge is redirected to the \textsc {loop exit node}}{figure.caption.26}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {14}{\ignorespaces Continue statement insertion. The \texttt  {continue} node's outgoing edge is redirected to the loop's \textsc  {fixpoint evaluation node} $\phi $}}{42}{figure.caption.27}\protected@file@percent }
-\newlabel{fig:new-continue}{{14}{42}{Continue statement insertion. The \texttt {continue} node's outgoing edge is redirected to the loop's \textsc {fixpoint evaluation node} $\phi $}{figure.caption.27}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {15}{\ignorespaces Return statement insertion. The \texttt  {return} node is rewired to the function's unique \textsc  {return exit}}}{42}{figure.caption.28}\protected@file@percent }
-\newlabel{fig:new-return}{{15}{42}{Return statement insertion. The \texttt {return} node is rewired to the function's unique \textsc {return exit}}{figure.caption.28}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {16}{\ignorespaces Require statement insertion. The builder creates a \textsc  {condition node} with true edge to a node and false edge to the \textsc  {error exit}}}{42}{figure.caption.29}\protected@file@percent }
-\newlabel{fig:new-require}{{16}{42}{Require statement insertion. The builder creates a \textsc {condition node} with true edge to a node and false edge to the \textsc {error exit}}{figure.caption.29}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {C}Abstract Domain and Formal Semantics}{43}{appendix.C}\protected@file@percent }
-\newlabel{app:semantics}{{C}{43}{Abstract Domain and Formal Semantics}{appendix.C}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.1}Language Syntax}{43}{subsection.C.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.2}Abstract Domain}{43}{subsection.C.2}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Concrete semantics (denotational)}}{44}{table.caption.31}\protected@file@percent }
-\newlabel{tab:conc-denot}{{5}{44}{Concrete semantics (denotational)}{table.caption.31}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.3}Concrete Semantics}{44}{subsection.C.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.4}Collecting Semantics}{45}{subsection.C.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {C.5}Abstract Semantics (Denotational)}{45}{subsection.C.5}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Abstract semantics (denotational)}}{46}{table.caption.33}\protected@file@percent }
-\newlabel{tab:abs-denot}{{6}{46}{Abstract semantics (denotational)}{table.caption.33}{}}
-\gdef \@abspage@last{46}
+\@writefile{toc}{\contentsline {section}{\numberline {A}Interactive Parser Grammar Specification}{34}{appendix.A}\protected@file@percent }
+\newlabel{appendix:interactive-grammar}{{A}{34}{Interactive Parser Grammar Specification}{appendix.A}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.1}Entry Rules for Solidity Program Fragments}{34}{subsection.A.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.1}Rule 1: \texttt  {interactiveSourceUnit}}{34}{subsubsection.A.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.2}Rule 2: \texttt  {interactiveEnumUnit}}{34}{subsubsection.A.1.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.3}Rule 3: \texttt  {interactiveStructUnit}}{34}{subsubsection.A.1.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.4}Rule 4: \texttt  {interactiveBlockUnit}}{34}{subsubsection.A.1.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.5}Rule 5: \texttt  {interactiveDoWhileUnit}}{35}{subsubsection.A.1.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.6}Rule 6: \texttt  {interactiveIfElseUnit}}{35}{subsubsection.A.1.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.1.7}Rule 7: \texttt  {interactiveCatchClauseUnit}}{36}{subsubsection.A.1.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.2}Entry Rule for Debugging Annotations}{36}{subsection.A.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {A.2.1}\texttt  {debugUnit}}{36}{subsubsection.A.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {B}Incremental CFG Construction Patterns}{36}{appendix.B}\protected@file@percent }
+\newlabel{appendix:cfg-patterns}{{B}{36}{Incremental CFG Construction Patterns}{appendix.B}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {B.1}CFG Hierarchy}{37}{subsection.B.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Structure of ContractCFG. The contract-level CFG sequences state variable initialization, constructor execution, and all function definitions.}}{37}{figure.caption.21}\protected@file@percent }
+\newlabel{fig:contract-cfg}{{8}{37}{Structure of ContractCFG. The contract-level CFG sequences state variable initialization, constructor execution, and all function definitions}{figure.caption.21}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Structure of FunctionCFG. Each function maintains its own control-flow graph. When modifiers are present, control flows from the function entry to the modifier, and returns from the modifier's placeholder (\texttt  {\_}) back to the function body, eventually reaching the function exit.}}{37}{figure.caption.22}\protected@file@percent }
+\newlabel{fig:function-cfg}{{9}{37}{Structure of FunctionCFG. Each function maintains its own control-flow graph. When modifiers are present, control flows from the function entry to the modifier, and returns from the modifier's placeholder (\texttt {\_}) back to the function body, eventually reaching the function exit}{figure.caption.22}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {B.2}Statement-Level Construction Patterns}{38}{subsection.B.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Simple statement insertion: single node spliced between current node and successors}}{38}{figure.caption.23}\protected@file@percent }
+\newlabel{fig:new-simple-statement}{{10}{38}{Simple statement insertion: single node spliced between current node and successors}{figure.caption.23}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces If statement insertion. The builder creates a \textsc  {condition node}, two nodes for true/false arms, and an \textsc  {if join}}}{38}{figure.caption.24}\protected@file@percent }
+\newlabel{fig:new-if}{{11}{38}{If statement insertion. The builder creates a \textsc {condition node}, two nodes for true/false arms, and an \textsc {if join}}{figure.caption.24}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces Else-if statement insertion. The builder replaces the false arm with a new \textsc  {condition node}, two nodes, and an \textsc  {else-if join}}}{39}{figure.caption.25}\protected@file@percent }
+\newlabel{fig:new-else-if}{{12}{39}{Else-if statement insertion. The builder replaces the false arm with a new \textsc {condition node}, two nodes, and an \textsc {else-if join}}{figure.caption.25}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {13}{\ignorespaces Else statement insertion. The builder replaces the false branch node with a new else node, connecting to the \textsc  {if join}}}{39}{figure.caption.26}\protected@file@percent }
+\newlabel{fig:new-else}{{13}{39}{Else statement insertion. The builder replaces the false branch node with a new else node, connecting to the \textsc {if join}}{figure.caption.26}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {14}{\ignorespaces While loop insertion. The builder creates a \textsc  {fixpoint evaluation node} $\phi $, a \textsc  {condition node}, a loop body node, and a \textsc  {loop exit node}}}{40}{figure.caption.27}\protected@file@percent }
+\newlabel{fig:new-while}{{14}{40}{While loop insertion. The builder creates a \textsc {fixpoint evaluation node} $\phi $, a \textsc {condition node}, a loop body node, and a \textsc {loop exit node}}{figure.caption.27}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {15}{\ignorespaces Break statement insertion. The \texttt  {break} node's outgoing edge is redirected to the \textsc  {loop exit node}}}{40}{figure.caption.28}\protected@file@percent }
+\newlabel{fig:new-break}{{15}{40}{Break statement insertion. The \texttt {break} node's outgoing edge is redirected to the \textsc {loop exit node}}{figure.caption.28}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {16}{\ignorespaces Continue statement insertion. The \texttt  {continue} node's outgoing edge is redirected to the loop's \textsc  {fixpoint evaluation node} $\phi $}}{41}{figure.caption.29}\protected@file@percent }
+\newlabel{fig:new-continue}{{16}{41}{Continue statement insertion. The \texttt {continue} node's outgoing edge is redirected to the loop's \textsc {fixpoint evaluation node} $\phi $}{figure.caption.29}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {17}{\ignorespaces Return statement insertion. The \texttt  {return} node is rewired to the function's unique \textsc  {return exit}}}{41}{figure.caption.30}\protected@file@percent }
+\newlabel{fig:new-return}{{17}{41}{Return statement insertion. The \texttt {return} node is rewired to the function's unique \textsc {return exit}}{figure.caption.30}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {18}{\ignorespaces Require statement insertion. The builder creates a \textsc  {condition node} with true edge to a node and false edge to the \textsc  {error exit}}}{41}{figure.caption.31}\protected@file@percent }
+\newlabel{fig:new-require}{{18}{41}{Require statement insertion. The builder creates a \textsc {condition node} with true edge to a node and false edge to the \textsc {error exit}}{figure.caption.31}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {C}Abstract Domain and Formal Semantics}{42}{appendix.C}\protected@file@percent }
+\newlabel{app:semantics}{{C}{42}{Abstract Domain and Formal Semantics}{appendix.C}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.1}Language Syntax}{42}{subsection.C.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.2}Abstract Domain}{42}{subsection.C.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Concrete semantics (denotational)}}{43}{table.caption.33}\protected@file@percent }
+\newlabel{tab:conc-denot}{{5}{43}{Concrete semantics (denotational)}{table.caption.33}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.3}Concrete Semantics}{43}{subsection.C.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.4}Collecting Semantics}{44}{subsection.C.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.5}Abstract Semantics (Denotational)}{44}{subsection.C.5}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Abstract semantics (denotational)}}{45}{table.caption.35}\protected@file@percent }
+\newlabel{tab:abs-denot}{{6}{45}{Abstract semantics (denotational)}{table.caption.35}{}}
+\gdef \@abspage@last{45}

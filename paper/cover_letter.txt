@@ -1,0 +1,22 @@
+Dear Editor-in-Chief,
+
+I am writing to submit our manuscript entitled "SolQDebug: Debug Solidity Quickly for Interactive Immediacy in Smart Contract Development" for consideration for publication in Automated Software Engineering.
+
+As the dominant language for smart contract development, Solidity powers the Ethereum ecosystem valued at over $460 billion. However, its debugging experience remains significantly inferior to traditional programming environments. Current tools require time-consuming cycles of compilation, deployment, and bytecode-level tracing for every debugging iteration. Recent developer surveys show that 88.8% of Solidity practitioners report debugging as painful, with 69% specifically citing the absence of interactive source-level tooling as the primary cause.
+
+This research addresses this critical gap by introducing SolQDebug, the first interactive source-level debugger for Solidity powered by abstract interpretation. Our approach builds on two core contributions: (1) incremental CFG construction that recomputes abstract states only for affected program points as developers type, and (2) annotation-guided abstract interpretation that enables developers to specify symbolic input ranges directly in source code for precise multi-path analysis. Our evaluation on 30 real-world functions from DAppSCAN demonstrates a median speedup of 350x over Remix IDE (0.15s vs. 53.0s per function). We provide practical insights into how annotation structure affects precision in common smart contract patterns and demonstrate effective loop convergence strategies.
+
+This work is highly appropriate for Automated Software Engineering as it: (1) addresses a critical development tooling gap by eliminating the compilation-deployment-tracing cycle, (2) introduces novel methodological contributions through statement-local incremental CFG construction with line-to-node indexing and annotation-guided adaptive widening, and (3) demonstrates substantial performance improvements over existing industrial tools.
+
+This work has not been published elsewhere nor is it under consideration by another journal. We have no conflicts of interest to declare.
+
+Thank you for considering our manuscript. We look forward to your response.
+Sincerely,
+
+Inseong Jeon
+Sundeuk Kim
+Hyunwoo Kim
+Hoh Peter In (Corresponding Author, hoh_in@korea.ac.kr)
+
+Department of Computer Science
+Korea University, Seoul, Republic of Korea

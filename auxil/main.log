@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (MiKTeX 25.4) (preloaded format=pdflatex 2025.10.22)  4 NOV 2025 23:25
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (MiKTeX 25.4) (preloaded format=pdflatex 2025.10.22)  6 NOV 2025 22:03
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -1470,6 +1470,21 @@ LaTeX Font Warning: Font shape `U/stmry/b/n' in size <4.51686> not available
 LaTeX Font Info:    Calculating math sizes for size <10.03749> on input line 11
 5.
 
+Package natbib Warning: Citation `coinmarketcap' on page 1 undefined on input l
+ine 119.
+
+
+Package natbib Warning: Citation `solidity' on page 1 undefined on input line 1
+20.
+
+
+Package natbib Warning: Citation `gpt' on page 1 undefined on input line 123.
+
+
+Package natbib Warning: Citation `llama' on page 1 undefined on input line 123.
+
+
+
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
@@ -1477,6 +1492,27 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
  [1
 
 {C:/Users/isjeon/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}]
+
+Package natbib Warning: Citation `remix' on page 2 undefined on input line 127.
+
+
+
+Package natbib Warning: Citation `hardhat' on page 2 undefined on input line 12
+7.
+
+
+Package natbib Warning: Citation `forge' on page 2 undefined on input line 128.
+
+
+
+Package natbib Warning: Citation `interview' on page 2 undefined on input line 
+128.
+
+
+Package natbib Warning: Citation `dappscan' on page 2 undefined on input line 1
+42.
+
+
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
@@ -1492,79 +1528,113 @@ File: lstlang2.sty 2024/09/23 1.10c listings language file
 File: lstlang3.sty 2024/09/23 1.10c listings language file
 )
 
-main.tex:169: Package Listings Error: Couldn't load requested language.
+main.tex:160: Package Listings Error: Couldn't load requested language.
 
 See the Listings package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.169 ...o our analysis}, label={lst:grammar-min}]
+l.160 ...numbers=left, basicstyle=\ttfamily\small]
                                                   
 The following languages weren't loadable:
     ,solidity$
 This may cause errors in the sequel.
 
 
-main.tex:169: Package Listings Error: language solidity undefined.
+main.tex:160: Package Listings Error: language solidity undefined.
 
 See the Listings package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.169 ...o our analysis}, label={lst:grammar-min}]
+l.160 ...numbers=left, basicstyle=\ttfamily\small]
                                                   
 The language is not loadable. Try typing  <return>  to proceed.
 If that doesn't work, type  X <return>  to quit.
 
-Package hyperref Info: bookmark level for unknown lstlisting defaults to 0 on i
-nput line 169.
+
+LaTeX Warning: Reference `fig:grammar-min' on page 3 undefined on input line 18
+9.
+
 
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [3]
-<Fig1a.pdf, id=292, 3060.63445pt x 1520.5608pt>
+<Fig1a.pdf, id=265, 3060.63445pt x 1520.5608pt>
 File: Fig1a.pdf Graphic file (type pdf)
 <use Fig1a.pdf>
-Package pdftex.def Info: Fig1a.pdf  used on input line 248.
+Package pdftex.def Info: Fig1a.pdf  used on input line 211.
 (pdftex.def)             Requested size: 178.55841pt x 88.7007pt.
-<Fig1b.pdf, id=293, 3061.35712pt x 1520.5608pt>
+<Fig1b.pdf, id=266, 3061.35712pt x 1520.5608pt>
 File: Fig1b.pdf Graphic file (type pdf)
 <use Fig1b.pdf>
-Package pdftex.def Info: Fig1b.pdf  used on input line 255.
+Package pdftex.def Info: Fig1b.pdf  used on input line 218.
 (pdftex.def)             Requested size: 178.55841pt x 88.6775pt.
-<Fig1c.pdf, id=294, 3060.63445pt x 1519.83813pt>
+<Fig1c.pdf, id=267, 3060.63445pt x 1519.83813pt>
 File: Fig1c.pdf Graphic file (type pdf)
 <use Fig1c.pdf>
-Package pdftex.def Info: Fig1c.pdf  used on input line 264.
+Package pdftex.def Info: Fig1c.pdf  used on input line 227.
 (pdftex.def)             Requested size: 178.55841pt x 88.65855pt.
-<Fig1d.pdf, id=295, 3060.63445pt x 1520.5608pt>
+<Fig1d.pdf, id=268, 3060.63445pt x 1520.5608pt>
 File: Fig1d.pdf Graphic file (type pdf)
 <use Fig1d.pdf>
-Package pdftex.def Info: Fig1d.pdf  used on input line 271.
+Package pdftex.def Info: Fig1d.pdf  used on input line 234.
 (pdftex.def)             Requested size: 178.55841pt x 88.7007pt.
 
 
+LaTeX Warning: Reference `fig:legacy-debug-grid' on page 4 undefined on input l
+ine 260.
+
+
+
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [4]
+ [4 <./Fig1a.pdf> <./Fig1b.pdf> <./Fig1c.pdf> <./Fig1d.pdf>]
+
+Package natbib Warning: Citation `pycharm' on page 5 undefined on input line 27
+3.
+
+
+Package natbib Warning: Citation `visual' on page 5 undefined on input line 273
+.
+
+
+Package natbib Warning: Citation `interview' on page 5 undefined on input line 
+303.
+
+
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [5 <./Fig1a.pdf> <./Fig1b.pdf> <./Fig1c.pdf> <./Fig1d.pdf>]
+ [5]
+<Fig2.pdf, id=286, 3445.83356pt x 1385.4159pt>
+File: Fig2.pdf Graphic file (type pdf)
+<use Fig2.pdf>
+Package pdftex.def Info: Fig2.pdf  used on input line 351.
+(pdftex.def)             Requested size: 353.38426pt x 142.08003pt.
+
+
+LaTeX Warning: Reference `fig:solqdebug-arch' on page 6 undefined on input line
+ 366.
+
+
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [6]
-<Fig2.pdf, id=328, 3445.83356pt x 1385.4159pt>
-File: Fig2.pdf Graphic file (type pdf)
-<use Fig2.pdf>
-Package pdftex.def Info: Fig2.pdf  used on input line 365.
-(pdftex.def)             Requested size: 353.38426pt x 142.08003pt.
+
+Package natbib Warning: Citation `antlr' on page 7 undefined on input line 376.
+
+
+
+LaTeX Warning: Reference `fig:grammar-min' on page 7 undefined on input line 40
+2.
+
 
 
 
@@ -1572,19 +1642,35 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [7 <./Fig2.pdf>]
 
+LaTeX Warning: Reference `tab:input_code' on page 8 undefined on input line 450
+.
 
-Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [8]
+LaTeX Warning: Reference `tab:input_code' on page 8 undefined on input line 459
+.
+
+
+LaTeX Warning: Reference `tab:input_code' on page 8 undefined on input line 464
+.
+
 LaTeX Font Info:    Trying to load font information for OMS+cmr on input line 4
-89.
-
+79.
 (C:\Users\isjeon\AppData\Local\Programs\MiKTeX\tex/latex/base\omscmr.fd
 File: omscmr.fd 2024/11/19 v2.5n Standard LaTeX font definitions
 )
 LaTeX Font Info:    Font shape `OMS/cmr/m/n' in size <7> not available
-(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 489.
+(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 479.
 
+
+LaTeX Warning: Reference `fig:solqdebug-cfg' on page 8 undefined on input line 
+520.
+
+
+
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [8]
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
@@ -1600,29 +1686,33 @@ File: lstlang2.sty 2024/09/23 1.10c listings language file
 File: lstlang3.sty 2024/09/23 1.10c listings language file
 )
 
-main.tex:553: Package Listings Error: Couldn't load requested language.
+main.tex:544: Package Listings Error: Couldn't load requested language.
 
 See the Listings package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.553 ... annotations}, label={lst:grammar-batch}]
+l.544 ...numbers=left, basicstyle=\ttfamily\small]
                                                   
 The following languages weren't loadable:
     ,solidity$
 This may cause errors in the sequel.
 
 
-main.tex:553: Package Listings Error: language solidity undefined.
+main.tex:544: Package Listings Error: language solidity undefined.
 
 See the Listings package documentation for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.553 ... annotations}, label={lst:grammar-batch}]
+l.544 ...numbers=left, basicstyle=\ttfamily\small]
                                                   
 The language is not loadable. Try typing  <return>  to proceed.
 If that doesn't work, type  X <return>  to quit.
+
+
+LaTeX Warning: Reference `lst:grammar-batch' on page 10 undefined on input line
+ 573.
 
 
 
@@ -1630,9 +1720,26 @@ If that doesn't work, type  X <return>  to quit.
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [10]
-Overfull \hbox (44.28969pt too wide) in paragraph at lines 613--632
+
+Package natbib Warning: Citation `solgram' on page 11 undefined on input line 6
+01.
+
+
+Overfull \hbox (44.28969pt too wide) in paragraph at lines 606--625
  [] 
  []
+
+
+LaTeX Warning: Reference `tab:interactive-rules' on page 11 undefined on input 
+line 627.
+
+
+LaTeX Warning: Reference `tab:input_code' on page 11 undefined on input line 64
+3.
+
+
+LaTeX Warning: Reference `appendix:interactive-grammar' on page 11 undefined on
+ input line 650.
 
 
 
@@ -1640,9 +1747,14 @@ Overfull \hbox (44.28969pt too wide) in paragraph at lines 613--632
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [11]
-LaTeX Font Info:    Font shape `OT1/cmtt/bx/n' in size <10.03749> not available
 
-(Font)              Font shape `OT1/cmtt/m/n' tried instead on input line 663.
+LaTeX Warning: Reference `appendix:interactive-grammar' on page 12 undefined on
+ input line 662.
+
+
+Package natbib Warning: Citation `solqrule' on page 12 undefined on input line 
+663.
+
 
 
 
@@ -1650,13 +1762,80 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [12]
 
+LaTeX Warning: Reference `appendix:cfg-patterns' on page 13 undefined on input 
+line 700.
+
+
+LaTeX Warning: Reference `fig:new-simple-statement' on page 13 undefined on inp
+ut line 713.
+
+
+LaTeX Warning: Reference `fig:new-if' on page 13 undefined on input line 718.
+
+
+LaTeX Warning: Reference `fig:new-else-if' on page 13 undefined on input line 7
+23.
+
+
+LaTeX Warning: Reference `fig:new-else' on page 13 undefined on input line 727.
+
+
+
+LaTeX Warning: Reference `fig:new-while' on page 13 undefined on input line 733
+.
+
+
+LaTeX Warning: Reference `fig:new-break' on page 13 undefined on input line 736
+.
+
+
+LaTeX Warning: Reference `fig:new-continue' on page 13 undefined on input line 
+739.
+
+
+
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [13]
-Overfull \hbox (27.05017pt too wide) in paragraph at lines 770--789
+
+LaTeX Warning: Reference `fig:new-return' on page 14 undefined on input line 74
+2.
+
+
+LaTeX Warning: Reference `fig:new-require' on page 14 undefined on input line 7
+46.
+
+
+LaTeX Warning: Reference `appendix:cfg-patterns' on page 14 undefined on input 
+line 751.
+
+
+Package natbib Warning: Citation `solqimpl' on page 14 undefined on input line 
+752.
+
+
+Overfull \hbox (27.05017pt too wide) in paragraph at lines 757--776
  [] 
  []
+
+
+LaTeX Warning: Reference `tab:line-mapping' on page 14 undefined on input line 
+784.
+
+Package hyperref Info: bookmark level for unknown algorithm defaults to 0 on in
+put line 790.
+
+LaTeX Warning: Reference `alg:get-branch-context' on page 14 undefined on input
+ line 819.
+
+
+LaTeX Warning: Reference `alg:get-insertion-site' on page 14 undefined on input
+ line 819.
+
+
+LaTeX Warning: Reference `tab:line-mapping' on page 14 undefined on input line 
+820.
 
 
 
@@ -1664,8 +1843,18 @@ Overfull \hbox (27.05017pt too wide) in paragraph at lines 770--789
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [14]
-Package hyperref Info: bookmark level for unknown algorithm defaults to 0 on in
-put line 803.
+
+LaTeX Warning: Reference `alg:get-branch-context' on page 15 undefined on input
+ line 825.
+
+
+LaTeX Warning: Reference `alg:get-insertion-site' on page 15 undefined on input
+ line 826.
+
+
+LaTeX Warning: Reference `alg:get-branch-context' on page 15 undefined on input
+ line 829.
+
 
 
 
@@ -1673,14 +1862,31 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [15]
 
+LaTeX Warning: Reference `alg:get-insertion-site' on page 16 undefined on input
+ line 865.
+
+
+
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [16]
-main.tex:913: Undefined control sequence.
+
+LaTeX Warning: Reference `alg:reinterpret' on page 17 undefined on input line 8
+81.
+
+
+LaTeX Warning: Reference `alg:fixpoint' on page 17 undefined on input line 883.
+
+
+
+LaTeX Warning: Reference `alg:fixpoint' on page 17 undefined on input line 902.
+
+
+main.tex:911: Undefined control sequence.
 <recently read> \Env 
                      
-l.913        \State $\Env
+l.911        \State $\Env
                          (n)\gets \hat{\sigma}_{\mathrm{out}}$; \quad $out[n...
 The control sequence at the end of the top line
 of your error message was never \def'ed. If you have
@@ -1688,8 +1894,16 @@ misspelled it (e.g., `\hobx'), type `I' and the correct
 spelling (e.g., `I\hbox'). Otherwise just continue,
 and I'll forget about whatever was undefined.
 
-main.tex:937: Undefined control sequence.
-l.937 ..., h)$; \quad $start \gets \bigsqcup\{\Env
+
+LaTeX Warning: Reference `alg:reinterpret' on page 17 undefined on input line 9
+21.
+
+
+LaTeX Warning: Reference `alg:fixpoint' on page 17 undefined on input line 931.
+
+
+main.tex:945: Undefined control sequence.
+l.945 ..., h)$; \quad $start \gets \bigsqcup\{\Env
                                                   (p)\mid p\in\textsc{Pred}(...
 The control sequence at the end of the top line
 of your error message was never \def'ed. If you have
@@ -1697,10 +1911,10 @@ misspelled it (e.g., `\hobx'), type `I' and the correct
 spelling (e.g., `I\hbox'). Otherwise just continue,
 and I'll forget about whatever was undefined.
 
-main.tex:966: Undefined control sequence.
+main.tex:974: Undefined control sequence.
 <recently read> \Env 
                      
-l.966   \State $\Env
+l.974   \State $\Env
                     (exit) \gets \bigsqcup_{p\in\textsc{Pred}(G, exit)} \tex...
 The control sequence at the end of the top line
 of your error message was never \def'ed. If you have
@@ -1709,11 +1923,24 @@ spelling (e.g., `I\hbox'). Otherwise just continue,
 and I'll forget about whatever was undefined.
 
 
+LaTeX Warning: Reference `alg:fixpoint' on page 17 undefined on input line 980.
+
+
+
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [17]
+
+LaTeX Warning: Reference `alg:fixpoint' on page 18 undefined on input line 983.
+
+
+
+LaTeX Font Warning: Font shape `OT1/cmr/bx/sc' undefined
+(Font)              using `OT1/cmr/bx/n' instead on input line 987.
+
+
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
@@ -1725,8 +1952,32 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [19]
 
-LaTeX Font Warning: Font shape `OT1/cmr/bx/sc' undefined
-(Font)              using `OT1/cmr/bx/n' instead on input line 996.
+Package natbib Warning: Citation `flow' on page 20 undefined on input line 1008
+.
+
+
+Package natbib Warning: Citation `DBM' on page 20 undefined on input line 1008.
+
+
+
+Package natbib Warning: Citation `DBM' on page 20 undefined on input line 1012.
+
+
+
+Package natbib Warning: Citation `flow' on page 20 undefined on input line 1012
+.
+
+
+LaTeX Warning: Reference `tab:conc-denot' on page 20 undefined on input line 10
+13.
+
+
+LaTeX Warning: Reference `tab:abs-denot' on page 20 undefined on input line 101
+3.
+
+
+LaTeX Warning: Reference `app:semantics' on page 20 undefined on input line 101
+3.
 
 
 
@@ -1735,32 +1986,62 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [20]
 
+Package natbib Warning: Citation `dappscan' on page 21 undefined on input line 
+1052.
 
-Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [21]
+LaTeX Warning: Reference `tab:benchmark-dataset' on page 21 undefined on input 
+line 1083.
+
 (benchmark_table.tex)
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
+ [21]
+
+Package natbib Warning: Citation `remix_bench' on page 22 undefined on input li
+ne 1097.
+
+
+Package natbib Warning: Citation `selenium' on page 22 undefined on input line 
+1097.
+
+
+LaTeX Warning: Reference `sec:impl' on page 22 undefined on input line 1105.
+
+
+
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
  [22]
-<Fig13.pdf, id=530, 3836.81429pt x 1603.67136pt>
+<Fig13.pdf, id=410, 3836.81429pt x 1603.67136pt>
 File: Fig13.pdf Graphic file (type pdf)
 <use Fig13.pdf>
-Package pdftex.def Info: Fig13.pdf  used on input line 1121.
+Package pdftex.def Info: Fig13.pdf  used on input line 1122.
 (pdftex.def)             Requested size: 297.60114pt x 124.38112pt.
+
+
+LaTeX Warning: Reference `fig:rq1-responsiveness' on page 23 undefined on input
+ line 1133.
+
 
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [23 <./Fig13.pdf>]
-<Fig14.pdf, id=541, 462.52798pt x 346.89601pt>
+<Fig14.pdf, id=418, 462.52798pt x 346.89601pt>
 File: Fig14.pdf Graphic file (type pdf)
 <use Fig14.pdf>
-Package pdftex.def Info: Fig14.pdf  used on input line 1165.
+Package pdftex.def Info: Fig14.pdf  used on input line 1166.
 (pdftex.def)             Requested size: 178.55841pt x 133.91795pt.
+
+
+LaTeX Warning: Reference `fig:rq2-lock' on page 24 undefined on input line 1189
+.
+
 
 
 
@@ -1768,60 +2049,65 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [24 <./Fig14.pdf>]
 
+LaTeX Warning: Reference `tab:benchmark-dataset' on page 25 undefined on input 
+line 1215.
+
+
+
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [25]
-Underfull \hbox (badness 1533) in paragraph at lines 1228--1235
+Underfull \hbox (badness 1533) in paragraph at lines 1229--1236
 \OT1/cmr/m/n/10 on dynamic val-ues but the loop body per-forms only sim-ple upd
 ates, anno-
  []
 
 
-Underfull \hbox (badness 1412) in paragraph at lines 1228--1235
+Underfull \hbox (badness 1412) in paragraph at lines 1229--1236
 \OT1/cmr/m/n/10 ta-tions enable pre-cise con-ver-gence. []\OT1/cmtt/m/n/10.0374
 9 addActionBuilderAt \OT1/cmr/m/n/10 (Bal-ancer) uses \OT1/cmtt/m/n/10.03749 fo
 r
  []
 
 
-Underfull \hbox (badness 2980) in paragraph at lines 1228--1235
+Underfull \hbox (badness 2980) in paragraph at lines 1229--1236
 \OT1/cmtt/m/n/10.03749 (uint8 i = 0; i < additionalCount; i++) \OT1/cmr/m/n/10 
 where \OT1/cmtt/m/n/10.03749 additionalCount \OT1/cmr/m/n/10 is com-
  []
 
 
-Underfull \hbox (badness 4621) in paragraph at lines 1228--1235
+Underfull \hbox (badness 4621) in paragraph at lines 1229--1236
 \OT1/cmtt/m/n/10.03749 actionBuilders = arrayAddress[1,2,3]; \OT1/cmr/m/n/10 an
 d \OT1/cmtt/m/n/10.03749 // @LocalVar index = [3,3];
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 1241--1248
+Underfull \hbox (badness 10000) in paragraph at lines 1242--1249
 \OT1/cmr/bx/n/10.03749 Pattern 3: Unini-tial-ized Local Vari-ables (Developer-F
 ixable).
  []
 
 
-Underfull \hbox (badness 5008) in paragraph at lines 1241--1248
+Underfull \hbox (badness 5008) in paragraph at lines 1242--1249
 \OT1/cmr/m/n/10 When local vari-ables lack explicit ini-tial-iza-tion, pre-ci-s
 ion loss can occur.
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 1241--1248
+Underfull \hbox (badness 10000) in paragraph at lines 1242--1249
 \OT1/cmtt/m/n/10.03749 getTotalDeposit \OT1/cmr/m/n/10 (Time-Lock-Pool) declare
 s \OT1/cmtt/m/n/10.03749 uint256 total; \OT1/cmr/m/n/10 with-out ini-
  []
 
 
-Underfull \hbox (badness 2790) in paragraph at lines 1241--1248
+Underfull \hbox (badness 2790) in paragraph at lines 1242--1249
 \OT1/cmr/m/n/10 tial-iza-tion and then accu-mu-lates val-ues in a loop. For exa
 m-ple, pro-vid-ing
  []
 
 
-Underfull \hbox (badness 1014) in paragraph at lines 1241--1248
+Underfull \hbox (badness 1014) in paragraph at lines 1242--1249
 \OT1/cmr/m/n/10 anno-ta-tions \OT1/cmtt/m/n/10.03749 // @StateVar depositsOf[[]
 account][0].amount = [100,200];\OT1/cmr/m/n/10 , \OT1/cmtt/m/n/10.03749 //
  []
@@ -1838,41 +2124,186 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [27]
 
+Package natbib Warning: Citation `remix' on page 28 undefined on input line 132
+2.
+
+
+Package natbib Warning: Citation `hardhat' on page 28 undefined on input line 1
+324.
+
+
+Package natbib Warning: Citation `forge' on page 28 undefined on input line 132
+6.
+
+
+Package natbib Warning: Citation `soldepro' on page 28 undefined on input line 
+1329.
+
+
+Package natbib Warning: Citation `securify' on page 28 undefined on input line 
+1342.
+
+
+Package natbib Warning: Citation `slither' on page 28 undefined on input line 1
+342.
+
+
+Package natbib Warning: Citation `mythril' on page 28 undefined on input line 1
+342.
+
+
+Package natbib Warning: Citation `solidet' on page 28 undefined on input line 1
+343.
+
+
+Package natbib Warning: Citation `ethersolve' on page 28 undefined on input lin
+e 1344.
+
+
+Package natbib Warning: Citation `confuzz' on page 28 undefined on input line 1
+347.
+
+
+Package natbib Warning: Citation `echidna' on page 28 undefined on input line 1
+348.
+
+
+Package natbib Warning: Citation `sfuzz' on page 28 undefined on input line 134
+9.
+
+
+Package natbib Warning: Citation `transracer' on page 28 undefined on input lin
+e 1349.
+
+
+Package natbib Warning: Citation `ityfuzz' on page 28 undefined on input line 1
+351.
+
+
+Package natbib Warning: Citation `zeus' on page 28 undefined on input line 1353
+.
+
+
+Package natbib Warning: Citation `verismart' on page 28 undefined on input line
+ 1353.
+
+
+Package natbib Warning: Citation `pulse' on page 28 undefined on input line 135
+3.
+
+
+Package natbib Warning: Citation `peculiar' on page 28 undefined on input line 
+1356.
+
+
+Package natbib Warning: Citation `tmlvd' on page 28 undefined on input line 135
+6.
+
+
+Package natbib Warning: Citation `pscvfinder' on page 28 undefined on input lin
+e 1356.
+
+
+
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [28]
+
+Package natbib Warning: Citation `flow' on page 29 undefined on input line 1367
+.
+
+
+Package natbib Warning: Citation `DBM' on page 29 undefined on input line 1367.
+
+
+
+Package natbib Warning: Citation `flow' on page 29 undefined on input line 1368
+.
+
+
+Package natbib Warning: Citation `DBM' on page 29 undefined on input line 1370.
+
+
+
+Package natbib Warning: Citation `dao' on page 29 undefined on input line 1370.
+
+
+
+Package natbib Warning: Citation `daig' on page 29 undefined on input line 1384
+.
+
+
+Package natbib Warning: Citation `ds' on page 29 undefined on input line 1384.
+
+
+Package natbib Warning: Citation `iac' on page 29 undefined on input line 1384.
+
+
+
+Package natbib Warning: Citation `iaj' on page 29 undefined on input line 1384.
+
+
+
+Package natbib Warning: Citation `fap' on page 29 undefined on input line 1384.
+
+
+
+Package natbib Warning: Citation `daig' on page 29 undefined on input line 1387
+.
+
+
+Package natbib Warning: Citation `ds' on page 29 undefined on input line 1389.
+
+
+Package natbib Warning: Citation `iac' on page 29 undefined on input line 1391.
+
+
+
+Package natbib Warning: Citation `iaj' on page 29 undefined on input line 1393.
+
+
+
+Package natbib Warning: Citation `fap' on page 29 undefined on input line 1395.
+
+
+
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [29]
 
+Package natbib Warning: Citation `dappscan' on page 30 undefined on input line 
+1430.
+
+
+
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [30]
-Underfull \hbox (badness 1033) in paragraph at lines 1429--1430
-\OT1/cmr/m/n/10 The curated bench-mark dataset of 30 Solid-ity con-tracts deriv
-ed from DApp-
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 1456--1458
+Underfull \hbox (badness 10000) in paragraph at lines 1457--1459
 []\OT1/cmr/m/n/10 ConsenSys Dili-gence: Python Solid-ity Parser. [][]$https : /
  / github . com /
  []
 
 
-Underfull \hbox (badness 2150) in paragraph at lines 1473--1476
+Underfull \hbox (badness 2150) in paragraph at lines 1474--1477
 \OT1/cmr/m/n/10 tracts. In: Pro-ceed-ings of the 29th ACM SIG-SOFT Inter-na-tio
 nal Sym-
  []
 
 
-Underfull \hbox (badness 1748) in paragraph at lines 1473--1476
+Underfull \hbox (badness 1748) in paragraph at lines 1474--1477
 \OT1/cmr/m/n/10 po-sium on Soft-ware Test-ing and Anal-y-sis (ISSTA), pp. 557--
 560 (2020).
+ []
+
+
+Underfull \hbox (badness 4634) in paragraph at lines 1490--1492
+[]\OT1/cmr/m/n/10 Hu, T., et al.: Detect defects of Solid-ity smart con-tract b
+ased on the
  []
 
 
@@ -1881,37 +2312,31 @@ Underfull \hbox (badness 1748) in paragraph at lines 1473--1476
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [31]
-Underfull \hbox (badness 4634) in paragraph at lines 1489--1491
-[]\OT1/cmr/m/n/10 Hu, T., et al.: Detect defects of Solid-ity smart con-tract b
-ased on the
- []
-
-
-Underfull \hbox (badness 1137) in paragraph at lines 1508--1511
+Underfull \hbox (badness 1137) in paragraph at lines 1509--1512
 []\OT1/cmr/m/n/10 Ma, C., Song, W., Huang, J.: Tran-sRacer: func-tion dependenc
 e-guided trans-
  []
 
 
-Underfull \hbox (badness 2799) in paragraph at lines 1508--1511
+Underfull \hbox (badness 2799) in paragraph at lines 1509--1512
 \OT1/cmr/m/n/10 ac-tion race detec-tion for smart con-tracts. In: Pro-ceed-ings
  of the 31st
  []
 
 
-Underfull \hbox (badness 2735) in paragraph at lines 1546--1549
+Underfull \hbox (badness 2735) in paragraph at lines 1547--1550
 []\OT1/cmr/m/n/10 Shou, C., Tan, S., Sen, K.: Ity-fuzz: snapshot-based fuzzer f
 or smart con-
  []
 
 
-Underfull \hbox (badness 2521) in paragraph at lines 1546--1549
+Underfull \hbox (badness 2521) in paragraph at lines 1547--1550
 \OT1/cmr/m/n/10 tract. In: Pro-ceed-ings of the 32nd ACM SIG-SOFT Inter-na-tion
 al Sym-
  []
 
 
-Underfull \hbox (badness 1748) in paragraph at lines 1546--1549
+Underfull \hbox (badness 1748) in paragraph at lines 1547--1550
 \OT1/cmr/m/n/10 po-sium on Soft-ware Test-ing and Anal-y-sis (ISSTA), pp. 322--
 333 (2023).
  []
@@ -1922,72 +2347,67 @@ Underfull \hbox (badness 1748) in paragraph at lines 1546--1549
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [32]
-Underfull \hbox (badness 1824) in paragraph at lines 1576--1579
+Underfull \hbox (badness 1824) in paragraph at lines 1577--1580
 []\OT1/cmr/m/n/10 Stein, B., Chang, B.-Y.E., Srid-ha-ran, M.: Demanded abstract
  inter-pre-ta-tion.
  []
 
 
-Underfull \hbox (badness 3769) in paragraph at lines 1576--1579
+Underfull \hbox (badness 3769) in paragraph at lines 1577--1580
 \OT1/cmr/m/n/10 In: Pro-ceed-ings of the 42nd ACM SIG-PLAN Inter-na-tional Con-
 fer-ence
  []
 
 
-Underfull \hbox (badness 3919) in paragraph at lines 1576--1579
+Underfull \hbox (badness 3919) in paragraph at lines 1577--1580
 \OT1/cmr/m/n/10 on Pro-gram-ming Lan-guage Design and Imple-men-ta-tion (PLDI) 
 (2021).
  []
 
 
-Underfull \hbox (badness 1057) in paragraph at lines 1593--1596
+Underfull \hbox (badness 1057) in paragraph at lines 1594--1597
 \OT1/cmr/m/n/10 con-tracts. In: 2019 IEEE/ACM 2nd Inter-na-tional Work-shop on 
 Emerg-ing
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 1603--1605
+Underfull \hbox (badness 10000) in paragraph at lines 1604--1606
 []\OT1/cmr/m/n/10 Yao, Y., et al.: An improved vul-ner-a-bil-ity detec-tion sys
 -tem of smart
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 1603--1605
+Underfull \hbox (badness 10000) in paragraph at lines 1604--1606
 \OT1/cmr/m/n/10 con-tracts based on sym-bolic exe-cu-tion. In: 2022 IEEE Inter-
 na-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 1603--1605
+Underfull \hbox (badness 10000) in paragraph at lines 1604--1606
 \OT1/cmr/m/n/10 tional Con-fer-ence on Big Data (Big Data), pp. 3225--3234 (202
 2).
  []
 
 
-Underfull \hbox (badness 2828) in paragraph at lines 1607--1610
+Underfull \hbox (badness 2828) in paragraph at lines 1608--1611
 \OT1/cmr/m/n/10 tract vul-ner-a-bil-ity detec-tion. In: 2023 IEEE 34th Inter-na
 -tional Sym-po-
  []
 
 
-Underfull \hbox (badness 2856) in paragraph at lines 1607--1610
+Underfull \hbox (badness 2856) in paragraph at lines 1608--1611
 \OT1/cmr/m/n/10 sium on Soft-ware Reli-a-bil-ity Engi-neer-ing (ISSRE), pp. 556
 --567 (2023).
  []
 
 
-
-
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [33]
-Underfull \hbox (badness 10000) in paragraph at lines 1620--1622
+Underfull \hbox (badness 10000) in paragraph at lines 1621--1623
 []\OT1/cmr/m/n/10 Zou, W., et al.: Smart con-tract devel-op-ment: chal-lenges a
 nd oppor-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 1620--1622
+Underfull \hbox (badness 10000) in paragraph at lines 1621--1623
 \OT1/cmr/m/n/10 tu-ni-ties. IEEE Trans-ac-tions on Soft-ware Engi-neer-ing (201
 9).
  []
@@ -1997,18 +2417,18 @@ Underfull \hbox (badness 10000) in paragraph at lines 1620--1622
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [34]
+ [33]
 LaTeX Font Info:    Font shape `OT1/cmtt/bx/n' in size <11.04124> not available
 
-(Font)              Font shape `OT1/cmtt/m/n' tried instead on input line 1636.
+(Font)              Font shape `OT1/cmtt/m/n' tried instead on input line 1637.
 
 
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [35]
-Overfull \hbox (44.3014pt too wide) in paragraph at lines 1706--1706
+ [34]
+Overfull \hbox (44.3014pt too wide) in paragraph at lines 1707--1707
 []  \OT1/cmtt/m/n/10.03749 : 'for' '(' (simpleStatement | ';') expression? ';' 
 expression? ')' '{' '}' ;[] 
  []
@@ -2018,25 +2438,30 @@ expression? ')' '{' '}' ;[]
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [36]
-Overfull \hbox (44.3014pt too wide) in paragraph at lines 1738--1738
+ [35]
+Overfull \hbox (44.3014pt too wide) in paragraph at lines 1739--1739
 []\OT1/cmtt/m/n/10.03749 interactiveCatchClause : 'catch' (identifier? '(' para
 meterList ')')? '{' '}' ;[] 
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 1747--1748
+Underfull \hbox (badness 10000) in paragraph at lines 1748--1749
 []\OT1/cmtt/m/n/10.03749 @GlobalVar\OT1/cmr/m/n/10 : Assigns val-ues to global 
 vari-ables (e.g., \OT1/cmtt/m/n/10.03749 msg.sender\OT1/cmr/m/n/10 ,
  []
 
 
-Overfull \hbox (75.91924pt too wide) in paragraph at lines 1758--1758
+Overfull \hbox (75.91924pt too wide) in paragraph at lines 1759--1759
 []\OT1/cmtt/m/n/10.03749 debugGlobalVar : '//' '@GlobalVar' identifier ('.' ide
 ntifier)? '=' globalValue ';' ;[] 
  []
 
 
+
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [36]
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
@@ -2067,18 +2492,13 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [42]
-
-
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [43]
-Underfull \hbox (badness 10000) in paragraph at lines 2228--2228
+Underfull \hbox (badness 10000) in paragraph at lines 2229--2229
 []|$\OML/cmm/m/it/9 F\OT1/cmr/m/n/9 (\OML/cmm/m/it/9 H\OT1/cmr/m/n/9 )(\OML/cmm
 /m/it/9 ^^[\OT1/cmr/m/n/9 ) = []$;
  []
 
 
-Overfull \hbox (18.38658pt too wide) in paragraph at lines 2228--2228
+Overfull \hbox (18.38658pt too wide) in paragraph at lines 2229--2229
 []|$\OML/cmm/m/it/9 F\OT1/cmr/m/n/9 (\OML/cmm/m/it/9 H\OT1/cmr/m/n/9 )(\OML/cmm
 /m/it/9 ^^[\OT1/cmr/m/n/9 ) = []$;
  []
@@ -2088,22 +2508,22 @@ Overfull \hbox (18.38658pt too wide) in paragraph at lines 2228--2228
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [44]
-Underfull \hbox (badness 10000) in paragraph at lines 2337--2337
+ [43]
+Underfull \hbox (badness 10000) in paragraph at lines 2338--2338
 []|$\OML/cmm/m/it/9 G[]\OT1/cmr/m/n/9 (\OML/cmm/m/it/9 H\OT1/cmr/m/n/9 )([]) = 
 [][]\U/stmry/m/n/9 J\OML/cmm/m/it/9 s\U/stmry/m/n/9 K[]\OT1/cmr/m/n/9 ([]([]\OM
 L/cmm/m/it/9 ; p; []\OT1/cmr/m/n/9 ))  \OML/cmm/m/it/9 .[]
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 2337--2337
+Underfull \hbox (badness 10000) in paragraph at lines 2338--2338
 []|$\OML/cmm/m/it/9 G[]\OT1/cmr/m/n/9 (\OML/cmm/m/it/9 H\OT1/cmr/m/n/9 )([]) = 
 [][]\U/stmry/m/n/9 J\OML/cmm/m/it/9 s\U/stmry/m/n/9 K[]\OT1/cmr/m/n/9 ([]([]\OM
 L/cmm/m/it/9 ; p; []\OT1/cmr/m/n/9 ))  \OML/cmm/m/it/9 .[]
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 2337--2337
+Underfull \hbox (badness 10000) in paragraph at lines 2338--2338
 \OT1/cmr/m/n/9 (\OML/cmm/m/it/9 ^^U[]: \U/stmry/m/n/9 J\OML/cmm/m/it/9 incr\U/s
 tmry/m/n/9 K[]\OT1/cmr/m/n/9 ([])  \OML/cmm/m/it/9 .[]  H\OT1/cmr/m/n/9 )\OML/c
 mm/m/it/9 ;  []\OT1/cmr/m/n/9 ([]([]\OML/cmm/m/it/9 ; p; []\OT1/cmr/m/n/9 ))[]$
@@ -2111,31 +2531,43 @@ mm/m/it/9 ;  []\OT1/cmr/m/n/9 ([]([]\OML/cmm/m/it/9 ; p; []\OT1/cmr/m/n/9 ))[]$
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 2337--2337
+Underfull \hbox (badness 10000) in paragraph at lines 2338--2338
 []|$\OML/cmm/m/it/9 G[]\OT1/cmr/m/n/9 (\OML/cmm/m/it/9 H\OT1/cmr/m/n/9 )([]) = 
 \U/stmry/m/n/9 J\OML/cmm/m/it/9 s\U/stmry/m/n/9 K[]\OT1/cmr/m/n/9 ([])  \OML/cm
 m/m/it/9 .[]
  []
 
 
-Overfull \hbox (7.67401pt too wide) in paragraph at lines 2337--2337
+Overfull \hbox (7.67401pt too wide) in paragraph at lines 2338--2338
 \OT1/cmr/m/n/9 (\OML/cmm/m/it/9 ^^U[]: [][]H\OT1/cmr/m/n/9 ([]([]\OML/cmm/m/it/
 9 ; p; []\OT1/cmr/m/n/9 ))\OML/cmm/m/it/9 ;  []\OT1/cmr/m/n/9 ([]([]\OML/cmm/m/
 it/9 ; p; []\OT1/cmr/m/n/9 ))[])$;
  []
 
 
+LaTeX Warning: Reference `app:semantics' on page 44 undefined on input line 234
+6.
+
+
+Package natbib Warning: There were undefined citations.
+
+
+
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [44]
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [45]
+(C:/Users\isjeon\PycharmProjects\pythonProject\SolDebug\auxil\main.aux
 
+Package natbib Warning: Citation(s) may have changed.
+(natbib)                Rerun to get citations correct.
 
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [46]
-(C:/Users\isjeon\PycharmProjects\pythonProject\SolDebug\auxil\main.aux)
+)
  ***********
 LaTeX2e <2025-06-01> patch level 1
 L3 programming layer <2025-09-02>
@@ -2149,19 +2581,22 @@ LaTeX Font Warning: Size substitutions with differences
 LaTeX Font Warning: Some font shapes were not available, defaults substituted.
 
 
+LaTeX Warning: There were undefined references.
+
+
 LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
 
 Package rerunfilecheck Info: File `main.out' has not changed.
-(rerunfilecheck)             Checksum: EB64CFAA24841B35207CF97DE7ADAE09;10861.
+(rerunfilecheck)             Checksum: A7B9BD2908282AB0436EAC72E2E1902B;10869.
  ) 
 Here is how much of TeX's memory you used:
- 29886 strings out of 468081
- 566225 string characters out of 5425304
- 1146753 words of memory out of 5000000
- 57776 multiletter control sequences out of 15000+600000
+ 29885 strings out of 468081
+ 566254 string characters out of 5425304
+ 1140309 words of memory out of 5000000
+ 57774 multiletter control sequences out of 15000+600000
  662133 words of font info for 175 fonts, out of 8000000 for 9000
  1151 hyphenation exceptions out of 8191
- 90i,24n,93p,958b,1120s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 90i,24n,93p,769b,1258s stack positions out of 10000i,1000n,20000p,200000b,200000s
  <C:\Users\isjeon\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi602\tcr
 m1000.pk><C:/Users/isjeon/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsf
 onts/cm/cmbsy10.pfb><C:/Users/isjeon/AppData/Local/Programs/MiKTeX/fonts/type1/
@@ -2203,9 +2638,9 @@ on/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/symbols/msbm10.pfb
 mary10.pfb><C:/Users/isjeon/AppData/Local/Programs/MiKTeX/fonts/type1/public/ho
 ekwater/stmary9.pfb>
 Output written on C:/Users\isjeon\PycharmProjects\pythonProject\SolDebug\out\ma
-in.pdf (46 pages, 12784975 bytes).
+in.pdf (45 pages, 12751831 bytes).
 PDF statistics:
- 1029 PDF objects out of 1200 (max. 8388607)
- 234 named destinations out of 1000 (max. 500000)
+ 858 PDF objects out of 1000 (max. 8388607)
+ 235 named destinations out of 1000 (max. 500000)
  456 words of extra memory for PDF output out of 10000 (max. 10000000)
 
