@@ -1,4 +1,0 @@
-Lines with em dash (U+2014) or en dash (U+2013) or ellipsis (U+2026):
-================================================================================
-
-Total lines with non-ASCII characters: 0
