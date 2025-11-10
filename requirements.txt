@@ -1,0 +1,9 @@
+# Core dependencies
+antlr4-python3-runtime==4.13.1
+
+# Data processing
+openpyxl>=3.0.0
+
+# Optional: For visualization (if needed)
+matplotlib>=3.5.0
+numpy>=1.21.0

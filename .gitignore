@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDEs
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+*~
+
+# LaTeX
+*.aux
+*.log
+*.out
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+*.toc
+*.bbl
+*.blg
+*.pdf
+
+# Temporary files
+temp/
+DEBUG/
+nul
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+auxil/
+out/
+
+# Submission files
+paper/submission.zip
