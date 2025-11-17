@@ -1,9 +1,0 @@
-function,pattern,delta,var,low,high
-pending,diff,1,_pending,334,348
-pending,diff,3,_pending,368,408
-pending,diff,6,_pending,419,498
-pending,diff,10,_pending,487,618
-pending,overlap,1,_pending,200,212
-pending,overlap,3,_pending,200,220
-pending,overlap,6,_pending,200,232
-pending,overlap,10,_pending,200,248

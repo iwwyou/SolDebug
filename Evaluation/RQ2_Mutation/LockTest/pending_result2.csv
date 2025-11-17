@@ -1,0 +1,9 @@
+function,pattern,delta,var,low,high
+pending,diff,1,_pending,256,270
+pending,diff,3,_pending,202,242
+pending,diff,6,_pending,121,200
+pending,diff,10,_pending,13,144
+pending,overlap,1,_pending,190,202
+pending,overlap,3,_pending,186,206
+pending,overlap,6,_pending,180,212
+pending,overlap,10,_pending,172,220

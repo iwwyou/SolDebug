@@ -12,10 +12,11 @@ This directory contains the benchmark dataset used to evaluate SolQDebug, consis
 
 ```
 dataset/
-├── dataset_all/           # All 30 benchmark contracts (.sol files)
+├── dataset_all/           # Original 30 benchmark contracts from DAppSCAN
 ├── dataset_select/        # Selected subset for quick testing
-├── contraction/          # Preprocessed contracts
+├── contraction/          # Extracted target functions and related state variables
 ├── contraction_remix/    # Remix-compatible versions
+├── json/annotation/      # Test annotations in JSON format for experiments
 ├── evaluation_Dataset.xlsx  # Dataset metadata and statistics
 └── README.md
 ```
@@ -106,11 +107,38 @@ All contracts are sourced from DAppSCAN, a large-scale dataset of real-world sma
 ### `dataset_select/`
 Contains a smaller subset (10 contracts) for quick testing and development.
 
-### `contraction/` and `contraction_remix/`
-Preprocessed versions of contracts:
-- Simplified for specific experiments
-- Modified for Remix IDE compatibility
-- Annotated with test cases
+### `contraction/`
+Contains contracted versions of the original DAppSCAN contracts:
+- **Purpose**: Extract only the target function and its related state variables from each contract
+- **Why**: Original contracts may have hundreds of functions and state variables. Contraction focuses on the specific functions to be analyzed.
+- **Naming**: Each file is named `<ContractName>_c.sol` (e.g., `Lock_c.sol`)
+
+Example transformation:
+- Original `Lock.sol` (from `dataset_all/`): ~500 lines with many functions
+- Contracted `Lock_c.sol` (in `contraction/`): ~30 lines with only `pending()` function and its dependencies
+
+### `contraction_remix/`
+Remix-compatible versions of contracted contracts:
+- Modified to compile in Remix IDE
+- Used for latency comparison experiments (RQ1)
+
+### `json/annotation/`
+Test case annotations in JSON format for running experiments:
+- **Format**: Each JSON file contains an array of code insertion events that can be used as `test_inputs` in `main.py`
+- **Structure**: Includes both the contracted Solidity code and debugging annotations (e.g., `// @StateVar`, `// @LocalVar`, `// @GlobalVar`)
+- **Naming**: `<ContractName>_c_annot.json`
+
+**Usage**: Load the JSON file and pass it to `simulate_inputs()` in `main.py`:
+```python
+import json
+
+with open('dataset/json/annotation/Lock_c_annot.json', 'r') as f:
+    test_inputs = json.load(f)
+
+simulate_inputs(test_inputs)
+```
+
+This allows automated execution of SolQDebug analysis on all benchmark contracts with predefined test case annotations.
 
 ## Adding New Contracts
 

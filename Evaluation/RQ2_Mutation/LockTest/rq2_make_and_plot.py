@@ -8,8 +8,8 @@ from pathlib import Path
 from io import StringIO
 import csv, re, sys
 
-RAW = Path("pending_convert_result.csv")          # ★ 원본 파일
-OUT = "rq2_convert_precision.csv"
+RAW = Path("pending_result2.csv")          # ★ 원본 파일
+OUT = "rq2_precision.csv"
 
 # ───────────────────── 1. 유연 로더 ────────────────────────────────
 def read_flexible(path: Path) -> pd.DataFrame:
@@ -80,9 +80,9 @@ for pat, grp in summary.groupby("pattern"):
 plt.xlabel("Δ (input range)")
 plt.ylabel("F90 (inflation ×)")
 #title_fn = ", ".join(summary["function"].unique())
-plt.title(f"DIVIDE/ADD – F90 vs Δ")
+plt.title(f"DIVIDE/SUB – F90 vs Δ")
 plt.legend()
 plt.tight_layout()
-plt.savefig("fig_pending_convert_f90.pdf")
+plt.savefig("fig_pending_f90.pdf")
 plt.close()
 print("✓ fig_pending_f90.pdf saved")

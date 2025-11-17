@@ -1,0 +1,98 @@
+[
+  {
+    "code": "contract Balancer {\n}",
+    "startLine": 1,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    address[] public actionBuilders;",
+    "startLine": 2,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 3,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "    function _addActionBuilderAt(address actionBuilder, uint256 index) internal {\n}",
+    "startLine": 4,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 currentLength = actionBuilders.length;",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "        if (currentLength == 0 || currentLength - 1 < index) {\n}",
+    "startLine": 7,
+    "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "            uint256 additionalCount = index - currentLength + 1;",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "            for (uint8 i = 0; i < additionalCount; i++) {\n}",
+    "startLine": 9,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "                actionBuilders.push();                ",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "        actionBuilders[index] = actionBuilder;       ",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar actionBuilders = arrayAddress[1,2,3];",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar actionBuilder = symbolicAddress 4;",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar index = [3,3];",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 9,
+    "endLine": 9,
+    "event": "add"
+  }
+]

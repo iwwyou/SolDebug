@@ -16,6 +16,8 @@ The evaluation consists of three research questions:
 Evaluation/
 ├── RQ1_Latency/                    # Latency comparison experiments
 ├── RQ2_Mutation/                   # Annotation pattern experiments
+│   └── LockTest/                   # Main RQ2 experiment (Lock.sol)
+├── RQ3_Loops/                      # Loop analysis experiments
 ├── analyze_complex_arithmetic.py   # Complex arithmetic analysis
 ├── parse_analysis_log.py           # Log parser for analysis results
 ├── read_evaluation_dataset.py      # Dataset loader
@@ -45,38 +47,88 @@ python remix_benchmark.py  # Benchmark Remix IDE (requires Remix running)
 
 ## RQ2: Annotation Pattern Impact
 
-**Goal**: Evaluate how annotation structure affects precision in complex arithmetic operations.
+**Goal**: Evaluate how annotation structure affects precision in complex arithmetic operations involving multiplication and division.
+
+### Key Insight
+Real-world smart contracts frequently use multiplication and division for computing financial quantities (rewards, fees, vesting schedules). These operations amplify interval widths due to the combinatorial nature of interval arithmetic.
 
 ### Annotation Patterns
-1. **overlap**: All input variables share common base range (e.g., [100, 100+Δ])
-2. **diff**: Input variables have disjoint ranges
+1. **overlap (safe)**: All input variables share common base range (e.g., [100, 100+Δ])
+   - Extreme products remain closer to midpoint, limiting interval expansion
+2. **diff**: Input variables have disjoint ranges (e.g., [100, 100+Δ], [300, 300+Δ], [500, 500+Δ])
+   - Disjoint ranges maximize distance between endpoint combinations
 
-### Running RQ2 Experiments
+### Main Experiment: Lock.sol
+The primary RQ2 experiment uses the `pending()` function from `Lock.sol`:
 
 ```bash
-cd Evaluation/RQ2_Mutation
-python run_mutation_experiments.py
+cd Evaluation/RQ2_Mutation/LockTest
+python LockTest.py           # Run experiments
+python rq2_make_and_plot.py  # Generate F90 plot (fig_pending_f90.pdf)
 ```
 
+**Files**:
+- `pending_safe_*.json`: Annotations with overlap pattern (Δ = 1, 3, 6, 10, 15)
+- `pending_diff_*.json`: Annotations with diff pattern (Δ = 1, 3, 6, 10, 15)
+- `rq2_precision.csv`: F90 measurement results
+- `fig_pending_f90.pdf`: Figure for the paper (Figure 10)
+
 ### Expected Results
-- **overlap**: Progressive precision improvement with wider inputs (F90: 12.0 → 4.8)
-- **diff**: Near-constant inflation (F90 ≈ 13-14)
+- **overlap**: F90 decreases from 12.0 → 4.8 as Δ increases (1 → 10)
+- **diff**: F90 remains constant (~13-14) regardless of input width
+
+### Additional Contracts with Similar Patterns
+Similar patterns observed in:
+- GovStakingStorage (reward computations)
+- GreenHouse, HubPool (fee calculations)
+- LockupContract (vesting schedules)
+- ThorusBond (proportional payouts)
+
+Overlapping annotations consistently yield tighter precision than disjoint ranges across these contracts.
 
 ## RQ3: Loop Analysis
 
-**Goal**: Identify patterns causing precision loss in loop-containing functions.
+**Goal**: Evaluate the effectiveness of annotation-guided adaptive widening for loop analysis.
 
-### Patterns Analyzed
-1. **Bounded iterations with dependent updates**: Precise convergence
-2. **Unbounded iterations**: Divergence without annotations
-3. **Multiplication in loop**: Exponential interval growth
-4. **Data-dependent accumulation**: Imprecise due to data dependencies
+### Benchmark Functions
+Five loop-containing functions from the benchmark dataset:
+- `updateUserInfo` (AOC_BEP)
+- `_addActionBuilderAt` (Balancer)
+- `revokeStableMaster` (Core)
+- `getTotalDeposit` (TimeLockPool)
+- `_removeFromTokens` (AvatarArtMarketPlace)
+
+### Loop Patterns
+
+**Pattern 1: Constant-Bounded Loops with Simple Updates**
+- Example: AOC_BEP's `updateUserInfo` with `for (i = 1; i <= 4; i++)`
+- Result: Precise interval `userInfo[account].level` ∈ [1,4]
+
+**Pattern 2: Annotation-Enabled Convergence**
+- Example: Balancer's `_addActionBuilderAt`, Core's `revokeStableMaster`
+- With annotations, loop bounds become concrete, enabling precise convergence
+- Result: `i = [0,1]` for Balancer, `i = [0,2]` for Core
+
+**Pattern 3: Uninitialized Local Variables (Developer-Fixable)**
+- Example: TimeLockPool's `getTotalDeposit` declares `uint256 total;` without initialization
+- Result: `total` remains TOP despite precise loop bound
+- Fix: Initialize `total = 0` explicitly
+
+**Pattern 4: Data-Dependent Accumulation**
+- Example: AvatarArtMarketPlace's `_removeFromTokens`
+- Conditional increments based on array comparisons
+- Result: Loop index precise, but `resultIndex` widened to [0,∞]
 
 ### Running RQ3 Experiments
 
 ```bash
-python analyze_complex_arithmetic.py
+cd Evaluation/RQ3_Loops
+python run_rq3_experiments.py
 ```
+
+**Files**:
+- `*_c_annot.json`: Annotation files for each contract
+- `run_rq3_experiments.py`: Script to run all loop analysis experiments
 
 ## Utility Scripts
 
