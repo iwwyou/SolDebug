@@ -320,12 +320,12 @@ contract Example {
 
     \subsection{Proposed Approach Overview}
 
-    \textsc{SolQDebug} addresses the two root causes of Solidity's debugging bottleneck through a
-    pair of complementary techniques. The first technique targets temporal inefficiency by eliminating
-    blockchain round trips, while the second addresses iterative inefficiency by enabling state manipulation.
+    \textsc{SolQDebug} addresses the two root causes of Solidity's debugging inefficiency through an integrated design.
+    Rather than independent optimizations, the two components jointly constitute the interactive debugging paradigm: incremental analysis provides
+    line-by-line responsiveness during editing, while annotations enable input specification—a prerequisite for any debugging activity that observes how inputs affect program behavior.
 
     \smallskip
-    \noindent\textbf{(1) Removing the multi-stage workflow to address temporal inefficiency.}
+    \noindent\textbf{(1) Incremental analysis to address temporal inefficiency.}
     The traditional debugging workflow requires compilation, deployment, transaction-based state
     setup, and bytecode tracing. Each of these stages incurs significant latency. \textsc{SolQDebug}
     replaces this round trip by performing both parsing and abstract interpretation directly inside
@@ -340,7 +340,7 @@ contract Example {
     structure and control flow without compilation or chain interaction.
 
     \smallskip
-    \noindent\textbf{(2) Enabling repeated execution via batch annotations to address iterative inefficiency.}
+    \noindent\textbf{(2) Annotation-guided interpretation to address iterative inefficiency.}
     The EVM does not support reverting to a prior state without redeploying the contract or replaying
     transactions. Both approaches disrupt iteration. \textsc{SolQDebug} introduces batch annotations
     as a mechanism for symbolic state injection. In essence, this reflects a core debugging activity,
@@ -1285,10 +1285,9 @@ Remaining precision loss arises from developer-fixable initialization issues and
 
 \subsection{Why use Abstract Interpretation with Interval Domain for Debugging}
 
-In this work, debugging refers to a developer-led, interactive exploration activity that
-occurs during code editing, before deployment. Developers specify debug annotations
-and immediately observe program behaviors at the source level. This edit-time feedback
-loop imposes strict requirements on the analysis technique.
+In this work, debugging refers to a developer-led, interactive exploration activity that occurs during code editing, before deployment.
+Developers specify debug annotations and immediately observe program behaviors at the source level.
+This edit-time feedback loop imposes strict requirements on the analysis technique.
 
 \smallskip
 \noindent\textbf{Why Abstract Interpretation?}
