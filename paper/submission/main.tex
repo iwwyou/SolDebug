@@ -31,6 +31,8 @@
 \usepackage{booktabs}%
 \usepackage{tabularx}
 \usepackage{array}
+\usepackage{pdflscape}% For landscape tables
+\usepackage{arydshln}% For dashed lines in tables
 
 % Algorithm packages
 \usepackage{algorithm}%
@@ -118,16 +120,15 @@ Development}
 efficient debugging grows increasingly critical. However, current Solidity debugging
 remains inefficient: developers must compile, deploy, set up transactions,
 and step through execution line-by-line to examine each variable. This process is too slow for
-practical use. To address this challenge, this paper presented \texttt{SolQDebug}, the first
-interactive source-level debugger for Solidity that delivered millisecond feedback directly
-on source code. Developers specify input value ranges through annotations and compare them
+practical use. To address this challenge, this paper presented \textsc{SolQDebug}, the first
+edit-time debugging assistant for Solidity that focuses on a single contract/transaction context, providing abstract value summaries with millisecond feedback directly on source code. Developers specify symbolic interval inputs through annotations and compare them
 against abstract interpretation results, thereby enabling exploration of contract behavior
-across multiple execution paths. \texttt{SolQDebug} was evaluated on 30 real-world functions
-from DAppSCAN, achieving 350$\times$ faster debugging (0.15s vs. 53s per function) than Remix IDE.
+across multiple execution paths. \textsc{SolQDebug} was evaluated on 30 real-world functions
+from DAppSCAN, achieving millisecond-scale feedback during code editing.
 The evaluation provided debugging insights: overlapping annotation patterns improved
 precision in most Solidity debugging scenarios, while analysis of diverse loop patterns
 demonstrated improved convergence while preserving soundness guarantees. These results
-demonstrated that \texttt{SolQDebug} enabled interactive debugging for Solidity development.}
+demonstrated that \textsc{SolQDebug} enabled interactive debugging for Solidity development.}
 
 
 \keywords{Smart Contract Development, Solidity, Debugging, Abstract Interpretation, Incremental Analysis}
@@ -150,9 +151,9 @@ demonstrated that \texttt{SolQDebug} enabled interactive debugging for Solidity 
     best of our knowledge, no existing research or tooling provides interactive feedback during
     Solidity code editing, a gap that this paper aims to fill.
     
-    This paper presented \texttt{SolQDebug}, a source-level interactive Solidity debugger powered by abstract interpretation (AI) with interval domain.
-    Unlike traditional debugging workflows that require compilation and deployment, \texttt{SolQDebug} provided live feedback as developers typed, helping them understand program behavior at the statement level.
-    To achieve this goal, \texttt{SolQDebug} built on two core ideas.
+    This paper presented \textsc{SolQDebug}, an edit-time debugging assistant for Solidity that focused on a single contract/transaction context, powered by abstract interpretation (AI) with interval domain.
+    Unlike conventional step-through debuggers that require compilation and deployment, \textsc{SolQDebug} provided abstract value summaries as developers type, enabling exploration of function behavior at the statement level.
+    To achieve this goal, \textsc{SolQDebug} built on two core ideas.
     First, it provided incremental analysis through interactive parsing and incremental CFG construction via line-to-node indexing.
     As developers type each statement, the system efficiently determines insertion sites and extends the CFG, recomputing abstract states
     only for affected program points.
@@ -160,35 +161,33 @@ demonstrated that \texttt{SolQDebug} enabled interactive debugging for Solidity 
     directly in source code, and the interpreter used these ranges to analyze multiple execution
     paths in a single pass.
 
-    To validate these design choices, \texttt{SolQDebug} was evaluated on 30 real-world functions from DAppSCAN~\citep{dappscan}.
+    To validate these design choices, \textsc{SolQDebug} was evaluated on 30 real-world functions from DAppSCAN~\citep{dappscan}.
     The evaluation demonstrated millisecond-scale responsiveness and examined how annotation structure
     affected precision across common smart contract patterns. The results also showed how annotation-guided analysis
     addressed the precision challenges typically encountered in loops.
 
-    This paper makes the following contributions:
-    
+    This paper makes the following contributions, focusing on function-level, single-contract analysis during code editing:
+
     \begin{itemize}
       \item This work identified the main barriers to interactive Solidity debugging: (1) temporal inefficiency from compilation, deployment, and state initialization, and (2) iterative inefficiency from EVM constraints that prevent repeated execution with different states.
       \item An interactive parser with seven specialized entry rules and line-to-node indexing was designed that enables incremental CFG construction with efficient statement insertion during live editing.
       \item An annotation-guided abstract interpreter with adaptive widening was introduced that mitigates precision challenges in loop analysis while maintaining termination guarantees.
-      \item \texttt{SolQDebug} was evaluated on 30 real-world functions from DAppSCAN, demonstrating a 350$\times$ median speedup over Remix IDE. The evaluation demonstrated that overlapping annotation patterns improve precision in common smart contract patterns and provided guidance on annotation design.
+      \item \textsc{SolQDebug} was evaluated on 30 real-world functions from DAppSCAN, achieving millisecond-scale feedback latency (median 0.15s). The evaluation demonstrated that overlapping annotation patterns improve precision in common smart contract patterns and provided guidance on annotation design.
     \end{itemize}
 
 \section{Background}\label{sect2}
     \subsection{Structure of Solidity Smart Contract}
-
 \begin{figure}[t]
 \begin{lstlisting}[language=Solidity, numbers=left, basicstyle=\ttfamily\small]
 contract Example {
     address public owner;
     uint256 public totalSupply = 1000;
     mapping(address => uint256) private balances;
-
+    
     modifier onlyOwner() {
         require(msg.sender == owner, "not owner");
         _;
     }
-
     function burn(uint256 amount) public onlyOwner {
         uint256 bal = balances[msg.sender];
         uint256 delta;
@@ -207,9 +206,12 @@ contract Example {
 \label{fig:grammar-min}
 \end{figure}
 
+
         Figure~\ref{fig:grammar-min} illustrates the key structural elements of a Solidity smart
         contract. At the top level, Solidity programs may declare contracts, interfaces, and
         libraries. A contract is composed of variables and functions. The following first describes the variable categories.
+
+
 
         Variables are categorized by their scope and lifetime. Global variables such as
         \texttt{msg.sender} (appearing at line 7) and \texttt{block.timestamp} represent read-only
@@ -336,14 +338,14 @@ contract Example {
 
     \subsection{Proposed Approach Overview}
 
-    \texttt{SolQDebug} addresses the two root causes of Solidity's debugging inefficiency through an integrated design.
+    \textsc{SolQDebug} addresses the two root causes of Solidity's debugging inefficiency through an integrated design.
     Rather than independent optimizations, the two components jointly constitute the interactive debugging paradigm: incremental analysis provides
-    line-by-line responsiveness during editing, while annotations enable input specification—a prerequisite for any debugging activity that observes how inputs affect program behavior.
+    line-by-line responsiveness during editing, while annotations enable input specification---a prerequisite for any debugging activity that observes how inputs affect program behavior.
 
     \smallskip
     \noindent\textbf{(1) Incremental analysis to address temporal inefficiency.}
     The traditional debugging workflow requires compilation, deployment, transaction-based state
-    setup, and bytecode tracing. Each of these stages incurs significant latency. \texttt{SolQDebug}
+    setup, and bytecode tracing. Each of these stages incurs significant latency. \textsc{SolQDebug}
     replaces this round trip by performing both parsing and abstract interpretation directly inside
     the Solidity Editor. To support live editing, the Solidity grammar was extended with interactive
     parsing rules tailored for isolated statements, expressions, and control-flow blocks. When the
@@ -358,7 +360,7 @@ contract Example {
     \smallskip
     \noindent\textbf{(2) Annotation-guided interpretation to address iterative inefficiency.}
     The EVM does not support reverting to a prior state without redeploying the contract or replaying
-    transactions. Both approaches disrupt iteration. \texttt{SolQDebug} introduces batch annotations
+    transactions. Both approaches disrupt iteration. \textsc{SolQDebug} introduces batch annotations
     as a mechanism for symbolic state injection. In essence, this reflects a core debugging activity,
     which involves varying inputs or contract state to observe control-flow outcomes. Rather than
     reconstructing such conditions through live transactions, developers can write annotations at the
@@ -379,12 +381,12 @@ contract Example {
     keepaspectratio
   ]{Fig6.pdf}
   \vspace{0.3cm}
-  \caption{\texttt{SolQDebug} architecture}
+  \caption{\textsc{SolQDebug} architecture}
   \label{fig:solqdebug-arch}
 \end{figure*}
 
 \section{The design of SolQDebug}
-    \texttt{SolQDebug} is designed to analyze single-contract, single-transaction Solidity functions
+    \textsc{SolQDebug} is designed to analyze single-contract, single-transaction Solidity functions
     through incremental statement-by-statement processing. As developers write code,
     the system maintains an evolving abstract interpretation of the program, enabling
     immediate feedback on variable values and potential errors without requiring compilation or deployment.
@@ -392,7 +394,7 @@ contract Example {
     and explain the core mechanisms for parsing (\S3.3) and incremental analysis (\S3.4).
 
     \subsection{System Architecture}
-        Figure~\ref{fig:solqdebug-arch} illustrates the overall architecture of \texttt{SolQDebug}.
+        Figure~\ref{fig:solqdebug-arch} illustrates the overall architecture of \textsc{SolQDebug}.
         The system accepts either single Solidity statements or batch debug annotations as input,
         processing them through two main modules before producing line-level output:
 
@@ -420,7 +422,7 @@ contract Example {
 
         \smallskip
         \noindent\textbf{Output.}
-        Following analysis, \texttt{SolQDebug} produces a line-level summary showing computed intervals
+        Following analysis, \textsc{SolQDebug} produces a line-level summary showing computed intervals
         for variables affected by each statement, including declarations, assignments, and return values.
         All outputs are mapped to their corresponding source line numbers and displayed inline within
         the editor, providing immediate feedback as developers write and modify code.
@@ -470,7 +472,7 @@ contract Example {
     input fragment, (2) updates the control-flow graph, and (3) performs abstract
     interpretation to compute variable intervals. Additionally, when batch debug
     annotations are present, the system re-analyzes the function using the
-    annotated symbolic interval input as starting points.
+    annotated symbolic interval inputs as starting points.
     This example demonstrates these two key analysis modes: incremental source code analysis (\S{}3.2.1)
     and batch annotation analysis (\S{}3.2.2).
 
@@ -529,7 +531,7 @@ contract Example {
 Table~\ref{tab:input_code} shows how the developer incrementally constructs the \texttt{burn}
 function through nine distinct input steps, each introducing a new code fragment.
 
-\texttt{SolQDebug} accepts two kinds of code fragments as input:
+\textsc{SolQDebug} accepts two kinds of code fragments as input:
 
 \begin{itemize}
   \item \textbf{Block fragment:} Includes contract and function definitions and control-flow constructs (if/else blocks, while loops).
@@ -545,7 +547,7 @@ function through nine distinct input steps, each introducing a new code fragment
 
 
 
-As the developer types each fragment, \texttt{SolQDebug} incrementally extends the CFG
+As the developer types each fragment, \textsc{SolQDebug} incrementally extends the CFG
 and recomputes abstract values only for affected program points.
 Figure~\ref{fig:solqdebug-cfg} visualizes the CFG structure after Steps 1--8 have been integrated.
 To illustrate incremental analysis, we focus on Step~9 (\texttt{totalSupply -= delta;}).
@@ -612,14 +614,14 @@ In this example, we annotate \texttt{balances[msg.sender]} with the interval \([
         the conditional branches, computing \texttt{delta} as \([0,150]\) at the join point and
         reducing \texttt{totalSupply} from \([1000,1000]\) to \([850,1000]\).
 
-        When \texttt{SolQDebug} processes a batch annotation block, it follows this pipeline:
+        When \textsc{SolQDebug} processes a batch annotation block, it follows this pipeline:
 
 \begin{enumerate}
   \item \textbf{Parse and validate.} Each annotation line is parsed, type-checked, and converted
         to the corresponding abstract domain (e.g., intervals for integers).
   \item \textbf{Save state and overlay.} The unannotated abstract memory is saved, and the annotated
         values replace it for the analysis run.
-  \item \textbf{Single-pass analysis.} \texttt{SolQDebug} re-analyzes the pre-built CFG with
+  \item \textbf{Single-pass analysis.} \textsc{SolQDebug} re-analyzes the pre-built CFG with
         the annotated environment.
   \item \textbf{Restore previous state.} After analysis, the unannotated abstract memory is restored.
 \end{enumerate}
@@ -667,7 +669,7 @@ that differ in how they interact with existing code:
 \end{itemize}
 
 This distinction maintains syntactic validity during incremental edits.
-\texttt{SolQDebug} validates that continuation rules have their required antecedent structure,
+\textsc{SolQDebug} validates that continuation rules have their required antecedent structure,
 ensuring that the resulting program structure remains well-formed at each step.
 
 For concreteness, we refer to the burn function in Table~\ref{tab:input_code}.
@@ -709,15 +711,15 @@ Our CFG consists of the following node types:
   \item \texttt{condition node}: Represents branching constructs such as \texttt{if}, \texttt{else if}, \texttt{while}, \texttt{require}/\texttt{assert}, and \texttt{try}.
   \item \texttt{join node}: Merges control flow from multiple branches (e.g., \texttt{if join}, \texttt{else-if join}).
   \item \texttt{fixpoint evaluation node} (\(\phi\)): The loop join point used for widening and narrowing during fixpoint computation (\S3.4.3).
-  \item \texttt{loop exit node}: The false branch that exits a loop when the guard condition fails.
-  \item \texttt{return node}: A statement node whose outgoing edge is immediately rewired to the function's unique \texttt{return exit}.
-  \item \texttt{error exit}: The function's unique exceptional exit (targets the exceptional path via \texttt{revert}, \texttt{require}, or \texttt{assert} failures).
+  \item \texttt{loop exit node}: The false branch that exits a loop when the loop condition fails.
+  \item \texttt{return exit node}: A sink node that aggregates return values from all return statements. When a return statement is inserted, its containing node's outgoing edge is rewired to this node.
+  \item \texttt{error exit node}: The function's unique exceptional exit (targets the exceptional path via \texttt{revert}, \texttt{require}, or \texttt{assert} failures).
   \item \texttt{exit node}: The unique normal exit point where execution terminates successfully. Contract-level CFGs have a contract exit, and function-level CFGs have a function exit.
 \end{itemize}
 
 \subsubsection{CFG Hierarchy}
 
-\texttt{SolQDebug} organizes control flow at two levels. At the contract level, a
+\textsc{SolQDebug} organizes control flow at two levels. At the contract level, a
 \texttt{ContractCFG} sequences state variable initializations, the constructor, and function
 definitions. This ordering reflects how Solidity deploys contracts. State variables are
 initialized first, then the constructor executes and may modify those state variables.
@@ -759,7 +761,7 @@ types create their corresponding CFG structures:
   \item \textbf{While loop} creates a \texttt{fixpoint evaluation node} $\phi$, a \texttt{condition node},
         a loop body node, and a \texttt{loop exit node}. The body connects back to $\phi$ for fixpoint iteration.
         The environment propagates through $\phi$ to the condition, then branches to the body or exit with the
-        environment refined by the loop guard, with the body flowing back to $\phi$ until convergence
+        environment refined by the loop condition, with the body flowing back to $\phi$ until convergence
         (Figure~\ref{fig:new-while}).
 
   \item \textbf{Break statement} is inserted in the loop body with its outgoing edge redirected to the
@@ -768,15 +770,15 @@ types create their corresponding CFG structures:
   \item \textbf{Continue statement} is inserted in the loop body with its outgoing edge redirected to the
         loop's $\phi$ node (Figure~\ref{fig:new-continue}).
 
-  \item \textbf{Return statement} is inserted with its edge rewired to the function's unique \texttt{return exit},
-        detaching original successors. The environment flows directly to the return exit (Figure~\ref{fig:new-return}).
+  \item \textbf{Return statement} is inserted with its edge rewired to the function's unique \texttt{return exit node},
+        detaching original successors. The environment flows directly to the return exit node (Figure~\ref{fig:new-return}).
 
   \item \textbf{Require statement} creates a \texttt{condition node} with the true edge connecting to a
-        continuation node and the false edge pointing to the \texttt{error exit}. The environment propagates
-        with refinement based on the predicate to the continuation or error exit (Figure~\ref{fig:new-require}).
+        continuation node and the false edge pointing to the \texttt{error exit node}. The environment propagates
+        with refinement based on the predicate to the continuation or error exit node (Figure~\ref{fig:new-require}).
 \end{itemize}
 
-These construction patterns enable \texttt{SolQDebug} to build the CFG incrementally
+These construction patterns enable \textsc{SolQDebug} to build the CFG incrementally
 as the user types each statement, with environment updates propagating only through affected nodes.
 Representative CFG construction patterns are provided in Appendix~\ref{appendix:cfg-patterns}.
 The complete implementation supports all Solidity statements~\citep{solqimpl}.
@@ -807,7 +809,7 @@ The complete implementation supports all Solidity statements~\citep{solqimpl}.
 
 The key challenge in incremental CFG construction is determining where to insert each new node.
 Traditional CFG construction processes complete programs sequentially, building the
-entire graph in a single pass. In contrast, \texttt{SolQDebug} must handle partial code edits
+entire graph in a single pass. In contrast, \textsc{SolQDebug} must handle partial code edits
 that specify only target line numbers. Since CFG edges encode control flow rather than source positions,
 we cannot determine where an edit belongs without additional context.
 To enable incremental insertion, we maintain a line-to-node index during
@@ -906,8 +908,8 @@ This approach handles all statement types uniformly:
 \end{itemize}
 
         \subsubsection{Abstract Interpretation for Incremental Analysis}\label{sec:impl}
-\texttt{SolQDebug} provides instant feedback on source code edits by propagating updates only along affected CFG paths, avoiding full re-analysis. When the user inserts statements, new nodes are spliced into the CFG. Incremental reinterpretation then propagates updates from these insertion points as seed nodes.
-While for debug annotations, \texttt{SolQDebug} performs full interpretation from the function entry node, ensuring all inspection points receive complete abstract states.
+\textsc{SolQDebug} provides instant feedback on source code edits by propagating updates only along affected CFG paths, avoiding full re-analysis. When the user inserts statements, new nodes are spliced into the CFG. Incremental reinterpretation then propagates updates from these insertion points as seed nodes.
+While for debug annotations, \textsc{SolQDebug} performs full interpretation from the function entry node, ensuring all inspection points receive complete abstract states.
 Algorithm~\ref{alg:reinterpret} performs incremental interpretation by propagating abstract states
 through a worklist-based dataflow analysis. When encountering loop condition nodes, it delegates to
 Algorithm~\ref{alg:fixpoint} for loop fixpoint computation.
@@ -926,7 +928,7 @@ Algorithm~\ref{alg:fixpoint} for loop fixpoint computation.
 
   \While{$wl\neq\langle\rangle$}
     \State $n \gets wl.\textsf{dequeue}()$; \quad $inq\gets inq\setminus\{n\}$
-    \State $\hat{\sigma}_{\mathrm{in}}\gets \bigsqcup_{p\in\texttt{Pred}(G, n)} \texttt{RefineByCondition}(p,n)$ \Comment{join predecessors with path refinement}
+    \State $\hat{\sigma}_{\mathrm{in}}\gets \bigsqcup_{p\in\texttt{Pred}(G, n)} \texttt{RefineByCondition}(p,n)$
 
     \If{$\texttt{IsLoopHeader}(G, n)$}
        \State $exit \gets \texttt{Fixpoint}(G, n)$ \Comment{compute loop fixpoint (Algorithm~\ref{alg:fixpoint})}
@@ -956,7 +958,8 @@ Algorithm~\ref{alg:fixpoint} for loop fixpoint computation.
 
   \item \textbf{Worklist iteration (Lines 10--31):} The while loop processes nodes until the worklist is empty. Each iteration performs the following steps for the dequeued node $n$:
 
-  \item \textbf{Incoming environment computation (Lines 11--12):} Compute incoming environment $\hat{\sigma}_{\mathrm{in}}$ by joining outputs from all predecessors. For condition nodes, \texttt{RefineByCondition} narrows operand intervals based on the edge truth label (true/false branch), pruning infeasible paths.
+  \item \textbf{Incoming environment computation (Lines 11--12):} For each predecessor $p$, \texttt{RefineByCondition} examines the edge from $p$ to $n$. If $p$ is a condition node, it prunes the predecessor's output environment based on the branch direction (true or false), removing infeasible paths. For non-condition predecessors, no pruning is applied. At join nodes with two predecessors, the resulting states are merged via $\sqcup$. Single-predecessor nodes receive the (possibly pruned) state directly as $\hat{\sigma}_{\mathrm{in}}$.
+        For \texttt{require} and \texttt{assert}, which create condition nodes, the true branch receives the pruned environment while the false branch leads to the error exit node. For \texttt{revert}, control transfers directly to the error exit node without creating a condition node. Since the error exit node is a sink node, the \texttt{IsSink} check filters it out and propagation terminates along exceptional paths.
 
   \item \textbf{Loop condition node delegation (Lines 13--21):} When encountering a loop condition node, delegate to Algorithm~\ref{alg:fixpoint} to compute the loop fixpoint. After fixpoint converges, enqueue the loop-exit node's successors to continue analysis beyond the loop.
 
@@ -1044,7 +1047,7 @@ The key innovation is that \texttt{EstimateIterations} analyzes loop conditions 
 \smallskip
 \noindent\textbf{Abstract Interpretation Framework.}
 Our approach builds upon abstract interpretation frameworks for Solidity smart contracts~\citep{flow,DBM}.
-\texttt{SolQDebug} computes sound over-approximations of variable ranges using interval domains
+\textsc{SolQDebug} computes sound over-approximations of variable ranges using interval domains
 for integer and boolean types ($\widehat{\mathbb{Z}}_N, \widehat{\mathbb{U}}_N$), set abstractions
 for addresses, and on-demand materialization for composite types such as arrays, mappings, and structs.
 Unlike prior work focusing on invariant generation~\citep{DBM} or information flow analysis~\citep{flow}, we target interactive debugging with incremental refinement.
@@ -1057,25 +1060,25 @@ The complete formal semantics (Tables~\ref{tab:conc-denot} and~\ref{tab:abs-deno
 % CONTENT MOVED TO APPENDIX A
 
 \section{Evaluation}
-To evaluate the benefits of \texttt{SolQDebug} in real-world development scenarios,
+To evaluate the benefits of \textsc{SolQDebug} in real-world development scenarios,
 we structure our empirical analysis around three key questions:
 
 \begin{itemize}
   \item \textbf{RQ1 -- Responsiveness}:\;%
-        How much does \texttt{SolQDebug} reduce debugging latency compared to Remix?
+        How much does \textsc{SolQDebug} reduce debugging latency compared to Remix?
 
   \item \textbf{RQ2 -- Impact of Annotation Patterns on Precision}:\;%
         How should developers structure annotations to improve precision in
         arithmetic operations involving multiplication and division?
 
   \item \textbf{RQ3 -- Loops}:\;%
-        How does \texttt{SolQDebug}'s analysis approach affect precision in loop structures?
+        How does \textsc{SolQDebug}'s analysis approach affect precision in loop structures?
 \end{itemize}
 
 To answer these questions, we conducted experiments under controlled conditions.
 
 \subsection{Experimental Setup}
-\texttt{SolQDebug} was evaluated on single-contract, single-transaction functions
+\textsc{SolQDebug} was evaluated on single-contract, single-transaction functions
 to validate the contributions of incremental CFG construction and
 annotation-guided abstract interpretation, with multi-contract analysis
 as future work.
@@ -1084,7 +1087,7 @@ as future work.
 \noindent\textbf{Experimental Setting.}
 The evaluation environment consists of an 11th Gen Intel\textregistered{} Core\texttrademark{}
 i7-11390H CPU at 3.40GHz with 16.0~GB RAM, running Windows 10 (64-bit).
-\texttt{SolQDebug} is implemented in Python~3.10 and operates directly on Solidity
+\textsc{SolQDebug} is implemented in Python~3.10 and operates directly on Solidity
 source code without requiring compilation or deployment, using the ANTLR4-based
 parser described in Section~3.
 
@@ -1126,10 +1129,10 @@ source files, target functions, and line counts.
 The following presents the findings for each research question.
 
 \subsection{RQ1 - Responsiveness}
-To evaluate responsiveness, \textit{debugging latency} was measured, defined as the time
+To evaluate responsiveness, debugging latency was measured, defined as the time
 required to step through the execution of a function line-by-line.
 For Remix IDE, this corresponds to the duration from opening the debugger to
-stepping through the entire execution using the "step forward" button. For \texttt{SolQDebug}, it
+stepping through the entire execution using the "step forward" button. For \textsc{SolQDebug}, it
 represents the time from a code modification to the display of updated variable information.
 
 Since Remix IDE lacks built-in automated benchmarking capabilities, \texttt{remix\_benchmark}~\citep{remix_bench}
@@ -1137,17 +1140,17 @@ was developed, a Selenium~\citep{selenium}-based automation framework
 that programmatically controls the Remix web interface, automating compilation, deployment, and step-through debugging.
 
 Unlike Remix's concrete execution model, which requires stepping through every bytecode
-instruction for each test input, \texttt{SolQDebug} uses AI with
+instruction for each test input, \textsc{SolQDebug} uses AI with
 interval domain (Section~\ref{sec:impl}) that operates directly on the Solidity AST.
 Rather than enumerating concrete values one by one, the abstract interpreter represents
 inputs as intervals and computes abstract states over those intervals, analyzing all possible
 behaviors in a single pass without blockchain deployment. With this interval-based approach,
-\texttt{SolQDebug} maintains consistent latency regardless of test-case width \(\Delta\),
+\textsc{SolQDebug} maintains consistent latency regardless of test-case width \(\Delta\),
 which specifies the width of each symbolic interval input in debug annotations. In contrast, Remix must
 execute each concrete input value separately, so its latency scales linearly with the number
 of test inputs.
 
-Although \texttt{SolQDebug} is designed for interactive use within a Solidity editor, all
+Although \textsc{SolQDebug} is designed for interactive use within a Solidity editor, all
 experiments simulate this behavior in a controlled scripting environment. For each function,
 a sequence of incremental edits and annotations was reconstructed that mimic realistic developer
 activity. These fragments are streamed into the interpreter to measure latency and interval
@@ -1156,15 +1159,15 @@ growth under reproducible conditions.
 \begin{figure}[t]
   \centering
   \includegraphics[width=0.8\linewidth]{Fig9.pdf}
-  \caption{Debugging latency comparison between \texttt{SolQDebug} and Remix across varying
-  ByteOp counts and test-case widths \(\Delta\). \texttt{SolQDebug} maintains consistent
+  \caption{Debugging latency comparison between \textsc{SolQDebug} and Remix across varying
+  ByteOp counts and test-case widths \(\Delta\). \textsc{SolQDebug} maintains consistent
   sub-second latency regardless of function complexity or symbolic interval input width, while Remix's
   latency scales linearly with both dimensions.}
   \label{fig:rq1-responsiveness}
 \end{figure}
 
 30 functions were evaluated across 4 test-case widths \(\Delta \in \{0, 2, 5, 10\}\), yielding
-120 total measurements for \texttt{SolQDebug}. For Remix, each function was measured once per
+120 total measurements for \textsc{SolQDebug}. For Remix, each function was measured once per
 \(\Delta\) value to demonstrate the linear scaling behavior.
 Figure~\ref{fig:rq1-responsiveness} illustrates the latency comparison across these dimensions.
 
@@ -1172,24 +1175,16 @@ For Remix, the debugging latency ranged from 25.1 to 124.6 seconds (median: 53.0
 the time required to step through bytecode operations in the debugger, with latency
 scaling linearly with test-case width as each additional input value requires a separate
 transaction execution and complete bytecode step-through.
-In contrast, \texttt{SolQDebug} completed analysis in 0.03--5.09 seconds (median: 0.15s)
-across all 120 measurements. \texttt{SolQDebug}'s latency remains nearly constant
-regardless of test-case width, as AI analyzes all
-input combinations symbolically in a single pass. This results in a median speedup of approximately
-350$\times$ over Remix for pure debugging time. In practice, Remix users also incur additional
-overhead from compilation, deployment, and state initialization, further increasing total debugging
-time. \texttt{SolQDebug} eliminates these preparatory steps entirely, enabling immediate feedback
-during code editing.
+In contrast, \textsc{SolQDebug} completed analysis in 0.03--5.09 seconds (median: 0.15s)
+across all 120 measurements. \textsc{SolQDebug}'s latency remains nearly constant
+regardless of test-case width, as AI analyzes all input combinations symbolically in a single pass.
+This results in a median feedback time of 0.15s compared to 53s with Remix. This comparison reflects debugging workflow time, measuring how quickly developers gain insights into function behavior rather than comparing equivalent computational tasks. Remix requires compilation, deployment, and concrete execution tracing, while \textsc{SolQDebug} provides immediate statement-level abstract summaries during editing.
 
 \medskip
 \noindent\fbox{%
 \begin{minipage}{0.96\linewidth}
 \textbf{Answer to RQ1:}
-\texttt{SolQDebug} achieves sub-second debugging latency (median: 0.15s), providing
-approximately 350$\times$ faster line-by-line variable inspection compared to Remix's
-bytecode step-through (median: 53.0s). Unlike Remix, whose latency scales linearly with
-input space size, \texttt{SolQDebug}'s performance through abstract interpretation does not depend on
-test-case width. Including compilation and deployment overhead further increases Remix's total latency.
+\textsc{SolQDebug} achieves millisecond-scale feedback (median 0.15s), reducing debugging workflow time compared to Remix's compile-deploy-debug cycle (median 53s). The two tools take fundamentally different approaches: \textsc{SolQDebug} generates statement-level abstract summaries over symbolic inputs, while Remix traces concrete execution paths. Unlike Remix, whose latency scales linearly with input space size, \textsc{SolQDebug}'s performance through abstract interpretation does not depend on test-case width.
 \end{minipage}%
 }
 
@@ -1210,7 +1205,7 @@ to compute financial quantities such as rewards, fees, and vesting schedules.
 These operations inherently amplify interval widths during AI
 due to the combinatorial nature of interval arithmetic.
 Understanding how annotation structure influences precision in such contexts is critical for practical adoption
-of \texttt{SolQDebug}.
+of \textsc{SolQDebug}.
 
 To investigate this, the \texttt{pending} function from \texttt{Lock.sol} in the benchmark dataset was examined. The function uses complex arithmetic operations involving multiplication and division. Multiplication is critical: in interval arithmetic, it computes the Cartesian product of endpoint combinations $\{a_{\min} \times b_{\min}, a_{\min} \times b_{\max}, a_{\max} \times b_{\min}, a_{\max} \times b_{\max}\}$. Consequently, when operand intervals are disjoint, this combinatorial expansion generates significantly wider output ranges.
 
@@ -1268,7 +1263,7 @@ When local variables lack explicit initialization, precision loss can occur.
 \texttt{getTotalDeposit} (TimeLockPool) declares \texttt{uint256 total;} without initialization
 and then accumulates values in a loop.
 For example, when appropriate annotations are provided for the \texttt{depositsOf} array elements, the analyzer infers a loop bound of 3 (setting $\tau = 3$) and correctly computes \texttt{i = [0,3]} after the loop.
-However, \texttt{SolQDebug} conservatively models uninitialized variables as $\top$ (unknown), causing \texttt{total} to remain $\top = [0, 2^{256}-1]$ regardless of the precise loop bound.
+However, \textsc{SolQDebug} conservatively models uninitialized variables as $\top$ (unknown), causing \texttt{total} to remain $\top = [0, 2^{256}-1]$ regardless of the precise loop bound.
 
 This pattern represents a developer-fixable limitation.
 Explicitly initializing \texttt{total = 0} would enable precise tracking (yielding \texttt{total = [700,1000]} for the annotated example).
@@ -1284,7 +1279,7 @@ where \texttt{tokenCount} is known from annotations.
 With appropriate annotations for \texttt{\_tokens} and \texttt{tokenId}, the analyzer infers \texttt{tokenCount = 3} (setting $\tau = 3$) and correctly computes \texttt{tokenIndex = [0,3]} after the loop.
 However, \texttt{resultIndex} inside the loop increments conditionally (\texttt{if (tokenItemId != tokenId) resultIndex++}) based on array element comparisons, depending on data values rather than the loop index itself.
 
-Once the widening threshold is exceeded, \texttt{SolQDebug} widens \texttt{resultIndex} to $[0, \infty]$.
+Once the widening threshold is exceeded, \textsc{SolQDebug} widens \texttt{resultIndex} to $[0, \infty]$.
 The interval domain cannot track correlations between array contents and conditional accumulation.
 This pattern represents an inherent limitation of the interval domain.
 Annotations of iteration bounds cannot prevent widening when variable updates depend on unpredictable data rather than iteration count.
@@ -1293,7 +1288,7 @@ Annotations of iteration bounds cannot prevent widening when variable updates de
 \noindent\fbox{%
 \begin{minipage}{0.96\linewidth}
 \textbf{Answer to RQ3:}
-\texttt{SolQDebug} improves loop analysis precision for constant-bounded and annotation-enabled dynamic loops.
+\textsc{SolQDebug} improves loop analysis precision for constant-bounded and annotation-enabled dynamic loops.
 Remaining precision loss arises from developer-fixable initialization issues and inherent interval domain limitations in tracking data-dependent accumulation.
 \end{minipage}%
 }
@@ -1316,7 +1311,7 @@ a user study with developers has not yet been conducted.
 
 \smallskip
 \noindent\textbf{Construct Validity.}
-We compared \texttt{SolQDebug} only against Remix IDE,
+We compared \textsc{SolQDebug} only against Remix IDE,
 without direct comparison to other debugging tools such as Hardhat Debugger or Foundry Forge Debug.
 However, Remix is the most widely used Solidity IDE,
 and these alternative tools share the same concrete execution model,
@@ -1326,9 +1321,10 @@ exhibiting similar characteristics in terms of deployment requirements and step-
 
 \subsection{Why use Abstract Interpretation with Interval Domain for Debugging}
 
-In this work, debugging refers to a developer-led, interactive exploration activity that occurs during code editing, before deployment.
+In this work, debugging refers to a developer-led, interactive exploration activity that occurs during code editing.
 Developers specify debug annotations and immediately observe program behaviors at the source level.
 This edit-time feedback loop imposes strict requirements on the analysis technique.
+Unlike conventional step-through debuggers that trace concrete execution, \textsc{SolQDebug} provides abstract value summaries that characterize possible behaviors across symbolic interval inputs.
 
 \smallskip
 \noindent\textbf{Why Abstract Interpretation?}
@@ -1354,28 +1350,90 @@ by the interactive debugging context. Edit-time debugging fundamentally requires
 feedback to maintain developer flow. Developers iterate rapidly through code edits,
 and analysis delays that exceed even a few seconds would break this interactive loop,
 forcing developers back to the traditional compile-deploy-debug cycle.
-\texttt{SolQDebug} achieved 350$\times$ median speedup over Remix IDE (RQ1),
-delivering millisecond-scale feedback that keeps developers in flow.
+\textsc{SolQDebug} achieved millisecond-scale feedback latency (RQ1), keeping developers in flow.
 Although AI's precision is inherently conservative, this limitation was mitigated
 by providing developers with annotation-based techniques to control precision where needed.
 The evaluation shows that such techniques can reduce imprecision in practice for common
 smart contract patterns (cf.\ RQ2, RQ3).
 \vspace{0.25em}
 
-    \subsection{Current Limitations}
-    The current scope and analysis introduce several limitations. First, the focus is on
-    single-contract, single-transaction functions. Inter-contract calls, multi-transaction workflows,
-    proxies, and inheritance hierarchies are currently out of scope. As a result,
-    a developer study in larger project settings has not yet been conducted. Consequently, the usability and
-    interpretability of edit-time feedback across multi-contract workflows remain unvalidated.
+\subsection{Practical Guidelines for Annotation and Loop Design}
 
-    Second, the interval domain exhibits inherent precision limitations due to over-approximation.
-    Arithmetic operations such as multiplication and division expand interval ranges combinatorially,
-    control-flow joins compute least upper bounds that may encompass infeasible values, and
-    loops apply widening to guarantee termination, sacrificing precision particularly for
-    data-dependent accumulation patterns. As demonstrated in RQ2 and RQ3, such operations
-    result in widened ranges that may include infeasible values. While this trade-off preserves
-    edit-time responsiveness, it limits precision for complex data-dependent computations.
+\begin{table}[!t]
+\centering
+\caption{Practical guidelines for maximizing analysis precision, synthesized from RQ2 (arithmetic operations) and RQ3 (loop constructs). Guidelines include annotation strategies and code design patterns.}
+\label{tab:guidelines}
+\rotatebox{90}{%
+\begin{minipage}{0.95\textheight}
+\centering
+\small
+\begin{tabular}{@{}p{2.4cm}p{2.2cm}p{5.5cm}p{6.5cm}@{}}
+\toprule
+\textbf{Scenario} & \textbf{Detail} & \textbf{Guideline} & \textbf{Rationale} \\
+\midrule
+\multicolumn{4}{@{}l}{\textit{Arithmetic Operations (RQ2)}} \\[0.4em]
+
+1. Basic principle
+& All operators & Annotate \textbf{one operand as interval} (e.g., \texttt{[100,110]}), others as \textbf{singleton} (e.g., \texttt{[100,100]}). & Minimizes interval expansion from combinatorial endpoint calculations. \\[0.5em]
+\hdashline\noalign{\vskip 1em}
+\multirow[t]{5}{*}{\parbox{2.4cm}{2. Multiple\\intervals needed}}
+& \texttt{*}, \texttt{/} & Use \textbf{overlapping} ranges (e.g., \texttt{[100,110]} and \texttt{[100,115]}). & Disjoint ranges maximize spread of endpoint products. \\[0.5em]
+& \texttt{+} & Position (overlapping vs.\ disjoint) does not matter. & Result width equals sum of input widths. \\[0.5em]
+& \texttt{-} (\texttt{int}) & Position (overlapping vs.\ disjoint) does not matter. & Result width equals sum of input widths. \\[0.5em]
+& \texttt{-} (\texttt{uint}) & Use \textbf{disjoint} ranges where minuend $>$ subtrahend (e.g., \texttt{[100,110] - [50,70]}). & Overlapping ranges risk underflow, degrading precision. \\[0.5em]
+& \texttt{\%} & Position does not matter. & Result depends on divisor magnitude only. \\[0.5em]
+
+\midrule
+\multicolumn{4}{@{}l}{\textit{Loop Constructs (RQ3)}} \\[0.4em]
+
+\multirow[t]{2}{*}{\parbox{2.4cm}{1. Before loop}}
+& Initialization & \textbf{Initialize local variables explicitly} (e.g., \texttt{uint x = 0;}). & Uninitialized locals start as $\top$; annotations cannot recover precision. \\[0.5em]
+& Bounds annotation & Annotate state variables or parameters determining loop bounds (e.g., array lengths). & Enables precise iteration estimation and widening threshold. \\[0.5em]
+\hdashline\noalign{\vskip 1em}
+\multirow[t]{3}{*}{\parbox{2.4cm}{2. Inside loop}}
+& Simple assignment & Assignments without arithmetic (e.g., \texttt{x = arr[i]}) can converge. & No interval expansion occurs from arithmetic operations. \\[0.5em]
+& Index-related arithmetic & Arithmetic where operands relate to loop index (e.g., \texttt{i}, \texttt{arr[i]}) can converge with proper annotation. & Bounds-aware analysis tracks index-correlated computations. \\[0.5em]
+& Index-unrelated arithmetic & Arithmetic on variables unrelated to loop index (e.g., \texttt{if (...) count++}) causes widening. & Interval domain cannot track data-dependent correlations. \\[0.5em]
+\hdashline\noalign{\vskip 1em}
+3. After loop
+& Propagation & Avoid using widened variables in subsequent statements when precise analysis is needed. & Widened intervals propagate imprecision to all dependent computations. \\
+\bottomrule
+\end{tabular}
+\end{minipage}%
+}
+\end{table}
+
+The experimental findings from RQ2 and RQ3 yield actionable strategies for developers to maximize analysis precision. Table~\ref{tab:guidelines} synthesizes these findings into a unified framework that includes annotation strategies for both arithmetic and loops, as well as code design patterns specifically for loop constructs.
+
+For arithmetic operations, developers should minimize interval expansion by using singleton intervals for all but one operand, and when multiple intervals are necessary, choose appropriate positioning based on the operator (overlapping for multiplication/division, disjoint for unsigned subtraction).
+
+For loop constructs, precision depends on: (1) explicit initialization of local variables before the loop, (2) proper annotation of loop bounds, and (3) whether arithmetic operations inside the loop involve operands related to the loop index. Operations on index-unrelated variables cause unavoidable widening, and such widened variables should be isolated from subsequent computations when precise analysis is required.
+
+    \subsection{Limitations}
+
+    The current implementation focuses on single-contract, single-transaction functions within a subset of Solidity language features. We identify four categories of limitations and outline concrete next steps toward addressing real-world challenges.
+
+    \smallskip
+    \noindent\textbf{Language Coverage.}
+    The current implementation does not support inline assembly blocks. Inline assembly allows developers to write raw EVM opcodes within Solidity, bypassing the type system and enabling low-level optimizations. Since assembly instructions operate directly on stack and memory without Solidity's semantic abstractions, the current CFG construction and abstract interpretation cannot reason about their effects. As a minimal viable step, assembly blocks could be treated conservatively by assigning TOP to all variables potentially modified within the block. A more refined approach would pattern-match common assembly idioms (e.g., \texttt{mload}/\texttt{mstore} for memory operations, \texttt{sload}/\texttt{sstore} for storage) and translate them into equivalent abstract operations.
+
+    \smallskip
+    \noindent\textbf{Contract Interaction.}
+    Inter-contract calls, inheritance hierarchies, and multi-transaction workflows are currently out of scope. For external calls, a summary-based approach would analyze callee contracts separately and represent their effects as function summaries (input-output interval relations) at call sites. This avoids full inlining while preserving soundness. Similarly, inheritance support requires resolving the C3 linearization order and merging state variable declarations from parent contracts before analysis.
+
+    Multi-transaction analysis would require serializing abstract states between transaction boundaries and modeling how external actors may modify contract state between calls.
+
+    \smallskip
+    \noindent\textbf{Bug Detection.}
+    The current system functions as a debugging assistant that displays variable values and execution paths. A natural extension is proactive bug detection: once interval information is available, a validation engine can check for common vulnerability patterns. For example, if a divisor variable has an interval containing zero, the system could warn about potential division-by-zero; if an array index interval exceeds the array bounds annotation, an out-of-bounds access warning could be raised. This evolution from ``showing values'' to ``detecting problems'' aligns with the debugging assistant paradigm while providing additional value without requiring separate analysis passes.
+
+    \smallskip
+    \noindent\textbf{User Experience Validation.}
+    A formal developer study has not yet been conducted.
+    Since \textsc{SolQDebug} currently operates without full GUI/IDE integration,
+    a developer study at this stage would not accurately reflect usability in complete development settings.
+    Meaningful usability evaluation requires additional HCI/GUI research to provide intuitive interfaces for annotation input, result visualization, and seamless editor integration.
+    We plan to conduct formal usability studies once the above extensions are implemented alongside comprehensive IDE integration.
 
 \section{Related Works}
 
@@ -1391,7 +1449,7 @@ smart contract patterns (cf.\ RQ2, RQ3).
         concrete transactions and integrates with Hardhat.
 
         In summary, these debuggers operate on compiled artifacts or post-deployment traces.
-        By contrast, \texttt{SolQDebug} targets pre-deployment authoring, accepts partial fragments
+        By contrast, \textsc{SolQDebug} targets pre-deployment authoring, accepts partial fragments
         and symbolic annotations, and reports line-level effects via AI during
         editing.
 
@@ -1417,8 +1475,8 @@ smart contract patterns (cf.\ RQ2, RQ3).
         adaptation \citep{peculiar,tmlvd,pscvfinder}.
 
         These approaches have substantially advanced vulnerability detection and property checking
-        for smart contracts. However, they target complete programs and focus on vulnerability detection rather than providing edit-time feedback. In contrast, \texttt{SolQDebug}
-        provides real-time analysis as developers write code, enabling immediate understanding of program behavior without requiring complete contracts.
+        for smart contracts. However, they target complete programs and focus on vulnerability detection rather than providing edit-time feedback. In contrast, \textsc{SolQDebug}
+        provides interactive analysis as developers write code, enabling immediate understanding of program behavior without requiring complete contracts.
     
     \subsection{Solidity-Specific Abstract Interpretation Frameworks}
         AI is a well-established framework for static analysis and has been
@@ -1430,8 +1488,8 @@ smart contract patterns (cf.\ RQ2, RQ3).
         contracts and provide no support for line-by-line interpretation or developer interaction
         within an IDE.
 
-        \texttt{SolQDebug} builds upon these AI frameworks but targets interactive debugging
-        rather than invariant generation or information flow analysis. Unlike these approaches that analyze complete contracts, \texttt{SolQDebug} incrementally updates
+        \textsc{SolQDebug} builds upon these AI frameworks but targets interactive debugging
+        rather than invariant generation or information flow analysis. Unlike these approaches that analyze complete contracts, \textsc{SolQDebug} incrementally updates
         the control-flow graph and abstract state during editing, allowing developers to use debug annotations
         to guide interval analysis and receive edit-time feedback without requiring complete contracts.
     
@@ -1439,7 +1497,7 @@ smart contract patterns (cf.\ RQ2, RQ3).
         Beyond Solidity, the broader programming languages community has increasingly focused
         on making abstract interpretation interactive. Recent work integrates static analysis
         directly into IDEs for C, Java, and other traditional languages, delivering live feedback
-        during editing \citep{daig, ds, iac, iaj, fap}. While these systems share \texttt{SolQDebug}'s
+        during editing \citep{daig, ds, iac, iaj, fap}. While these systems share \textsc{SolQDebug}'s
         goal of edit-time responsiveness, they differ in language semantics, domain requirements,
         and input mechanisms.
         \citet{daig} proposed demanded abstract interpretation, which incrementally rebuilds only
@@ -1455,7 +1513,7 @@ smart contract patterns (cf.\ RQ2, RQ3).
         the impacted functions.
 
         While these frameworks demonstrate the feasibility of interactive abstract interpretation
-        in traditional languages, \texttt{SolQDebug} represents the first application of this paradigm
+        in traditional languages, \textsc{SolQDebug} represents the first application of this paradigm
         to Solidity. Beyond language adaptation, it introduces an annotation-guided approach where developers
         specify debug annotations directly in source code to explore multiple execution scenarios in a single analysis pass. This enables Solidity developers to benefit from interactive static analysis without deploying contracts to a blockchain.
 
@@ -1465,20 +1523,13 @@ smart contract patterns (cf.\ RQ2, RQ3).
     line-to-node indexing for incremental CFG construction, and annotation-guided abstract interpretation, SolQDebug
     provides millisecond-scale feedback directly within the editor.
 
-    Evaluation on 30 real-world DAppSCAN functions demonstrated a 350$\times$ median speedup
-    over Remix IDE (0.15s vs. 53.0s). Our analysis showed that annotation-guided interpretation
+    Evaluation on 30 real-world DAppSCAN functions demonstrated millisecond-scale feedback latency. Our analysis showed that annotation-guided interpretation
     enables precise analysis across diverse execution paths while maintaining soundness guarantees.
     These results demonstrated that SolQDebug effectively bridges the interactivity gap in
     Solidity debugging, bringing the development experience closer to modern IDEs and
     enhancing software quality in the blockchain ecosystem.
 
-    Future work includes extending support to inter-contract and multi-transaction contexts,
-    conducting user studies to assess practical adoption, and applying EVM Object Format (EOF)-based analysis
-    to support inter-contract debugging when source code is unavailable.
-    Additionally, we plan to explore bug detection in the debugging context
-    by extending SolQDebug.
-    This direction aligns with developer preferences for development-integrated tools
-    that provide sound guarantees~\citep{defisecurity}.
+    Future work includes extending language coverage to inline assembly, supporting inter-contract calls and multi-transaction workflows, and evolving the debugging assistant into a proactive bug detection system with IDE integration.
 
 \section*{Acknowledgements}
 This work was supported by the Institute of Information \& communications Technology Planning \& Evaluation (IITP) grant funded by the Korean government (MSIT) (RS-2021-II210177, High Assurance of Smart Contract for Secure Software Development Life Cycle).
@@ -1693,7 +1744,7 @@ Software Engineering (2019). https://doi.org/10.1109/TSE.2019.2942301
 \section{Interactive Parser Grammar Specification}
 \label{appendix:interactive-grammar}
 
-This appendix provides the complete grammar specification for \texttt{SolQDebug}'s interactive parser.
+This appendix provides the complete grammar specification for \textsc{SolQDebug}'s interactive parser.
 
 \subsection{Entry Rules for Solidity Program Fragments}
 
@@ -1828,7 +1879,7 @@ debugLocalVar : '//' '@LocalVar' lvalue '=' value ';' ;
 \section{Incremental CFG Construction Patterns}
 \label{appendix:cfg-patterns}
 
-This appendix provides the complete CFG construction patterns for \texttt{SolQDebug}'s incremental CFG builder.
+This appendix provides the complete CFG construction patterns for \textsc{SolQDebug}'s incremental CFG builder.
 The patterns show how each statement type is incrementally spliced into the existing control-flow graph.
 
 \subsection{CFG Hierarchy}
@@ -1940,7 +1991,7 @@ as illustrated in the simple statement example.
   dots/.style={circle, draw=none, minimum size=0.3cm}
 ]
   \node[block] (current) {Current Node};
-  \node[cond, below=of current, fill=green!15] (cond) {guard};
+  \node[cond, below=of current, fill=green!15] (cond) {condition};
   \node[block, below left=of cond, fill=green!15] (true) {True\\Node};
   \node[block, below right=of cond, fill=green!15] (false) {False\\Node};
   \node[block, below=2.5cm of cond, fill=green!15] (join) {If Join\\Node};
@@ -1966,12 +2017,12 @@ as illustrated in the simple statement example.
   dots/.style={circle, draw=none, minimum size=0.3cm}
 ]
   \node[block] (current) {Current Node};
-  \node[cond, below=1cm of current] (if_cond) {if guard};
+  \node[cond, below=1cm of current] (if_cond) {if condition};
   \node[block, below left=1.2cm and 2.2cm of if_cond] (if_true) {If True\\Node};
   \node[dots, below=0.6cm of if_true] (if_dots) {...};
 
   % else-if branch (highlighted)
-  \node[cond, below right=1.2cm and 2.2cm of if_cond, fill=green!15] (elif_cond) {else-if\\guard};
+  \node[cond, below right=1.2cm and 2.2cm of if_cond, fill=green!15] (elif_cond) {else-if\\condition};
   \node[block, below left=1cm and 1.5cm of elif_cond, fill=green!15] (elif_true) {Else-If True\\Node};
   \node[block, below right=1cm and 1.5cm of elif_cond, fill=green!15] (elif_false) {Else-If False\\Node};
 
@@ -2003,7 +2054,7 @@ as illustrated in the simple statement example.
   dots/.style={circle, draw=none, minimum size=0.3cm}
 ]
   \node[block] (current) {Current Node};
-  \node[cond, below=1cm of current] (cond) {guard};
+  \node[cond, below=1cm of current] (cond) {condition};
   \node[block, below left=1.2cm and 2cm of cond] (true) {True\\Node};
   \node[dots, below=0.6cm of true] (true_dots) {...};
   \node[block, below right=1.2cm and 2cm of cond, fill=green!15] (else) {Else\\Node};
@@ -2035,7 +2086,7 @@ as illustrated in the simple statement example.
 ]
   \node[block] (current) {Current Node};
   \node[phi, below=1cm of current, fill=green!15] (phi) {$\phi$};
-  \node[cond, below=1cm of phi, fill=green!15] (cond) {guard};
+  \node[cond, below=1cm of phi, fill=green!15] (cond) {condition};
   \node[block, below left=1.2cm and 2.2cm of cond, fill=green!15] (body) {Body\\Entry Node};
   \node[block, below right=1.2cm and 2.2cm of cond, fill=green!15] (exit) {Loop\\Exit Node};
   \node[dots, below=0.6cm of exit] (succ) {...};
@@ -2061,7 +2112,7 @@ as illustrated in the simple statement example.
   dots/.style={circle, draw=none, minimum size=0.3cm}
 ]
   \node[phi] (phi) {$\phi$};
-  \node[cond, below=0.8cm of phi] (cond) {guard};
+  \node[cond, below=0.8cm of phi] (cond) {condition};
   \node[block, below left=1cm and 2cm of cond] (body) {Body Node};
   \node[dots, below=0.5cm of body] (body_dots) {...};
   \node[block, below=0.5cm of body_dots, fill=green!15] (break) {\texttt{break}};
@@ -2088,7 +2139,7 @@ as illustrated in the simple statement example.
   dots/.style={circle, draw=none, minimum size=0.3cm}
 ]
   \node[phi] (phi) {$\phi$};
-  \node[cond, below=0.8cm of phi] (cond) {guard};
+  \node[cond, below=0.8cm of phi] (cond) {condition};
   \node[block, below left=1cm and 2cm of cond] (body) {Body Node};
   \node[dots, below=0.5cm of body] (body_dots) {...};
   \node[block, below=0.5cm of body_dots, fill=green!15] (continue) {\texttt{continue}};
@@ -2122,7 +2173,7 @@ as illustrated in the simple statement example.
   \draw[->, thick, bend left=15] (return) to node[above right] {rewire} (exit);
   \draw[->, thick, dashed, gray] (return) -- node[left, gray] {detached} (detached);
 \end{tikzpicture}
-\caption{Return statement insertion. The \texttt{return} node is rewired to the function's unique \texttt{return exit}}
+\caption{Return statement insertion. The containing node's edge is rewired to the function's unique \texttt{return exit node}}
 \label{fig:new-return}
 \end{figure}
 
@@ -2136,7 +2187,7 @@ as illustrated in the simple statement example.
   dots/.style={circle, draw=none, minimum size=0.3cm}
 ]
   \node[block] (current) {Current Node};
-  \node[cond, below=of current, fill=green!15] (cond) {predicate};
+  \node[cond, below=of current, fill=green!15] (cond) {condition};
   \node[block, below left=of cond, fill=green!15] (true) {True\\Node};
   \node[exit, below right=of cond] (error) {ERROR\\EXIT};
   \node[dots, below=of true] (succ) {...};
@@ -2146,14 +2197,14 @@ as illustrated in the simple statement example.
   \draw[->, thick] (cond) -| node[above right, pos=0.3] {F} (error);
   \draw[->, thick] (true) -- (succ);
 \end{tikzpicture}
-\caption{Require statement insertion. The builder creates a \texttt{condition node} with true edge to a node and false edge to the \texttt{error exit}}
+\caption{Require statement insertion. The builder creates a \texttt{condition node} with true edge to a node and false edge to the \texttt{error exit node}}
 \label{fig:new-require}
 \end{figure}
 
 \section{Abstract Domain and Formal Semantics}
 \label{app:semantics}
 
-This appendix presents the abstract domain definitions and formal semantics used by \texttt{SolQDebug}'s abstract interpreter. The framework is based on interval analysis for numeric types, set domains for addresses, and lazy materialization for composite data structures.
+This appendix presents the abstract domain definitions and formal semantics used by \textsc{SolQDebug}'s abstract interpreter. The framework is based on interval analysis for numeric types, set domains for addresses, and lazy materialization for composite data structures.
 
 \subsection{Language Syntax}
 
