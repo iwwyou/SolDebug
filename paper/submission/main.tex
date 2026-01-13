@@ -1103,10 +1103,42 @@ which typically contain minimal logic unsuitable for debugging analysis. From th
   \item 11--20~KB (304 contracts): 30 samples
   \item Over 20~KB (163 contracts): 20 samples
 \end{itemize}
-yielding 120 candidate contracts. From these candidates, two filtering criteria were then applied: (1)~excluding functions with multi-contract
-interactions such as accessing variables or invoking functions from other contracts,
-as the analysis focuses on single-contract scenarios, and (2)~excluding logic-free
-functions that contain only assignments or return statements.
+yielding 120 candidate contracts. Since \textsc{SolQDebug} focuses on single-contract, single-transaction analysis, functions were systematically filtered based on four exclusion criteria, applied in the following priority order:
+
+\begin{enumerate}
+  \item \textbf{External dependencies}---functions involving cross-contract interactions were excluded, including: external contract calls (e.g., \texttt{IERC20(token).transfer()}), library function calls via Solidity's \texttt{using} directive, low-level calls (\texttt{.call()}, \texttt{.delegatecall()}, \texttt{.staticcall()}), parent contract invocations via \texttt{super}, and functions using inherited modifiers not defined in the analyzed contract (e.g., \texttt{onlyOwner} from OpenZeppelin's \texttt{Ownable}).
+
+  \item \textbf{Inline assembly}---functions containing EVM assembly blocks were excluded, as they bypass Solidity's type system and require specialized low-level analysis beyond the scope of source-level debugging.
+
+  \item \textbf{Data builtin functions}---functions using Solidity's built-in data transformation operations were excluded, including: cryptographic hash functions (\texttt{keccak256}, \texttt{sha256}, \texttt{ecrecover}) and ABI encoding/decoding functions (\texttt{abi.encode}, \texttt{abi.decode}, \texttt{abi.encodePacked}). These operations are opaque to source-level analysis and their internal computations cannot be traced step-by-step.
+
+  \item \textbf{Trivial functions}---functions with minimal logic that provide no meaningful debugging targets were excluded, including: single-statement returns, assignments, or function calls; functions containing only \texttt{require}/\texttt{assert} guards; and functions with empty bodies.
+\end{enumerate}
+
+\noindent The filtering criteria were applied hierarchically: if a function matched an earlier criterion, subsequent criteria were not evaluated. This ordering reflects the nature of each limitation: external dependencies represent fundamental scope boundaries (cross-contract analysis is not supported), while inline assembly and data builtin functions are internal features that could potentially be supported in future versions. Trivial functions, though within scope, simply lack sufficient complexity to benefit from debugging analysis. This hierarchical approach ensures each function is counted in exactly one exclusion category.
+
+\noindent Table~\ref{tab:filtering-stats} summarizes the filtering results across all 120 contracts. Of the 1,529 functions extracted, external dependencies account for the largest exclusion category (70.8\%), reflecting the heavily modular nature of modern DeFi contracts that extensively rely on OpenZeppelin libraries and cross-contract interactions. Trivial functions represent the second largest category (18.4\%), consisting of simple getters, setters, and single-statement operations. After filtering, 142 candidate functions (9.3\%) remain suitable for debugging analysis.
+
+\begin{table}[t]
+\centering
+\caption{Function filtering statistics across 120 benchmark contracts.}
+\label{tab:filtering-stats}
+\begin{tabular}{lrr}
+\toprule
+\textbf{Category} & \textbf{Functions} & \textbf{\%} \\
+\midrule
+Total functions extracted & 1,529 & 100.0 \\
+\midrule
+\multicolumn{3}{l}{\textit{Excluded by filtering criteria (in priority order):}} \\
+\quad 1. External dependencies & 1,083 & 70.8 \\
+\quad 2. Inline assembly & 1 & 0.1 \\
+\quad 3. Data builtin functions & 21 & 1.4 \\
+\quad 4. Trivial functions & 282 & 18.4 \\
+\midrule
+\textbf{Candidate functions} & \textbf{142} & \textbf{9.3} \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 After applying these filters, representative functions were selected based on three dimensions of debugging complexity:
 \begin{itemize}
