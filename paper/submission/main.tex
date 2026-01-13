@@ -1419,13 +1419,11 @@ For loop constructs, precision depends on: (1) explicit initialization of local 
 
     \smallskip
     \noindent\textbf{Contract Interaction.}
-    Inter-contract calls, inheritance hierarchies, and multi-transaction workflows are currently out of scope. For external calls, a summary-based approach would analyze callee contracts separately and represent their effects as function summaries (input-output interval relations) at call sites. This avoids full inlining while preserving soundness. Similarly, inheritance support requires resolving the C3 linearization order and merging state variable declarations from parent contracts before analysis.
-
-    Multi-transaction analysis would require serializing abstract states between transaction boundaries and modeling how external actors may modify contract state between calls.
+    Inter-contract calls, inheritance hierarchies, and multi-transaction workflows are currently out of scope. For multi-contract support, a summary-based approach would analyze callee contracts separately and represent their effects as function summaries (input-output interval relations) at call sites. This avoids full inlining while preserving soundness. Multi-transaction analysis would additionally require serializing abstract states between transaction boundaries.
 
     \smallskip
     \noindent\textbf{Bug Detection.}
-    The current system functions as a debugging assistant that displays variable values and execution paths. A natural extension is proactive bug detection: once interval information is available, a validation engine can check for common vulnerability patterns. For example, if a divisor variable has an interval containing zero, the system could warn about potential division-by-zero; if an array index interval exceeds the array bounds annotation, an out-of-bounds access warning could be raised. This evolution from ``showing values'' to ``detecting problems'' aligns with the debugging assistant paradigm while providing additional value without requiring separate analysis passes.
+    The current system functions as a debugging assistant that displays variable values and execution paths. A natural extension is proactive bug detection: once interval information is available, a validation engine can check for common vulnerability patterns. The target bugs are logic errors, particularly numerical defects such as arithmetic overflow, precision loss, and accounting errors~\citep{numscout, gptscan, accountingerrors}. This evolution from ``showing values'' to ``detecting problems'' aligns with the debugging assistant paradigm and with developer preferences for development-integrated tools with sound guarantees~\citep{defisecurity}.
 
     \smallskip
     \noindent\textbf{User Experience Validation.}
@@ -1560,8 +1558,11 @@ CoinMarketCap: \url{https://coinmarketcap.com/} (2025). Accessed November 2025
 \bibitem[Chaliasos et~al.(2024)]{defisecurity}
 Chaliasos, S., et al.: Smart contract and defi security tools: Do they meet the needs of practitioners?. In: Proceedings of the 46th IEEE/ACM International Conference on Software Engineering (ICSE), pp. 1--13 (2024). https://doi.org/10.1145/3597503.3623302
 
-\bibitem[Chen et~al.(2025)]{smart contract evolution}
+\bibitem[Chen et~al.(2025a)]{smart contract evolution}
 Chen, X., et al.: Characterizing smart contract evolution. ACM Transactions on Software Engineering and Methodology (2025). https://doi.org/10.1145/3719004
+
+\bibitem[Chen et~al.(2025b)]{numscout}
+Chen, J., et al.: NumScout: unveiling numerical defects in smart contracts using LLM-pruning symbolic execution. IEEE Transactions on Software Engineering (2025). https://doi.org/10.1109/TSE.2025.3526631
 
 \bibitem[Chimdyalwar(2024)]{fap}
 Chimdyalwar, B.: Fast and precise interval analysis on industry code. In: 2024 IEEE 35th
@@ -1666,6 +1667,9 @@ the 32nd ACM SIGSOFT International Symposium on Software Testing and Analysis (I
 So, S., et al.: Verismart: a highly precise safety verifier for Ethereum smart contracts. In: 2020
 IEEE Symposium on Security and Privacy (SP), pp. 1678--1694 (2020). https://doi.org/10.1109/SP40000.2020.00032
 
+\bibitem[Sun et~al.(2024)]{gptscan}
+Sun, Y., et al.: GPTScan: detecting logic vulnerabilities in smart contracts by combining GPT with program analysis. In: Proceedings of the 46th IEEE/ACM International Conference on Software Engineering (ICSE), pp. 1--13 (2024). https://doi.org/10.1145/3597503.3639117
+
 \bibitem[solcx(2025)]{solcx}
 Solidity Compiler in Python (solcx): \url{https://solcx.readthedocs.io/en/latest/} (2025). Accessed
 November 2025
@@ -1722,6 +1726,9 @@ execution. In: 2022 IEEE International Conference on Big Data (Big Data), pp. 32
 Yu, L., et al.: PSCVFinder: a prompt-tuning based framework for smart contract vulnerability
 detection. In: 2023 IEEE 34th International Symposium on Software Reliability Engineering (ISSRE),
 pp. 556--567 (2023). https://doi.org/10.1109/ISSRE59848.2023.00030
+
+\bibitem[Zhang(2024)]{accountingerrors}
+Zhang, B.: Towards finding accounting errors in smart contracts. In: Proceedings of the 46th IEEE/ACM International Conference on Software Engineering (ICSE), pp. 1--13 (2024). https://doi.org/10.1145/3597503.3639222
 
 \bibitem[Zheng et~al.(2024)]{dappscan}
 Zheng, Z., et al.: Dappscan: building large-scale datasets for smart contract weaknesses in dApp
