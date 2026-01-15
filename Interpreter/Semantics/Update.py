@@ -556,10 +556,12 @@ class Update :
             if log and operator is not None:
                 # top_expr을 사용하여 최상위 LHS expression 기록
                 actual_record_expr = top_expr if top_expr is not None else record_expr
+                # ★ r_val이 ArrayVariable이면 r_val을 기록 (배열 전체 할당)
+                record_var = r_val if isinstance(r_val, ArrayVariable) else var_obj
                 self.an.recorder.record_assignment(
                     line_no=actual_line_no,
                     expr=actual_record_expr,
-                    var_obj=var_obj,
+                    var_obj=record_var,
                     base_obj=caller_object,
                 )
 

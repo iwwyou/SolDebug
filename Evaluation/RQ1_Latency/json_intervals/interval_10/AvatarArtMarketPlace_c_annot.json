@@ -1,0 +1,110 @@
+[
+  {
+    "code": "contract AvatarArtMarketplace {\n}",
+    "startLine": 1,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    uint256[] internal _tokens;",
+    "startLine": 2,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 3,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "    function _removeFromTokens(uint tokenId) internal view returns(uint256[] memory){\n}",
+    "startLine": 4,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 tokenCount = _tokens.length;",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "        uint256[] memory result = new uint256[](tokenCount);",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 resultIndex = 0;",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "        for(uint tokenIndex = 0; tokenIndex < tokenCount; tokenIndex++){\n}",
+    "startLine": 8,
+    "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "            uint tokenItemId = _tokens[tokenIndex];",
+    "startLine": 9,
+    "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "            if(tokenItemId != tokenId){\n}",
+    "startLine": 10,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "                result[resultIndex] = tokenItemId;",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "                resultIndex++;",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "        return result;",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar _tokens = array [1,2,3,4,5,6,7,8,9,10,11];",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar tokenId = [4,14];",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  }
+]

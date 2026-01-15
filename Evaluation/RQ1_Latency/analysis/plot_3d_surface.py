@@ -13,7 +13,7 @@ from scipy.interpolate import griddata
 import sys
 from pathlib import Path
 
-def load_data(csv_path='soldebug_benchmark_results_seconds.csv'):
+def load_data(csv_path='soldebug_benchmark_results_5run_mean.csv'):
     """Load and preprocess benchmark data"""
     print(f"Loading data from {csv_path}...")
     df = pd.read_csv(csv_path)
@@ -128,7 +128,7 @@ def create_interpolated_surface(df, output_path='3d_benchmark_surface.png', dpi=
     ax2.view_init(elev=ax1.elev, azim=ax1.azim)
 
     # Overall title
-    plt.suptitle('3D Benchmark with Smooth Interpolated Surfaces',
+    plt.suptitle('3D Benchmark Comparison (5-Run Mean Values)',
                  fontsize=15, fontweight='bold', y=0.98)
 
     plt.tight_layout()
@@ -149,10 +149,10 @@ def main():
     print("="*70)
 
     # Load data
-    csv_path = Path(__file__).parent / 'soldebug_benchmark_results_seconds.csv'
+    csv_path = Path(__file__).parent / 'soldebug_benchmark_results_5run_mean.csv'
     if not csv_path.exists():
         print(f"ERROR: CSV file not found at {csv_path}")
-        print("Please ensure 'soldebug_benchmark_results_seconds.csv' is in the same directory.")
+        print("Please ensure 'soldebug_benchmark_results_5run_mean.csv' is in the same directory.")
         sys.exit(1)
 
     df = load_data(csv_path)

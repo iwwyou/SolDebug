@@ -2328,7 +2328,7 @@ class ContractAnalyzer:
         if not self._batch_targets:
             return
         fcfg = self._batch_targets.pop()
-        self.engine.interpret_function_cfg(fcfg, None)
+        self.engine.interpret_function_cfg_for_debug(fcfg, None)  # ★ 디버깅용 함수 사용
 
         ln_set = {st.src_line
                   for blk in fcfg.graph.nodes

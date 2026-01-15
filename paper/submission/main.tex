@@ -1161,6 +1161,11 @@ source files, target functions, and line counts.
 The following presents the findings for each research question.
 
 \subsection{RQ1 - Responsiveness}
+\noindent\textbf{Baseline Selection.}
+RQ1 evaluates the reduction in debugging workflow latency---specifically, the time required for developers to understand program behavior under specific input ranges. While various abstract interpretation techniques have been proposed for other programming languages, such as demanded summarization-based approaches for incremental reanalysis~\citep{daig}, these methods focus on optimizing static analysis pipelines rather than supporting interactive debugging tasks. In contrast, Remix IDE provides debugging functionality that allows developers to trace execution flows for user-specified inputs, which aligns with the task that \textsc{SolQDebug} aims to support. Therefore, we select Remix as our baseline as it is the only existing Solidity tool capable of performing the same debugging task.
+
+\smallskip
+\noindent\textbf{Measurement.}
 To evaluate responsiveness, debugging latency was measured, defined as the time
 required to step through the execution of a function line-by-line.
 For Remix IDE, this corresponds to the duration from opening the debugger to
@@ -1191,32 +1196,34 @@ growth under reproducible conditions.
 \begin{figure}[t]
   \centering
   \includegraphics[width=0.8\linewidth]{Fig9.pdf}
-  \caption{Debugging latency comparison between \textsc{SolQDebug} and Remix across varying
-  ByteOp counts and test-case widths \(\Delta\). \textsc{SolQDebug} maintains consistent
+  \caption{Debugging workflow latency comparison between \textsc{SolQDebug} and Remix across varying
+  ByteOp counts and test-case widths \(\Delta\) (5-run mean values). \textsc{SolQDebug} maintains consistent
   sub-second latency regardless of function complexity or symbolic interval input width, while Remix's
   latency scales linearly with both dimensions.}
   \label{fig:rq1-responsiveness}
 \end{figure}
 
 30 functions were evaluated across 4 test-case widths \(\Delta \in \{0, 2, 5, 10\}\), yielding
-120 total measurements for \textsc{SolQDebug}. For Remix, each function was measured once per
-\(\Delta\) value to demonstrate the linear scaling behavior.
-Figure~\ref{fig:rq1-responsiveness} illustrates the latency comparison across these dimensions.
+120 total measurements for \textsc{SolQDebug}. To ensure statistical validity, each measurement was repeated 5 times, and mean latencies were computed for analysis.
+Figure~\ref{fig:rq1-responsiveness} illustrates the latency comparison across these dimensions using 5-run mean values.
 
-For Remix, the debugging latency ranged from 25.1 to 124.6 seconds (median: 53.0s), reflecting
+To assess statistical significance, we employed the Wilcoxon signed-rank test, a non-parametric method for comparing paired samples. The p-value represents the probability of observing results at least as extreme as the measured data under the null hypothesis~\citep{pvalue}. A p-value below 0.05 indicates that the observed difference is statistically significant.
+
+For Remix, the debugging workflow latency ranged from 25.6 to 128.7 seconds (mean: 54.62s, median: 51.68s), reflecting
 the time required to step through bytecode operations in the debugger, with latency
 scaling linearly with test-case width as each additional input value requires a separate
 transaction execution and complete bytecode step-through.
-In contrast, \textsc{SolQDebug} completed analysis in 0.03--5.09 seconds (median: 0.15s)
-across all 120 measurements. \textsc{SolQDebug}'s latency remains nearly constant
+In contrast, \textsc{SolQDebug} completed analysis in 0.02--1.88 seconds (mean: 0.24s, median: 0.09s)
+across all 30 contracts. \textsc{SolQDebug}'s latency remains nearly constant
 regardless of test-case width, as AI analyzes all input combinations symbolically in a single pass.
-This results in a median feedback time of 0.15s compared to 53s with Remix. This comparison reflects debugging workflow time, measuring how quickly developers gain insights into function behavior rather than comparing equivalent computational tasks. Remix requires compilation, deployment, and concrete execution tracing, while \textsc{SolQDebug} provides immediate statement-level abstract summaries during editing.
+Across 30 smart contracts, \textsc{SolQDebug} demonstrated significantly lower debugging workflow latency than Remix (Wilcoxon signed-rank test, $n=30$, $p = 9.31 \times 10^{-10}$).
+This comparison reflects debugging workflow time, measuring how quickly developers gain insights into function behavior rather than comparing equivalent computational tasks. Remix requires compilation, deployment, and concrete execution tracing, while \textsc{SolQDebug} provides immediate statement-level abstract summaries during editing.
 
 \medskip
 \noindent\fbox{%
 \begin{minipage}{0.96\linewidth}
 \textbf{Answer to RQ1:}
-\textsc{SolQDebug} achieves millisecond-scale feedback (median 0.15s), reducing debugging workflow time compared to Remix's compile-deploy-debug cycle (median 53s). The two tools take fundamentally different approaches: \textsc{SolQDebug} generates statement-level abstract summaries over symbolic inputs, while Remix traces concrete execution paths. Unlike Remix, whose latency scales linearly with input space size, \textsc{SolQDebug}'s performance through abstract interpretation does not depend on test-case width.
+\textsc{SolQDebug} achieves sub-second feedback (median 0.09s), providing significantly lower debugging workflow latency compared to Remix's compile-deploy-debug cycle (median 51.68s) with statistical significance (Wilcoxon test, $p < 0.001$). The two tools take fundamentally different approaches: \textsc{SolQDebug} generates statement-level abstract summaries over symbolic inputs, while Remix traces concrete execution paths. Unlike Remix, whose latency scales linearly with input space size, \textsc{SolQDebug}'s performance through abstract interpretation does not depend on test-case width.
 \end{minipage}%
 }
 
@@ -1744,6 +1751,9 @@ the 2018 ACM SIGSAC Conference on Computer and Communications Security (CCS), pp
 Feist, J., Grieco, G., Groce, A.: Slither: a static analysis framework for smart contracts. In: 2019 IEEE/ACM 2nd
 International Workshop on Emerging Trends in Software Engineering for Blockchain (WETSEB), pp. 8--15
 (2019). https://doi.org/10.1109/WETSEB.2019.00008
+
+\bibitem[Wasserstein and Lazar(2016)]{pvalue}
+Wasserstein, R.L., Lazar, N.A.: The ASA statement on p-values: context, process, and purpose. The American Statistician 70(2), 129--133 (2016). https://doi.org/10.1080/00031305.2016.1154108
 
 \bibitem[Wu et~al.(2021)]{peculiar}
 Wu, H., et al.: Peculiar: smart contract vulnerability detection based on crucial data-flow graph

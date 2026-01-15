@@ -108,13 +108,13 @@
     "event": "add"
   },  
   {
-    "code": "// @StateVar firstWinningNumber = [100,100]",
+    "code": "// @StateVar firstWinningNumber = [100,100];",
     "startLine": 15,
     "endLine": 15,
     "event": "add"
   },
   {
-    "code": "// @StateVar lastWinningNumber = [100,100]",
+    "code": "// @StateVar lastWinningNumber = [100,100];",
     "startLine": 16,
     "endLine": 16,
     "event": "add"

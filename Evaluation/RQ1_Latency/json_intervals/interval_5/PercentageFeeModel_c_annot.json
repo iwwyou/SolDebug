@@ -1,0 +1,188 @@
+[
+  {
+    "code": "contract PercentageFeeModel {\n}",
+    "startLine": 1,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    uint256 internal constant PRECISION = 10**18;",
+    "startLine": 2,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    struct FeeOverride {\n}",
+    "startLine": 3,
+    "endLine": 4,
+    "event": "add"
+  },
+  {
+    "code": "        bool isOverridden;",
+    "startLine": 4,
+    "endLine": 4,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 fee;",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "    mapping(address => FeeOverride) public earlyWithdrawFeeOverrideForPool;",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "    mapping(address => mapping(uint64 => FeeOverride)) public earlyWithdrawFeeOverrideForDeposit;",
+    "startLine": 9,
+    "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "    uint256 public earlyWithdrawFee;",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "    function getEarlyWithdrawFeeAmount(\n        address pool,\n        uint64 depositID,\n        uint256 withdrawnDepositAmount\n    ) external view override returns (uint256 feeAmount) {\n}",
+    "startLine": 12,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 feeRate;",
+    "startLine": 17,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "        FeeOverride memory feeOverrideForDeposit =\n            earlyWithdrawFeeOverrideForDeposit[pool][depositID];",
+    "startLine": 18,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "        if (feeOverrideForDeposit.isOverridden) {           \n}",
+    "startLine": 20,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "            feeRate = feeOverrideForDeposit.fee;",
+    "startLine": 21,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "else {\n}",
+    "startLine": 22,
+    "endLine": 23,
+    "event": "add"
+  },
+  {
+    "code": "            FeeOverride memory feeOverrideForPool =\n                earlyWithdrawFeeOverrideForPool[pool];",
+    "startLine": 23,
+    "endLine": 24,
+    "event": "add"
+  },
+  {
+    "code": "            if (feeOverrideForPool.isOverridden) {            \n}",
+    "startLine": 25,
+    "endLine": 26,
+    "event": "add"
+  },
+  {
+    "code": "                feeRate = feeOverrideForPool.fee;",
+    "startLine": 26,
+    "endLine": 26,
+    "event": "add"
+  },
+  {
+    "code": "else {              \n}",
+    "startLine": 27,
+    "endLine": 28,
+    "event": "add"
+  },
+  {
+    "code": "                feeRate = earlyWithdrawFee;",
+    "startLine": 28,
+    "endLine": 28,
+    "event": "add"
+  },
+  {
+    "code": "        return (withdrawnDepositAmount * feeRate) / PRECISION;",
+    "startLine": 31,
+    "endLine": 31,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 17,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar earlyWithdrawFeeOverrideForDeposit[pool][depositID].isOverridden = any;",
+    "startLine": 18,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar earlyWithdrawFeeOverrideForDeposit[pool][depositID].fee = [30,35];",
+    "startLine": 19,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar earlyWithdrawFeeOverrideForPool[pool].isOverridden = any;",
+    "startLine": 20,
+    "endLine": 20,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar earlyWithdrawFeeOverrideForPool[pool].fee = [20,25];",
+    "startLine": 21,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar earlyWithdrawFee = [10,15];",
+    "startLine": 22,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar depositID = [1,6];",
+    "startLine": 23,
+    "endLine": 23,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar withdrawnDepositAmount = [10,15];",
+    "startLine": 24,
+    "endLine": 24,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 25,
+    "endLine": 25,
+    "event": "add"
+  }
+]

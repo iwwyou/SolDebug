@@ -65,63 +65,34 @@ class Engine:
         var_name = stmt.var_name
         init_expr = stmt.init_expr
 
+        # ──────────────────────────────────────────────────────────────
+        # 1. 변수가 없으면 새로 생성
+        # ──────────────────────────────────────────────────────────────
         if var_name not in variables:
-            # 구조체/배열/매핑 타입은 초기화식에서 처리
             if var_type.typeCategory in ("struct", "array", "mapping"):
-                if init_expr is not None:
-                    # 초기화식 평가 (구조체 생성자 등)
-                    vobj = self.eval.evaluate_expression(init_expr, variables, None, None)
-                    if isinstance(vobj, (StructVariable, ArrayVariable, MappingVariable)):
-                        vobj.identifier = var_name
-                        variables[var_name] = vobj
-                    else:
-                        # 평가 결과가 예상과 다르면 타입에 맞는 객체 생성
-                        if var_type.typeCategory == "array":
-                            vobj = ArrayVariable(
-                                identifier=var_name,
-                                base_type=var_type.arrayBaseType,
-                                array_length=var_type.arrayLength,
-                                is_dynamic=var_type.isDynamicArray,
-                                scope="local"
-                            )
-                        elif var_type.typeCategory == "struct":
-                            vobj = StructVariable(
-                                identifier=var_name,
-                                struct_type=var_type.structTypeName,
-                                scope="local"
-                            )
-                        elif var_type.typeCategory == "mapping":
-                            vobj = MappingVariable(
-                                identifier=var_name,
-                                key_type=var_type.mappingKeyType,
-                                value_type=var_type.mappingValueType,
-                                scope="local"
-                            )
-                        variables[var_name] = vobj
-                else:
-                    # 초기화식 없으면 타입에 맞는 객체 생성
-                    if var_type.typeCategory == "array":
-                        vobj = ArrayVariable(
-                            identifier=var_name,
-                            base_type=var_type.arrayBaseType,
-                            array_length=var_type.arrayLength,
-                            is_dynamic=var_type.isDynamicArray,
-                            scope="local"
-                        )
-                    elif var_type.typeCategory == "struct":
-                        vobj = StructVariable(
-                            identifier=var_name,
-                            struct_type=var_type.structTypeName,
-                            scope="local"
-                        )
-                    elif var_type.typeCategory == "mapping":
-                        vobj = MappingVariable(
-                            identifier=var_name,
-                            key_type=var_type.mappingKeyType,
-                            value_type=var_type.mappingValueType,
-                            scope="local"
-                        )
-                    variables[var_name] = vobj
+                # 초기화식 없으면 타입에 맞는 빈 객체 생성
+                if var_type.typeCategory == "array":
+                    vobj = ArrayVariable(
+                        identifier=var_name,
+                        base_type=var_type.arrayBaseType,
+                        array_length=var_type.arrayLength,
+                        is_dynamic=var_type.isDynamicArray,
+                        scope="local"
+                    )
+                elif var_type.typeCategory == "struct":
+                    vobj = StructVariable(
+                        identifier=var_name,
+                        struct_type=var_type.structTypeName,
+                        scope="local"
+                    )
+                elif var_type.typeCategory == "mapping":
+                    vobj = MappingVariable(
+                        identifier=var_name,
+                        key_type=var_type.mappingKeyType,
+                        value_type=var_type.mappingValueType,
+                        scope="local"
+                    )
+                variables[var_name] = vobj
             else:
                 # Elementary 타입 처리
                 vobj = Variables(identifier=var_name, scope="local")
@@ -138,15 +109,26 @@ class Engine:
                 else:
                     vobj.value = f"symbol_{var_name}"
                 variables[var_name] = vobj
-        else:
-            vobj = variables[var_name]
 
-        if init_expr is not None and var_type.typeCategory not in ("struct", "array", "mapping"):
-            # ArrayVariable 등 특수 케이스가 아니면 값 평가
-            if not isinstance(vobj, ArrayVariable):
+        # ──────────────────────────────────────────────────────────────
+        # 2. 초기화식이 있으면 항상 평가 (변수가 이미 있어도)
+        # ──────────────────────────────────────────────────────────────
+        if init_expr is not None:
+            if var_type.typeCategory in ("struct", "array", "mapping"):
+                # 구조체/배열/매핑: 초기화식 평가 결과로 변수 대체
+                eval_result = self.eval.evaluate_expression(init_expr, variables, None, None)
+                if isinstance(eval_result, (StructVariable, ArrayVariable, MappingVariable)):
+                    eval_result.identifier = var_name
+                    variables[var_name] = eval_result
+                    vobj = eval_result
+                else:
+                    vobj = variables[var_name]
+            else:
+                # Elementary 타입: 값 평가 후 업데이트
+                vobj = variables[var_name]
                 eval_result = self.eval.evaluate_expression(init_expr, variables, None, None)
 
-                # ★ 평가 결과가 Variables 객체면 그 value를 추출
+                # 평가 결과가 Variables 객체면 그 value를 추출
                 if isinstance(eval_result, Variables) and not isinstance(eval_result, (ArrayVariable, StructVariable, MappingVariable)):
                     vobj.value = getattr(eval_result, 'value', eval_result)
                 else:
@@ -158,6 +140,7 @@ class Engine:
                         var_name=var_name,
                         var_obj=vobj
                     )
+
         return variables
 
     def _interpret_assignment(self, stmt, variables):
@@ -513,6 +496,11 @@ class Engine:
             if not VariableEnv.variables_equal(in_vars[node], new_in):
                 in_vars[node] = VariableEnv.copy_variables(new_in or {})
 
+            # ★ unreachable 노드 처리: in_vars가 빈 딕셔너리면 skip
+            if not in_vars[node]:
+                # 이 노드는 unreachable (모든 predecessor의 flow가 None)
+                continue
+
             tmp_out = self.transfer_function(node, in_vars[node])
             narrowed = (VariableEnv.narrow_variables(out_vars[node], tmp_out)
                         if getattr(node, "fixpoint_evaluation_node", False)
@@ -574,18 +562,33 @@ class Engine:
         return exit_node
 
     # =================================================================
-    #  interpret_function_cfg (기록/헬퍼 self로 일원화, 분기 기록 제거)
+    #  interpret_function_cfg (내부 함수 호출용 - 기록 비활성화)
     # =================================================================
     def interpret_function_cfg(self, fcfg: FunctionCFG, caller_env: dict[str, Variables] | None = None):
+        return self._interpret_function_cfg_impl(fcfg, caller_env, record_enabled=False)
+
+    # =================================================================
+    #  interpret_function_cfg_for_debug (디버깅 테스트용 - 기록 활성화)
+    # =================================================================
+    def interpret_function_cfg_for_debug(self, fcfg: FunctionCFG, caller_env: dict[str, Variables] | None = None):
+        return self._interpret_function_cfg_impl(fcfg, caller_env, record_enabled=True)
+
+    # =================================================================
+    #  _interpret_function_cfg_impl (공통 구현)
+    # =================================================================
+    def _interpret_function_cfg_impl(self, fcfg: FunctionCFG, caller_env: dict[str, Variables] | None = None, record_enabled: bool = False):
         an = self.an; rec = self.rec
         _old_func = an.current_target_function
         _old_fcfg = an.current_target_function_cfg
 
+        # ★ 재귀 호출 전 _record_enabled 상태 저장 (내부 함수 호출 후 복원용)
+        _old_record_enabled = self._record_enabled
+
         an.current_target_function = fcfg.function_name
         an.current_target_function_cfg = fcfg
 
-        # 기록 초기화
-        self._record_enabled = True
+        # 기록 활성화 여부 설정
+        self._record_enabled = record_enabled
         an._seen_stmt_ids.clear()
         for blk in fcfg.graph.nodes:
             # ★ 노드의 variables 초기화 (이전 실행의 값 제거)
@@ -729,7 +732,6 @@ class Engine:
 
             else:
                 for stmt in node.statements:
-                    # ★ 디버그 로그 제거 (문제 파악 완료)
                     cur_vars = self.update_statement_with_variables(stmt, cur_vars, return_values)
                     if "__STOP__" in return_values:
                         break
@@ -770,12 +772,17 @@ class Engine:
                 env_dict = {v.identifier: v for v in var_objs}
                 self.rec.add_env_record(ln, "implicitReturn", env_dict)
 
+        # ★ 반환 전 _record_enabled 복원을 위한 헬퍼
+        def _restore_and_return(val):
+            self._record_enabled = _old_record_enabled
+            return val
+
         if len(return_values) == 0:
             if fcfg.return_vars:
                 _log_implicit_return(fcfg.return_vars)
-                self._record_enabled = False
-                return fcfg.return_vars[0].value if len(fcfg.return_vars) == 1 \
+                result = fcfg.return_vars[0].value if len(fcfg.return_vars) == 1 \
                        else [rv.value for rv in fcfg.return_vars]
+                return _restore_and_return(result)
             else:
                 exit_retvals = list(fcfg.get_return_exit_node().return_vals.values())
                 if exit_retvals:
@@ -785,18 +792,16 @@ class Engine:
                             joined = joined.join(v)
                         else:
                             # Handle tuples or other types that don't have join method
-                            return joined
-                    return joined
-                return None
+                            return _restore_and_return(joined)
+                    return _restore_and_return(joined)
+                return _restore_and_return(None)
         elif len(return_values) == 1:
-            self._record_enabled = False
-            return return_values[0]
+            return _restore_and_return(return_values[0])
         else:
-            self._record_enabled = False
             # Filter out "__STOP__" strings from return_values
             filtered_values = [rv for rv in return_values if rv != "__STOP__"]
             if not filtered_values:
-                return None
+                return _restore_and_return(None)
 
             joined_ret = filtered_values[0]
             for rv in filtered_values[1:]:
@@ -805,8 +810,8 @@ class Engine:
                 else:
                     # Handle tuples or other types that don't have join method
                     # For now, just return the first valid return value
-                    return joined_ret
-            return joined_ret
+                    return _restore_and_return(joined_ret)
+            return _restore_and_return(joined_ret)
 
     # =================================================================
     #  reinterpret_from (변경 없음; self.* 호출로 정리)

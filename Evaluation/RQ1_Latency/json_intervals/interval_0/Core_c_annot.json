@@ -1,0 +1,158 @@
+[
+  {
+    "code": "contract Core {\n}",
+    "startLine": 1,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    mapping(address => bool) public governorMap;",
+    "startLine": 2,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 3,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "    address[] internal _stablecoinList;",
+    "startLine": 4,
+    "endLine": 4,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "    modifier onlyGovernor() {\n}",
+    "startLine": 6,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "        require(governorMap[msg.sender], \"1\");",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "        _;",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "    function revokeStableMaster(address stableMaster) external override onlyGovernor {\n}",
+    "startLine": 11,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 stablecoinListLength = _stablecoinList.length;",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "        require(stablecoinListLength >= 1, \"45\");",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 indexMet;",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "        for (uint256 i = 0; i < stablecoinListLength - 1; i++) {\n}",
+    "startLine": 16,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "            if (_stablecoinList[i] == stableMaster) {\n}",
+    "startLine": 17,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "                indexMet = 1;",
+    "startLine": 18,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "                _stablecoinList[i] = _stablecoinList[stablecoinListLength - 1];",
+    "startLine": 19,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "                break;",
+    "startLine": 20,
+    "endLine": 20,
+    "event": "add"
+  },
+  {
+    "code": "        require(indexMet == 1 || _stablecoinList[stablecoinListLength - 1] == stableMaster, \"45\");",
+    "startLine": 23,
+    "endLine": 23,
+    "event": "add"
+  },
+  {
+    "code": "        _stablecoinList.pop();        ",
+    "startLine": 24,
+    "endLine": 24,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar governorMap[msg.sender] = any;",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar _stablecoinList = arrayAddress[2];",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar stableMaster = symbolicAddress 3;",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  }
+]

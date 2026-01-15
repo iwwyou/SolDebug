@@ -42,15 +42,6 @@ class Evaluation :
         if not struct_list:
             return None
 
-        # DEBUG: Struct joining
-        try:
-            if struct_list and hasattr(struct_list[0], 'identifier'):
-                print(f"[STRUCT DEBUG] Joining {len(struct_list)} structs")
-            else:
-                print(f"[STRUCT DEBUG] Joining {len(struct_list)} structs")
-        except:
-            pass
-
         # 첫 구조체를 복사하여 결과 구조체 생성
         result = copy.deepcopy(struct_list[0])
 
@@ -66,10 +57,6 @@ class Evaluation :
                         break
                     else:
                         val = field_var.value
-                        try:
-                            print(f"[STRUCT DEBUG]   struct[{i}].{field_name} = {repr(val)[:80]}")
-                        except:
-                            pass
                         values.append(val)
 
             # join 수행
@@ -78,10 +65,6 @@ class Evaluation :
                 for v in values[1:]:
                     if hasattr(joined_val, 'join') and hasattr(v, 'join'):
                         joined_val = joined_val.join(v)
-                try:
-                    print(f"[STRUCT DEBUG]   {field_name} joined = {repr(joined_val)[:80]}")
-                except:
-                    pass
 
                 # 결과 저장
                 if isinstance(result.members[field_name], Variables):
@@ -187,15 +170,23 @@ class Evaluation :
         # ── (A) 배열 ───────────────────────────────────────────────
         if sol_t.typeCategory == "array":
             # 동적 배열 크기 평가: new uint256[](size) 형태
+            MAX_CONCRETE_ARRAY_LEN = 100  # 구체적으로 초기화할 최대 배열 길이
             array_length = sol_t.arrayLength
             if expr.arguments and len(expr.arguments) > 0:
                 # arguments[0]에 길이 표현식이 있으면 평가
                 length_result = self.evaluate_expression(expr.arguments[0], variables, callerObject, callerContext)
-                # 결과가 interval이면 상한값 사용
-                if hasattr(length_result, 'upper'):
-                    array_length = length_result.upper
+                # 결과가 interval이면 상한값 사용 (max_value 속성 사용)
+                if hasattr(length_result, 'max_value') and length_result.max_value is not None:
+                    # 배열 길이가 너무 크면 동적 배열로 처리 (무한 루프 방지)
+                    if length_result.max_value > MAX_CONCRETE_ARRAY_LEN:
+                        array_length = None  # 동적 배열로 처리
+                    else:
+                        array_length = length_result.max_value
                 elif isinstance(length_result, int):
-                    array_length = length_result
+                    if length_result > MAX_CONCRETE_ARRAY_LEN:
+                        array_length = None
+                    else:
+                        array_length = length_result
                 else:
                     # 심볼릭이거나 다른 타입이면 None으로 (동적)
                     array_length = None
@@ -515,7 +506,18 @@ class Evaluation :
                         elif val.min_value == val.max_value:  # 숫자·bool 싱글톤
                             key_val = str(val.min_value)
                         else:
-                            key_val = key_var.identifier  # 여전히 TOP
+                            # TOP 범위인 경우: 매핑에 이미 설정된 키 중 범위 내 키가 있으면 사용
+                            # (디버그 annotation으로 설정된 concrete 키 우선)
+                            found_key = None
+                            for existing_key in callerObject.mapping.keys():
+                                try:
+                                    k_int = int(existing_key)
+                                    if val.min_value <= k_int <= val.max_value:
+                                        found_key = existing_key
+                                        break
+                                except (ValueError, TypeError):
+                                    continue
+                            key_val = found_key if found_key else key_var.identifier
                     else:
                         key_val = key_var.identifier  # string·bool 등
                 else:
@@ -666,7 +668,6 @@ class Evaluation :
             if member == "length":
                 # ★ widening으로 TOP으로 표시된 경우 (-1)
                 if baseVal.typeInfo.arrayLength == -1:
-                    print(f"[LENGTH DEBUG] Array {baseVal.identifier} has widened arrayLength=-1, returning TOP")
                     return UnsignedIntegerInterval(0, 2 ** 256 - 1, 256)
 
                 # 동적 배열의 경우: 실제 elements 길이를 우선 사용
@@ -675,7 +676,6 @@ class Evaluation :
                     if len(baseVal.elements) > 0:
                         # elements가 있으면 그 길이 반환
                         ln = len(baseVal.elements)
-                        print(f"[LENGTH DEBUG] Dynamic array {baseVal.identifier} has {ln} elements")
                         return UnsignedIntegerInterval(ln, ln, 256)
                     else:
                         # 빈 동적 배열: TOP 반환 (알 수 없는 길이)

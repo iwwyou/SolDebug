@@ -1,0 +1,92 @@
+[
+  {
+    "code": "contract Dripper {\n}",
+    "startLine": 1,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    struct Drip {\n}",
+    "startLine": 2,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "        uint64 lastCollect; ",
+    "startLine": 3,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "        uint192 perBlock; ",
+    "startLine": 4,
+    "endLine": 4,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "    function _availableFunds(uint256 _balance, Drip memory _drip)\n        internal\n        view\n        returns (uint256)\n    {\n}",
+    "startLine": 7,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 elapsed = block.timestamp - _drip.lastCollect;",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 allowed = (elapsed * _drip.perBlock);",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "        return (allowed > _balance) ? _balance : allowed;",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "// @GlobalVar block.timestamp = [1000,1005];",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar _balance = [100,105];",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar _drip.lastCollect = [10,15];",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar _drip.perBlock = [5,10];",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 17,
+    "endLine": 17,
+    "event": "add"
+  }
+]

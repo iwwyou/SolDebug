@@ -1,0 +1,128 @@
+[
+  {
+    "code": "contract ThorusBond {\n}",
+    "startLine": 1,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 2,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    struct UserInfo {\n}",
+    "startLine": 3,
+    "endLine": 4,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 remainingPayout;",
+    "startLine": 4,
+    "endLine": 4,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 remainingVestingSeconds;",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 lastInteractionSecond;",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "    mapping(address => UserInfo) public userInfo;",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 9,
+    "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "    function claimablePayout(address user) public view returns (uint256) {\n}",
+    "startLine": 10,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "        UserInfo memory info = userInfo[user];",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 secondsSinceLastInteraction = block.timestamp - info.lastInteractionSecond;",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "        if(secondsSinceLastInteraction > info.remainingVestingSeconds) {\n}",
+    "startLine": 14,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "        return info.remainingPayout;",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "        return info.remainingPayout * secondsSinceLastInteraction / info.remainingVestingSeconds;",
+    "startLine": 17,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "// @GlobalVar block.timestamp = [100,100];",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar userInfo[user].lastInteractionSecond = [50,50];",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar userInfo[user].remainingVestingSeconds = [40,40];",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar userInfo[user].remainingPayout = [10,10];",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  }
+]

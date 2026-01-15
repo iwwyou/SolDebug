@@ -1,0 +1,104 @@
+[
+  {
+    "code": "contract GreenHouse {\n}",
+    "startLine": 1,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    uint256 constant internal FEE_ALL_USERS_STAKED_PERMILLE = 700;",
+    "startLine": 2,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    uint256 constant internal FEE_BONUS_POOL_PERMILLE = 100;",
+    "startLine": 3,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "    uint256 constant internal FEE_PLATFORM_WALLET_PERMILLE = 100;    ",
+    "startLine": 4,
+    "endLine": 4,
+    "event": "add"
+  },
+  {
+    "code": "    uint256 constant internal FEE_REFERRAL_PERMILLE = 50;",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "    uint256 constant internal FEE_PARTNER_WALLET_PERMILLE = 50;",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "    function _calculateFees(uint256 amount)\n    internal pure\n    returns(\n        uint256 allUsers,\n        uint256 bonusPool,\n        uint256 partner,\n        uint256 referral,\n        uint256 platform,\n        uint256 net\n    ) {\n}",
+    "startLine": 8,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "        allUsers = (amount * FEE_ALL_USERS_STAKED_PERMILLE) / 10000;",
+    "startLine": 18,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "        bonusPool = (amount * FEE_BONUS_POOL_PERMILLE) / 10000;",
+    "startLine": 19,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "        partner = (amount * FEE_PARTNER_WALLET_PERMILLE) / 10000;",
+    "startLine": 20,
+    "endLine": 20,
+    "event": "add"
+  },
+  {
+    "code": "        referral = (amount * FEE_REFERRAL_PERMILLE) / 10000;",
+    "startLine": 21,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "        platform = (amount * FEE_PLATFORM_WALLET_PERMILLE) / 10000;",
+    "startLine": 22,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "        net = amount - allUsers - bonusPool - partner - referral - platform;",
+    "startLine": 23,
+    "endLine": 23,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 18,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar amount = [10,12];",
+    "startLine": 19,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 20,
+    "endLine": 20,
+    "event": "add"
+  }
+]

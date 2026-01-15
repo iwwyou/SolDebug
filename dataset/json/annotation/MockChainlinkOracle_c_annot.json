@@ -150,13 +150,13 @@
     "event": "add"
   },
   {
-    "code": "// @StateVar latestRoundDataShouldRevert = any;",
+    "code": "// @StateVar latestRoundDataShouldRevert = false;",
     "startLine": 47,
     "endLine": 47,
     "event": "add"
   },
   {
-    "code": "// @StateVar entry.updatedAt  = [0,5];",
+    "code": "// @StateVar entries[0].updatedAt  = [1,5];",
     "startLine": 48,
     "endLine": 48,
     "event": "add"

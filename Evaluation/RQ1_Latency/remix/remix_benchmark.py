@@ -1978,7 +1978,7 @@ def run_single_contract(contract_filename, num_runs=1):
     return results_df
 
 
-def run_benchmark_suite(num_runs=3, sample_size=None, start_from=None):
+def run_benchmark_suite(num_runs=3, sample_size=None, start_from=None, run_id=None):
     """
     Run benchmark suite on dataset contracts
 
@@ -1986,6 +1986,7 @@ def run_benchmark_suite(num_runs=3, sample_size=None, start_from=None):
         num_runs: Number of times to run each test (for averaging)
         sample_size: If specified, only test this many contracts (for quick testing)
         start_from: If specified, start from this contract file name (e.g., "AvatarArtMarketPlace_c.sol")
+        run_id: If specified, append run_id to output filename (e.g., remix_results_run1.csv)
     """
     # Load dataset
     df = load_dataset()
@@ -2022,8 +2023,12 @@ def run_benchmark_suite(num_runs=3, sample_size=None, start_from=None):
     all_results = []
 
     # File paths
-    csv_file = 'remix_benchmark_results.csv'
-    json_file = 'remix_benchmark_results.json'
+    if run_id is not None:
+        csv_file = f'remix_results_run{run_id}.csv'
+        json_file = f'remix_results_run{run_id}.json'
+    else:
+        csv_file = 'remix_benchmark_results.csv'
+        json_file = 'remix_benchmark_results.json'
 
     for idx, row in df.iterrows():
         contract_name = row['Contract_Name']
@@ -2145,40 +2150,61 @@ if __name__ == "__main__":
 
     # Check command line arguments
     start_from_file = None
+    run_id = None
 
-    if len(sys.argv) > 1:
-        if sys.argv[1] == '--full':
+    # Parse --run-id argument (can appear anywhere)
+    args = sys.argv[1:]
+    if '--run-id' in args:
+        run_id_idx = args.index('--run-id')
+        if run_id_idx + 1 < len(args):
+            run_id = int(args[run_id_idx + 1])
+            args = args[:run_id_idx] + args[run_id_idx + 2:]  # Remove --run-id and its value
+        else:
+            print("ERROR: --run-id requires a number argument")
+            print("Usage: python remix_benchmark.py --full --run-id 1")
+            sys.exit(1)
+
+    if len(args) > 0:
+        if args[0] == '--full':
             # Full benchmark: All 30 contracts, 1 run each
             print("\n>> Running FULL benchmark (30 contracts x 1 run)")
+            if run_id:
+                print(f"   Run ID: {run_id}")
             print("   Estimated time: ~30 minutes")
             print("Press Ctrl+C within 5 seconds to cancel...\n")
             time.sleep(5)
-            results = run_benchmark_suite(num_runs=1, sample_size=None)
-        elif sys.argv[1] == '--quick':
+            results = run_benchmark_suite(num_runs=1, sample_size=None, run_id=run_id)
+        elif args[0] == '--quick':
             # Quick test: 3 contracts, 1 run each
             print("\n>> Running QUICK test (3 contracts x 1 run)")
-            results = run_benchmark_suite(num_runs=1, sample_size=3)
-        elif sys.argv[1] == '--start-from':
+            if run_id:
+                print(f"   Run ID: {run_id}")
+            results = run_benchmark_suite(num_runs=1, sample_size=3, run_id=run_id)
+        elif args[0] == '--start-from':
             # Start from a specific contract file
-            if len(sys.argv) < 3:
+            if len(args) < 2:
                 print("ERROR: --start-from requires a filename argument")
                 print("Usage: python remix_benchmark.py --start-from AvatarArtMarketPlace_c.sol")
                 sys.exit(1)
-            start_from_file = sys.argv[2]
+            start_from_file = args[1]
             print(f"\n>> Running benchmark starting from: {start_from_file}")
+            if run_id:
+                print(f"   Run ID: {run_id}")
             print("Press Ctrl+C within 5 seconds to cancel...\n")
             time.sleep(5)
-            results = run_benchmark_suite(num_runs=1, sample_size=None, start_from=start_from_file)
-        elif sys.argv[1] == '--only':
+            results = run_benchmark_suite(num_runs=1, sample_size=None, start_from=start_from_file, run_id=run_id)
+        elif args[0] == '--only':
             # Run only a specific contract
-            if len(sys.argv) < 3:
+            if len(args) < 2:
                 print("ERROR: --only requires a filename argument")
                 print("Usage: python remix_benchmark.py --only BEP20_c.sol")
                 sys.exit(1)
-            contract_file = sys.argv[2]
-            num_runs = int(sys.argv[3]) if len(sys.argv) > 3 else 1
+            contract_file = args[1]
+            num_runs = int(args[2]) if len(args) > 2 else 1
             print(f"\n>> Running benchmark for single contract: {contract_file}")
             print(f"   Number of runs: {num_runs}")
+            if run_id:
+                print(f"   Run ID: {run_id}")
             print("Press Ctrl+C within 5 seconds to cancel...\n")
             time.sleep(5)
             results = run_single_contract(contract_file, num_runs=num_runs)
@@ -2189,8 +2215,10 @@ if __name__ == "__main__":
             print("  --quick                Test with 3 contracts only (for testing)")
             print("  --start-from FILENAME  Start from a specific contract file")
             print("  --only FILENAME [RUNS] Run only a specific contract (default: 1 run)")
+            print("  --run-id N             Specify run ID for output filename (e.g., remix_results_run1.csv)")
             print("\nExamples:")
             print("  python remix_benchmark.py --full")
+            print("  python remix_benchmark.py --full --run-id 1")
             print("  python remix_benchmark.py --quick")
             print("  python remix_benchmark.py --start-from BEP20_c.sol")
             print("  python remix_benchmark.py --only BEP20_c.sol")
@@ -2199,12 +2227,14 @@ if __name__ == "__main__":
     else:
         # Default: Full benchmark
         print("\n>> Running FULL benchmark (30 contracts x 1 run)")
+        if run_id:
+            print(f"   Run ID: {run_id}")
         print("   Estimated time: ~30 minutes")
         print("   Tip: Use '--quick' for testing with 3 contracts only")
         print("   Tip: Use '--start-from FILENAME' to resume from a specific contract")
         print("Press Ctrl+C within 5 seconds to cancel...\n")
         time.sleep(5)
-        results = run_benchmark_suite(num_runs=1, sample_size=None)
+        results = run_benchmark_suite(num_runs=1, sample_size=None, run_id=run_id)
 
     # Show summary statistics
     if len(results) > 0:

@@ -1,0 +1,176 @@
+[
+  {
+    "code": "contract OptimisitcGrants {\n}",
+    "startLine": 1,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    address _governance;",
+    "startLine": 2,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    uint256 public solvency;",
+    "startLine": 3,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 4,
+    "endLine": 4,
+    "event": "add"
+  },
+  {
+    "code": "    struct Grant {    \n}",
+    "startLine": 5,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "        uint128 amount;    ",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "        uint128 expiration;",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 9,
+    "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "    mapping(address => Grant) public grants;",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "    modifier onlyGovernance() {\n}",
+    "startLine": 12,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "        require(msg.sender == _governance, \"!governance\");",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "        _;",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 16,
+    "endLine": 16,
+    "event": "add"
+  },
+  {
+    "code": "    function configureGrant(\n        address _owner,\n        uint128 _amount,\n        uint128 _expiration\n    ) external onlyGovernance {\n}",
+    "startLine": 17,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "        uint128 oldAmount = grants[_owner].amount;",
+    "startLine": 22,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 23,
+    "endLine": 23,
+    "event": "add"
+  },
+  {
+    "code": "        if (oldAmount < _amount) {\n}",
+    "startLine": 24,
+    "endLine": 25,
+    "event": "add"
+  },
+  {
+    "code": "            solvency -= (_amount - oldAmount);",
+    "startLine": 25,
+    "endLine": 25,
+    "event": "add"
+  },
+  {
+    "code": "        else {\n}",
+    "startLine": 27,
+    "endLine": 28,
+    "event": "add"
+  },
+  {
+    "code": "            solvency += (oldAmount - _amount);",
+    "startLine": 28,
+    "endLine": 28,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 30,
+    "endLine": 30,
+    "event": "add"
+  },
+  {
+    "code": "        grants[_owner].amount = _amount;",
+    "startLine": 31,
+    "endLine": 31,
+    "event": "add"
+  },
+  {
+    "code": "        grants[_owner].expiration = _expiration;",
+    "startLine": 32,
+    "endLine": 32,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 22,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar _owner = symbolicAddress 1;",
+    "startLine": 23,
+    "endLine": 23,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar grants[_owner].amount = [100,105];",
+    "startLine": 24,
+    "endLine": 24,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar _amount = [120,125];",
+    "startLine": 25,
+    "endLine": 25,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 26,
+    "endLine": 26,
+    "event": "add"
+  }
+]

@@ -1,0 +1,194 @@
+[
+  {
+    "code": "contract HubPool {\n}",
+    "startLine": 1,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    uint256 public protocolFeeCapturePct;",
+    "startLine": 2,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 3,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "    struct PooledToken {       \n}",
+    "startLine": 4,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "        address lpToken;   ",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "        bool isEnabled;    ",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "        uint32 lastLpFeeUpdate;     ",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "        int256 utilizedReserves;     ",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 liquidReserves;     ",
+    "startLine": 9,
+    "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 undistributedLpFees;",
+    "startLine": 10,
+    "endLine": 10,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "    mapping(address => PooledToken) public pooledTokens;",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "    mapping(address => uint256) public unclaimedAccumulatedProtocolFees;",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "    function _allocateLpAndProtocolFees(address l1Token, uint256 bundleLpFees) internal {      \n}",
+    "startLine": 16,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 protocolFeesCaptured = (bundleLpFees * protocolFeeCapturePct) / 1e18;",
+    "startLine": 17,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 lpFeesCaptured = bundleLpFees - protocolFeesCaptured;",
+    "startLine": 18,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 19,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "        if (lpFeesCaptured > 0) {\n}",
+    "startLine": 20,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "            pooledTokens[l1Token].undistributedLpFees += lpFeesCaptured;",
+    "startLine": 21,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "            pooledTokens[l1Token].utilizedReserves += int256(lpFeesCaptured);",
+    "startLine": 22,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 24,
+    "endLine": 24,
+    "event": "add"
+  },
+  {
+    "code": "        if (protocolFeesCaptured > 0)  {\n}",
+    "startLine": 25,
+    "endLine": 26,
+    "event": "add"
+  },
+  {
+    "code": "            unclaimedAccumulatedProtocolFees[l1Token] += protocolFeesCaptured;",
+    "startLine": 26,
+    "endLine": 26,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 17,
+    "endLine": 17,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar protocolFeeCapturePct = [10000,10002];",
+    "startLine": 18,
+    "endLine": 18,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar l1Token = symbolicAddress 1;",
+    "startLine": 19,
+    "endLine": 19,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar pooledTokens[l1Token].undistributedLpFees = [100,102];",
+    "startLine": 20,
+    "endLine": 20,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar pooledTokens[l1Token].utilizedReserves = [100,102];",
+    "startLine": 21,
+    "endLine": 21,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar unclaimedAccumulatedProtocolFees[l1Token] = [100,102];",
+    "startLine": 22,
+    "endLine": 22,
+    "event": "add"
+  },
+  {
+    "code": "// @LocalVar bundleLpFees = [3000000,3000002];",
+    "startLine": 23,
+    "endLine": 23,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 24,
+    "endLine": 24,
+    "event": "add"
+  }
+]

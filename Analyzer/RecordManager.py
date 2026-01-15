@@ -148,7 +148,10 @@ class RecordManager:
             payload = {"kind": "return", "vars": flat}
 
         else:
-            key = self._expr_to_str(return_expr) if return_expr else "<value>"
+            key = self._expr_to_str(return_expr) if return_expr else ""
+            # expression return일 때 빈 키나 "None"이면 "returnExpression"으로 대체
+            if not key or key == "None":
+                key = "returnExpression"
             payload = {"kind": "return",
                        "vars": {key: self._serialize_val(return_val)}}
 
@@ -237,6 +240,20 @@ class RecordManager:
     def _flatten_var(self, var_obj: Any, prefix: str, out: Dict[str, Any]):
         # ArrayVariable ---------------------------------------------------
         if isinstance(var_obj, ArrayVariable):
+            if not var_obj.elements:
+                # 빈 배열이면 array(len=N) 형태로 표시
+                arr_len = getattr(var_obj.typeInfo, 'arrayLength', 0) or 0
+                out[prefix] = f"array(len={arr_len})"
+                return
+            # 모든 원소가 ⊤(top)이면 배열 요약 형태로 표시
+            all_top = all(
+                isinstance(getattr(elem, 'value', None), AddressSet) and getattr(elem, 'value', None).is_top
+                for elem in var_obj.elements
+                if isinstance(elem, Variables)
+            )
+            if all_top and len(var_obj.elements) > 0:
+                out[prefix] = f"array(len={len(var_obj.elements)})"
+                return
             for idx, elem in enumerate(var_obj.elements):
                 self._flatten_var(elem, f"{prefix}[{idx}]", out)
             return
@@ -273,16 +290,23 @@ class RecordManager:
         if hasattr(v, "min_value"):
             return f"[{v.min_value},{v.max_value}]"
 
-        # ArrayVariable – serialise shallowly (recursion handled in
-        # _flatten_var already). Here we just show a summary.
+        # ArrayVariable – return에서는 실제 원소 값을 리스트로 표시
         if isinstance(v, ArrayVariable):
-            return f"array(len={len(v.elements)})"
+            if v.elements:
+                elem_vals = [self._serialize_val(getattr(e, 'value', e)) for e in v.elements]
+                return f"[{', '.join(elem_vals)}]"
+            return f"array(len=0)"
 
         # StructVariable / MappingVariable – brief summary only
         if isinstance(v, StructVariable):
             return "struct"  # UI will show individual members anyway
         if isinstance(v, MappingVariable):
             return f"mapping(size={len(v.mapping)})"
+
+        # List/Tuple – 튜플 반환값 처리
+        if isinstance(v, (list, tuple)):
+            elem_vals = [self._serialize_val(e) for e in v]
+            return f"({', '.join(elem_vals)})"
 
         # Fallback str()
         return str(v)

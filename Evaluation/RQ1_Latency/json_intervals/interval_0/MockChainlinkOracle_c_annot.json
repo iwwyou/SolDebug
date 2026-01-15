@@ -1,0 +1,170 @@
+[
+  {
+    "code": "contract MockChainlinkOracle {\n}",
+    "startLine": 1,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "    uint80 public roundId = 0;    ",
+    "startLine": 2,
+    "endLine": 2,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 3,
+    "endLine": 3,
+    "event": "add"
+  },
+  {
+    "code": "    struct Entry {\n}",
+    "startLine": 4,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "        uint80 roundId;",
+    "startLine": 5,
+    "endLine": 5,
+    "event": "add"
+  },
+  {
+    "code": "        int256 answer;",
+    "startLine": 6,
+    "endLine": 6,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 startedAt;",
+    "startLine": 7,
+    "endLine": 7,
+    "event": "add"
+  },
+  {
+    "code": "        uint256 updatedAt;",
+    "startLine": 8,
+    "endLine": 8,
+    "event": "add"
+  },
+  {
+    "code": "        uint80 answeredInRound;",
+    "startLine": 9,
+    "endLine": 9,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 11,
+    "endLine": 11,
+    "event": "add"
+  },
+  {
+    "code": "    mapping(uint256 => Entry) public entries;",
+    "startLine": 12,
+    "endLine": 12,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 13,
+    "endLine": 13,
+    "event": "add"
+  },
+  {
+    "code": "    bool public latestRoundDataShouldRevert;",
+    "startLine": 14,
+    "endLine": 14,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 15,
+    "endLine": 15,
+    "event": "add"
+  },
+  {
+    "code": "    function getRoundData(uint80 _roundId)\n        public\n        view\n        override\n        returns (\n            uint80,\n            int256,\n            uint256,\n            uint256,\n            uint80\n        )\n    {\n}",
+    "startLine": 16,
+    "endLine": 28,
+    "event": "add"
+  },
+  {
+    "code": "        Entry memory entry = entries[_roundId];        ",
+    "startLine": 28,
+    "endLine": 28,
+    "event": "add"
+  },
+  {
+    "code": "        require(entry.updatedAt > 0, \"No data present\");",
+    "startLine": 29,
+    "endLine": 29,
+    "event": "add"
+  },
+  {
+    "code": "        return (entry.roundId, entry.answer, entry.startedAt, entry.updatedAt, entry.answeredInRound);",
+    "startLine": 30,
+    "endLine": 30,
+    "event": "add"
+  },
+  {
+    "code": "\n",
+    "startLine": 32,
+    "endLine": 32,
+    "event": "add"
+  },
+  {
+    "code": "    function latestRoundData()\n        external\n        view\n        override\n        returns (\n            uint80,\n            int256,\n            uint256,\n            uint256,\n            uint80\n        )\n    {\n}",
+    "startLine": 33,
+    "endLine": 45,
+    "event": "add"
+  },
+  {
+    "code": "        if (latestRoundDataShouldRevert) {\n}",
+    "startLine": 45,
+    "endLine": 46,
+    "event": "add"
+  },
+  {
+    "code": "            revert(\"latestRoundData reverted\");",
+    "startLine": 46,
+    "endLine": 46,
+    "event": "add"
+  },
+  {
+    "code": "        return getRoundData(uint80(roundId));",
+    "startLine": 48,
+    "endLine": 48,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging BEGIN",
+    "startLine": 45,
+    "endLine": 45,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar roundId = [0,0];",
+    "startLine": 46,
+    "endLine": 46,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar latestRoundDataShouldRevert = false;",
+    "startLine": 47,
+    "endLine": 47,
+    "event": "add"
+  },
+  {
+    "code": "// @StateVar entries[0].updatedAt  = [1,1];",
+    "startLine": 48,
+    "endLine": 48,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 49,
+    "endLine": 49,
+    "event": "add"
+  }
+]

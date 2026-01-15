@@ -332,15 +332,7 @@ class DebugInitializer:
                 try:
                     if callerObject.typeInfo.isDynamicArray:
                         # 동적 배열은 필요하면 확장
-                        try:
-                            print(f"[DEBUG INIT] Getting/creating element {idx} in array {callerObject.identifier}, current length={len(callerObject.elements)}")
-                        except:
-                            pass
                         elem = callerObject.get_or_create_element(idx)
-                        try:
-                            print(f"[DEBUG INIT] After get_or_create: array length={len(callerObject.elements)}, elem type={type(elem).__name__}")
-                        except:
-                            pass
                         return elem
                     else:
                         # 정적 배열은 범위 내에서만
