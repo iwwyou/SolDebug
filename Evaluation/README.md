@@ -26,24 +26,25 @@ Evaluation/
 
 ## RQ1: Debugging Latency
 
-**Goal**: Compare debugging latency between SolQDebug and Remix IDE across varying function complexity and input widths.
+**Goal**: Compare debugging workflow latency between SolQDebug and Remix IDE.
 
 ### Dataset
 - 30 functions from real-world contracts
-- Test-case widths: Δ ∈ {0, 2, 5, 10}
-- Total: 120 measurements for SolQDebug, 30 for Remix
 
 ### Running RQ1 Experiments
 
 ```bash
-cd Evaluation/RQ1_Latency
-python remix_benchmark.py  # Benchmark Remix IDE (requires Remix running)
+cd RQ1_Latency
+install_dependencies.bat   # Install dependencies (Windows)
+python solqdebug_benchmark.py
 ```
 
-### Expected Results
-- **SolQDebug**: 0.03-5.09 seconds (median: 0.15s)
-- **Remix**: 25.1-124.6 seconds (median: 53.0s)
-- SolQDebug maintains sub-second latency regardless of complexity
+See [RQ1_Latency/README.md](RQ1_Latency/README.md) for details.
+
+### Results
+- **SolQDebug**: mean 0.24s, median 0.09s
+- **Remix**: mean 54.62s, median 51.68s
+- Statistical significance: Wilcoxon test, p < 0.001
 
 ## RQ2: Annotation Pattern Impact
 
@@ -161,15 +162,15 @@ To reproduce all results from the paper:
 ```bash
 # RQ1: Latency comparison
 cd RQ1_Latency
-python remix_benchmark.py
+python solqdebug_benchmark.py
 
 # RQ2: Annotation patterns
-cd ../RQ2_Mutation
-python run_mutation_experiments.py
+cd ../RQ2_Mutation/LockTest
+python LockTest.py
 
 # RQ3: Loop analysis
-cd ..
-python analyze_complex_arithmetic.py
+cd ../../RQ3_Loops
+python run_rq3_experiments.py
 ```
 
 ## Notes
