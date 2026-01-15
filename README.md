@@ -96,13 +96,15 @@ See [dataset/README.md](dataset/README.md) for details.
 
 ## Evaluation
 
-The `Evaluation/` directory contains scripts to reproduce the experimental results from the paper:
+The `Evaluation/RQ1_Latency/` directory contains the benchmark scripts to reproduce the latency comparison results.
 
-- **RQ1 (Latency)**: Debugging responsiveness comparison with Remix
-- **RQ2 (Precision)**: Annotation pattern impact on analysis precision
-- **RQ3 (Loop Analysis)**: Loop-related precision analysis
+```bash
+cd Evaluation/RQ1_Latency
+install_dependencies.bat
+python solqdebug_benchmark.py
+```
 
-See [Evaluation/README.md](Evaluation/README.md) for instructions.
+See [Evaluation/RQ1_Latency/README.md](Evaluation/RQ1_Latency/README.md) for details.
 
 ## Citation
 
