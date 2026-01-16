@@ -117,18 +117,16 @@ Development}
 
 
 \abstract{As Solidity becomes the dominant language for blockchain smart contracts,
-efficient debugging grows increasingly critical. However, current Solidity debugging
-remains inefficient: developers must compile, deploy, set up transactions,
-and step through execution line-by-line to examine each variable. This process is too slow for
-practical use. To address this challenge, this paper presented \textsc{SolQDebug}, the first
-edit-time debugging assistant for Solidity that focuses on a single contract/transaction context, providing abstract value summaries with millisecond feedback directly on source code. Developers specify symbolic interval inputs through annotations and compare them
-against abstract interpretation results, thereby enabling exploration of contract behavior
-across multiple execution paths. \textsc{SolQDebug} was evaluated on 30 real-world functions
-from DAppSCAN, achieving millisecond-scale feedback during code editing.
-The evaluation provided debugging insights: overlapping annotation patterns improved
-precision in most Solidity debugging scenarios, while analysis of diverse loop patterns
-demonstrated improved convergence while preserving soundness guarantees. These results
-demonstrated that \textsc{SolQDebug} enabled interactive debugging for Solidity development.}
+    efficient debugging grows increasingly critical. However, current Solidity debugging
+    remains inefficient: developers must compile, deploy, set up transactions, and trace bytecode execution step by step. This process is too slow for practical use.
+    To address this challenge, this paper presented \textsc{SolQDebug},
+    the first edit-time debugging assistant for Solidity designed for interactive analysis within a single contract/transaction context,
+    providing abstract value summaries with millisecond feedback directly on source code.
+    Developers specify symbolic interval inputs through annotations and compare them against abstract interpretation results,
+    thereby capturing multiple input scenarios over various execution paths in a single analysis.
+    \textsc{SolQDebug} was evaluated on 30 real-world functions from DAppSCAN, achieving millisecond-scale feedback during code editing.
+    This paper also synthesized experimental observations on annotation patterns for arithmetic operations and loop constructs into practical guidelines.
+    These results demonstrated that \textsc{SolQDebug} serves as an effective edit-time debugging assistant for Solidity development.}
 
 
 \keywords{Smart Contract Development, Solidity, Debugging, Abstract Interpretation, Incremental Analysis}
@@ -146,38 +144,47 @@ demonstrated that \textsc{SolQDebug} enabled interactive debugging for Solidity 
     However, these tools cannot provide formal correctness guarantees.
     Therefore, developers must still rigorously understand program behavior at the statement level during editing.
 
-    Unfortunately, the debugging workflow for Solidity lacks the maturity of traditional programming environments. Even a single inspection requires full compilation, deployment, manual state initialization, and manual bytecode-level tracing. Moreover, once a transaction modifies contract state, reverting to previous conditions requires costly redeployment or manual reconstruction, making iterative debugging impractical. Tools like Remix IDE~\citep{remix}, Hardhat~\citep{hardhat}, and
-    Foundry Forge~\citep{forge} suffer from these fundamental limitations. A prior study found that 88.8\% of Solidity developers described debugging as painful. Moreover, 69\% attributed this pain to the absence of interactive source-level tooling~\citep{interview}. To the
-    best of our knowledge, no existing research or tooling provides interactive feedback during
-    Solidity code editing, a gap that this paper aims to fill.
+    Unfortunately, the debugging workflow for Solidity lacks the maturity of traditional programming environments.
+    Even a single inspection requires full compilation, deployment, manual state initialization, and manual bytecode-level tracing.
+    Moreover, once a transaction modifies contract state, reverting to previous conditions requires costly redeployment or manual reconstruction, making iterative debugging impractical.
+    Tools like Remix IDE~\citep{remix}, Hardhat~\citep{hardhat}, and Foundry Forge~\citep{forge} suffer from these fundamental limitations.
+    A prior study found that 88.8\% of Solidity developers described debugging as painful, with 69\% attributing this pain to the absence of interactive source-level tooling~\citep{interview}.
+    To the best of our knowledge, no existing research or tooling provides interactive feedback during Solidity code editing, a gap that this paper aims to fill.
     
-    This paper presented \textsc{SolQDebug}, an edit-time debugging assistant for Solidity that focused on a single contract/transaction context, powered by abstract interpretation (AI) with interval domain.
-    Unlike conventional step-through debuggers that require compilation and deployment, \textsc{SolQDebug} provided abstract value summaries as developers type, enabling exploration of function behavior at the statement level.
+    This paper presented \textsc{SolQDebug}, an edit-time debugging assistant for Solidity designed for interactive analysis within a single contract/transaction context,
+    powered by abstract interpretation (AI) with interval domain.
+    Unlike conventional step-through debuggers that require compilation and deployment,
+    \textsc{SolQDebug} provided abstract value summaries as developers type, enabling exploration of function behavior at the statement level.
     To achieve this goal, \textsc{SolQDebug} built on two core ideas.
-    First, it provided incremental analysis through interactive parsing and incremental CFG construction via line-to-node indexing.
-    As developers type each statement, the system efficiently determines insertion sites and extends the CFG, recomputing abstract states
-    only for affected program points.
-    Second, it enabled annotation-guided exploration. Developers specified symbolic interval inputs
-    directly in source code, and the interpreter used these ranges to analyze multiple execution
-    paths in a single pass.
+    First, it provided incremental analysis through interactive parsing and incremental control flow graph (CFG) construction via line-to-node indexing.
+    As developers type each statement, the system efficiently determines insertion sites and extends the CFG, recomputing abstract states only for affected program points.
+    Second, it enabled annotation-guided abstract interpretation. Developers specify symbolic interval inputs through annotations,
+    and the interpreter captures multiple input scenarios over various execution paths in a single analysis.
 
     To validate these design choices, \textsc{SolQDebug} was evaluated on 30 real-world functions from DAppSCAN~\citep{dappscan}.
     The evaluation demonstrated millisecond-scale responsiveness and examined how annotation structure
     affected precision across common smart contract patterns. The results also showed how annotation-guided analysis
     addressed the precision challenges typically encountered in loops.
+    These findings were synthesized into practical guidelines for developers.
 
-    This paper makes the following contributions, focusing on function-level, single-contract analysis during code editing:
+    This paper makes the following contributions:
 
     \begin{itemize}
-      \item This work identified the main barriers to interactive Solidity debugging: (1) temporal inefficiency from compilation, deployment, and state initialization, and (2) iterative inefficiency from EVM constraints that prevent repeated execution with different states.
-      \item An interactive parser with seven specialized entry rules and line-to-node indexing was designed that enables incremental CFG construction with efficient statement insertion during live editing.
-      \item An annotation-guided abstract interpreter with adaptive widening was introduced that mitigates precision challenges in loop analysis while maintaining termination guarantees.
-      \item \textsc{SolQDebug} was evaluated on 30 real-world functions from DAppSCAN, achieving millisecond-scale feedback latency (median 0.15s). The evaluation demonstrated that overlapping annotation patterns improve precision in common smart contract patterns and provided guidance on annotation design.
+      \item This work identified the main barriers to interactive Solidity debugging: temporal inefficiency and iterative inefficiency.
+      \item An interactive parser with seven specialized entry rules and line-to-node indexing was designed that enables incremental CFG construction with efficient statement insertion during editing.
+      \item An annotation-guided abstract interpreter was introduced that mitigates precision challenges in loop analysis while maintaining termination guarantees.
+      \item \textsc{SolQDebug} was evaluated on 30 real-world functions from DAppSCAN, achieving millisecond-scale feedback latency. The experimental findings were synthesized into practical guidelines for annotation patterns in arithmetic operations and loop constructs.
     \end{itemize}
+
+    The rest of this paper is organized as follows.
+    Section 2 provides background on Solidity and the debugging challenge.
+    Sections 3--5 cover the design of SolQDebug, evaluation results, and discussion with practical guidelines.
+    Section 6 reviews related work, and Section 7 concludes.
 
 \section{Background}\label{sect2}
     \subsection{Structure of Solidity Smart Contract}
-\begin{figure}[t]
+\vspace{-1em}
+\begin{figure}[!h]
 \begin{lstlisting}[language=Solidity, numbers=left, basicstyle=\ttfamily\small]
 contract Example {
     address public owner;
@@ -206,38 +213,29 @@ contract Example {
 \label{fig:grammar-min}
 \end{figure}
 
+        Figure~\ref{fig:grammar-min} illustrates the key structural elements of a Solidity smart contract.
+        At the top level, Solidity programs may declare contracts, interfaces, and libraries.
+        A contract is composed of variables and functions.
 
-        Figure~\ref{fig:grammar-min} illustrates the key structural elements of a Solidity smart
-        contract. At the top level, Solidity programs may declare contracts, interfaces, and
-        libraries. A contract is composed of variables and functions. The following first describes the variable categories.
+        Variables are categorized by their scope and lifetime.
+        Global variables such as \texttt{msg.sender} (appearing at line 7) and \texttt{block.timestamp} represent read-only EVM metadata provided implicitly by the runtime.
+        State variables such as \texttt{owner}, \texttt{totalSupply}, and \texttt{balances} (lines 2--4) persist across transactions and provide the contract's permanent storage.
+        Local variables such as \texttt{bal} and \texttt{delta} (lines 12--13) are scoped to a single function call and do not persist beyond execution.
 
+        Functions consist of statements such as assignments, conditionals (\texttt{if}/\texttt{else}), and loops (\texttt{while}/\texttt{for}).
+        The \texttt{burn} function (lines 10--21) illustrates this structure.
+        Solidity defines several function types, including \texttt{function}, \texttt{constructor}, \texttt{fallback}, \texttt{receive}, and \texttt{modifier}.
+        Among these, modifiers provide reusable precondition checks.
+        The \texttt{onlyOwner} modifier (lines 6--9) verifies that \texttt{msg.sender} equals \texttt{owner} before executing the function body.
+        The placeholder underscore at line 8 marks where the original function body is inserted when the modifier is applied.
 
-
-        Variables are categorized by their scope and lifetime. Global variables such as
-        \texttt{msg.sender} (appearing at line 7) and \texttt{block.timestamp} represent read-only
-        EVM metadata provided implicitly by the runtime. State variables such as \texttt{owner},
-        \texttt{totalSupply}, and \texttt{balances} (lines 2--4) persist across transactions and
-        provide the contract's permanent storage. Local variables such as \texttt{bal} and \texttt{delta} (lines 12--13) are
-        scoped to a single function call and do not persist beyond execution.
-
-        Functions such as \texttt{burn} (lines 11--22) use control flow constructs including \texttt{if}/\texttt{else}, \texttt{while}/\texttt{for}/\texttt{do-while},
-        \texttt{break}/\texttt{continue}, and \texttt{return}. Functions can be augmented with
-        modifiers. The \texttt{onlyOwner} modifier (lines 6--9) performs a precondition check before
-        the function body executes. The placeholder underscore at line 8 marks where the original
-        function body is inserted when the modifier is inlined. These structural elements define
-        Solidity contracts.
-
-    \subsection{Solidity Execution and Debugging Workflow}
-        Unlike traditional programs, Solidity contracts operate within a blockchain
-        environment that imposes strict execution constraints. The execution model is
-        strictly state-based, where state variables persist across transactions and
-        modifications become permanent once confirmed. To debug Solidity code, developers
-        must follow a multi-stage workflow as described in Steps 1--4.
+    \subsection{Solidity Execution Model and Debugging Workflow}
+        Unlike traditional programs, Solidity contracts execute in a state-based environment where state modifications are irreversible.
+        To debug Solidity code, developers must follow a multi-stage workflow as described in Steps 1--4.
 
         \smallskip
         \noindent\textbf{Step 1: Compile.}
-        Figure~\ref{fig:step-compile} shows the compilation step in Remix IDE,
-        where the contract source code is compiled into EVM bytecode.
+        Figure~\ref{fig:step-compile} shows the compilation step in Remix IDE, where the contract source code is compiled into EVM bytecode.
 
 \begin{figure}[!h]
   \centering
@@ -250,12 +248,12 @@ contract Example {
         \smallskip
         \noindent\textbf{Step 2: Deploy.}
         Figure~\ref{fig:step-deploy} illustrates selecting the target contract and deploying it.
-        Deployment is a one-time transaction that stores compiled bytecode on-chain
-        and invokes the constructor. Once deployed, the bytecode becomes immutable.
+        Deployment is a one-time transaction that stores compiled bytecode on-chain and invokes the constructor.
+        Once deployed, the bytecode becomes immutable.
 
 \begin{figure}[!h]
   \centering
-  \includegraphics[width=0.9\columnwidth,height=0.4\textheight,keepaspectratio]{Fig3.pdf}
+  \includegraphics[width=0.9\columnwidth,height=0.3\textheight,keepaspectratio]{Fig3.pdf}
   \caption{Traditional Solidity debugging workflow: Deploy contract}
   \label{fig:step-deploy}
 \end{figure}
@@ -283,95 +281,74 @@ contract Example {
 
 \begin{figure}[!h]
   \centering
-  \includegraphics[width=1.05\columnwidth, keepaspectratio]{Fig5.pdf}
+  \includegraphics[width=1.01\columnwidth, keepaspectratio]{Fig5.pdf}
   \caption{Traditional Solidity debugging workflow: Bytecode-level debugging}
   \label{fig:step-debug}
 \end{figure}
 \FloatBarrier
 
-        This state-based execution model introduces a critical constraint: changes to contract
-        state cannot be undone automatically and require costly external actions such as
-        redeployment or manual state reconstruction. This workflow interacts with these
-        execution model constraints, introducing significant challenges in the debugging process.
+        This debugging workflow introduces significant overhead that the following subsection analyzes in detail.
 
     \subsection{Two Sources of Inefficiency in Solidity Debugging}
-        The workflow described above reveals temporal and iterative inefficiencies. These issues stem from
-        two orthogonal obstacles that make debugging Solidity programs significantly slower than
-        traditional application development.
-
         \smallskip
         \noindent\textbf{(1) Environmental disconnect between editor and execution engine causes temporal inefficiency.}
         Unlike conventional IDEs such as PyCharm~\citep{pycharm} or Visual Studio~\citep{visual},
-        where the source editor and execution engine run in the same process, Solidity development
-        involves external coordination with a blockchain node at every stage. The multi-stage
-        workflow described in the previous subsection introduces several seconds to minutes of
-        latency per iteration, preventing the immediate feedback that developers expect when writing
-        and testing code.
+        where the source editor and execution engine run in the same process,
+        Solidity development involves external coordination with a blockchain node at every stage.
+        The multi-stage workflow described in the previous subsection introduces several seconds to minutes of latency per iteration,
+        preventing the immediate feedback that developers expect when writing and testing code.
 
-        Given this workflow overhead, developers often rely on \texttt{emit} logs or event outputs to
-        observe intermediate values. However, such instrumentation provides only runtime snapshots
-        and lacks the structural insight needed to understand symbolic variation or control-flow
-        behavior. Moreover, modifying the expression of interest typically requires recompilation and
-        redeployment, compounding latency and disrupting iteration. The final stage, tracing raw EVM
-        opcodes, is particularly costly because developers are forced to mentally reconstruct
-        source-level semantics. This not only adds execution overhead but also imposes significant
-        cognitive burden during fault localization and fix validation.
+        Given this workflow overhead, developers often rely on \texttt{emit} logs or event outputs to observe intermediate values.
+        However, such instrumentation provides only runtime snapshots of a single execution.
+        Moreover, changing what is being logged typically requires recompilation and redeployment, compounding latency and disrupting iteration.
+        The final stage, stepping through raw EVM opcodes, is particularly slow because each source statement maps to multiple bytecode instructions.
 
         \smallskip
         \noindent\textbf{(2) Architectural limitations of EVM cause iterative inefficiency.}
-        The EVM's state-based execution model makes state modifications irreversible. This constraint
-        fundamentally conflicts with iterative debugging, which requires repeatedly re-executing the
-        same function under different conditions.
+        The EVM's state-based execution model makes state modifications irreversible.
+        This constraint fundamentally conflicts with iterative debugging,
+        where developers need to repeatedly execute the same function under varying conditions to understand control-flow behavior.
 
-        Additionally, if a function includes conditional guards that depend on the current state such
-        as account balances or counters, then any debugging session must first ensure that those
-        conditions are satisfied. For example, consider a function that enforces a check on
-        \texttt{\_balances[account]}. Developers must manually assign a sufficient balance before
-        they can observe the downstream effects on \texttt{\_totalSupply}. Without such setup, the
-        function exits early, preventing inspection of the intended execution path.
+        Additionally, if a function includes conditional guards that depend on the current state such as account balances or counters,
+        then any debugging session must first ensure that those conditions are satisfied.
+        For example, consider a function that enforces a check on \texttt{\_balances[account]}.
+        Developers must manually assign a sufficient balance before they can observe the downstream effects on \texttt{\_totalSupply}.
+        Without such setup, the function exits early, preventing inspection of the intended execution path.
 
-        In short, these constraints make repeated debugging iterations costly and fragile. According
-        to a developer study~\citep{interview}, 88.8\% of Solidity practitioners reported frustration
-        with current debugging workflows, with 69\% attributing this to the lack of interactive,
-        state-aware tooling. The next subsection outlines our proposed approach to address these two
-        root causes.
+        In short, these constraints make repeated debugging iterations costly and fragile.
+        According to a developer study~\citep{interview}, 88.8\% of Solidity practitioners reported frustration with current debugging workflows,
+        with 69\% attributing this to the lack of interactive, state-aware tooling.
 
     \subsection{Proposed Approach Overview}
 
-    \textsc{SolQDebug} addresses the two root causes of Solidity's debugging inefficiency through an integrated design.
-    Rather than independent optimizations, the two components jointly constitute the interactive debugging paradigm: incremental analysis provides
-    line-by-line responsiveness during editing, while annotations enable input specification---a prerequisite for any debugging activity that observes how inputs affect program behavior.
+        \textsc{SolQDebug} addresses these two inefficiencies through an integrated design.
+        Rather than independent optimizations, the two components jointly constitute an edit-time debugging assistant.
+        Incremental analysis enables immediate feedback during editing, which defines the interactive aspect.
+        Annotations provide input specification, which is essential for observing how inputs affect program behavior.
 
-    \smallskip
-    \noindent\textbf{(1) Incremental analysis to address temporal inefficiency.}
-    The traditional debugging workflow requires compilation, deployment, transaction-based state
-    setup, and bytecode tracing. Each of these stages incurs significant latency. \textsc{SolQDebug}
-    replaces this round trip by performing both parsing and abstract interpretation directly inside
-    the Solidity Editor. To support live editing, the Solidity grammar was extended with interactive
-    parsing rules tailored for isolated statements, expressions, and control-flow blocks. When the
-    developer types or edits code, only the affected region is reparsed incrementally.
+        \smallskip
+        \noindent\textbf{(1) Incremental analysis to address temporal inefficiency.}
+        The traditional debugging workflow requires compilation, deployment, transaction-based state setup, and bytecode tracing.
+        Each of these stages incurs significant latency.
+        \textsc{SolQDebug} replaces this round trip by performing both parsing and abstract interpretation directly inside the Solidity Editor.
+        To support incremental editing, the Solidity grammar was extended with interactive parsing rules tailored for isolated statements.
+        When the developer types or edits code, only the affected region is reparsed incrementally.
 
-    Each parsed statement is inserted into an incremental CFG, and abstract interpretation resumes from
-    the edit point. Abstract interpretation with interval domain was used because it provides three key
-    properties for edit-time debugging: guaranteed termination through widening, explainable results
-    as variable ranges, and millisecond-scale responsiveness. This enables immediate feedback on code
-    structure and control flow without compilation or chain interaction.
+        Each parsed statement is inserted into an incremental CFG, and abstract interpretation resumes from the edit point.
+        Among various abstract domains, the interval domain was chosen.
+        It guarantees termination through widening and produces explainable results as variable ranges.
+        These properties enable immediate feedback without compilation or chain interaction.
 
-    \smallskip
-    \noindent\textbf{(2) Annotation-guided interpretation to address iterative inefficiency.}
-    The EVM does not support reverting to a prior state without redeploying the contract or replaying
-    transactions. Both approaches disrupt iteration. \textsc{SolQDebug} introduces batch annotations
-    as a mechanism for symbolic state injection. In essence, this reflects a core debugging activity,
-    which involves varying inputs or contract state to observe control-flow outcomes. Rather than
-    reconstructing such conditions through live transactions, developers can write annotations at the
-    top of the function to define symbolic interval inputs. These inputs are injected before analysis
-    begins and rolled back afterward, ensuring test-case isolation.
+        \smallskip
+        \noindent\textbf{(2) Annotation-guided interpretation to address iterative inefficiency.}
+        The EVM does not support reverting to a prior state without redeploying the contract or replaying transactions.
+        Both approaches disrupt iteration. \textsc{SolQDebug} introduces batch annotations, enabling developers to vary inputs or contract state to observe control-flow outcomes.
+        Rather than reconstructing such conditions through on-chain transactions, developers can write annotations at the top of the function to define symbolic interval inputs.
+        These inputs are injected before analysis begins and rolled back afterward, ensuring test-case isolation.
 
-    This approach brings the debugging workflow closer to the source by making state manipulation
-    explicit and reproducible within the code itself. Developers can explore alternative execution
-    paths by editing annotations alone without modifying the contract logic or incurring compilation
-    and deployment overhead. It effectively decouples symbolic interval input configuration from the
-    analysis cycle while preserving the intuitive debugging process developers already follow.
+        This approach brings the debugging workflow closer to the source by making state manipulation explicit and reproducible within the code itself.
+        Developers can explore alternative execution paths by editing annotations alone without modifying the contract logic or incurring compilation and deployment overhead.
+        It effectively decouples symbolic interval input configuration from the analysis cycle while preserving the intuitive debugging process developers already follow.
 
 \begin{figure*}[t]
   \centering
@@ -422,10 +399,8 @@ contract Example {
 
         \smallskip
         \noindent\textbf{Output.}
-        Following analysis, \textsc{SolQDebug} produces a line-level summary showing computed intervals
-        for variables affected by each statement, including declarations, assignments, and return values.
-        All outputs are mapped to their corresponding source line numbers and displayed inline within
-        the editor, providing immediate feedback as developers write and modify code.
+        Following analysis, \textsc{SolQDebug} produces a summary showing computed intervals at key program points: variable declarations, assignments, return values, and loop fixpoints.
+        All outputs are mapped to their corresponding source line numbers and displayed inline within the editor, providing immediate feedback as developers write and modify code.
     
     \subsection{Running Example}
 \begin{table}[t!]
@@ -1570,6 +1545,7 @@ For loop constructs, precision depends on: (1) explicit initialization of local 
 
 \section*{Acknowledgements}
 This work was supported by the Institute of Information \& communications Technology Planning \& Evaluation (IITP) grant funded by the Korean government (MSIT) (RS-2021-II210177, High Assurance of Smart Contract for Secure Software Development Life Cycle).
+This work was supported in part by the MSIT(Ministry of Science and ICT), Korea, under the Global Research Support Program in the Digital Field Program(IITP-2024-RS-2022-II221198) supervised by the IITP(Institute of Information & Communications Technology Planning & Evaluation).
 
 \section*{Author Contributions}
 Inseong Jeon participated in conceptualization, methodology design, system implementation, data collection, experiments, and manuscript writing. Sundeuk Kim and Hyunwoo Kim assisted in experiments, data collection and analysis, and contributed to manuscript writing. Hoh Peter In provided resources, assisted in editing the manuscript, and supervised the entire project. All authors reviewed and approved the final version of the manuscript.
