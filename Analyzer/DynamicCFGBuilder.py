@@ -740,8 +740,18 @@ class DynamicCFGBuilder:
             line_info: dict,
     ) -> list[CFGNode]:  # ★ 변경: 이전 succ 들을 반환
 
-        # ① statement
-        cur_block.add_revert_statement(revert_id, string_literal, call_args, line_no)
+        G = fcfg.graph
+
+        # 1) 새 블록 삽입
+        new_block = self.insert_new_statement_block(
+            pred_block=cur_block,
+            fcfg=fcfg,
+            line_no=line_no,
+            line_info=line_info,
+            tag="revert"
+        )
+        # 2) statement 추가
+        new_block.add_revert_statement(revert_id, string_literal, call_args, line_no)
 
         # ★ seed 용으로 ‘재배선 전’ succ 보관
         g = fcfg.graph
