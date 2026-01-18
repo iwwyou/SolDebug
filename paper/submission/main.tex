@@ -686,70 +686,57 @@ Our CFG consists of the following node types:
 
 \subsubsection{CFG Hierarchy}
 
-\textsc{SolQDebug} organizes control flow at two levels. At the contract level, a
-\texttt{ContractCFG} sequences state variable initializations, the constructor, and function
-definitions. This ordering reflects how Solidity deploys contracts. State variables are
-initialized first, then the constructor executes and may modify those state variables.
+\textsc{SolQDebug} organizes control flow at two levels.
+At the contract level, a \texttt{ContractCFG} sequences state variable initializations, the constructor, and function definitions.
+This ordering reflects how Solidity deploys contracts. State variables are initialized first, then the constructor executes and may modify those state variables.
 Function definitions receive the environment that results from constructor execution.
 
-At the function level, each \texttt{FunctionCFG} represents control flow starting from a
-function's entry point. When a function declares modifiers, the function body is spliced
-into the modifier's control flow at the placeholder (\texttt{\_}) position. When a function invokes another function, the callee's \texttt{FunctionCFG}
-is incorporated as part of the caller's control flow graph. The complete CFG hierarchy
-structures are shown in Appendix~\ref{appendix:cfg-patterns}.
+At the function level, each \texttt{FunctionCFG} represents control flow starting from a function's entry point.
+When a function declares modifiers, the function body is spliced into the modifier's control flow at the placeholder (\texttt{\_}) position.
+When a function invokes another function, the callee's \texttt{FunctionCFG} is incorporated as part of the caller's control flow graph.
+The complete CFG hierarchy structures are shown in Appendix~\ref{appendix:cfg-patterns}.
 
 \subsubsection{Statement-Local, Incremental Construction}
 
-Having described the hierarchical organization of CFGs, we now focus on how individual
-statements are incrementally spliced into the function-level CFG. Each insertion operates
-at the \texttt{current node}, the insertion point for new statements. The following statement
-types create their corresponding CFG structures:
+Having described the hierarchical organization of CFGs, we now focus on how individual statements are incrementally spliced into the function-level CFG.
+Each insertion operates at the \texttt{current node}, the insertion point for new statements.
+The following statement types create their corresponding CFG structures:
 
 \begin{itemize}
-  \item \textbf{Simple statements} are spliced between the current node and its successors, creating a single
-        \texttt{basic node}. This includes variable declarations, assignments, function calls, and expression statements.
-        The environment flows sequentially through the new node, updated by the statement's semantics
-        (Figure~\ref{fig:new-simple-statement}).
+  \item \textbf{Simple statements} are spliced between the current node and its successors, creating a single \texttt{basic node}.
+        This includes variable declarations, assignments, and function calls.
+        The environment flows sequentially through the new node, updated by the statement's semantics (Figure~\ref{fig:new-simple-statement}).
 
-  \item \textbf{If statement} creates a \texttt{condition node}, true/false \texttt{basic nodes}, and an
-        \texttt{if join}. The environment propagates from the current node to the condition, then branches
-        to the true/false arms with the environment refined by the branch condition, and merges at the join
-        node via the least upper bound operation (Figure~\ref{fig:new-if}).
+  \item \textbf{If statement} creates a \texttt{condition node}, true/false \texttt{basic nodes}, and an \texttt{if join}.
+        The environment propagates from the current node to the condition, then branches to the true/false arms with the environment pruned by the branch condition,
+        and merges at the join node via the least upper bound operation (Figure~\ref{fig:new-if}).
 
-  \item \textbf{Else-if clause} replaces the preceding false branch with a new \texttt{condition node}
-        and its own join, which then connects to the outer \texttt{if join}. The environment flows through
-        the else-if condition, branches to its true/false arms with refinement, merges at the else-if join,
+  \item \textbf{Else-if clause} replaces the preceding false branch with a new \texttt{condition node} and its own join, which then connects to the outer \texttt{if join}.
+        The environment flows through the else-if condition, branches to its true/false arms with pruning, merges at the else-if join,
         and continues to the outer join (Figure~\ref{fig:new-else-if}).
 
-  \item \textbf{Else clause} replaces the false branch node of the preceding \texttt{if}/\texttt{else if}
-        with a new else node, which connects to the \texttt{if join}. The environment is refined by the
-        negated condition and merges at the join (Figure~\ref{fig:new-else}).
+  \item \textbf{Else clause} replaces the false branch node of the preceding \texttt{if}/\texttt{else if} with a new else node, which connects to the \texttt{if join}.
+        The environment is pruned by the negated condition and merges at the join (Figure~\ref{fig:new-else}).
 
-  \item \textbf{While loop} creates a \texttt{fixpoint evaluation node} $\phi$, a \texttt{condition node},
-        a loop body node, and a \texttt{loop exit node}. The body connects back to $\phi$ for fixpoint iteration.
-        The environment propagates through $\phi$ to the condition, then branches to the body or exit with the
-        environment refined by the loop condition, with the body flowing back to $\phi$ until convergence
-        (Figure~\ref{fig:new-while}).
+  \item \textbf{While loop} creates a \texttt{fixpoint evaluation node} $\phi$, a \texttt{condition node}, a loop body node, and a \texttt{loop exit node}.
+        The body connects back to $\phi$ for fixpoint iteration.
+        The environment propagates through $\phi$ to the condition, then branches to the body or exit with the environment pruned by the loop condition,
+        with the body flowing back to $\phi$ until a fixpoint is reached (Figure~\ref{fig:new-while}).
 
-  \item \textbf{Break statement} is inserted in the loop body with its outgoing edge redirected to the
-        \texttt{loop exit node} (Figure~\ref{fig:new-break}).
+  \item \textbf{Break statement} is inserted in the loop body with its outgoing edge redirected to the \texttt{loop exit node} (Figure~\ref{fig:new-break}).
 
-  \item \textbf{Continue statement} is inserted in the loop body with its outgoing edge redirected to the
-        loop's $\phi$ node (Figure~\ref{fig:new-continue}).
+  \item \textbf{Continue statement} is inserted in the loop body with its outgoing edge redirected to the loop's $\phi$ node (Figure~\ref{fig:new-continue}).
 
-  \item \textbf{Return statement} is inserted with its edge rewired to the function's unique \texttt{return exit node},
-        detaching original successors. The environment flows directly to the return exit node (Figure~\ref{fig:new-return}).
+  \item \textbf{Return statement} is inserted with its edge rewired to the function's unique \texttt{return exit node}, detaching original successors.
+        The environment flows directly to the return exit node (Figure~\ref{fig:new-return}).
 
-  \item \textbf{Require statement} creates a \texttt{condition node} with the true edge connecting to a
-        continuation node and the false edge pointing to the \texttt{error exit node}. The environment propagates
-        with refinement based on the predicate to the continuation or error exit node (Figure~\ref{fig:new-require}).
+  \item \textbf{Require/assert statement} creates a \texttt{condition node} with the true edge connecting to a continuation node and the false edge pointing to the \texttt{error exit node}.
+        The environment propagates with pruning based on the predicate to the continuation or error exit node (Figure~\ref{fig:new-require}).
 \end{itemize}
 
-These construction patterns enable \textsc{SolQDebug} to build the CFG incrementally
-as the user types each statement, with environment updates propagating only through affected nodes.
+These construction patterns enable \textsc{SolQDebug} to build the CFG incrementally as the developer types each statement, with environment updates propagating only through affected nodes.
 Representative CFG construction patterns are provided in Appendix~\ref{appendix:cfg-patterns}.
-The complete implementation supports all Solidity statements~\citep{solqimpl}.
-
+The complete implementation supports all Solidity statements except inline assembly~\citep{solqimpl}.
 
 \subsubsection{Line-to-Node Indexing for Incremental Insertion}
 
@@ -895,7 +882,7 @@ Algorithm~\ref{alg:fixpoint} for loop fixpoint computation.
 
   \While{$wl\neq\langle\rangle$}
     \State $n \gets wl.\textsf{dequeue}()$; \quad $inq\gets inq\setminus\{n\}$
-    \State $\hat{\sigma}_{\mathrm{in}}\gets \bigsqcup_{p\in\texttt{Pred}(G, n)} \texttt{RefineByCondition}(p,n)$
+    \State $\hat{\sigma}_{\mathrm{in}}\gets \bigsqcup_{p\in\texttt{Pred}(G, n)} \texttt{PruneByCondition}(p,n)$
 
     \If{$\texttt{IsLoopHeader}(G, n)$}
        \State $exit \gets \texttt{Fixpoint}(G, n)$ \Comment{compute loop fixpoint (Algorithm~\ref{alg:fixpoint})}
@@ -925,10 +912,10 @@ Algorithm~\ref{alg:fixpoint} for loop fixpoint computation.
 
   \item \textbf{Worklist iteration (Lines 10--31):} The while loop processes nodes until the worklist is empty. Each iteration performs the following steps for the dequeued node $n$:
 
-  \item \textbf{Incoming environment computation (Lines 11--12):} For each predecessor $p$, \texttt{RefineByCondition} examines the edge from $p$ to $n$. If $p$ is a condition node, it prunes the predecessor's output environment based on the branch direction (true or false), removing infeasible paths. For non-condition predecessors, no pruning is applied. At join nodes with two predecessors, the resulting states are merged via $\sqcup$. Single-predecessor nodes receive the (possibly pruned) state directly as $\hat{\sigma}_{\mathrm{in}}$.
+  \item \textbf{Incoming environment computation (Lines 11--12):} For each predecessor $p$, \texttt{PruneByCondition} examines the edge from $p$ to $n$. If $p$ is a condition node, it prunes the predecessor's output environment based on the branch direction (true or false), removing infeasible paths. For non-condition predecessors, no pruning is applied. At join nodes with two predecessors, the resulting states are merged via $\sqcup$. Single-predecessor nodes receive the (possibly pruned) state directly as $\hat{\sigma}_{\mathrm{in}}$.
         For \texttt{require} and \texttt{assert}, which create condition nodes, the true branch receives the pruned environment while the false branch leads to the error exit node. For \texttt{revert}, control transfers directly to the error exit node without creating a condition node. Since the error exit node is a sink node, the \texttt{IsSink} check filters it out and propagation terminates along exceptional paths.
 
-  \item \textbf{Loop condition node delegation (Lines 13--21):} When encountering a loop condition node, delegate to Algorithm~\ref{alg:fixpoint} to compute the loop fixpoint. After fixpoint converges, enqueue the loop-exit node's successors to continue analysis beyond the loop.
+  \item \textbf{Loop condition node delegation (Lines 13--21):} When encountering a loop condition node, delegate to Algorithm~\ref{alg:fixpoint} to compute the loop fixpoint. After the fixpoint is reached, enqueue the loop-exit node's successors to continue analysis beyond the loop.
 
   \item \textbf{Transfer function (Line 22):} Apply the abstract transfer function to node $n$, computing output environment $\hat{\sigma}_{\mathrm{out}}$ by interpreting statements (assignments, calls, etc.) using interval arithmetic and domain operations.
 
@@ -940,7 +927,7 @@ Algorithm~\ref{alg:fixpoint} for loop fixpoint computation.
 \label{alg:fixpoint}
 \begin{algorithmic}[1]
 \State \textbf{Input:} CFG $G$, loop condition node $h$
-\State \textbf{Output:} Loop exit node with converged environment
+\State \textbf{Output:} Loop exit node with stabilized environment
 \Function{LoopFixpoint}{$G, h$}
   \State $L \gets \texttt{LoopNodes}(G, h)$; \quad $start \gets \bigsqcup\{\Env(p)\mid p\in\texttt{Pred}(G, h)\setminus L\}$
   \State $\tau \gets \texttt{EstimateIterations}(h, start)$ \Comment{annotation-aware threshold}
@@ -951,7 +938,7 @@ Algorithm~\ref{alg:fixpoint} for loop fixpoint computation.
   \While{$wl\neq\langle\rangle$}
     \State $n\gets wl.\textsf{dequeue}()$; \quad $vis[n]\gets vis[n]+1$
     \If{$in[n] = \bot$} \Comment{compute input if not initialized}
-       \State $in[n] \gets \bigsqcup_{p\in\texttt{Pred}(G, n)\cap L} \texttt{RefineByCondition}(p,n)$
+       \State $in[n] \gets \bigsqcup_{p\in\texttt{Pred}(G, n)\cap L} \texttt{PruneByCondition}(p,n)$
     \EndIf
     \State $\hat{o}_{\text{raw}}\gets \texttt{Transfer}(n,in[n])$
     \If{$\texttt{IsFixpointEvalNode}(n)\ \land\ vis[n] > \tau$}
@@ -971,7 +958,7 @@ Algorithm~\ref{alg:fixpoint} for loop fixpoint computation.
   \State \texttt{NarrowingPhase}($L$) \Comment{standard descending iteration}
 
   \State $exit \gets \texttt{FindLoopExit}(G, h)$
-  \State $\Env(exit) \gets \bigsqcup_{p\in\texttt{Pred}(G, exit)} \texttt{RefineByCondition}(p, exit)$ \Comment{join with false-branch pruning}
+  \State $\Env(exit) \gets \bigsqcup_{p\in\texttt{Pred}(G, exit)} \texttt{PruneByCondition}(p, exit)$ \Comment{join with false-branch pruning}
   \State \Return $exit$
 \EndFunction
 \end{algorithmic}
