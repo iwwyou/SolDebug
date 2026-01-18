@@ -399,8 +399,8 @@ contract Example {
 
         \smallskip
         \noindent\textbf{Output.}
-        Following analysis, \textsc{SolQDebug} produces a summary showing computed intervals at key program points: variable declarations, assignments, return values, and loop fixpoints.
-        All outputs are mapped to their corresponding source line numbers and displayed inline within the editor, providing immediate feedback as developers write and modify code.
+        Following analysis, \textsc{SolQDebug} produces a summary showing computed intervals at program points where values are defined, assigned, returned, or reach a fixpoint through loop iterations.
+        All outputs are mapped to their corresponding source line numbers, enabling rapid feedback as developers write and modify code.
     
     \subsection{Running Example}
 \begin{table}[t!]
@@ -440,16 +440,10 @@ contract Example {
   \rmfamily
 \end{table}
 
-
-    To illustrate how the proposed architecture functions in practice, we presented
-    a concrete example using the \texttt{burn} function from Figure~\ref{fig:grammar-min}.
-    As the developer incrementally constructs this function, the system (1) parses each
-    input fragment, (2) updates the control-flow graph, and (3) performs abstract
-    interpretation to compute variable intervals. Additionally, when batch debug
-    annotations are present, the system re-analyzes the function using the
-    annotated symbolic interval inputs as starting points.
-    This example demonstrates these two key analysis modes: incremental source code analysis (\S{}3.2.1)
-    and batch annotation analysis (\S{}3.2.2).
+    To illustrate how the proposed architecture functions in practice, we presented a concrete example using the \texttt{burn} function from Figure~\ref{fig:grammar-min}.
+    As the developer incrementally constructs this function, the system (1) parses each input fragment, (2) updates the control-flow graph, and (3) performs abstract interpretation to compute variable intervals.
+    Additionally, when batch debug annotations are present, the system re-analyzes the function using the annotated symbolic interval inputs as starting points.
+    This example demonstrates these two key analysis modes: incremental source code analysis (\S{}3.2.1) and batch annotation analysis (\S{}3.2.2).
 
         \subsubsection{Incremental Source Code Analysis}
 \begin{figure*}[t!]
@@ -519,8 +513,6 @@ function through nine distinct input steps, each introducing a new code fragment
         triggering immediate parsing and analysis
         (e.g., Steps 2, 3, 5, 6, 8, and 9 in Table~\ref{tab:input_code}).
 \end{itemize}
-
-
 
 As the developer types each fragment, \textsc{SolQDebug} incrementally extends the CFG
 and recomputes abstract values only for affected program points.
@@ -673,8 +665,8 @@ with the full ANTLR4 implementation available at~\citep{solqrule}.
 
 Incremental CFG construction maintains a control-flow graph that evolves as developers insert new statements.
 Rather than rebuilding from scratch, our approach modifies the graph in place.
-The following first describes the hierarchical organization of CFGs at the contract and function levels (\S3.4.1),
-then explains how individual statements are incrementally spliced into the function-level CFG (\S3.4.2),
+We first describe the hierarchical organization of CFGs at the contract and function levels (\S3.4.1),
+then explain how individual statements are incrementally spliced into the function-level CFG (\S3.4.2),
 how the insertion site is determined (\S3.4.3), and how reinterpretation propagates abstract values
 only through affected regions (\S3.4.4).
 
