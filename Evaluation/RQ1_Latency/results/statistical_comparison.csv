@@ -1,0 +1,14 @@
+Metric,SolQDebug,Remix,Combined
+Sample size (n),30,30,30
+Mean (s),0.2449,54.62,
+Median (s),0.0857,51.68,
+Std. deviation (s),0.4205,25.53,
+Min (s),0.0220,25.61,
+Max (s),1.8814,128.65,
+Range (s),0.02--1.88,25.6--128.7,
+
+Statistical Test,,,Value
+Wilcoxon p-value (two-sided),,,1.86e-09
+Wilcoxon p-value (one-sided),,,9.31e-10
+Cliffs delta,,,-1.0000
+Effect size interpretation,,,large
