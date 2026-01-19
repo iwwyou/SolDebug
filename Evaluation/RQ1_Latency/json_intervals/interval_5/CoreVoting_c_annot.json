@@ -90,7 +90,7 @@
     "event": "add"
   },
   {
-    "code": "// @StateVar functionSelector = symbolicBytes '0xa';",
+    "code": "// @LocalVar functionSelector = symbolicBytes hex'0000000a';",
     "startLine": 14,
     "endLine": 14,
     "event": "add"

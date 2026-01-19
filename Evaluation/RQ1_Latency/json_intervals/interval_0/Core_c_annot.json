@@ -138,7 +138,7 @@
     "event": "add"
   },
   {
-    "code": "// @StateVar _stablecoinList = arrayAddress[2];",
+    "code": "// @StateVar _stablecoinList = arrayAddress[2,3,4];",
     "startLine": 14,
     "endLine": 14,
     "event": "add"

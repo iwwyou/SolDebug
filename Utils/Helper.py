@@ -362,8 +362,7 @@ class VariableEnv:
         for path, new_val in new_flat.items():
             old_val = old_flat.get(path)
             if old_val is None:
-                # 이전에 없던 변수는 제외 (루프 내부 새 변수는 loopDelta에 포함 안 함)
-                continue
+                continue  # 새로 추가된 변수는 '변경'이 아님 → skip
             # old_val과 new_val은 이미 _flatten_var에서 직렬화된 문자열이므로 직접 비교
             if old_val != new_val:
                 changed[path] = new_val  # path 는 "a[3].x" 같은 키

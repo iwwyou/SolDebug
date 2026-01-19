@@ -514,6 +514,10 @@ class Engine:
                 if succ in loop_nodes:
                     WL.append(succ)
 
+        # ★ Narrowing 후 fixpoint_evaluation_node_vars 업데이트
+        for n in loop_nodes:
+            if getattr(n, "fixpoint_evaluation_node", False):
+                n.fixpoint_evaluation_node_vars = VariableEnv.copy_variables(out_vars[n] or {})
 
         # 루프 내부 문장 기록 억제 off
         self._suppress_stmt_records = old_sup
@@ -533,7 +537,6 @@ class Engine:
         exit_node.variables = VariableEnv.copy_variables(exit_env or {})
 
         # loopDelta: 헤더(조건) 라인에 기록
-        # ★ fixpoint evaluation node(join)의 고정점 상태를 사용 (false edge 정제 전)
         join_node = None
         for p in G.predecessors(head):
             if getattr(p, "fixpoint_evaluation_node", False):
@@ -542,9 +545,7 @@ class Engine:
 
         if join_node is not None:
             base_env = getattr(join_node, "join_baseline_env", None)
-            # ★ fixpoint_evaluation_node_vars: 고정점 도달 후 join 노드의 최종 상태
             fixpoint_env = getattr(join_node, "fixpoint_evaluation_node_vars", None)
-
             if base_env is not None and fixpoint_env is not None:
                 changed_flat = VariableEnv.diff_changed(base_env, fixpoint_env)
 

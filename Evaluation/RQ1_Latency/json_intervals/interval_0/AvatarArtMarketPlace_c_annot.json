@@ -90,7 +90,7 @@
     "event": "add"
   },
   {
-    "code": "// @StateVar _tokens = array [1];",
+    "code": "// @StateVar _tokens = array [1,2,3];",
     "startLine": 6,
     "endLine": 6,
     "event": "add"

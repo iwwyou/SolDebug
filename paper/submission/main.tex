@@ -399,7 +399,7 @@ contract Example {
 
         \smallskip
         \noindent\textbf{Output.}
-        Following analysis, \textsc{SolQDebug} produces a summary showing computed intervals at program points where values are defined, assigned, returned, or reach a fixpoint through loop iterations.
+        Following analysis, \textsc{SolQDebug} produces a summary showing computed intervals at program points where values are defined, assigned, returned, or change through loop iterations by comparing pre-loop and post-loop abstract states.
         All outputs are mapped to their corresponding source line numbers, enabling rapid feedback as developers write and modify code.
     
     \subsection{Running Example}
@@ -1251,13 +1251,13 @@ the five loop-containing functions from the benchmark dataset (Table~\ref{tab:be
 These functions exhibit four distinct patterns that demonstrate varying levels of precision under this approach.
 
 \smallskip
-\noindent\textbf{Pattern 1: Constant-Bounded Loops with Simple Updates.}
-When loop conditions reference only constants and the loop body contains only simple assignments,
+\noindent\textbf{Pattern 1: Constant-Bounded Loops.}
+When loop conditions reference only constants,
 \texttt{EstimateIterations} computes precise thresholds without annotations.
 For example, \texttt{updateUserInfo} (AOC\_BEP) uses \texttt{for (uint256 i = 1; i <= 4; i++)}
 with $\tau = 4$ computed from the constant bound.
-The small constant bound and simple updates allow convergence without triggering widening.
-The analysis produces precise interval \texttt{userInfo[account].level} $\in [1,4]$.
+The analysis produces precise interval \texttt{i} $\in [1,5]$ for the loop variable,
+where the upper bound reflects the post-increment value when the loop condition becomes false.
 
 \smallskip
 \noindent\textbf{Pattern 2: Annotation-Enabled Convergence.}
@@ -1266,7 +1266,6 @@ annotations enable precise convergence.
 \texttt{\_addActionBuilderAt} (Balancer) uses \texttt{for (uint8 i = 0; i < additionalCount; i++)}
 where \texttt{additionalCount} is computed from function inputs.
 With appropriate annotations for \texttt{actionBuilders} and \texttt{index}, the analyzer computes \texttt{additionalCount = 1}, allowing it to set $\tau = 1$ and achieve precise convergence with \texttt{i = [0,1]}.
-
 \texttt{revokeStableMaster} (Core) exhibits similar behavior.
 It iterates \texttt{for (uint256 i = 0; i < stablecoinListLength - 1; i++)} with simple index-based operations.
 The annotation \texttt{// @StateVar \_stablecoinList = arrayAddress[2,3,4];} yields \texttt{stablecoinListLength = 3}, so the loop bound becomes \texttt{3 - 1 = 2}, setting $\tau = 2$ and achieving precise convergence with \texttt{i = [0,2]}.
