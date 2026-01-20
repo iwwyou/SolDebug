@@ -2,6 +2,10 @@
 
 This directory contains benchmark scripts for evaluating annotation-guided adaptive widening on loop constructs.
 
+## Requirements
+
+- **Python 3.10 or higher** (required for modern type hint syntax such as `int | None`)
+
 ## Quick Start
 
 ```bash

@@ -2,6 +2,10 @@
 
 This directory contains the edit-trace replay scripts used to evaluate SolQDebug's debugging workflow latency.
 
+## Requirements
+
+- **Python 3.10 or higher** (required for modern type hint syntax such as `int | None`)
+
 ## Quick Start
 
 ```bash

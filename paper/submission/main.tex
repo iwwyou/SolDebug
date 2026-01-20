@@ -399,7 +399,8 @@ contract Example {
 
         \smallskip
         \noindent\textbf{Output.}
-        Following analysis, \textsc{SolQDebug} produces a summary showing computed intervals at program points where values are defined, assigned, returned, or change through loop iterations by comparing pre-loop and post-loop abstract states.
+        Following analysis, \textsc{SolQDebug} produces a summary showing computed intervals at program points
+        where values are defined, assigned, returned, or change through loop iterations by comparing pre-loop and post-loop abstract states.
         All outputs are mapped to their corresponding source line numbers, enabling rapid feedback as developers write and modify code.
     
     \subsection{Running Example}
@@ -1221,7 +1222,11 @@ due to the combinatorial nature of interval arithmetic.
 Understanding how annotation structure influences precision in such contexts is critical for practical adoption
 of \textsc{SolQDebug}.
 
-To investigate this, the \texttt{pending} function from \texttt{Lock.sol} in the benchmark dataset was examined. The function uses complex arithmetic operations involving multiplication and division. Multiplication is critical: in interval arithmetic, it computes the Cartesian product of endpoint combinations $\{a_{\min} \times b_{\min}, a_{\min} \times b_{\max}, a_{\max} \times b_{\min}, a_{\max} \times b_{\max}\}$. Consequently, when operand intervals are disjoint, this combinatorial expansion generates significantly wider output ranges.
+To investigate this, the \texttt{pending} function from \texttt{Lock.sol} in the benchmark dataset was examined.
+The function uses complex arithmetic operations involving multiplication and division.
+Multiplication is critical: in interval arithmetic,
+it computes the Cartesian product of endpoint combinations $\{a_{\min} \times b_{\min}, a_{\min} \times b_{\max}, a_{\max} \times b_{\min}, a_{\max} \times b_{\max}\}$.
+Consequently, when operand intervals are disjoint, this combinatorial expansion generates significantly wider output ranges.
 
 To assess this effect, two annotation strategies were evaluated under varying input widths $\Delta \in \{1, 3, 6, 10\}$.
 In the \texttt{overlap} style, all input variables share a common base range (e.g., $[100, 100+\Delta]$).
@@ -1229,11 +1234,17 @@ In the \texttt{diff} style, each variable occupies a distinct range (e.g., $[100
 $[500, 500+\Delta]$). F90 was measured, the 90th percentile of the inflation factor
 $F = \frac{\text{exit\_width}}{\text{input\_width}}$.
 
-As shown in Figure~\ref{fig:rq2-lock}, the \texttt{overlap} strategy consistently produces tighter bounds: as $\Delta$ increases from 1 to 10, F90 decreases from 12.0 to 4.8, indicating that wider inputs lead to proportionally smaller relative growth. In contrast, the \texttt{diff} strategy maintains nearly constant inflation (F90 $\approx$ 13--14) regardless of input width. This difference arises from interval multiplication semantics: when annotations align operands to overlapping ranges, the extreme products remain closer to the midpoint, limiting excessive interval expansion. Conversely, disjoint ranges maximize the distance between endpoint combinations, causing output intervals to span unnecessarily large ranges.
+As shown in Figure~\ref{fig:rq2-lock}, the \texttt{overlap} strategy consistently produces tighter bounds: as $\Delta$ increases from 1 to 10,
+F90 decreases from 12.0 to 4.8, indicating that wider inputs lead to proportionally smaller relative growth.
+In contrast, the \texttt{diff} strategy maintains nearly constant inflation (F90 $\approx$ 13--14) regardless of input width.
+This difference arises from interval multiplication semantics: when annotations align operands to overlapping ranges,
+the extreme products remain closer to the midpoint, limiting excessive interval expansion.
+Conversely, disjoint ranges maximize the distance between endpoint combinations, causing output intervals to span unnecessarily large ranges.
 
 Moreover, similar patterns were observed in other contracts from the benchmark dataset that use multiplication or division in their arithmetic.
 These include reward computations (GovStakingStorage\_c), fee calculations (GreenHouse\_c, HubPool\_c), vesting schedules (LockupContract\_c), and proportional payouts (ThorusBond\_c).
-Across these contracts, overlapping annotations consistently yield tighter precision than disjoint ranges, demonstrating that developers can significantly improve analysis precision by choosing overlapping rather than disjoint annotations.
+Across these contracts, overlapping annotations consistently yield tighter precision than disjoint ranges,
+demonstrating that developers can significantly improve analysis precision by choosing overlapping rather than disjoint annotations.
 
 \medskip
 \noindent\fbox{%
@@ -1258,6 +1269,10 @@ For example, \texttt{updateUserInfo} (AOC\_BEP) uses \texttt{for (uint256 i = 1;
 with $\tau = 4$ computed from the constant bound.
 The analysis produces precise interval \texttt{i} $\in [1,5]$ for the loop variable,
 where the upper bound reflects the post-increment value when the loop condition becomes false.
+Furthermore, \texttt{userInfo[account].level}, assigned within conditional branches followed by \texttt{break},
+does not appear in the loop output since \texttt{break} bypasses the fixpoint node.
+However, when combined with debugging annotations,
+its value at the loop exit (a join of all exit paths) remains available for subsequent analysis.
 
 \smallskip
 \noindent\textbf{Pattern 2: Annotation-Enabled Convergence.}

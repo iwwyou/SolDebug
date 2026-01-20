@@ -2,6 +2,10 @@
 
 This directory contains benchmark scripts for evaluating annotation pattern precision on arithmetic operations.
 
+## Requirements
+
+- **Python 3.10 or higher** (required for modern type hint syntax such as `int | None`)
+
 ## Quick Start
 
 ```bash
