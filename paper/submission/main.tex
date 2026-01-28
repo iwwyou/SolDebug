@@ -124,7 +124,7 @@ Development}
     providing abstract value summaries with millisecond feedback directly on source code.
     Developers specify symbolic interval inputs through annotations and compare them against abstract interpretation results,
     thereby capturing multiple input scenarios over various execution paths in a single analysis.
-    \textsc{SolQDebug} was evaluated on 30 real-world functions from DAppSCAN, achieving millisecond-scale feedback during code editing.
+    \textsc{SolQDebug} was evaluated on 30 real-world functions from DAppSCAN, achieving millisecond-scale feedback.
     This paper also synthesized experimental observations on annotation patterns for arithmetic operations and loop constructs into practical guidelines.
     These results demonstrated that \textsc{SolQDebug} serves as an effective edit-time debugging assistant for Solidity development.}
 
@@ -149,7 +149,7 @@ Development}
     Moreover, once a transaction modifies contract state, reverting to previous conditions requires costly redeployment or manual reconstruction, making iterative debugging impractical.
     Tools like Remix IDE~\citep{remix}, Hardhat~\citep{hardhat}, and Foundry Forge~\citep{forge} suffer from these fundamental limitations.
     A prior study found that 88.8\% of Solidity developers described debugging as painful, with 69\% attributing this pain to the absence of interactive source-level tooling~\citep{interview}.
-    To the best of our knowledge, no existing research or tooling provides interactive feedback during Solidity code editing, a gap that this paper aims to fill.
+    To the best of our knowledge, no existing research or tooling provides interactive feedback for Solidity development, a gap that this paper aims to fill.
     
     This paper presented \textsc{SolQDebug}, an edit-time debugging assistant for Solidity designed for interactive analysis within a single contract/transaction context,
     powered by abstract interpretation (AI) with interval domain.
@@ -166,6 +166,7 @@ Development}
     affected precision across common smart contract patterns. The results also showed how annotation-guided analysis
     addressed the precision challenges typically encountered in loops.
     These findings were synthesized into practical guidelines for developers.
+    Additionally, a pilot study confirmed that manual value tracing is demanding, highlighting the need for integrated debugging assistance.
 
     This paper makes the following contributions:
 
@@ -175,7 +176,7 @@ Development}
       \item An annotation-guided abstract interpreter was introduced that mitigates precision challenges in loop analysis while maintaining termination guarantees.
       \item \textsc{SolQDebug} was evaluated on 30 real-world functions from DAppSCAN, achieving millisecond-scale feedback latency. The experimental findings were synthesized into practical guidelines for annotation patterns in arithmetic operations and loop constructs.
     \end{itemize}
-
+\vspace{-1em}
     The rest of this paper is organized as follows.
     Section 2 provides background on Solidity and the debugging challenge.
     Sections 3--5 cover the design of SolQDebug, evaluation results, and discussion with practical guidelines.
@@ -183,14 +184,12 @@ Development}
 
 \section{Background}\label{sect2}
     \subsection{Structure of Solidity Smart Contract}
-\vspace{-1em}
 \begin{figure}[!h]
 \begin{lstlisting}[language=Solidity, numbers=left, basicstyle=\ttfamily\small]
 contract Example {
     address public owner;
     uint256 public totalSupply = 1000;
     mapping(address => uint256) private balances;
-    
     modifier onlyOwner() {
         require(msg.sender == owner, "not owner");
         _;
@@ -218,16 +217,16 @@ contract Example {
         A contract is composed of variables and functions.
 
         Variables are categorized by their scope and lifetime.
-        Global variables such as \texttt{msg.sender} (appearing at line 7) and \texttt{block.timestamp} represent read-only EVM metadata provided implicitly by the runtime.
+        Global variables such as \texttt{msg.sender} (appearing at line 6) and \texttt{block.timestamp} represent read-only EVM metadata provided implicitly by the runtime.
         State variables such as \texttt{owner}, \texttt{totalSupply}, and \texttt{balances} (lines 2--4) persist across transactions and provide the contract's permanent storage.
-        Local variables such as \texttt{bal} and \texttt{delta} (lines 12--13) are scoped to a single function call and do not persist beyond execution.
+        Local variables such as \texttt{bal} and \texttt{delta} (lines 10--11) are scoped to a single function call and do not persist beyond execution.
 
         Functions consist of statements such as assignments, conditionals (\texttt{if}/\texttt{else}), and loops (\texttt{while}/\texttt{for}).
-        The \texttt{burn} function (lines 10--21) illustrates this structure.
+        The \texttt{burn} function (lines 9--20) illustrates this structure.
         Solidity defines several function types, including \texttt{function}, \texttt{constructor}, \texttt{fallback}, \texttt{receive}, and \texttt{modifier}.
         Among these, modifiers provide reusable precondition checks.
-        The \texttt{onlyOwner} modifier (lines 6--9) verifies that \texttt{msg.sender} equals \texttt{owner} before executing the function body.
-        The placeholder underscore at line 8 marks where the original function body is inserted when the modifier is applied.
+        The \texttt{onlyOwner} modifier (lines 5--8) verifies that \texttt{msg.sender} equals \texttt{owner} before executing the function body.
+        The placeholder underscore at line 7 marks where the original function body is inserted when the modifier is applied.
 
     \subsection{Solidity Execution Model and Debugging Workflow}
         Unlike traditional programs, Solidity contracts execute in a state-based environment where state modifications are irreversible.
@@ -919,7 +918,7 @@ When encountering loop condition nodes, it delegates to Algorithm~\ref{alg:fixpo
 
   \item \textbf{Worklist iteration (Lines 10--31):} Process nodes until the worklist is empty. For each dequeued node $n$:
 
-  \item \textbf{Incoming environment computation (Lines 11--12):} For each predecessor $p$, use \texttt{PruneByCondition} to examine the edge from $p$ to $n$. If $p$ is a condition node, prune the predecessor's output environment based on the branch direction (true or false) to remove infeasible paths. For non-condition predecessors, no pruning is needed. At join nodes with two predecessors, merge the resulting states via $\sqcup$. Single-predecessor nodes receive the (possibly pruned) state directly as $\hat{\sigma}_{\mathrm{in}}$.
+  \item \textbf{Incoming environment computation (Lines 11--12):} For each predecessor $p$, use \texttt{PruneByCondition} to examine the edge from $p$ to $n$. If $p$ is a condition node, prune the predecessor's output environment based on the branch direction (true or false), returning $\bot$ for infeasible branches which does not affect the join result since $\bot$ is the identity element of $\sqcup$. For non-condition predecessors, no pruning is needed. At join nodes with two predecessors, merge the resulting states via $\sqcup$. Single-predecessor nodes receive the (possibly pruned) state directly as $\hat{\sigma}_{\mathrm{in}}$.
 
   \item \textbf{Loop condition node delegation (Lines 13--21):} When encountering a loop condition node, delegate to Algorithm~\ref{alg:fixpoint} to compute the loop fixpoint. After the fixpoint is reached, enqueue the loop-exit node's successors to continue analysis beyond the loop.
 
@@ -1115,8 +1114,6 @@ Total functions extracted & 1,529 & 100.0 \\
 
 \noindent The hierarchical filtering ensures each function is counted in exactly one exclusion category. As shown in Table~\ref{tab:filtering-stats}, external dependencies dominate (70.8\%), reflecting the highly modular nature of modern DeFi contracts. After filtering, 142 candidate functions (9.3\%) remain suitable for debugging analysis.
 
-\input{benchmark_table}
-
 After applying these filters, representative functions were selected based on three dimensions of debugging complexity:
 \begin{itemize}
   \item \textbf{Computational complexity}---complex arithmetic patterns with
@@ -1134,6 +1131,8 @@ Table~\ref{tab:benchmark-dataset} lists all 30 benchmark contracts with their
 source files, target functions, and line counts.
 
 The following presents the findings for each research question.
+
+\input{benchmark_table}
 
 \subsection{RQ1 - Responsiveness}
 \noindent\textbf{Baseline Selection.}
@@ -1327,7 +1326,16 @@ Remaining precision loss arises from developer-fixable initialization issues and
 
 \subsection{RQ4 - Pilot User Study}
 
-\begin{table}[!t]
+To measure the practical benefits of automated debugging assistance for users,
+we conducted a preliminary study with 21 participants.
+Participants were presented with five functions based on the benchmark dataset (Table~\ref{tab:benchmark-dataset}), selected for their complex arithmetic patterns.
+For each function, input values were provided with the task of calculating the return value.
+The study was hosted on Cognition.run~\citep{cognition}, which automatically recorded response times.
+Table~\ref{tab:rq4-demographics} summarizes participant demographics:
+the majority had more than 5 years of programming experience (71.4\%) and intermediate or advanced Solidity experience (71.4\%),
+including graduate students (47.6\%), researchers (28.6\%), software developers (9.5\%), and professors (4.8\%).
+
+\begin{table}[!h]
 \centering
 \caption{Participant Demographics}
 \label{tab:rq4-demographics}
@@ -1352,7 +1360,7 @@ Remaining precision loss arises from developer-fixable initialization issues and
 \end{tabular*}
 \end{table}
 
-\begin{table}[!t]
+\begin{table}[!h]
 \centering
 \caption{Tool Usage and Accuracy}
 \label{tab:rq4-tools}
@@ -1371,14 +1379,7 @@ Pen and paper & 1 (4.8\%) & 60.0\% & 199.9s \\
 \end{tabular*}
 \end{table}
 
-To measure the practical benefits of automated debugging assistance for users,
-we conducted a preliminary study with 21 participants.
-Participants were presented with five functions based on the benchmark dataset (Table~\ref{tab:benchmark-dataset}), selected for their complex arithmetic patterns.
-For each function, input values were provided with the task of calculating the return value.
-The study was hosted on Cognition.run~\citep{cognition}, which automatically recorded response times.
-Table~\ref{tab:rq4-demographics} summarizes participant demographics:
-the majority had more than 5 years of programming experience (71.4\%) and intermediate or advanced Solidity experience (71.4\%),
-including graduate students (47.6\%), researchers (28.6\%), software developers (9.5\%), and professors (4.8\%).
+
 
 The overall accuracy across all problems was 81.0\% (85/105 responses correct),
 with a median response time of 66.4 seconds per problem.
@@ -1536,13 +1537,13 @@ The experimental findings from RQ2 and RQ3 yield actionable strategies for devel
 
     \smallskip
     \noindent\textbf{User Experience Validation.}
-    A formal developer study has not yet been conducted.
+    While a pilot study on value tracing was conducted (RQ4),
+    a formal usability study with industry developers has not yet been performed.
     Prior research indicates that meaningful usability evaluation requires assessing ease of use within realistic development workflows~\citep{defisecurity}.
-    Since \textsc{SolQDebug} currently addresses only single-contract, single-transaction scenarios without full IDE integration,
-    a study at this stage would not accurately reflect usability in complete development settings.
     However, the same study found that practitioners prefer lightweight, development-integrated tools over standalone analyzers.
     \textsc{SolQDebug}'s design aligns with this preference by providing immediate feedback during editing.
-    We plan to conduct formal usability studies once multi-contract support and comprehensive IDE integration are implemented.
+    Since \textsc{SolQDebug} currently addresses only single-contract, single-transaction scenarios without full IDE integration,
+    comprehensive usability evaluation is planned once multi-contract support and IDE integration are implemented.
 
 \section{Related Works}
 
@@ -1634,6 +1635,7 @@ The experimental findings from RQ2 and RQ3 yield actionable strategies for devel
 
     Evaluation on 30 real-world DAppSCAN functions demonstrated millisecond-scale feedback latency.
     Our analysis also revealed how annotation patterns affect interval expansion in arithmetic operations and loop constructs, which we synthesized into practical guidelines for developers.
+    Additionally, a pilot study confirmed that manual value tracing is demanding for programmers, validating the practical need for such assistance.
     These results demonstrated that SolQDebug effectively reduces debugging workflow latency, enabling interactive feedback during Solidity development.
 
     Future work includes extending language coverage to inline assembly, supporting inter-contract calls through summary-based analysis, and multi-transaction workflows.
