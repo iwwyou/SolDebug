@@ -144,7 +144,7 @@
     "event": "add"
   },
   {
-    "code": "// @GlobalVar block.timestamp = [1000,1000];",
+    "code": "// @GlobalVar block.timestamp = [400,400];",
     "startLine": 16,
     "endLine": 16,
     "event": "add"
@@ -168,27 +168,33 @@
     "event": "add"
   },
   {
-    "code": "// @StateVar startLock = [300,300];",
+    "code": "// @StateVar data[_account].estUnlock = [50,50];",
     "startLine": 20,
     "endLine": 20,
     "event": "add"
   },
   {
-    "code": "// @StateVar unlockDuration = [1,1];",
+    "code": "// @StateVar startLock = [300,300];",
     "startLine": 21,
     "endLine": 21,
     "event": "add"
   },
   {
-    "code": "// @StateVar lockedTime = [600,600];",
+    "code": "// @StateVar unlockDuration = [100,100];",
     "startLine": 22,
     "endLine": 22,
     "event": "add"
   },
   {
-    "code": "// @Debugging END",
+    "code": "// @StateVar lockedTime = [600,600];",
     "startLine": 23,
     "endLine": 23,
+    "event": "add"
+  },
+  {
+    "code": "// @Debugging END",
+    "startLine": 24,
+    "endLine": 24,
     "event": "add"
   }
 ]

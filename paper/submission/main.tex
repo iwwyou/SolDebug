@@ -943,20 +943,19 @@ When encountering loop condition nodes, it delegates to Algorithm~\ref{alg:fixpo
   \State $wl\gets \langle h\rangle$
   \While{$wl\neq\langle\rangle$}
     \State $n\gets wl.\textsf{dequeue}()$; \quad $vis[n]\gets vis[n]+1$
-    \If{$in[n] = \bot$} \Comment{compute input if not initialized}
+    \If{$in[n] = \bot$}
        \State $in[n] \gets \bigsqcup_{p\in\texttt{Pred}(G, n)\cap L} \texttt{PruneByCondition}(p,n)$
     \EndIf
-    \State $\hat{o}_{\text{raw}}\gets \texttt{Transfer}(n,in[n])$
+    \State $\hat{o}_{\text{raw}}\gets \texttt{Transfer}(n,in[n])$ \Comment{compute raw output}
     \If{$\texttt{IsFixpointEvalNode}(n)\ \land\ vis[n] > \tau$}
-       \State $\hat{o}\gets \texttt{Widen}(out[n],\hat{o}_{\text{raw}})$ \Comment{widen at fixpoint eval node after $\tau$ visits}
+       \State $\hat{o}\gets \texttt{Widen}(out[n],\hat{o}_{\text{raw}})$ \Comment{widen output after $\tau$ visits}
     \Else \State $\hat{o}\gets out[n]\sqcup \hat{o}_{\text{raw}}$
     \EndIf
-
-    \If{$\hat{o} = out[n]$} \State $out[n]\gets \hat{o}$; \textbf{ continue} \Comment{fixpoint reached, skip propagation}
+    \If{$\hat{o} = out[n]$} \textbf{continue} \Comment{output unchanged, skip propagation}
     \EndIf
-
     \State $out[n]\gets \hat{o}$
     \ForAll{$s \in \texttt{Succ}(G, n) \cap L$}
+      \State $in[s] \gets in[s] \sqcup \texttt{PruneByCondition}(n,s)$
       \State $wl.\textsf{enqueue}(s)$
     \EndFor
   \EndWhile
@@ -964,7 +963,7 @@ When encountering loop condition nodes, it delegates to Algorithm~\ref{alg:fixpo
   \State \texttt{NarrowingPhase}($L$) \Comment{standard descending iteration}
 
   \State $exit \gets \texttt{FindLoopExit}(G, h)$
-  \State $\Env(exit) \gets \bigsqcup_{p\in\texttt{Pred}(G, exit)} \texttt{PruneByCondition}(p, exit)$ \Comment{join with false-branch pruning}
+  \State $\Env(exit) \gets \bigsqcup_{p\in\texttt{Pred}(G, exit)} \texttt{PruneByCondition}(p,exit)$ \Comment{join with loop-exit pruning}
   \State \Return $exit$
 \EndFunction
 \end{algorithmic}
@@ -993,15 +992,17 @@ The key innovation is that \texttt{EstimateIterations} analyzes loop conditions 
 
   \item \textbf{Initialization (Line 6):} Initialize visit counts $vis$ to track iterations and node input environments $in$, setting $in[h] \gets start$ for the loop condition node.
 
-  \item \textbf{Widening phase (Lines 9--27):} Perform fixpoint iteration with worklist-based propagation. For each iteration:
+  \item \textbf{Widening phase (Lines 9--26):} Perform fixpoint iteration with worklist-based propagation. For each iteration:
   \begin{itemize}
-    \item Dequeue node and increment visit count (Line 10); compute incoming environment if not initialized (Lines 11--13).
-    \item Apply transfer function to compute raw output (Line 14).
-    \item Apply adaptive widening (Lines 15--19): use widening operator if visit count exceeds $\tau$ (Line 16), otherwise use join (Line 18).
-    \item Check for convergence (Lines 20--22): if output unchanged, skip propagation (Line 21); otherwise, store output (Line 23) and enqueue successors (Lines 24--26).
+    \item Dequeue node $n$ and increment visit count (Line 10).
+    \item Initialize input environment if unset (Lines 11--13): compute $in[n]$ by joining predecessor outputs $out[p]$, each pruned by the edge condition $p \to n$.
+    \item Compute raw output $\hat{o}_{\text{raw}}$ by applying transfer function to current input (Line 14).
+    \item Apply adaptive widening to output (Lines 15--18): use widening operator to combine $out[n]$ with $\hat{o}_{\text{raw}}$ if visit count exceeds $\tau$ at fixpoint evaluation nodes (Line 16), otherwise use join (Line 17).
+    \item Check for convergence (Lines 19--20): if output unchanged, skip propagation.
+    \item Update $out[n]$ (Line 21); propagate to successors by joining pruned output into their inputs and enqueue (Lines 22--25).
   \end{itemize}
 
-  \item \textbf{Narrowing phase and exit node (Lines 28--31):} Apply standard narrowing using descending iteration with narrowing operator at fixpoint evaluation nodes to refine over-approximations from widening (Line 28). Then compute the exit node environment (Lines 29--30) by joining predecessor outputs where the loop condition node's false-branch is pruned by the negated loop condition. Return the exit node with its computed environment (Line 31).
+  \item \textbf{Narrowing phase and exit node (Lines 27--30):} Apply standard narrowing using descending iteration with narrowing operator at fixpoint evaluation nodes to refine over-approximations from widening (Line 27). Then compute the exit node environment (Lines 28--29) by joining predecessor outputs $out[p]$, each pruned by the edge condition $p \to exit$ (i.e., the negated loop condition for the false-branch). Return the exit node with its computed environment (Line 30).
 \end{itemize}
 
 \smallskip
@@ -1033,6 +1034,9 @@ we structure our empirical analysis around three key questions:
 
   \item \textbf{RQ3 -- Loops}:\;%
         How does \textsc{SolQDebug}'s analysis approach affect precision in loop structures?
+
+  \item \textbf{RQ4 -- Pilot User Study}:\;%
+        How do programmers perform when manually tracing variable values in Solidity functions?
 \end{itemize}
 
 To answer these questions, we conducted experiments under controlled conditions.
@@ -1321,6 +1325,81 @@ Remaining precision loss arises from developer-fixable initialization issues and
 \end{minipage}%
 }
 
+\subsection{RQ4 - Pilot User Study}
+
+\begin{table}[!t]
+\centering
+\caption{Participant Demographics}
+\label{tab:rq4-demographics}
+\small
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}llr@{}}
+\toprule
+\textbf{Category} & \textbf{Level} & \textbf{Count} \\
+\midrule
+\multirow{3}{*}{Programming Exp.}
+  & 1--2 years & 1 \\
+  & 3--5 years & 5 \\
+  & More than 5 years & 15 \\
+\midrule
+\multirow{4}{*}{Solidity Exp.}
+  & None & 1 \\
+  & Beginner & 5 \\
+  & Intermediate & 7 \\
+  & Advanced & 8 \\
+\midrule
+\textbf{Total} & & \textbf{21} \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+\begin{table}[!t]
+\centering
+\caption{Tool Usage and Accuracy}
+\label{tab:rq4-tools}
+\small
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lrrr@{}}
+\toprule
+\textbf{Tool} & \textbf{Users} & \textbf{Accuracy} & \textbf{Median Time} \\
+\midrule
+AI (ChatGPT, Claude, etc.) & 11 (52.4\%) & 98.2\% & 89.6s \\
+Calculator & 6 (28.6\%) & 86.7\% & 165.7s \\
+Mental calculation only & 3 (14.3\%) & 13.3\% & 93.9s \\
+Pen and paper & 1 (4.8\%) & 60.0\% & 199.9s \\
+\midrule
+\textbf{Total} & \textbf{21 (100\%)} & \textbf{81.0\%} & \textbf{66.4s} \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+To measure the practical benefits of automated debugging assistance for users,
+we conducted a preliminary study with 21 participants.
+Participants were presented with five functions based on the benchmark dataset (Table~\ref{tab:benchmark-dataset}), selected for their complex arithmetic patterns.
+For each function, input values were provided with the task of calculating the return value.
+The study was hosted on Cognition.run~\citep{cognition}, which automatically recorded response times.
+Table~\ref{tab:rq4-demographics} summarizes participant demographics:
+the majority had more than 5 years of programming experience (71.4\%) and intermediate or advanced Solidity experience (71.4\%),
+including graduate students (47.6\%), researchers (28.6\%), software developers (9.5\%), and professors (4.8\%).
+
+The overall accuracy across all problems was 81.0\% (85/105 responses correct),
+with a median response time of 66.4 seconds per problem.
+As shown in Table~\ref{tab:rq4-tools}, participants who did not use AI assistants achieved 62\% accuracy (31/50),
+indicating that manual value tracing is demanding even for experienced programmers.
+In contrast, the majority (52.4\%) relied on AI assistants such as ChatGPT or Claude, achieving 98.2\% accuracy.
+However, even with AI assistance, participants spent a median of 89.6 seconds per problem,
+as the workflow requires copying code to the AI interface, specifying input values, and interpreting responses.
+In comparison, \textsc{SolQDebug} analyzed the same functions in 0.08--0.18 seconds (mean: 0.12s, median: 0.10s).
+These results highlight the need for integrated debugging assistance that provides immediate feedback within the development environment.
+
+\medskip
+\noindent\fbox{%
+\begin{minipage}{0.96\linewidth}
+\textbf{Answer to RQ4:}
+Without AI assistance, participants achieved only 62\% accuracy.
+While AI improved accuracy to 98.2\%, it requires external tool workflows.
+\textsc{SolQDebug} addresses this by providing integrated, edit-time feedback within the development environment.
+\end{minipage}%
+}
+
 \subsection{Threats to Validity}
 
 \noindent\textbf{Internal Validity.}
@@ -1334,8 +1413,9 @@ Actual latencies may vary depending on contract complexity.
 \noindent\textbf{External Validity.}
 The 30 benchmark functions used in our evaluation may not fully represent
 the diversity of real-world smart contracts.
-Additionally, due to the current scope limitation,
-a user study with developers has not yet been conducted.
+Additionally, while a pilot study on value tracing was conducted (RQ4),
+participants were predominantly from academic backgrounds rather than industry developers,
+and a formal usability study evaluating developers' experience with \textsc{SolQDebug} in realistic workflows has not yet been performed.
 
 \smallskip
 \noindent\textbf{Construct Validity.}
@@ -1599,6 +1679,9 @@ Chen, J., et al.: NumScout: unveiling numerical defects in smart contracts using
 Chimdyalwar, B.: Fast and precise interval analysis on industry code. In: 2024 IEEE 35th
 International Symposium on Software Reliability Engineering Workshops (ISSREW) (2024). https://doi.org/10.1109/ISSREW63542.2024.00049
 
+
+\bibitem[Cognition.run(2025)]{cognition}
+Cognition.run: \url{https://www.cognition.run/} (2025). Accessed January 2026
 
 \bibitem[ConsenSys Diligence(2025)]{psp}
 ConsenSys Diligence: Python Solidity Parser. \url{https://github.

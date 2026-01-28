@@ -1,0 +1,75 @@
+{
+  "problems": [
+    {
+      "id": 1,
+      "name": "GreenHouse",
+      "complexity": "Low",
+      "answer": 7651,
+      "input": {
+        "amount": 8500,
+        "feeAllUsers": 700,
+        "feeBonus": 100,
+        "feePartner": 50,
+        "feeReferral": 50,
+        "feePlatform": 100
+      }
+    },
+    {
+      "id": 2,
+      "name": "HubPool",
+      "complexity": "Medium",
+      "answer": 954,
+      "input": {
+        "bundleFees": 1847,
+        "capturePct": 30,
+        "undistributedFees": 500,
+        "utilizedReserves": 200,
+        "unclaimedFees": 100
+      }
+    },
+    {
+      "id": 3,
+      "name": "PercentageFeeModel",
+      "complexity": "Medium-High",
+      "answer": 85,
+      "input": {
+        "withdrawnAmount": 2450,
+        "isDepositOverridden": false,
+        "depositFee": 50,
+        "isPoolOverridden": true,
+        "poolFee": 35,
+        "defaultFee": 25
+      }
+    },
+    {
+      "id": 4,
+      "name": "LockupContract",
+      "complexity": "High",
+      "answer": 6000,
+      "input": {
+        "currentTime": 15000000,
+        "deploymentStartTime": 10000000,
+        "monthsToWait": 3,
+        "secondsInMonth": 1000000,
+        "initialAmount": 24000,
+        "releaseSchedule": 12
+      }
+    },
+    {
+      "id": 5,
+      "name": "Lock",
+      "complexity": "High",
+      "answer": 6800,
+      "input": {
+        "total": 10000,
+        "unlockedAmounts": 2000,
+        "pendingAmount": 500,
+        "estUnlock": 400,
+        "currentTime": 2500,
+        "startLock": 1000,
+        "lockedTime": 3000,
+        "unlockDuration": 500
+      }
+    }
+  ]
+}

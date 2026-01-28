@@ -1,2 +1,2 @@
 contract_name,function,pattern,expected,run_id,latency_s,success,error
-AOC_BEP,updateUserInfo,Pattern 1: Constant-bounded loops,"userInfo[account].level in [1,4]",1,1.6280727999983355,True,
+AvatarArtMarketPlace,_removeFromTokens,Pattern 4: Data-dependent accumulation,"tokenIndex in [0,3], resultIndex widened to [0,inf]",1,4.075403800001368,True,

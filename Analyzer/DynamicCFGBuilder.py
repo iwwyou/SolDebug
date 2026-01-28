@@ -90,7 +90,8 @@ class DynamicCFGBuilder:
         )
 
         # 3) Add to function-scope variable table
-        fcfg.add_related_variable(var_obj)
+        # ★ 로컬 변수는 related_variables에 추가하지 않음 (state var만 있어야 함)
+        # fcfg.add_related_variable(var_obj)
 
         return new_block
 
@@ -128,7 +129,8 @@ class DynamicCFGBuilder:
                 type_obj, var_obj.identifier, None, line_no
             )
             # 3) Add to function-scope variable table
-            fcfg.add_related_variable(var_obj)
+            # ★ 로컬 변수는 related_variables에 추가하지 않음 (state var만 있어야 함)
+            # fcfg.add_related_variable(var_obj)
 
         return new_block
 
@@ -248,7 +250,9 @@ class DynamicCFGBuilder:
         f_blk.variables = VariableEnv.copy_variables(false_env)
 
         join_env = VariableEnv.join_variables_simple(true_env, false_env)
-        join = CFGNode(f"if_join_{line_no}", join_point_node=True, src_line=line_no,
+        # ★ join의 src_line은 end_line으로 설정 (line_info[end_line]에 등록되므로 _shift_meta와 일치시킴)
+        join_src_line = end_line if end_line is not None else line_no
+        join = CFGNode(f"if_join_{line_no}", join_point_node=True, src_line=join_src_line,
                        is_loop_body=cur_block.is_loop_body)
         join.variables = VariableEnv.copy_variables(join_env)
 

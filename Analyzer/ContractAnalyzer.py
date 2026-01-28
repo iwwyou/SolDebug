@@ -110,18 +110,43 @@ class ContractAnalyzer:
 
         # start 라인에 control flow 노드가 있고, 새 코드가 연속되는 control flow인지 체크
         skip_shift_at_start = False
-        if start in self.line_info:
+        first_new_line = new_lines[0].strip() if new_lines else ""
+
+        # ★ 새 코드가 else/catch/while이고, start 라인에 '}'가 있으면 같은 줄 패턴
+        # 예: } else { / } catch { / } while (...) 등
+        existing_code = self.full_code_lines.get(start, "").strip()
+        if (first_new_line.startswith(('else if', 'else', 'catch')) or
+            (first_new_line.startswith('while') and existing_code == '}')):
+            if existing_code == '}':
+                # ★ 직전 줄에 join이 있으면 skip하지 않음 (nested if의 else인 경우)
+                # 직전 줄의 join이 else의 실제 대상이므로, 현재 줄의 join을 밀어야 함
+                prev_line_has_join = False
+                if (start - 1) in self.line_info:
+                    for node in self.line_info[start - 1].get('cfg_nodes', []):
+                        if getattr(node, 'join_point_node', False):
+                            prev_line_has_join = True
+                            break
+                if not prev_line_has_join:
+                    skip_shift_at_start = True
+
+        # 기존 로직: line_info의 cfg_nodes 기반 체크 (이미 처리된 경우)
+        if not skip_shift_at_start and start in self.line_info:
             cfg_nodes = self.line_info[start].get('cfg_nodes', [])
-            first_new_line = new_lines[0].strip() if new_lines else ""
 
             # 같은 control flow의 연속인 경우:
             # 1. if/else-if의 join + else/else-if
             # 2. do의 끝 + while
             # 3. try의 stub + catch
+            # cfg_nodes에 else_block이 이미 있는지 확인 (} else { 한 줄로 처리된 경우)
+            has_else_block = any(getattr(n, 'name', '').startswith('else_block') for n in cfg_nodes)
+
             for node in cfg_nodes:
                 # if/else-if join + else/else-if
+                # join만 있고 else_block이 없으면: 다른 if의 join이므로 skip하면 안 됨
+                # join과 else_block이 모두 있으면: 같은 if의 } else { 이므로 skip
                 if (getattr(node, 'join_point_node', False) and
-                    (first_new_line.startswith('else if') or first_new_line.startswith('else'))):
+                    (first_new_line.startswith('else if') or first_new_line.startswith('else')) and
+                    has_else_block):
                     skip_shift_at_start = True
                     break
                 # do end + while

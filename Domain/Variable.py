@@ -438,8 +438,9 @@ class StructVariable(Variables):
         self.members: dict[str, Variables] = {}          # field → variable ­obj
 
     def copy_from(self, other: 'StructVariable'):
+        import copy
         for k, member in other.members.items():
-            self.members[k] = member  # 얕은 참조·필요시 deepcopy
+            self.members[k] = copy.deepcopy(member)  # deep copy로 독립 복사
 
     # ────────────────────────────────────────────────────────────
     # 초기화

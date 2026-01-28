@@ -41,10 +41,10 @@ PATTERNS = ["overlap", "diff"]
 
 # Lock.sol annotation variables (for overlap/diff generation)
 LOCK_VARS = [
-    ("StateVar", "_data.total", 200),
-    ("StateVar", "_data.unlockedAmounts", 0),
-    ("StateVar", "_data.pending", 0),
-    ("StateVar", "_data.estUnlock", 0),
+    ("StateVar", "data[_account].total", 200),
+    ("StateVar", "data[_account].unlockedAmounts", 0),
+    ("StateVar", "data[_account].pending", 10),
+    ("StateVar", "data[_account].estUnlock", 0),
     ("GlobalVar", "block.timestamp", 0),
     ("StateVar", "startLock", 0),
     ("StateVar", "lockedTime", 20000001),  # Fixed value

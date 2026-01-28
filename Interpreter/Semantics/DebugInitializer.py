@@ -506,10 +506,6 @@ class DebugInitializer:
 
         # ② 값 패치
         self._patch_var_with_new_value_for_debug(target, value)
-        # try:
-        #     print(f"[APPLY DEBUG] After patching: {target_id} value updated")
-        # except:
-        #     pass
 
         # ③ 주소-ID 바인딩
         self._bind_if_address_for_debug(target)

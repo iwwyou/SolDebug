@@ -223,7 +223,8 @@ class StaticCFGFactory:
                     an,  # 🔑
                     r_type,
                     r_name,
-                    scope="local"
+                    scope="local",
+                    is_return_param=True  # ★ Solidity 규약: 0으로 초기화
                 )
                 fcfg.add_related_variable(rv)
                 fcfg.return_vars.append(rv)
@@ -250,12 +251,17 @@ class StaticCFGFactory:
                             sol_type: SolType,
                             ident: str,
                             *,
-                            scope: str = "local"
+                            scope: str = "local",
+                            is_return_param: bool = False
                             ) -> Variables | ArrayVariable | StructVariable | EnumVariable:
         """
         파라미터·리턴 변수 1개 생성 + 기본 interval 초기화.
         ▶ 기존 ContractAnalyzer._make_param_variable 의 로직 그대로,
           차이점은 `an` 인스턴스를 첫 인자로 받아 snap·structDef 등에 접근.
+
+        ★ is_return_param=True인 경우, Solidity 규약에 따라 0으로 초기화 (sound & precise)
+           - input parameter: TOP으로 초기화 (호출자가 어떤 값이든 전달 가능)
+           - return parameter: 0으로 초기화 (Solidity가 자동으로 0 초기화)
         """
         ccf = an.contract_cfgs[an.current_target_contract]
 
@@ -273,11 +279,16 @@ class StaticCFGFactory:
             if isinstance(base_t, SolType):  # 1-D 배열
                 et = base_t.elementaryTypeName
                 if et and et.startswith("int"):
-                    arr.initialize_elements(IntegerInterval.top(base_t.intTypeLength or 256))
+                    bits = base_t.intTypeLength or 256
+                    init_val = IntegerInterval(0, 0, bits) if is_return_param else IntegerInterval.top(bits)
+                    arr.initialize_elements(init_val)
                 elif et and et.startswith("uint"):
-                    arr.initialize_elements(UnsignedIntegerInterval.top(base_t.intTypeLength or 256))
+                    bits = base_t.intTypeLength or 256
+                    init_val = UnsignedIntegerInterval(0, 0, bits) if is_return_param else UnsignedIntegerInterval.top(bits)
+                    arr.initialize_elements(init_val)
                 elif et == "bool":
-                    arr.initialize_elements(BoolInterval.top())
+                    init_val = BoolInterval(0, 0) if is_return_param else BoolInterval.top()
+                    arr.initialize_elements(init_val)
                 else:  # address / bytes / string / struct 등
                     arr.initialize_not_abstracted_type()
             else:  # 다차원
@@ -312,17 +323,21 @@ class StaticCFGFactory:
             et = sol_type.elementaryTypeName
 
             if et.startswith("int"):
-                v.value = IntegerInterval.top(sol_type.intTypeLength or 256)
+                bits = sol_type.intTypeLength or 256
+                v.value = IntegerInterval(0, 0, bits) if is_return_param else IntegerInterval.top(bits)
             elif et.startswith("uint"):
-                v.value = UnsignedIntegerInterval.top(sol_type.intTypeLength or 256)
+                bits = sol_type.intTypeLength or 256
+                v.value = UnsignedIntegerInterval(0, 0, bits) if is_return_param else UnsignedIntegerInterval.top(bits)
             elif et == "bool":
-                v.value = BoolInterval.top()
+                v.value = BoolInterval(0, 0) if is_return_param else BoolInterval.top()
             elif et == "address":
-                v.value = AddressSet.top()
+                # address의 기본값은 address(0)
+                v.value = AddressSet(ids={0}) if is_return_param else AddressSet.top()
             elif et.startswith("bytes") and len(et) > 5:  # bytes32, bytes16 등
                 from Domain.BytesSet import BytesSet
                 byte_size = int(et[5:])  # "bytes32" -> 32
-                v.value = BytesSet.top(byte_size)
+                # bytes의 기본값은 0
+                v.value = BytesSet(values={0}, byte_size=byte_size) if is_return_param else BytesSet.top(byte_size)
             else:  # bytes / string …
                 v.value = f"symbol_{ident}"
 

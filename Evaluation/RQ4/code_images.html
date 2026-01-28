@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RQ4 Code Images for Qualtrics</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/solidity.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .problem {
+            margin-bottom: 60px;
+            page-break-inside: avoid;
+        }
+        .problem-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 15px 25px;
+            border-radius: 10px 10px 0 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .complexity {
+            float: right;
+            background: rgba(255,255,255,0.2);
+            padding: 3px 12px;
+            border-radius: 15px;
+            font-size: 14px;
+        }
+        .code-container {
+            background: #1e1e1e;
+            border-radius: 0 0 10px 10px;
+            padding: 20px;
+            border: 1px solid #333;
+            border-top: none;
+        }
+        pre {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        code {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        }
+        .input-section {
+            margin-top: 20px;
+            background: #252526;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #333;
+        }
+        .input-section h4 {
+            margin: 0 0 15px 0;
+            color: #569cd6;
+            font-size: 16px;
+        }
+        .input-values {
+            font-family: 'Consolas', monospace;
+            font-size: 14px;
+            line-height: 1.8;
+            color: #ce9178;
+        }
+        .question {
+            margin-top: 20px;
+            background: #2d2d30;
+            padding: 15px 20px;
+            border-radius: 10px;
+            border-left: 4px solid #4ec9b0;
+            font-size: 16px;
+        }
+        .divider {
+            border-top: 2px dashed #444;
+            margin: 50px 0;
+        }
+        h1 {
+            text-align: center;
+            color: #fff;
+            margin-bottom: 50px;
+        }
+        .note {
+            background: #3c3c3c;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 40px;
+            font-size: 14px;
+            color: #9cdcfe;
+        }
+    </style>
+</head>
+<body>
+    <h1>RQ4: Program Comprehension Study</h1>
+
+    <div class="note">
+        Instructions: For each problem, calculate the return value of the function given the input values.
+        You may use a calculator for arithmetic operations.
+    </div>
+
+    <!-- Problem 1 -->
+    <div class="problem" id="problem1">
+        <div class="problem-header">
+            Problem 1: calculateFees
+            <span class="complexity">Complexity: Low</span>
+        </div>
+        <div class="code-container">
+            <pre><code class="language-solidity">function calculateFees(
+    uint256 amount,
+    uint256 feeAllUsers,
+    uint256 feeBonus,
+    uint256 feePartner,
+    uint256 feeReferral,
+    uint256 feePlatform
+) returns (uint256 net) {
+    uint256 allUsers = (amount * feeAllUsers) / 10000;
+    uint256 bonusPool = (amount * feeBonus) / 10000;
+    uint256 partner = (amount * feePartner) / 10000;
+    uint256 referral = (amount * feeReferral) / 10000;
+    uint256 platform = (amount * feePlatform) / 10000;
+    net = amount - allUsers - bonusPool - partner - referral - platform;
+}</code></pre>
+        </div>
+        <div class="input-section">
+            <h4>Input Values:</h4>
+            <div class="input-values">
+                amount = 8500<br>
+                feeAllUsers = 700<br>
+                feeBonus = 100<br>
+                feePartner = 50<br>
+                feeReferral = 50<br>
+                feePlatform = 100
+            </div>
+        </div>
+        <div class="question">
+            <strong>Question:</strong> What is the return value (net)?
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Problem 2 -->
+    <div class="problem" id="problem2">
+        <div class="problem-header">
+            Problem 2: allocateFees
+            <span class="complexity">Complexity: Medium</span>
+        </div>
+        <div class="code-container">
+            <pre><code class="language-solidity">function allocateFees(
+    uint256 bundleFees,
+    uint256 capturePct,
+    uint256 undistributedFees,
+    uint256 utilizedReserves,
+    uint256 unclaimedFees
+) returns (uint256) {
+    uint256 protocolFees = (bundleFees * capturePct) / 100;
+    uint256 lpFees = bundleFees - protocolFees;
+
+    if (lpFees > 0) {
+        undistributedFees += lpFees;
+        utilizedReserves += lpFees;
+    }
+
+    if (protocolFees > 0) {
+        unclaimedFees += protocolFees + undistributedFees - utilizedReserves;
+    }
+
+    return unclaimedFees;
+}</code></pre>
+        </div>
+        <div class="input-section">
+            <h4>Input Values:</h4>
+            <div class="input-values">
+                bundleFees = 1847<br>
+                capturePct = 30<br>
+                undistributedFees = 500<br>
+                utilizedReserves = 200<br>
+                unclaimedFees = 100
+            </div>
+        </div>
+        <div class="question">
+            <strong>Question:</strong> What is the return value?
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Problem 3 -->
+    <div class="problem" id="problem3">
+        <div class="problem-header">
+            Problem 3: getEarlyWithdrawFeeAmount
+            <span class="complexity">Complexity: Medium-High</span>
+        </div>
+        <div class="code-container">
+            <pre><code class="language-solidity">function getEarlyWithdrawFeeAmount(
+    uint256 withdrawnAmount,
+    bool isDepositOverridden,
+    uint256 depositFee,
+    bool isPoolOverridden,
+    uint256 poolFee,
+    uint256 defaultFee
+) returns (uint256 feeAmount) {
+    uint256 feeRate;
+
+    if (isDepositOverridden) {
+        feeRate = depositFee;
+    } else {
+        if (isPoolOverridden) {
+            feeRate = poolFee;
+        } else {
+            feeRate = defaultFee;
+        }
+    }
+
+    feeAmount = (withdrawnAmount * feeRate) / 1000;
+}</code></pre>
+        </div>
+        <div class="input-section">
+            <h4>Input Values:</h4>
+            <div class="input-values">
+                withdrawnAmount = 2450<br>
+                isDepositOverridden = false<br>
+                depositFee = 50<br>
+                isPoolOverridden = true<br>
+                poolFee = 35<br>
+                defaultFee = 25
+            </div>
+        </div>
+        <div class="question">
+            <strong>Question:</strong> What is the return value (feeAmount)?
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Problem 4 -->
+    <div class="problem" id="problem4">
+        <div class="problem-header">
+            Problem 4: getReleasedAmount
+            <span class="complexity">Complexity: High</span>
+        </div>
+        <div class="code-container">
+            <pre><code class="language-solidity">function getReleasedAmount(
+    uint256 currentTime,
+    uint256 deploymentStartTime,
+    uint256 monthsToWait,
+    uint256 secondsInMonth,
+    uint256 initialAmount,
+    uint256 releaseSchedule
+) returns (uint256) {
+    uint256 unlockTimestamp = deploymentStartTime + (monthsToWait * secondsInMonth);
+
+    if (currentTime < unlockTimestamp) {
+        return 0;
+    }
+
+    uint256 monthsSinceUnlock = ((currentTime - unlockTimestamp) / secondsInMonth) + 1;
+    uint256 monthlyReleaseAmount = initialAmount / releaseSchedule;
+    uint256 releasedAmount = monthlyReleaseAmount * monthsSinceUnlock;
+
+    if (releasedAmount > initialAmount) {
+        return initialAmount;
+    }
+
+    return releasedAmount;
+}</code></pre>
+        </div>
+        <div class="input-section">
+            <h4>Input Values:</h4>
+            <div class="input-values">
+                currentTime = 15000000<br>
+                deploymentStartTime = 10000000<br>
+                monthsToWait = 3<br>
+                secondsInMonth = 1000000<br>
+                initialAmount = 24000<br>
+                releaseSchedule = 12
+            </div>
+        </div>
+        <div class="question">
+            <strong>Question:</strong> What is the return value?
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Problem 5 -->
+    <div class="problem" id="problem5">
+        <div class="problem-header">
+            Problem 5: pending
+            <span class="complexity">Complexity: High</span>
+        </div>
+        <div class="code-container">
+            <pre><code class="language-solidity">function pending(
+    uint256 total,
+    uint256 unlockedAmounts,
+    uint256 pendingAmount,
+    uint256 estUnlock,
+    uint256 currentTime,
+    uint256 startLock,
+    uint256 lockedTime,
+    uint256 unlockDuration
+) returns (uint256 result) {
+    uint256 totalLockRemain = total - unlockedAmounts - pendingAmount;
+
+    if (totalLockRemain > 0) {
+        if (currentTime >= startLock + lockedTime) {
+            result = totalLockRemain;
+        } else {
+            uint256 nUnlock = (lockedTime - (currentTime - startLock) - 1) / unlockDuration + 1;
+            result = totalLockRemain - estUnlock * nUnlock;
+        }
+    }
+
+    if (pendingAmount > 0) {
+        result += pendingAmount;
+    }
+}</code></pre>
+        </div>
+        <div class="input-section">
+            <h4>Input Values:</h4>
+            <div class="input-values">
+                total = 10000<br>
+                unlockedAmounts = 2000<br>
+                pendingAmount = 500<br>
+                estUnlock = 400<br>
+                currentTime = 2500<br>
+                startLock = 1000<br>
+                lockedTime = 3000<br>
+                unlockDuration = 500
+            </div>
+        </div>
+        <div class="question">
+            <strong>Question:</strong> What is the return value (result)?
+        </div>
+    </div>
+
+    <script>
+        hljs.highlightAll();
+    </script>
+</body>
+</html>

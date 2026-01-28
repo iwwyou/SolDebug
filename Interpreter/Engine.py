@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 from Domain.Variable import Variables, MappingVariable, ArrayVariable, StructVariable
 from Domain.IR import Expression
 from Domain.Interval import UnsignedIntegerInterval, IntegerInterval, BoolInterval
+from Domain.AddressSet import AddressSet
 from Utils.CFG import CFGNode, FunctionCFG
 from Utils.Helper import VariableEnv
 from collections import deque
@@ -100,12 +101,14 @@ class Engine:
                 et = var_type.elementaryTypeName
                 if et and et.startswith("uint"):
                     bits = var_type.intTypeLength or 256
-                    vobj.value = UnsignedIntegerInterval.bottom(bits)
+                    vobj.value = UnsignedIntegerInterval.top(bits)
                 elif et and et.startswith("int"):
                     bits = var_type.intTypeLength or 256
-                    vobj.value = IntegerInterval.bottom(bits)
+                    vobj.value = IntegerInterval.top(bits)
                 elif et == "bool":
-                    vobj.value = BoolInterval.bottom()
+                    vobj.value = BoolInterval.top()
+                elif et == "address":
+                    vobj.value = AddressSet.top()
                 else:
                     vobj.value = f"symbol_{var_name}"
                 variables[var_name] = vobj
@@ -429,10 +432,6 @@ class Engine:
 
             out_old = out_vars[node]
 
-            # ★ widening 필요 여부를 미리 계산하고 플래그 설정
-            need_widen = (getattr(node, "fixpoint_evaluation_node", False) and
-                          visit_cnt[node] > widening_threshold)
-
             # ★ widening 모드 설정 (후속 노드들도 widening threshold 넘으면 추상화)
             old_widening = self._in_widening_mode
             if visit_cnt[node] > widening_threshold:
@@ -443,11 +442,10 @@ class Engine:
             # ★ widening 모드 복원
             self._in_widening_mode = old_widening
 
-            out_joined = (
-                VariableEnv.join_variables_with_widening(out_old, out_raw)
-                if need_widen else
-                VariableEnv.join_variables_simple(out_old, out_raw)
-            )
+            # ★ out_vars에서는 widening 적용하지 않음
+            #    표준 abstract interpretation에서 widening은 loop header의 in_vars에서만 적용
+            #    out_vars에서 widening하면 loop body로 전파되어 불필요한 over-approximation 발생
+            out_joined = VariableEnv.join_variables_simple(out_old, out_raw)
 
             if getattr(node, "fixpoint_evaluation_node", False):
                 node.fixpoint_evaluation_node_vars = VariableEnv.copy_variables(out_joined)
@@ -469,9 +467,32 @@ class Engine:
                 else:
                     succ_widen = False
 
-                in_new = (VariableEnv.join_variables_with_widening(in_vars[succ], flow)
-                          if succ_widen
-                          else VariableEnv.join_variables_simple(in_vars[succ], flow))
+                # ★ fixpoint_evaluation_node (join 노드)의 경우:
+                #    모든 predecessor의 최신 flow를 먼저 join한 후 widening 적용
+                if getattr(succ, "fixpoint_evaluation_node", False):
+                    # 모든 predecessor의 flow를 join
+                    all_pred_flows = None
+                    for pred in G.predecessors(succ):
+                        if pred in loop_nodes:
+                            pred_out = out_vars.get(pred) or getattr(pred, "variables", {}) or {}
+                        else:
+                            # 루프 밖 predecessor (initial entry) - 현재 variables 사용
+                            pred_out = getattr(pred, "variables", {}) or {}
+                        pred_flow = _edge_flow_from_node_out(pred, succ, pred_out)
+                        if pred_flow is not None:
+                            all_pred_flows = VariableEnv.join_variables_simple(all_pred_flows, pred_flow)
+
+                    # 이제 old in_vars와 새로 join된 값을 비교하여 widening
+                    if all_pred_flows is not None:
+                        in_new = (VariableEnv.join_variables_with_widening(in_vars[succ], all_pred_flows)
+                                  if succ_widen
+                                  else VariableEnv.join_variables_simple(in_vars[succ], all_pred_flows))
+                    else:
+                        in_new = in_vars[succ]
+                else:
+                    in_new = (VariableEnv.join_variables_with_widening(in_vars[succ], flow)
+                              if succ_widen
+                              else VariableEnv.join_variables_simple(in_vars[succ], flow))
 
                 changed_succ = not VariableEnv.variables_equal(in_vars[succ], in_new)
 
@@ -596,12 +617,15 @@ class Engine:
             blk.variables = {}
             for st in blk.statements:
                 ln = getattr(st, "src_line", None)
-                if ln is not None and ln in an.analysis_per_line:
-                    an.analysis_per_line[ln].clear()
+                if ln is not None:
+                    if ln in an.analysis_per_line:
+                        an.analysis_per_line[ln].clear()
+                    # ★ recorder.ledger도 초기화 (이전 분석 결과 제거)
+                    if hasattr(rec, 'ledger') and ln in rec.ledger:
+                        rec.ledger[ln].clear()
 
         entry = fcfg.get_entry_node()
         (start_block,) = fcfg.graph.successors(entry)
-
         start_block.variables = VariableEnv.copy_variables(fcfg.related_variables)
 
         if caller_env is not None:
@@ -635,9 +659,19 @@ class Engine:
         while work:
             node = work.popleft()
             if node in visited: continue
-            visited.add(node)
 
             preds = list(G.predecessors(node))
+            # ★ join 노드는 모든 predecessor가 방문될 때까지 대기
+            # 단, worklist에 자기 자신 외의 노드가 있을 때만 defer
+            if getattr(node, 'join_point_node', False) and preds:
+                unvisited_preds = [p for p in preds if p not in visited]
+                if unvisited_preds and len(work) > 0:
+                    # worklist에 다른 노드가 남아있으면 defer
+                    work.append(node)
+                    continue
+
+            visited.add(node)
+
             if preds:
                 joined = None
                 for p in preds:
@@ -645,7 +679,8 @@ class Engine:
                     if p not in visited:
                         continue
                     flow = _edge_env_from_pred(p, node)
-                    if flow is None: continue
+                    if flow is None:
+                        continue
                     joined = (VariableEnv.copy_variables(flow) if joined is None
                               else VariableEnv.join_variables_simple(joined, flow))
                 if joined is not None:
@@ -678,14 +713,19 @@ class Engine:
                     # ✂ branch 기록 제거
 
                     t = true_succs[0]; f = false_succs[0]
+                    # ★ infeasible branch는 전체를 BOTTOM으로, 모든 branch가 join에 참여
                     if can_true:
-                        t.variables = true_variables;  work.append(t)
+                        t.variables = true_variables
                     else:
+                        t.variables = VariableEnv.copy_variables(true_variables)
                         self._set_bottom_env(t.variables)
+                    work.append(t)
                     if can_false:
-                        f.variables = false_variables; work.append(f)
+                        f.variables = false_variables
                     else:
+                        f.variables = VariableEnv.copy_variables(false_variables)
                         self._set_bottom_env(f.variables)
+                    work.append(f)
                     continue
 
                 elif node.condition_node_type in ["require", "assert"]:
@@ -697,7 +737,8 @@ class Engine:
                     # ✂ require/assert 기록 제거
 
                     if can_true:
-                        t.variables = true_variables; work.append(t)
+                        t.variables = true_variables
+                        work.append(t)
                     else:
                         self._set_bottom_env(t.variables)
                     continue
@@ -740,7 +781,6 @@ class Engine:
                     if _is_sink(nxt): continue
                     nxt.variables = VariableEnv.copy_variables(cur_vars)
                     work.append(nxt)
-
         self._force_join_before_exit(fcfg)
         self._sync_named_return_vars(fcfg)
 
@@ -958,6 +998,8 @@ class Engine:
             v.value = IntegerInterval.bottom(val.type_length); return
         if isinstance(val, BoolInterval):
             v.value = BoolInterval.bottom(); return
+        if isinstance(val, AddressSet):
+            v.value = AddressSet.bot(); return
         v.value = None
 
     def _force_join_before_exit(self, fcfg: FunctionCFG) -> None:

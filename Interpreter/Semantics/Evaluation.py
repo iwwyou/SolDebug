@@ -390,7 +390,6 @@ class Evaluation :
 
                     if idx >= len(callerObject.elements):
                         # ❗ 요소가 아직 없음 → base-type 의 TOP 값 (알 수 없는 값)
-                        print(f"[ARRAY OOB] Array {callerObject.identifier} accessed at index {idx}, but length is {len(callerObject.elements)} - returning TOP")
                         base_t = callerObject.typeInfo.arrayBaseType
                         if base_t.elementaryTypeName and base_t.elementaryTypeName.startswith("uint"):
                             bits = base_t.intTypeLength or 256
@@ -400,8 +399,21 @@ class Evaluation :
                             return IntegerInterval.top(bits)
                         elif base_t.elementaryTypeName and base_t.elementaryTypeName == "bool":
                             return BoolInterval.top()
+                        elif base_t.elementaryTypeName and base_t.elementaryTypeName == "address":
+                            return AddressSet.top()
+                        elif isinstance(base_t, SolType) and base_t.typeCategory == "struct":
+                            # 구조체 타입: 빈 구조체 생성 후 초기화
+                            empty_struct = StructVariable(
+                                f"{callerObject.identifier}[{idx}]",
+                                base_t.structTypeName,
+                                scope=callerObject.scope
+                            )
+                            ccf = self.an.contract_cfgs[self.an.current_target_contract]
+                            if base_t.structTypeName in ccf.structDefs:
+                                empty_struct.initialize_struct(ccf.structDefs[base_t.structTypeName])
+                            return empty_struct
                         else:
-                            # 주소/bytes/string 등은 symbol
+                            # 기타 (bytes/string 등)는 symbol
                             return f"symbolic_{callerObject.identifier}[{idx}]"
 
                     elem = callerObject.elements[idx]
@@ -410,8 +422,32 @@ class Evaluation :
                         return elem
                     return elem.value if hasattr(elem, "value") else elem
 
-                # ── (B) 불확정(bottom 또는 [l,r] 범위) ─────────────────
-                #      ⇒  배열 모든 요소의 join 을 반환 (구조체 포함)
+                # ── (B-0) BOTTOM인 경우: unreachable 경로이므로 BOTTOM 반환
+                if VariableEnv.is_interval(iv) and iv.is_bottom():
+                    base_t = callerObject.typeInfo.arrayBaseType
+                    if base_t.elementaryTypeName and base_t.elementaryTypeName.startswith("uint"):
+                        return UnsignedIntegerInterval.bottom(base_t.intTypeLength or 256)
+                    elif base_t.elementaryTypeName and base_t.elementaryTypeName.startswith("int"):
+                        return IntegerInterval.bottom(base_t.intTypeLength or 256)
+                    elif base_t.elementaryTypeName and base_t.elementaryTypeName == "bool":
+                        return BoolInterval.bottom()
+                    elif base_t.elementaryTypeName and base_t.elementaryTypeName == "address":
+                        return AddressSet.bot()
+                    elif isinstance(base_t, SolType) and base_t.typeCategory == "struct":
+                        # 구조체 타입: BOTTOM 상태의 빈 구조체 생성
+                        empty_struct = StructVariable(
+                            f"{callerObject.identifier}[bot]",
+                            base_t.structTypeName,
+                            scope=callerObject.scope
+                        )
+                        ccf = self.an.contract_cfgs[self.an.current_target_contract]
+                        if base_t.structTypeName in ccf.structDefs:
+                            empty_struct.initialize_struct(ccf.structDefs[base_t.structTypeName])
+                        return empty_struct
+                    else:
+                        return f"symbolic_bottom_{callerObject.identifier}[<bot>]"
+
+                # ── (B-1) 범위인 경우: 배열 모든 요소의 join 을 반환 (구조체 포함)
                 if callerObject.elements:
                     first_elem = callerObject.elements[0]
 
@@ -421,8 +457,6 @@ class Evaluation :
 
                     # 기본 타입: 모든 값 join
                     elif not isinstance(first_elem, (ArrayVariable, MappingVariable)):
-                        # # DEBUG: Check array access with interval index
-                        # print(f"[ARRAY DEBUG] Accessing {callerObject.identifier} with interval index {ident_str}={iv}, elements count={len(callerObject.elements)}")
                         joined = None
                         for i, elem in enumerate(callerObject.elements):
                             val = getattr(elem, "value", elem)
@@ -1066,9 +1100,9 @@ class Evaluation :
 
         if (isinstance(leftInterval, Interval) and leftInterval.is_bottom()) or \
                 (isinstance(rightInterval, Interval) and rightInterval.is_bottom()):
-            # 산술/비트/시프트 → ⊥,  비교/논리 → BoolInterval ⊤(= [0,1])
+            # ★ BOTTOM 피연산자가 있으면 결과도 BOTTOM (unreachable 경로 전파)
             if operator in ['==', '!=', '<', '>', '<=', '>=', '&&', '||']:
-                return BoolInterval.top()
+                return BoolInterval.bottom()
             return _bottom(leftInterval if not leftInterval.is_bottom() else rightInterval)
 
         if operator == '+':
@@ -1614,10 +1648,10 @@ class Evaluation :
     @staticmethod
     def compare_intervals(left_interval, right_interval, operator):
 
-        # 값이 하나라도 없으면 판단 불가 → TOP
+        # BOTTOM과의 비교는 BOTTOM 반환 (unreachable 경로)
         if (left_interval.min_value is None or left_interval.max_value is None or
                 right_interval.min_value is None or right_interval.max_value is None):
-            return BoolInterval(0, 1)  # [0,1]
+            return BoolInterval.bottom()
 
         definitely_true = False
         definitely_false = False

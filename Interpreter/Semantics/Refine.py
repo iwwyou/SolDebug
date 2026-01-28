@@ -225,7 +225,7 @@ class Refine:
         if VariableEnv.is_interval(left_val) and not VariableEnv.is_interval(right_val):
             coerced_r = self._coerce_literal_to_interval(right_val, left_val.type_length)
             new_l, _dummy = self.refine_intervals_for_comparison(left_val, coerced_r, actual_op)
-            _maybe_update(left_expr, variables, new_l)  # ★ 변경
+            _maybe_update(left_expr, variables, new_l)
             return
 
         # ───────── CASE 2-B : literal vs Interval ──────────────

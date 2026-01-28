@@ -579,12 +579,17 @@ class Update :
             if VariableEnv.is_interval(idx_iv) and idx_iv.is_bottom():
                 return caller_object
 
-            # Interval 범위가 너무 크면 전체-쓰기 추상화 (widening된 경우)
+            # Interval 범위가 너무 크면 모든 기존 요소에 값 join (sound over-approximation)
             MAX_CONCRETE_INDICES = 20
             if VariableEnv.is_interval(idx_iv) and idx_iv.min_value != idx_iv.max_value:
                 range_size = idx_iv.max_value - idx_iv.min_value + 1
                 if range_size > MAX_CONCRETE_INDICES:
-                    return caller_object
+                    # ★ 모든 기존 요소에 동일한 값 join → sound
+                    for elem in caller_object.elements:
+                        if isinstance(elem, (StructVariable, ArrayVariable, MappingVariable)):
+                            continue  # composite는 skip
+                        _apply_to_leaf(elem, expr)
+                    return None
 
                 # ★ 범위가 작으면 각 인덱스에 할당 (over-approximation)
                 for idx in range(idx_iv.min_value, idx_iv.max_value + 1):
