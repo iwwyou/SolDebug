@@ -23,6 +23,7 @@
 \DeclareGraphicsExtensions{.png,.pdf,.jpg}% PNG first, then PDF
 \usepackage{subcaption}% For subfigure environment
 \usepackage{caption}% For caption customization
+\captionsetup{compatibility=false}% Suppress unknown document class warning
 \captionsetup{justification=raggedright, singlelinecheck=false}% Left-align all captions by default
 \captionsetup[figure]{justification=centering, singlelinecheck=false}% Center-align figure captions
 \usepackage{tikz}%
@@ -184,7 +185,7 @@ Development}
 
 \section{Background}\label{sect2}
     \subsection{Structure of Solidity Smart Contract}
-\begin{figure}[!h]
+\begin{figure}[!ht]
 \begin{lstlisting}[language=Solidity, numbers=left, basicstyle=\ttfamily\small]
 contract Example {
     address public owner;
@@ -236,7 +237,7 @@ contract Example {
         \noindent\textbf{Step 1: Compile.}
         Figure~\ref{fig:step-compile} shows the compilation step in Remix IDE, where the contract source code is compiled into EVM bytecode.
 
-\begin{figure}[!h]
+\begin{figure}[!ht]
   \centering
   \includegraphics[width=0.9\columnwidth,height=0.35\textheight, keepaspectratio]{Fig2.pdf}
   \caption{Traditional Solidity debugging workflow: Compile step}
@@ -250,7 +251,7 @@ contract Example {
         Deployment is a one-time transaction that stores compiled bytecode on-chain and invokes the constructor.
         Once deployed, the bytecode becomes immutable.
 
-\begin{figure}[!h]
+\begin{figure}[!ht]
   \centering
   \includegraphics[width=0.9\columnwidth,height=0.3\textheight,keepaspectratio]{Fig3.pdf}
   \caption{Traditional Solidity debugging workflow: Deploy contract}
@@ -265,7 +266,7 @@ contract Example {
         to initialize the contract state and satisfy conditions enforced by \texttt{require} statements.
         Once the state is prepared, the target function is executed by clicking the transact button.
 
-\begin{figure}[!h]
+\begin{figure}[!ht]
   \centering
   \includegraphics[width=0.9\columnwidth,keepaspectratio]{Fig4.pdf}
   \caption{Traditional Solidity debugging workflow: Initialize state and execute target function}
@@ -278,7 +279,7 @@ contract Example {
         Figure~\ref{fig:step-debug} shows clicking the debug button and stepping through bytecode instructions.
         Once the target function is executed, its execution is traced step by step at the bytecode level.
 
-\begin{figure}[!h]
+\begin{figure}[!ht]
   \centering
   \includegraphics[width=1.01\columnwidth, keepaspectratio]{Fig5.pdf}
   \caption{Traditional Solidity debugging workflow: Bytecode-level debugging}
@@ -786,7 +787,7 @@ The choice between these algorithms depends on whether the statement can exist i
   \item \textbf{Independent contexts:} Other statements can exist independently. Algorithm~\ref{alg:get-insertion-site} uses a successor-first strategy, leveraging the fact that successors are already inserted and have complete CFG structure.
 \end{itemize}
 
-\begin{algorithm}[!h]
+\begin{algorithm}[!ht]
 \caption{Dependent-Context Insertion}
 \label{alg:get-branch-context}
 \begin{algorithmic}[1]
@@ -825,7 +826,7 @@ Dependent contexts (\texttt{else}/\texttt{else if}) cannot exist independently a
   \item \textbf{Error handling (Line 23):} Report an error if no matching condition is found.
 \end{itemize}
 
-\begin{algorithm}[!h]
+\begin{algorithm}[!ht]
 \caption{Independent-Context Insertion}
 \label{alg:get-insertion-site}
 \begin{algorithmic}[1]
@@ -927,7 +928,7 @@ When encountering loop condition nodes, it delegates to Algorithm~\ref{alg:fixpo
   \item \textbf{Change detection and propagation (Lines 23--30):} Compare $\hat{\sigma}_{\mathrm{out}}$ with the previously stored output $out[n]$. If changed, update the node environment and stored output, then enqueue successors. Sink nodes (\texttt{exit node}, \texttt{return exit node}, \texttt{error exit node}) are not enqueued, so propagation terminates along exceptional paths such as \texttt{revert} or failed \texttt{require}/\texttt{assert}. This ensures fixpoint termination by stopping propagation when environments stabilize.
 \end{itemize}
 
-\begin{algorithm}[!h]
+\begin{algorithm}[!ht]
 \caption{Loop Fixpoint with Adaptive Widening}
 \label{alg:fixpoint}
 \begin{algorithmic}[1]
@@ -1332,10 +1333,9 @@ Participants were presented with five functions based on the benchmark dataset (
 For each function, input values were provided with the task of calculating the return value.
 The study was hosted on Cognition.run~\citep{cognition}, which automatically recorded response times.
 Table~\ref{tab:rq4-demographics} summarizes participant demographics:
-the majority had more than 5 years of programming experience (71.4\%) and intermediate or advanced Solidity experience (71.4\%),
-including graduate students (47.6\%), researchers (28.6\%), software developers (9.5\%), and professors (4.8\%).
+the majority had more than 5 years of programming experience and intermediate or advanced Solidity experience.
 
-\begin{table}[!h]
+\begin{table}[!ht]
 \centering
 \caption{Participant Demographics}
 \label{tab:rq4-demographics}
@@ -1345,22 +1345,22 @@ including graduate students (47.6\%), researchers (28.6\%), software developers 
 \textbf{Category} & \textbf{Level} & \textbf{Count} \\
 \midrule
 \multirow{3}{*}{Programming Exp.}
-  & 1--2 years & 1 \\
-  & 3--5 years & 5 \\
-  & More than 5 years & 15 \\
+  & 1--2 years & 1 (4.8\%) \\
+  & 3--5 years & 5 (23.8\%) \\
+  & More than 5 years & 15 (71.4\%) \\
 \midrule
 \multirow{4}{*}{Solidity Exp.}
-  & None & 1 \\
-  & Beginner & 5 \\
-  & Intermediate & 7 \\
-  & Advanced & 8 \\
+  & None & 1 (4.8\%) \\
+  & Beginner & 5 (23.8\%) \\
+  & Intermediate & 7 (33.3\%) \\
+  & Advanced & 8 (38.1\%) \\
 \midrule
 \textbf{Total} & & \textbf{21} \\
 \bottomrule
 \end{tabular*}
 \end{table}
 
-\begin{table}[!h]
+\begin{table}[!ht]
 \centering
 \caption{Tool Usage and Accuracy}
 \label{tab:rq4-tools}
@@ -1369,24 +1369,20 @@ including graduate students (47.6\%), researchers (28.6\%), software developers 
 \toprule
 \textbf{Tool} & \textbf{Users} & \textbf{Accuracy} & \textbf{Median Time} \\
 \midrule
-AI (ChatGPT, Claude, etc.) & 11 (52.4\%) & 98.2\% & 89.6s \\
-Calculator & 6 (28.6\%) & 86.7\% & 165.7s \\
-Mental calculation only & 3 (14.3\%) & 13.3\% & 93.9s \\
-Pen and paper & 1 (4.8\%) & 60.0\% & 199.9s \\
+AI (ChatGPT, Claude, etc.) & 11 (52.4\%) & 98.2\% & 43.1s \\
+Non-AI & 10 (47.6\%) & 62.0\% & 125.9s \\
 \midrule
 \textbf{Total} & \textbf{21 (100\%)} & \textbf{81.0\%} & \textbf{66.4s} \\
 \bottomrule
 \end{tabular*}
 \end{table}
 
-
-
 The overall accuracy across all problems was 81.0\% (85/105 responses correct),
 with a median response time of 66.4 seconds per problem.
-As shown in Table~\ref{tab:rq4-tools}, participants who did not use AI assistants achieved 62\% accuracy (31/50),
+As shown in Table~\ref{tab:rq4-tools}, participants who did not use AI assistants (using calculator, mental calculation, or pen and paper) achieved 62\% accuracy (31/50) with a median time of 125.9 seconds,
 indicating that manual value tracing is demanding even for experienced programmers.
 In contrast, the majority (52.4\%) relied on AI assistants such as ChatGPT or Claude, achieving 98.2\% accuracy.
-However, even with AI assistance, participants spent a median of 89.6 seconds per problem,
+However, even with AI assistance, participants spent a median of 43.1 seconds per problem,
 as the workflow requires copying code to the AI interface, specifying input values, and interpreting responses.
 In comparison, \textsc{SolQDebug} analyzed the same functions in 0.08--0.18 seconds (mean: 0.12s, median: 0.10s).
 These results highlight the need for integrated debugging assistance that provides immediate feedback within the development environment.
@@ -1415,8 +1411,8 @@ Actual latencies may vary depending on contract complexity.
 The 30 benchmark functions used in our evaluation may not fully represent
 the diversity of real-world smart contracts.
 Additionally, while a pilot study on value tracing was conducted (RQ4),
-participants were predominantly from academic backgrounds rather than industry developers,
-and a formal usability study evaluating developers' experience with \textsc{SolQDebug} in realistic workflows has not yet been performed.
+participants' experience levels were self-reported without independent verification.
+A formal usability study evaluating developers' experience with \textsc{SolQDebug} in realistic workflows has not yet been performed.
 
 \smallskip
 \noindent\textbf{Construct Validity.}
@@ -1483,20 +1479,20 @@ smart contract patterns (cf.\ RQ2, RQ3).
 \multicolumn{4}{@{}l}{\textit{Arithmetic Operations (RQ2)}} \\[0.4em]
 
 1. Basic principle
-& All operators & Annotate \textbf{one operand as interval} (e.g., \texttt{[100,110]}), others as \textbf{singleton} (e.g., \texttt{[100,100]}). & Minimizes interval expansion from combinatorial endpoint calculations. \\[0.5em]
+& All operators & Annotate one operand as interval (e.g., \texttt{[100,110]}), others as singleton (e.g., \texttt{[100,100]}). & Minimizes interval expansion from combinatorial endpoint calculations. \\[0.5em]
 \hdashline\noalign{\vskip 1em}
 \multirow[t]{5}{*}{\parbox{2.4cm}{2. Multiple\\intervals needed}}
-& \texttt{*}, \texttt{/} & Use \textbf{overlapping} ranges (e.g., \texttt{[100,110]} and \texttt{[100,115]}). & Disjoint ranges maximize spread of endpoint products. \\[0.5em]
+& \texttt{*}, \texttt{/} & Use overlapping ranges (e.g., \texttt{[100,110]} and \texttt{[100,115]}). & Disjoint ranges maximize spread of endpoint products. \\[0.5em]
 & \texttt{+} & Position (overlapping vs.\ disjoint) does not matter. & Result width equals sum of input widths. \\[0.5em]
 & \texttt{-} (\texttt{int}) & Position (overlapping vs.\ disjoint) does not matter. & Result width equals sum of input widths. \\[0.5em]
-& \texttt{-} (\texttt{uint}) & Use \textbf{disjoint} ranges where minuend $>$ subtrahend (e.g., \texttt{[100,110] - [50,70]}). & Overlapping ranges risk underflow, degrading precision. \\[0.5em]
+& \texttt{-} (\texttt{uint}) & Use disjoint ranges where minuend $>$ subtrahend (e.g., \texttt{[100,110] - [50,70]}). & Overlapping ranges risk underflow, degrading precision. \\[0.5em]
 & \texttt{\%} & Position does not matter. & Result depends on divisor magnitude only. \\[0.5em]
 
 \midrule
 \multicolumn{4}{@{}l}{\textit{Loop Constructs (RQ3)}} \\[0.4em]
 
 \multirow[t]{2}{*}{\parbox{2.4cm}{1. Before loop}}
-& Initialization & \textbf{Initialize local variables explicitly} (e.g., \texttt{uint x = 0;}). & Uninitialized locals start as $\top$; annotations cannot recover precision. \\[0.5em]
+& Initialization & Initialize local variables explicitly (e.g., \texttt{uint x = 0;}). & Uninitialized locals start as $\top$; annotations cannot recover precision. \\[0.5em]
 & Bounds annotation & Annotate state variables or parameters determining loop bounds (e.g., array lengths). & Enables precise iteration estimation and widening threshold. \\[0.5em]
 \hdashline\noalign{\vskip 1em}
 \multirow[t]{3}{*}{\parbox{2.4cm}{2. Inside loop}}
@@ -1538,7 +1534,7 @@ The experimental findings from RQ2 and RQ3 yield actionable strategies for devel
     \smallskip
     \noindent\textbf{User Experience Validation.}
     While a pilot study on value tracing was conducted (RQ4),
-    a formal usability study with industry developers has not yet been performed.
+    a formal usability study evaluating developers' experience with \textsc{SolQDebug} in realistic workflows has not yet been performed.
     Prior research indicates that meaningful usability evaluation requires assessing ease of use within realistic development workflows~\citep{defisecurity}.
     However, the same study found that practitioners prefer lightweight, development-integrated tools over standalone analyzers.
     \textsc{SolQDebug}'s design aligns with this preference by providing immediate feedback during editing.
@@ -1680,9 +1676,8 @@ Chen, J., et al.: NumScout: unveiling numerical defects in smart contracts using
 Chimdyalwar, B.: Fast and precise interval analysis on industry code. In: 2024 IEEE 35th
 International Symposium on Software Reliability Engineering Workshops (ISSREW) (2024). https://doi.org/10.1109/ISSREW63542.2024.00049
 
-
-\bibitem[Cognition.run(2025)]{cognition}
-Cognition.run: \url{https://www.cognition.run/} (2025). Accessed January 2026
+\bibitem[Cognition.run(2026)]{cognition}
+Cognition.run: \url{https://www.cognition.run/} (2026). Accessed January 2026
 
 \bibitem[ConsenSys Diligence(2025)]{psp}
 ConsenSys Diligence: Python Solidity Parser. \url{https://github.
