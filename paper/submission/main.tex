@@ -113,21 +113,21 @@ Development}
 \author*[1]{\fnm{Hoh Peter} \sur{In}}\email{hoh\_in@korea.ac.kr}
 
 \affil*[1]{\orgdiv{Department of Computer Science}, \orgname{Korea University},
-\orgaddress{\street{145, Anam-ro}, \city{Seonbuk-gu}, \postcode{02841}, \state{Seoul},
+\orgaddress{\street{145, Anam-ro}, \city{Seongbuk-gu}, \postcode{02841}, \state{Seoul},
 \country{Republic of Korea}}}
 
 
 \abstract{As Solidity becomes the dominant language for blockchain smart contracts,
     efficient debugging grows increasingly critical. However, current Solidity debugging
     remains inefficient: developers must compile, deploy, set up transactions, and trace bytecode execution step by step. This process is too slow for practical use.
-    To address this challenge, this paper presented SolQDebug,
+    To address this challenge, this paper presents SolQDebug,
     the first edit-time debugging assistant for Solidity designed for interactive analysis within a single contract/transaction context,
-    providing abstract value summaries with millisecond feedback directly on source code.
+    providing abstract value summaries with millisecond-scale feedback directly on source code.
     Developers specify symbolic interval inputs through annotations and compare them against abstract interpretation results,
     thereby capturing multiple input scenarios over various execution paths in a single analysis.
     SolQDebug was evaluated on 30 real-world functions from DAppSCAN, achieving millisecond-scale feedback.
-    This paper also synthesized experimental observations on annotation patterns for arithmetic operations and loop constructs into practical guidelines.
-    These results demonstrated that SolQDebug serves as an effective edit-time debugging assistant for Solidity development.}
+    This paper also synthesizes experimental observations on annotation patterns for arithmetic operations and loop constructs into practical guidelines.
+    These results demonstrate that SolQDebug serves as an effective edit-time debugging assistant for Solidity development.}
 
 
 \keywords{Smart Contract Development, Solidity, Debugging, Abstract Interpretation, Incremental Analysis}
@@ -231,7 +231,7 @@ contract Example {
 
     \subsection{Solidity Execution Model and Debugging Workflow}
         Unlike traditional programs, Solidity contracts execute in a state-based environment that imposes a distinctive multi-stage debugging workflow.
-        To debug Solidity code, developers must follow a multi-stage workflow as described in Steps 1--4.
+        This workflow consists of four stages, as described in Steps 1--4.
 
         \smallskip
         \noindent\textbf{Step 1: Compile.}
@@ -342,7 +342,7 @@ contract Example {
         \smallskip
         \noindent\textbf{(2) Annotation-guided interpretation to address iterative inefficiency.}
         The EVM does not support reverting to a prior state without redeploying the contract or replaying transactions.
-        Both approaches disrupt iteration. To address this, SolQDebug introduces batch annotations, enabling developers to vary inputs or contract state to observe control-flow outcomes.
+        Both approaches disrupt iterative debugging. To address this, SolQDebug introduces batch annotations, enabling developers to vary inputs or contract state to observe control-flow outcomes.
         Rather than reconstructing such conditions through on-chain transactions, developers can write annotations at the top of the function to define symbolic interval inputs.
         These inputs are injected before analysis begins and rolled back afterward, ensuring test-case isolation.
 
@@ -1194,7 +1194,7 @@ The following presents the findings for each research question.
 \subsection{RQ1 - Responsiveness}
 \noindent\textbf{Baseline Selection.}
 RQ1 evaluates the reduction in debugging workflow latency, defined as the time required for developers to understand program behavior under specific input ranges.
-While abstract interpretation techniques such as demanded summarization~\citep{daig} have been proposed for other languages,
+While abstract interpretation techniques such as demanded abstract interpretation~\citep{daig} have been proposed for other languages,
 these focus on optimizing static analysis pipelines rather than supporting interactive debugging.
 Remix IDE, in contrast, provides debugging functionality for tracing execution flows with user-specified inputs, aligning with SolQDebug's target task.
 We therefore selected Remix as our baseline, as it is the most widely used Solidity IDE that provides comparable debugging functionality.
@@ -1489,7 +1489,7 @@ Unlike conventional step-through debuggers that trace concrete execution, SolQDe
 
 \smallskip
 \noindent\textbf{Why Abstract Interpretation?}
-Compared to other static analyses, dynamic analysis, and machine learning techniques,
+Compared to other static analysis techniques, dynamic analysis, and machine learning techniques,
 AI provides two properties essential for interactive debugging:
 \begin{itemize}
   \item \textbf{Termination.} AI enforces convergence through widening at loops and $\sqcup$-joins at control-flow merges, guaranteeing bounded analysis time regardless of program complexity.
@@ -1644,7 +1644,7 @@ The experimental findings from RQ2 and RQ3 yield actionable strategies for devel
         Third, formal verification aims to prove safety properties or refute counterexamples at compile
         time. Examples include ZEUS, VeriSmart, and SmartPulse \citep{zeus,verismart,pulse}.
         Finally, learning-based approaches train models to predict vulnerabilities or triage candidates, e.
-        g., via data-flow--aware pretraining, IoT-oriented classifiers, or prompt-tuning for detector
+        g., via data-flow-aware pretraining, IoT-oriented classifiers, or prompt-tuning for detector
         adaptation \citep{peculiar,tmlvd,pscvfinder}.
 
         These approaches have substantially advanced the security analysis
@@ -1697,7 +1697,7 @@ The experimental findings from RQ2 and RQ3 yield actionable strategies for devel
     SolQDebug provides millisecond-scale feedback on source code.
 
     Evaluation on 30 real-world DAppSCAN functions demonstrated millisecond-scale feedback latency.
-    Our analysis also revealed how annotation patterns affect interval expansion in arithmetic operations and loop constructs, which we synthesized into practical guidelines for developers.
+    The analysis also revealed how annotation patterns affect interval expansion in arithmetic operations and loop constructs, which were synthesized into practical guidelines for developers.
     Additionally, a pilot study confirmed that manual value tracing is demanding for programmers, validating the practical need for such assistance.
     These results demonstrated that SolQDebug effectively reduces debugging workflow latency, enabling interactive feedback during Solidity development.
 
