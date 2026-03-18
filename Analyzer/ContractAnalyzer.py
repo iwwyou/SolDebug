@@ -67,6 +67,71 @@ class ContractAnalyzer:
     # ────────────────────────────────────────────────────────────────
     #  ContractAnalyzer   (class body 안)
     # ----------------------------------------------------------------
+    def _find_fcfg_by_line(self, line_no: int):
+        """line_info에서 노드를 꺼내 소속 FunctionCFG를 반환."""
+        info = self.line_info.get(line_no)
+        if not info or not info.get("cfg_nodes"):
+            return None
+        node = info["cfg_nodes"][0]
+        for ccf in self.contract_cfgs.values():
+            for f in ccf.functions.values():
+                if node in f.graph.nodes:
+                    return f
+        return None
+
+    def _remove_cfg_nodes(self, start_line: int, end_line: int):
+        """
+        삭제 대상 라인의 CFG 노드를 그래프에서 제거하고,
+        start_line node의 pred → end_line node의 succ로 재연결 후 reinterpret.
+        line_info pop 전에 호출해야 함.
+        """
+        fcfg = self.current_target_function_cfg
+        if fcfg is None:
+            # line_info에서 노드를 꺼내 소속 FunctionCFG 탐색
+            fcfg = self._find_fcfg_by_line(start_line)
+        if fcfg is None:
+            return
+
+        G = fcfg.graph
+
+        # ① start_line / end_line 노드 찾기
+        start_info = self.line_info.get(start_line)
+        end_info = self.line_info.get(end_line)
+        if not start_info or not end_info:
+            return
+
+        start_nodes = start_info.get("cfg_nodes", [])
+        end_nodes = end_info.get("cfg_nodes", [])
+        if not start_nodes or not end_nodes:
+            return
+
+        start_node = start_nodes[0]
+        end_node = end_nodes[-1]
+
+        # ② pred / succ 찾기 (구조적으로 각각 1개)
+        pred = next(iter(G.predecessors(start_node)), None)
+        succ = next(iter(G.successors(end_node)), None)
+        if pred is None or succ is None:
+            return
+
+        # ③ 삭제 대상 노드 수집
+        nodes_to_remove = set()
+        for ln in range(start_line, end_line + 1):
+            info = self.line_info.get(ln)
+            if info and isinstance(info.get("cfg_nodes"), list):
+                nodes_to_remove.update(info["cfg_nodes"])
+
+        # ④ 재연결: pred → succ
+        G.add_edge(pred, succ)
+
+        # ⑤ 노드 제거
+        for node in nodes_to_remove:
+            if node in G.nodes:
+                G.remove_node(node)
+
+        # ⑥ succ부터 reinterpret
+        self.engine.reinterpret_from(fcfg, succ)
+
     def _shift_meta(self, old_ln: int, new_ln: int):
         """
         소스 라인 이동(old_ln → new_ln)에 맞춰
@@ -227,13 +292,26 @@ class ContractAnalyzer:
         elif event == "delete":
             offset = end_line - start_line + 1
 
-            # 기존 라인 제거
+            # ① syntax validation: 삭제 후 코드가 유효한지 확인
+            candidate_lines = {ln: code for ln, code in self.full_code_lines.items()
+                               if ln < start_line or ln > end_line}
+            candidate_code = "\n".join(candidate_lines[ln] for ln in sorted(candidate_lines))
+            try:
+                compile_source(candidate_code)
+            except SolcError:
+                print(f"[err] Deletion of lines {start_line}-{end_line} produces invalid syntax")
+                return
+
+            # ② CFG 노드 제거 및 엣지 재연결 (line_info pop 전에 수행)
+            self._remove_cfg_nodes(start_line, end_line)
+
+            # ③ 기존 라인 제거
             for ln in range(start_line, end_line + 1):
                 self.full_code_lines.pop(ln, None)
                 self.line_info.pop(ln, None)
-                self.recorder.ledger.pop(ln, None)  # ← recorder 같이 비움
+                self.recorder.ledger.pop(ln, None)
 
-            # 뒤쪽 라인 당기기
+            # ④ 뒤쪽 라인 당기기
             keys_to_shift = sorted([ln for ln in self.full_code_lines if ln > end_line])
             for old_ln in keys_to_shift:
                 new_ln = old_ln - offset
