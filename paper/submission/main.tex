@@ -153,9 +153,9 @@ Development}
     To the best of our knowledge, no existing research or tooling provides interactive feedback for Solidity development, a gap that this paper aims to fill.
     
     This paper presented SolQDebug, an edit-time debugging assistant for Solidity designed for interactive analysis within a single contract/transaction context,
-    powered by abstract interpretation (AI) with interval domain.
+    powered by abstract interpretation (AI) with the interval domain.
     Unlike conventional step-through debuggers that require compilation and deployment,
-    SolQDebug provided abstract value summaries as developers type, enabling exploration of function behavior at the statement level.
+    SolQDebug provides abstract value summaries as developers type, enabling exploration of function behavior at the statement level.
     To achieve this goal, SolQDebug built on two core ideas.
     First, it provided incremental analysis through interactive parsing and incremental control flow graph (CFG) construction via line-to-node indexing.
     As developers type each statement, the system efficiently determines insertion sites and extends the CFG, recomputing abstract states only for affected program points.
@@ -368,7 +368,7 @@ contract Example {
     the system maintains an evolving abstract interpretation of the program, enabling
     immediate feedback on variable values and potential errors without requiring compilation or deployment.
     The following subsections detail the architecture (\S3.1), provide a running example (\S3.2),
-    and explain the core mechanisms for parsing (\S3.3) and incremental analysis (\S3.4).
+    and explain the core mechanisms for parsing (\S3.3), incremental analysis (\S3.4), and code deletion and modification (\S3.5).
 
     \subsection{System Architecture}
         Figure~\ref{fig:solqdebug-arch} illustrates the overall architecture of SolQDebug.
@@ -400,7 +400,7 @@ contract Example {
         \smallskip
         \noindent\textbf{Output.}
         Following analysis, SolQDebug produces a summary showing computed intervals at program points
-        where values are defined, assigned, returned, or change through loop iterations by comparing pre-loop and post-loop abstract states.
+        where values are defined, assigned, returned, or changed through loop iterations by comparing pre-loop and post-loop abstract states.
         All outputs are mapped to their corresponding source line numbers, enabling rapid feedback as developers write and modify code.
     
     \subsection{Running Example}
@@ -546,8 +546,8 @@ uint256 public totalSupply = 1000;
 
 function burn(uint256 amount) public onlyOwner {
     // @Debugging BEGIN
-    // @StateVar balances[msg.sender] = [100,200]
-    // @LocalVar amount = [50,70]
+    // @StateVar balances[msg.sender] = [50,200]
+    // @LocalVar amount = [100,150]
     // @Debugging END
     uint256 bal = balances[msg.sender];
     uint256 delta;
@@ -576,8 +576,8 @@ Figure~\ref{lst:grammar-batch} shows the \texttt{burn} function with batch annot
         \texttt{@LocalVar} for local variables) and assigns a symbolic interval input, supporting both
         simple variables and nested accesses like \texttt{balances[msg.sender]}.
 
-In this example, we annotate \texttt{balances[msg.sender]} with the interval \([100,200]\)
-        and \texttt{amount} with \([50,70]\) to explore how the \texttt{burn} function behaves
+In this example, we annotate \texttt{balances[msg.sender]} with the interval \([50,200]\)
+        and \texttt{amount} with \([100,150]\) to explore how the \texttt{burn} function behaves
         under different balance and amount scenarios. The analysis propagates these intervals through
         the conditional branches, computing \texttt{delta} as \([0,150]\) at the join point and
         reducing \texttt{totalSupply} from \([1000,1000]\) to \([850,1000]\).
@@ -644,7 +644,7 @@ For concreteness, we refer to the burn function in Table~\ref{tab:input_code}.
 When the developer types the function definition (Step 1), it is parsed by \texttt{interactiveSourceUnit},
 which creates a function with an empty body.
 Subsequent inputs within the function body are parsed by \texttt{interactiveBlockUnit},
-which handles both statement fragments (Steps 2, 3, 5, 6, 8) and block fragments (Step 4).
+which handles both statement fragments (Steps 2, 3, 5, 6, 8, and 9) and block fragments (Step 4).
 Step 7 illustrates how continuation rules work: the \texttt{else} block is parsed by
 \texttt{interactiveIfElseUnit}, which depends on the preceding \texttt{if} from Step 4
 (see Appendix~\ref{appendix:interactive-grammar}).
@@ -771,7 +771,7 @@ Since CFG edges encode control flow rather than source positions, we cannot dete
 To enable incremental insertion, we maintain a line-to-node index during construction. Table~\ref{tab:line-mapping} summarizes how statement types map lines to nodes.
 
 \texttt{Simple statements} index only their start line.
-Most statements map to a basic node, though return maps to a return node and require maps to a condition node.
+Most statements map to a basic node, except \texttt{require}/\texttt{assert}, which maps to a condition node.
 Compound statements index both start and end lines.
 Conditionals (\texttt{if} and \texttt{else if}) map their start line to a condition node and end line to a join node,
 while \texttt{else} maps its start line to an else node and end line to the join node.
@@ -1013,10 +1013,6 @@ for integer and boolean types ($\widehat{\mathbb{Z}}_N, \widehat{\mathbb{U}}_N$)
 for addresses, and on-demand materialization for composite types such as arrays, mappings, and structs.
 Unlike prior work focusing on invariant generation~\citep{DBM} or information flow analysis~\citep{flow}, we target interactive debugging with incremental refinement.
 The complete formal semantics (Tables~\ref{tab:conc-denot} and~\ref{tab:abs-denot}) are in Appendix~\ref{app:semantics}.
-
-% SECTION 3.5 MOVED TO APPENDIX A
-% (Former subsection: Design of the Abstract Interpretation Framework for Solidity)
-% CONTENT MOVED TO APPENDIX A
 
 \subsection{Code Deletion and Modification}\label{sec:deletion}
 
@@ -1434,8 +1430,8 @@ the majority had more than 5 years of programming experience and intermediate or
 \toprule
 \textbf{Tool} & \textbf{Users} & \textbf{Accuracy} & \textbf{Median Time} \\
 \midrule
-AI (ChatGPT, Claude, etc.) & 11 (52.4\%) & 98.2\% & 43.1s \\
-Non-AI & 10 (47.6\%) & 62.0\% & 125.9s \\
+LLM (ChatGPT, Claude, etc.) & 11 (52.4\%) & 98.2\% & 43.1s \\
+Non-LLM & 10 (47.6\%) & 62.0\% & 125.9s \\
 \midrule
 \textbf{Total} & \textbf{21 (100\%)} & \textbf{81.0\%} & \textbf{66.4s} \\
 \bottomrule
@@ -1444,9 +1440,9 @@ Non-AI & 10 (47.6\%) & 62.0\% & 125.9s \\
 
 The overall accuracy across all problems was 81.0\% (85/105 responses correct),
 with a median response time of 66.4 seconds per problem.
-As shown in Table~\ref{tab:rq4-tools}, participants who did not use AI assistants (using calculator, mental calculation, or pen and paper) achieved 62\% accuracy (31/50) with a median time of 125.9 seconds,
+As shown in Table~\ref{tab:rq4-tools}, participants who did not use LLM assistants (using calculator, mental calculation, or pen and paper) achieved 62\% accuracy (31/50) with a median time of 125.9 seconds,
 indicating that manual value tracing is demanding even for experienced programmers.
-In contrast, the majority (52.4\%) relied on AI assistants such as ChatGPT or Claude, achieving 98.2\% accuracy.
+In contrast, the majority (52.4\%) relied on LLM assistants such as ChatGPT or Claude, achieving 98.2\% accuracy.
 However, even with AI assistance, participants spent a median of 43.1 seconds per problem,
 as the workflow requires copying code to the AI interface, specifying input values, and interpreting responses.
 In comparison, SolQDebug analyzed the same functions in 0.08--0.18 seconds (mean: 0.12s, median: 0.10s).
@@ -1456,8 +1452,8 @@ These results highlight the need for integrated debugging assistance that provid
 \noindent\fbox{%
 \begin{minipage}{0.96\linewidth}
 \textbf{Answer to RQ4:}
-Without AI assistance, participants achieved only 62\% accuracy.
-While AI improved accuracy to 98.2\%, it requires external tool workflows.
+Without LLM assistance, participants achieved only 62\% accuracy.
+While LLMs improved accuracy to 98.2\%, they require external tool workflows.
 SolQDebug addresses this by providing integrated, edit-time feedback within the development environment.
 \end{minipage}%
 }
@@ -1501,7 +1497,7 @@ Unlike conventional step-through debuggers that trace concrete execution, SolQDe
 Compared to other static analysis, dynamic analysis, and machine learning techniques,
 AI provides two properties essential for interactive debugging:
 \begin{itemize}
-  \item \textbf{Termination.} AI enforces convergence through widening at loops and joins at control-flow merges, guaranteeing bounded analysis time regardless of program complexity.
+  \item \textbf{Termination.} AI enforces convergence through widening at loops and $\sqcup$-joins at control-flow merges, guaranteeing bounded analysis time regardless of program complexity.
 
   \item \textbf{Explainability.} AI produces explicit abstract values that developers can inspect and interpret at the statement level.
 \end{itemize}
@@ -1526,7 +1522,7 @@ and developers can further narrow input ranges through annotations to control pr
 
 \smallskip
 \noindent\textbf{Precision-Responsiveness Tradeoff.}
-AI with interval domain prioritizes responsiveness over precision, a tradeoff justified
+AI with the interval domain prioritizes responsiveness over precision, a tradeoff justified
 by the interactive debugging context. Edit-time debugging fundamentally requires sub-second
 feedback to maintain developer flow. Developers iterate rapidly through code edits,
 and analysis delays that exceed even a few seconds would break this interactive loop,
@@ -1714,7 +1710,7 @@ The experimental findings from RQ2 and RQ3 yield actionable strategies for devel
     Building on this debugging infrastructure, we plan to develop bug detection capabilities targeting numerical defects~\citep{numscout}, with comprehensive IDE integration.
 
 \section*{Acknowledgements}
-This work was supported by the Institute of Information \& communications Technology Planning \& Evaluation (IITP) grants funded by the Korean government (MSIT) (RS-2021-II210177, High Assurance of Smart Contract for Secure Software Development Life Cycle).
+This work was supported by the Institute of Information \& communications Technology Planning \& Evaluation (IITP) grants funded by the Korean government (MSIT) (RS-2021-II210177, High Assurance of Smart Contract for Secure Software Development Life Cycle) and the Technology Development Program (RS-2025-25455127) funded by the Ministry of SMEs and Startups (MSS, Korea).
 
 \section*{Author Contributions}
 Inseong Jeon participated in conceptualization, methodology design, system implementation, data collection, experiments, and manuscript writing. Sundeuk Kim and Hyunwoo Kim assisted in experiments, data collection and analysis, and contributed to manuscript writing. Hoh Peter In provided resources, assisted in editing the manuscript, and supervised the entire project. All authors reviewed and approved the final version of the manuscript.
