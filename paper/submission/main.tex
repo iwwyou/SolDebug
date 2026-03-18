@@ -1069,15 +1069,10 @@ validating syntax, reconnecting CFG edges, and triggering reinterpretation.
 
 \smallskip
 \noindent\textbf{Code Modification.}
-Code modification is handled by decomposing the operation into a deletion followed by an insertion.
-When the modified code spans the same number of lines as the original,
-the system updates the corresponding CFG node statements in place and invokes
-Algorithm~\ref{alg:reinterpret} from the modified node.
-When the line count differs, the system first applies Algorithm~\ref{alg:deletion}
-to remove the original lines, then performs incremental insertion (\S3.4.2--\S3.4.3) for the replacement code.
-Structural refactoring operations such as wrapping existing code in an \texttt{if}/\texttt{else} block
-are similarly achieved through a sequence of deletion and insertion steps,
-as each step is independently processed by the incremental analysis pipeline.
+Code modification handles changes within a single statement,
+such as altering a condition expression in an \texttt{if} statement or changing an assigned value.
+The system updates the corresponding CFG node's statement in place and invokes
+Algorithm~\ref{alg:reinterpret} from the modified node to propagate updated abstract states.
 
 \FloatBarrier
 
