@@ -992,17 +992,17 @@ The key innovation is that \texttt{EstimateIterations} analyzes loop conditions 
 
   \item \textbf{Initialization (Line 6):} Initialize visit counts $vis$ to track iterations and node input environments $in$, setting $in[h] \gets start$ for the loop condition node.
 
-  \item \textbf{Widening phase (Lines 9--26):} Perform fixpoint iteration with worklist-based propagation. For each iteration:
+  \item \textbf{Widening phase (Lines 9--27):} Perform fixpoint iteration with worklist-based propagation. For each iteration:
   \begin{itemize}
     \item Dequeue node $n$ and increment visit count (Line 10).
     \item Initialize input environment if unset (Lines 11--13): compute $in[n]$ by joining predecessor outputs $out[p]$, each pruned by the edge condition $p \to n$.
     \item Compute raw output $\hat{o}_{\text{raw}}$ by applying transfer function to current input (Line 14).
-    \item Apply adaptive widening to output (Lines 15--18): use widening operator to combine $out[n]$ with $\hat{o}_{\text{raw}}$ if visit count exceeds $\tau$ at fixpoint evaluation nodes (Line 16), otherwise use join (Line 17).
-    \item Check for convergence (Lines 19--20): if output unchanged, skip propagation.
-    \item Update $out[n]$ (Line 21); propagate to successors by joining pruned output into their inputs and enqueue (Lines 22--25).
+    \item Apply adaptive widening to output (Lines 15--19): use widening operator to combine $out[n]$ with $\hat{o}_{\text{raw}}$ if visit count exceeds $\tau$ at fixpoint evaluation nodes (Line 16), otherwise use join (Line 17).
+    \item Check for convergence (Lines 20--21): if output unchanged, skip propagation.
+    \item Update $out[n]$ (Line 22); propagate to successors by joining pruned output into their inputs and enqueue (Lines 23--26).
   \end{itemize}
 
-  \item \textbf{Narrowing phase and exit node (Lines 27--30):} Apply standard narrowing using descending iteration with narrowing operator at fixpoint evaluation nodes to refine over-approximations from widening (Line 27). Then compute the exit node environment (Lines 28--29) by joining predecessor outputs $out[p]$, each pruned by the edge condition $p \to exit$ (i.e., the negated loop condition for the false-branch). Return the exit node with its computed environment (Line 30).
+  \item \textbf{Narrowing phase and exit node (Lines 28--31):} Apply standard narrowing using descending iteration with narrowing operator at fixpoint evaluation nodes to refine over-approximations from widening (Line 27). Then compute the exit node environment (Lines 28--29) by joining predecessor outputs $out[p]$, each pruned by the edge condition $p \to exit$ (i.e., the negated loop condition for the false-branch). Return the exit node with its computed environment (Line 30).
 \end{itemize}
 
 \smallskip
@@ -1050,24 +1050,18 @@ validating syntax, reconnecting CFG edges, and triggering reinterpretation.
 
 \noindent\textbf{Algorithm~\ref{alg:deletion}: Code Deletion.}
 \begin{itemize}
-  \item \textbf{Syntax validation (Lines 4--6):} Remove lines $[L_s, L_e]$ from $C$ to produce $C'$,
+  \item \textbf{Syntax validation (Lines 4--7):} Remove lines $[L_s, L_e]$ from $C$ to produce $C'$,
         then validate $C'$ using the Solidity compiler. If $C'$ is invalid, the deletion is rejected.
-  \item \textbf{Boundary lookup (Line 7):} \texttt{FindBoundary} retrieves the first and last CFG nodes mapped to the deletion range
+  \item \textbf{Boundary lookup (Line 8):} \texttt{FindBoundary} retrieves the first and last CFG nodes mapped to the deletion range
         via the line-to-node index $M$, then returns their unique predecessor and successor
-        outside the range. For a simple statement, these are the adjacent nodes.
-        For a compound block such as \texttt{if}/\texttt{else}, the start maps to a condition node whose predecessor
-        is the node before the conditional, and the end maps to a join node whose successor is the next statement.
-  \item \textbf{Edge removal and reconnection (Lines 8--11):} Detach the edges connecting the deleted region to the surrounding CFG,
+        outside the range.
+  \item \textbf{Edge removal and reconnection (Lines 9--11):} Detach the edges connecting the deleted region to the surrounding CFG,
         then add a direct edge from $pred$ to $succ$, bypassing the deleted region.
   \item \textbf{Node removal (Lines 12--14):} Remove all nodes mapped to lines in $[L_s, L_e]$ from the graph,
         along with their internal edges.
-  \item \textbf{Index shift (Line 15):} Shift line-to-node mappings for all lines after $L_e$ backward
-        by the number of deleted lines, maintaining index consistency.
-  \item \textbf{Reinterpretation (Line 16):} Invoke Algorithm~\ref{alg:reinterpret} with $succ$ as the seed node,
-        propagating updated abstract states through all affected program points.
+  \item \textbf{Index shift and reinterpretation (Lines 15--16):} Shift line-to-node mappings for all lines after $L_e$ backward by the number of deleted lines, then invoke Algorithm~\ref{alg:reinterpret} with $succ$ as the seed node to propagate updated abstract states.
 \end{itemize}
 
-\smallskip
 \noindent\textbf{Code Modification.}
 Code modification handles changes within a single statement,
 such as altering a condition expression in an \texttt{if} statement or changing an assigned value.
@@ -1083,14 +1077,11 @@ we structure our empirical analysis around three key questions:
 \begin{itemize}
   \item \textbf{RQ1 -- Responsiveness}:\;%
         How much does SolQDebug reduce debugging latency compared to Remix?
-
   \item \textbf{RQ2 -- Impact of Annotation Patterns on Precision}:\;%
         How should developers structure annotations to improve precision in
         arithmetic operations involving multiplication and division?
-
   \item \textbf{RQ3 -- Loops}:\;%
         How does SolQDebug's analysis approach affect precision in loop structures?
-
   \item \textbf{RQ4 -- Pilot User Study}:\;%
         How do programmers perform when manually tracing variable values in Solidity functions?
 \end{itemize}
